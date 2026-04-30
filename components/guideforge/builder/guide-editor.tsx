@@ -22,10 +22,10 @@ interface GuideEditorProps {
 
 export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const router = useRouter()
-  const [title, setTitle] = useState(guide.title)
-  const [summary, setSummary] = useState(guide.summary)
+  const [title, setTitle] = useState(guide.title || "")
+  const [summary, setSummary] = useState(guide.summary || "")
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
-  const [steps, setSteps] = useState(guide.steps)
+  const [steps, setSteps] = useState(guide.steps || [])
   const [version, setVersion] = useState(guide.version || "")
   const [rulesApplied, setRulesApplied] = useState(false)
   const [rulesCheckResult, setRulesCheckResult] = useState<any>(null)
@@ -36,7 +36,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const isReady = guide.status === "ready"
   const isPublished = guide.status === "published"
 
-  const guideHubSlug = MOCK_HUBS.find((h) => h.id === guide.hubId)?.slug || "emberfall"
+  // Safe .find() with defensive chaining
+  const guideHubSlug =
+    (guide.hubId ? MOCK_HUBS.find((h) => h.id === guide.hubId)?.slug : null) ||
+    "emberfall"
 
   const handlePublish = () => {
     // TODO: Save to Supabase and publish
@@ -73,8 +76,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }, 2000)
   }
 
-  const currentStep = steps.find((s) => s.id === editingStepId)
-  const allStepsHaveContent = steps.every((s) => s.title.trim() && s.body.trim())
+  const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
+  const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   return (
     <div className="min-h-screen bg-background">

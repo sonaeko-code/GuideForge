@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { GuideEditor } from "./guide-editor"
 import { loadGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { normalizeGeneratedGuide } from "@/lib/guideforge/normalize-generated-guide"
 import type { Guide } from "@/lib/guideforge/types"
 
 interface GuideEditorLoaderProps {
@@ -13,6 +14,7 @@ interface GuideEditorLoaderProps {
 
 /**
  * Client-side wrapper that loads guide drafts from localStorage.
+ * Normalizes generated guides to proper Guide shape.
  * Falls back to mock data if draft not found.
  */
 export function GuideEditorLoader({
@@ -27,7 +29,9 @@ export function GuideEditorLoader({
     // Try to load from localStorage
     const draft = loadGuideDraft(guideId)
     if (draft) {
-      setGuide(draft)
+      // Normalize the draft to ensure it has all required Guide fields
+      const normalized = normalizeGeneratedGuide(draft, guideId)
+      setGuide(normalized)
     }
     // Otherwise use fallback (already set in state)
     setIsLoading(false)
