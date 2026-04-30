@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Flame, ChevronRight, Copy, Check } from "lucide-react"
+import Link from "next/link"
+import { Flame, ChevronRight, Copy, Check, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -123,6 +124,16 @@ export default function GeneratorPage({
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
+        {/* Back to Builder Home link */}
+        <div className="mb-6">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/builder">
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Back to Builder Home
+            </Link>
+          </Button>
+        </div>
+
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <span>Builder</span>
