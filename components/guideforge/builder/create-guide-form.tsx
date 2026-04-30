@@ -21,8 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
+import type { GuideType, DifficultyLevel, Guide, GuideAuthor } from "@/lib/guideforge/types"
 import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
+import { saveGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { generateMockResponse } from "@/lib/guideforge/mock-generator"
+import { normalizeGeneratedGuide } from "@/lib/guideforge/normalize-generated-guide"
 
 interface CreateGuideFormProps {
   networkId: string
@@ -57,15 +60,69 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   const hubs = getHubsByNetwork(networkId)
   const collections = hubId ? getCollectionsByHub(hubId) : []
 
-  const handleGenerateMock = () => {
-    // TODO: Call OpenAI to generate sections
-    // For now, redirect to editor with mock data
-    router.push(`/builder/network/${networkId}/guide/guide_fire_warden_beginner/edit`)
+  // Mock author
+  const mockAuthor: GuideAuthor = {
+    id: "user_builder",
+    displayName: "You",
+    handle: "@builder",
+  }
+
+  const createEmptyGuide = (): Guide => {
+    const draftId = `draft_${Date.now()}`
+    return {
+      id: draftId,
+      networkId,
+      hubId,
+      collectionId,
+      slug: draftId,
+      title: title || "Untitled Guide",
+      summary: description || "",
+      type: guideType,
+      difficulty,
+      status: "draft",
+      verification: "unverified",
+      requirements: requirements ? requirements.split(",").map((r) => r.trim()) : [],
+      warnings: [],
+      version: "",
+      steps: [],
+      author: mockAuthor,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+  }
+
+  const handleGenerateMock = async () => {
+    // Create empty guide first
+    const guide = createEmptyGuide()
+
+    // Generate mock content
+    const response = await generateMockResponse({
+      title: guide.title,
+      type: guide.type,
+      difficulty: guide.difficulty,
+      audience: audience,
+      summary: guide.summary,
+    })
+
+    if (response.guide) {
+      // Normalize generated guide to editor shape
+      const normalized = normalizeGeneratedGuide(response.guide, guide.id)
+      
+      // Save to localStorage
+      saveGuideDraft(normalized)
+
+      // Navigate to editor
+      router.push(`/builder/network/${networkId}/guide/${guide.id}/edit`)
+    }
   }
 
   const handleContinueToEditor = () => {
-    // TODO: Save draft and navigate to editor
-    router.push(`/builder/network/${networkId}/guide/guide_fire_warden_beginner/edit`)
+    // Create empty guide and save to localStorage
+    const guide = createEmptyGuide()
+    saveGuideDraft(guide)
+
+    // Navigate to editor
+    router.push(`/builder/network/${networkId}/guide/${guide.id}/edit`)
   }
 
   return (
