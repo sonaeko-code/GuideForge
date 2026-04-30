@@ -265,7 +265,7 @@ export default async function NetworkDashboardPage({
                   </Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link href={`/builder/network/${networkId}/guide/new`}>
+                  <Link href={`/builder/network/${networkId}/generate`}>
                     <Plus className="size-4" aria-hidden="true" />
                     Create Guide
                   </Link>
@@ -281,7 +281,7 @@ export default async function NetworkDashboardPage({
                   Create your first guide to populate your network.
                 </p>
                 <Button size="sm" asChild className="mt-4">
-                  <Link href={`/builder/network/${networkId}/guide/new`}>
+                  <Link href={`/builder/network/${networkId}/generate`}>
                     Create First Guide
                   </Link>
                 </Button>

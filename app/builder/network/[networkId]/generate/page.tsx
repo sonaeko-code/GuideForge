@@ -21,6 +21,7 @@ import type {
   GenerationSession,
 } from "@/lib/guideforge/generation-schemas"
 import { generateMockResponse } from "@/lib/guideforge/mock-generator"
+import { saveGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
 import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
 import {
   getNetworkById,
@@ -89,16 +90,11 @@ export default function GeneratorPage({
 
     const guide = session.response.guide
 
-    // TODO: In the real flow, this would:
-    // 1. Insert the GeneratedGuide into Supabase
-    // 2. Create a Guide record with default status "draft"
-    // 3. Redirect to /builder/network/[networkId]/guide/[guideId]/edit
-    //
-    // For now, we'll redirect to the guide editor with mock data in state.
+    // Save generated guide to localStorage
+    const draftId = saveGuideDraft(guide)
 
-    // Simulated redirect (real flow would create Supabase record first)
-    const guideId = `guide_${Date.now()}`
-    router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
+    // Redirect to guide editor with draft ID
+    router.push(`/builder/network/${networkId}/guide/${draftId}/edit`)
   }
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
