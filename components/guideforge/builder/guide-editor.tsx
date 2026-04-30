@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,6 +14,7 @@ import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
+import { saveGuideDraft, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
 
 interface GuideEditorProps {
   guide: Guide
@@ -30,6 +31,41 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [rulesApplied, setRulesApplied] = useState(false)
   const [rulesCheckResult, setRulesCheckResult] = useState<any>(null)
   const [regeneratedSections, setRegeneratedSections] = useState<Set<string>>(new Set())
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  
+  // Debounce autosave timer
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Autosave effect - debounced by 300ms
+  useEffect(() => {
+    // Clear existing timer
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current)
+    }
+
+    // Set new timer
+    autosaveTimerRef.current = setTimeout(() => {
+      const updatedGuide: Guide = {
+        ...guide,
+        title,
+        summary,
+        steps,
+        version,
+        updatedAt: new Date().toISOString(),
+      }
+      setIsSaving(true)
+      saveGuideDraft(updatedGuide)
+      setLastSaved(new Date())
+      setIsSaving(false)
+    }, 300)
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current)
+      }
+    }
+  }, [title, summary, steps, version, guide])
 
   // Mock state tracking for draft/ready/published flow
   const isDraft = guide.status === "draft"
@@ -76,6 +112,32 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }, 2000)
   }
 
+  const handlePreview = () => {
+    router.push(`/builder/network/${networkId}/guide/${guide.id}/preview`)
+  }
+
+  const handleDelete = () => {
+    if (confirm("Are you sure you want to delete this draft? This cannot be undone.")) {
+      deleteDraft(guide.id)
+      router.push(`/builder/network/${networkId}/dashboard`)
+    }
+  }
+
+  const handlePublishDraft = () => {
+    // Mock publish: update status to "ready"
+    const updatedGuide: Guide = {
+      ...guide,
+      title,
+      summary,
+      steps,
+      version,
+      status: "ready",
+      updatedAt: new Date().toISOString(),
+    }
+    saveGuideDraft(updatedGuide)
+    // In real app, would save to Supabase here
+  }
+
   const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
@@ -96,25 +158,50 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </div>
           </div>
           
-          {/* Status indicator */}
+          {/* Status indicator and actions */}
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {isDraft && (
+                <Badge variant="secondary" className="gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-current" />
+                  Draft
+                </Badge>
+              )}
+              {isReady && (
+                <Badge className="gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  <CheckCircle2 className="size-3" aria-hidden="true" />
+                  Ready to publish
+                </Badge>
+              )}
+              {isPublished && (
+                <Badge className="gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-3" aria-hidden="true" />
+                  Published
+                </Badge>
+              )}
+            </div>
+
+            {/* Draft action buttons */}
             {isDraft && (
-              <Badge variant="secondary" className="gap-1">
-                <span className="inline-block h-2 w-2 rounded-full bg-current" />
-                Draft
-              </Badge>
-            )}
-            {isReady && (
-              <Badge className="gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                <CheckCircle2 className="size-3" aria-hidden="true" />
-                Ready to publish
-              </Badge>
-            )}
-            {isPublished && (
-              <Badge className="gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
-                <CheckCircle2 className="size-3" aria-hidden="true" />
-                Published
-              </Badge>
+              <div className="flex gap-2 ml-auto">
+                {lastSaved && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Saved
+                  </div>
+                )}
+                <Button size="sm" variant="outline" onClick={handlePreview}>
+                  <Eye className="size-4 mr-1" aria-hidden="true" />
+                  Preview
+                </Button>
+                <Button size="sm" onClick={handlePublishDraft}>
+                  <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
+                  Ready to Publish
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleDelete}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -329,22 +416,25 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                         </div>
                         <p className="line-clamp-2 text-sm text-muted-foreground">{step.body || "No content yet..."}</p>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleRegenerateSection(step.id)
                           }}
-                          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                          title="Regenerate section"
+                          title="Regenerate section with alternative content"
+                          className={regeneratedSections.has(step.id) ? "text-emerald-600" : ""}
                         >
-                          <RefreshCw className={`size-4 ${regeneratedSections.has(step.id) ? "text-emerald-600" : ""}`} aria-hidden="true" />
-                        </button>
+                          <Sparkles className="size-4 mr-1" aria-hidden="true" />
+                          Regenerate
+                        </Button>
+                        <Badge variant="outline" className="text-xs">
+                          {step.kind}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-xs flex-shrink-0">
-                        {step.kind}
-                      </Badge>
                     </div>
                     {regeneratedSections.has(step.id) && (
                       <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Generated draft updated</p>
