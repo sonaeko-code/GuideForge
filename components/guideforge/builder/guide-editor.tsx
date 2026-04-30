@@ -107,7 +107,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     // Persist to localStorage with the draft
     const updatedGuide: Guide = {
       ...currentGuide,
-      forgeRulesCheckResult: results,
+      forgeRulesCheckResult: results as any,
       forgeRulesCheckTimestamp: checkTimestamp,
     }
     saveGuideDraft(updatedGuide)
@@ -178,7 +178,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       version,
       status: "ready",
       updatedAt: new Date().toISOString(),
-      forgeRulesCheckResult: rulesCheckResult,
+      forgeRulesCheckResult: rulesCheckResult as any,
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
     saveGuideDraft(updatedGuide)

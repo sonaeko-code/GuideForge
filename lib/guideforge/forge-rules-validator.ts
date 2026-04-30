@@ -1,7 +1,7 @@
 import type { Guide, ForgeRule } from "./types"
 
 export interface ForgeRulesCheckResult {
-  rule: ForgeRule
+  rule: { id: string; label: string; description: string }
   passed: boolean
   reason?: string
 }
@@ -10,7 +10,7 @@ export interface ForgeRulesCheckResult {
  * Deterministic Forge Rules validation based on actual guide content.
  * Each check is based only on the current guide state - no randomization.
  */
-export function validateForgeRules(guide: Guide, availableRules: ForgeRule[]): ForgeRulesCheckResult[] {
+export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRulesCheckResult[] {
   const titleTrimmed = guide.title?.trim() || ""
   const summaryTrimmed = guide.summary?.trim() || ""
   const versionTrimmed = guide.version?.trim() || ""
@@ -22,7 +22,11 @@ export function validateForgeRules(guide: Guide, availableRules: ForgeRule[]): F
     let passed = false
     let reason: string | undefined
 
-    switch (rule.name?.toLowerCase() || "") {
+    // Handle both ForgeRule format and mock format
+    const ruleName = (rule.label || rule.name || "").toLowerCase()
+    const ruleId = rule.id || rule.ruleId || ""
+
+    switch (ruleName) {
       case "descriptive title":
         // Fail if: too short, generic, untitled
         const isGenericTitle =
@@ -126,7 +130,11 @@ export function validateForgeRules(guide: Guide, availableRules: ForgeRule[]): F
     }
 
     return {
-      rule,
+      rule: {
+        id: rule.id || rule.ruleId || "",
+        label: rule.label || rule.name || "",
+        description: rule.description || "",
+      },
       passed,
       reason: passed ? undefined : reason,
     }
