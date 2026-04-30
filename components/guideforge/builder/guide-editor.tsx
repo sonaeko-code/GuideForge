@@ -15,6 +15,7 @@ import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
 import { saveGuideDraft, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
   guide: Guide
@@ -29,7 +30,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [steps, setSteps] = useState(guide.steps || [])
   const [version, setVersion] = useState(guide.version || "")
   const [rulesApplied, setRulesApplied] = useState(false)
-  const [rulesCheckResult, setRulesCheckResult] = useState<any>(null)
+  const [rulesCheckResult, setRulesCheckResult] = useState<ForgeRulesCheckResult[] | null>(null)
+  const [rulesCheckTimestamp, setRulesCheckTimestamp] = useState<number | null>(null)
+  const [rulesStale, setRulesStale] = useState(false)
   const [regeneratedSections, setRegeneratedSections] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
@@ -79,62 +82,44 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   const handleApplyForgeRules = () => {
-    // Mock forge rules check - deterministic based on content
-    const forgeRules = suggestMockForgeRules("gaming")
-    
-    // Check: Do we have title?
-    const hasTitle = title.trim().length > 0
-    // Check: Do we have summary?
-    const hasSummary = summary.trim().length > 0
-    // Check: Do we have version?
-    const hasVersion = version.trim().length > 0
-    // Check: Do we have at least one section?
-    const hasSections = steps.length > 0 && steps.some(s => s.title.trim() && s.body.trim())
-    
-    const results = forgeRules.rules.map(rule => {
-      let passed = false
-      switch (rule.name.toLowerCase()) {
-        case "game name":
-          passed = hasTitle
-          break
-        case "patch/version":
-          passed = hasVersion
-          break
-        case "beginner summary":
-          passed = hasSummary
-          break
-        case "sections/steps":
-          passed = hasSections
-          break
-        case "spoiler tagging":
-        case "difficulty":
-        case "requirements":
-        case "status":
-        case "verification":
-          // Mock these as passed if enabled
-          passed = rule.enabled
-          break
-        default:
-          passed = rule.enabled ? Math.random() > 0.3 : true
-      }
-      return { ...rule, passed }
-    })
-    
-    setRulesCheckResult(results)
-    setRulesApplied(true)
-    
-    // Persist to localStorage with the draft
-    const updatedGuide: Guide = {
+    // Get the complete guide object
+    const currentGuide: Guide = {
       ...guide,
       title,
       summary,
       steps,
       version,
       updatedAt: new Date().toISOString(),
+    }
+
+    // Get available rules
+    const forgeRules = suggestMockForgeRules("gaming")
+    
+    // Perform deterministic validation
+    const results = validateForgeRules(currentGuide, forgeRules.rules)
+    const checkTimestamp = Date.now()
+
+    setRulesCheckResult(results)
+    setRulesCheckTimestamp(checkTimestamp)
+    setRulesApplied(true)
+    setRulesStale(false)
+    
+    // Persist to localStorage with the draft
+    const updatedGuide: Guide = {
+      ...currentGuide,
       forgeRulesCheckResult: results,
+      forgeRulesCheckTimestamp: checkTimestamp,
     }
     saveGuideDraft(updatedGuide)
   }
+
+  // Check if validation needs refreshing when content changes
+  useEffect(() => {
+    if (rulesApplied && rulesCheckTimestamp) {
+      const stale = isValidationStale(guide, rulesCheckResult || undefined, rulesCheckTimestamp)
+      setRulesStale(stale)
+    }
+  }, [title, summary, version, steps, rulesApplied, rulesCheckTimestamp, rulesCheckResult, guide])
 
   const handleRegenerateSection = (stepId: string) => {
     const updatedSteps = steps.map(s => 
@@ -167,6 +152,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   }
 
   const handlePublishDraft = () => {
+    // Check if validation is stale
+    if (rulesStale) {
+      setMarkReadyError(true)
+      setTimeout(() => setMarkReadyError(false), 3000)
+      return
+    }
+
     // Check if Forge Rules pass
     if (rulesCheckResult && rulesCheckResult.length > 0) {
       const allPassed = rulesCheckResult.every((r: any) => r.passed)
@@ -187,6 +179,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       status: "ready",
       updatedAt: new Date().toISOString(),
       forgeRulesCheckResult: rulesCheckResult,
+      forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
     saveGuideDraft(updatedGuide)
     setMarkedReady(true)
@@ -255,7 +248,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {markReadyError && (
                   <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
                     <div className="size-4 rounded-full border border-current" />
-                    This guide needs to pass Forge Rules before it can be marked ready.
+                    {rulesStale 
+                      ? "Rules check is stale. Re-check before marking ready."
+                      : "This guide needs to pass all Forge Rules before it can be marked ready."
+                    }
                   </div>
                 )}
                 <Button size="sm" variant="outline" onClick={handlePreview}>
@@ -380,40 +376,31 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         </div>
 
         {/* Forge Rules Applied */}
-        <Card className="border-primary/30 bg-primary/5 p-4">
+        <Card className={`p-4 ${rulesStale ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 flex-1">
-              <Sparkles className="mt-0.5 size-4 text-primary flex-shrink-0" aria-hidden="true" />
+              <Sparkles className={`mt-0.5 size-4 flex-shrink-0 ${rulesStale ? "text-amber-600" : "text-primary"}`} aria-hidden="true" />
               <div className="flex-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  {rulesApplied ? (rulesCheckResult?.every((r: any) => r.passed) ? "Forge Rules Passed" : "Rules Need Attention") : "Forge Rules Check"}
+                <p className={`text-xs font-semibold uppercase tracking-wider ${rulesStale ? "text-amber-700 dark:text-amber-400" : "text-primary"}`}>
+                  {!rulesApplied ? "Forge Rules Check" : rulesStale ? "Results Stale — Re-check Needed" : (rulesCheckResult?.every((r: any) => r.passed) ? "Forge Rules Passed" : "Rules Need Attention")}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Game name, patch/version, difficulty, requirements, beginner summary, spoiler tagging, status.
+                  {rulesStale 
+                    ? "Content changed since last check. Re-check to validate." 
+                    : "Game name, patch/version, difficulty, requirements, beginner summary, spoiler tagging, status."
+                  }
                 </p>
               </div>
             </div>
-            {!rulesApplied ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleApplyForgeRules}
-                className="flex-shrink-0"
-              >
-                Check Rules
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleApplyForgeRules}
-                className="flex-shrink-0"
-              >
-                Re-check
-              </Button>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleApplyForgeRules}
+              className="flex-shrink-0"
+            >
+              {rulesApplied ? "Re-check" : "Check Rules"}
+            </Button>
           </div>
         </Card>
 
@@ -442,16 +429,23 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 )}
               </div>
               <div className="space-y-2">
-                {rulesCheckResult.map((result: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2 text-xs">
-                    {result.passed ? (
-                      <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden="true" />
-                    ) : (
-                      <div className="size-3.5 rounded-full border border-amber-500" aria-hidden="true" />
+                {rulesCheckResult.map((result: ForgeRulesCheckResult, idx: number) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs">
+                      {result.passed ? (
+                        <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden="true" />
+                      ) : (
+                        <div className="size-3.5 rounded-full border border-amber-500" aria-hidden="true" />
+                      )}
+                      <span className={result.passed ? "text-foreground font-medium" : "text-amber-600 font-medium"}>
+                        {result.rule.label}
+                      </span>
+                    </div>
+                    {result.reason && (
+                      <p className="ml-5 text-xs text-amber-600 dark:text-amber-400">
+                        {result.reason}
+                      </p>
                     )}
-                    <span className={result.passed ? "text-foreground" : "text-amber-600"}>
-                      {result.name}
-                    </span>
                   </div>
                 ))}
               </div>
