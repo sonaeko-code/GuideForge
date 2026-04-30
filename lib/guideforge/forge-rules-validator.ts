@@ -63,15 +63,20 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         break
 
       case "game name present":
-        // Pass if title or summary includes known game/hub names, or if guide has a hubName
+        // Pass if:
+        // 1. Guide has hubId/hubName/gameName metadata, OR
+        // 2. Game name appears in summary (tags/metadata), OR
+        // 3. Known game names in summary
         const knownGames = ["emberfall", "starfall outriders", "hollowspire", "mechbound tactics"]
-        const contentLower = (titleTrimmed + " " + summaryTrimmed).toLowerCase()
-        const hasGameName = knownGames.some(game => contentLower.includes(game)) ||
-          (guide as any).hubName ||
-          (guide as any).gameName
-        passed = hasGameName
+        const summaryLower = summaryTrimmed.toLowerCase()
+        
+        const hasHubMetadata = (guide as any).hubId || (guide as any).hubName || (guide as any).gameName
+        const hasGameInSummary = knownGames.some(game => summaryLower.includes(game)) || 
+                                 summaryLower.includes("game:")
+        
+        passed = hasHubMetadata || hasGameInSummary
         if (!passed) {
-          reason = "No game or hub name found in title, summary, or metadata."
+          reason = "Associate this guide with a hub/game (metadata) or mention it in the summary."
         }
         break
 
