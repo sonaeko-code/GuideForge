@@ -51,9 +51,6 @@ export default function GeneratorPage({
     }
     loadNetwork()
   }, [params])
-    }
-    loadNetwork()
-  }, [params])
 
   const network = networkId ? getNetworkById(networkId) : null
   const hubs = network ? getHubsByNetwork(network.id) : []
