@@ -1,8 +1,8 @@
 import { SiteHeader } from "@/components/guideforge/site-header"
-import { GuideEditorLoader } from "@/components/guideforge/builder/guide-editor-loader"
+import { GuidePreviewLoader } from "@/components/guideforge/builder/guide-preview-loader"
 import { FIRE_WARDEN_GUIDE } from "@/lib/guideforge/mock-data"
 
-export default async function GuideEditorPage({
+export default async function GuidePreviewPage({
   params,
 }: {
   params: Promise<{ networkId: string; guideId: string }>
@@ -14,7 +14,7 @@ export default async function GuideEditorPage({
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6 md:py-14">
-        <GuideEditorLoader
+        <GuidePreviewLoader
           networkId={networkId}
           guideId={guideId}
           fallback={FIRE_WARDEN_GUIDE}

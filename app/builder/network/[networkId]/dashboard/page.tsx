@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
+import { DraftList } from "@/components/guideforge/builder/draft-list"
 import {
   getNetworkById,
   getHubsByNetwork,
@@ -137,13 +138,36 @@ export default async function NetworkDashboardPage({
         </div>
 
         {/* Main tabs */}
-        <Tabs defaultValue="hubs" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="drafts" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="drafts">Drafts</TabsTrigger>
             <TabsTrigger value="hubs">Hubs</TabsTrigger>
             <TabsTrigger value="collections">Collections</TabsTrigger>
             <TabsTrigger value="guides">Guides</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
+
+          {/* Drafts tab */}
+          <TabsContent value="drafts" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  Draft Guides
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Work in progress guides stored in your browser.
+                </p>
+              </div>
+              <Button size="sm" asChild>
+                <Link href={`/builder/network/${networkId}/generate`}>
+                  <Plus className="size-4 mr-1" aria-hidden="true" />
+                  New Draft
+                </Link>
+              </Button>
+            </div>
+
+            <DraftList networkId={networkId} />
+          </TabsContent>
 
           {/* Hubs tab */}
           <TabsContent value="hubs" className="space-y-4">
@@ -265,7 +289,7 @@ export default async function NetworkDashboardPage({
                   </Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link href={`/builder/network/${networkId}/guide/new`}>
+                  <Link href={`/builder/network/${networkId}/generate`}>
                     <Plus className="size-4" aria-hidden="true" />
                     Create Guide
                   </Link>
@@ -281,7 +305,7 @@ export default async function NetworkDashboardPage({
                   Create your first guide to populate your network.
                 </p>
                 <Button size="sm" asChild className="mt-4">
-                  <Link href={`/builder/network/${networkId}/guide/new`}>
+                  <Link href={`/builder/network/${networkId}/generate`}>
                     Create First Guide
                   </Link>
                 </Button>
