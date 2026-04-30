@@ -95,13 +95,13 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
     // Create empty guide first
     const guide = createEmptyGuide()
 
-    // Generate mock content
+    // Generate mock content using proper GenerationRequest format
     const response = await generateMockResponse({
-      title: guide.title,
-      type: guide.type,
-      difficulty: guide.difficulty,
-      audience: audience,
-      summary: guide.summary,
+      prompt: title || "Create a helpful guide",
+      guideType,
+      preferredDifficulty: difficulty,
+      targetHubId: hubId,
+      targetCollectionId: collectionId,
     })
 
     if (response.guide) {
