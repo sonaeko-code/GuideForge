@@ -73,6 +73,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }, 2000)
   }
 
+  const currentStep = steps.find((s) => s.id === editingStepId)
+  const allStepsHaveContent = steps.every((s) => s.title.trim() && s.body.trim())
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky top action bar */}

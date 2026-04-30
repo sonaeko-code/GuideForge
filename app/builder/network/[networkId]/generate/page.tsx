@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Flame, ChevronRight, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -44,10 +44,13 @@ export default function GeneratorPage({
   })
 
   // Load network on mount
-  React.useEffect(() => {
+  useEffect(() => {
     const loadNetwork = async () => {
       const params_resolved = await params
       setNetworkId(params_resolved.networkId)
+    }
+    loadNetwork()
+  }, [params])
     }
     loadNetwork()
   }, [params])
@@ -90,8 +93,20 @@ export default function GeneratorPage({
 
     const guide = session.response.guide
 
+    // Convert GeneratedGuide to Guide-like object with required fields
+    const guideData = {
+      ...guide,
+      id: `draft_${Date.now()}`,
+      collectionId: "mock-collection",
+      hubId: "mock-hub",
+      networkId: networkId,
+      status: "draft" as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
     // Save generated guide to localStorage
-    const draftId = saveGuideDraft(guide)
+    const draftId = saveGuideDraft(guideData as any)
 
     // Redirect to guide editor with draft ID
     router.push(`/builder/network/${networkId}/guide/${draftId}/edit`)

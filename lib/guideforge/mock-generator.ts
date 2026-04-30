@@ -201,7 +201,7 @@ export function generateMockNetworkDraft(
     name,
     description: descriptions[networkType],
     networkType,
-    themeDirection: networkType === "gaming" ? "dark" : "light",
+    themeDirection: (networkType === "gaming" ? "dark" : "light") as ThemeDirection,
     isPublic: true,
     subdomainSuggestion: subdomain,
   }
@@ -339,8 +339,12 @@ export function generateAlternateSectionContent(kind: GuideSectionKind): string 
       "Access specific content requirements. Complete prerequisites before proceeding.",
       "Must meet level and quest requirements. Ensure you have necessary items.",
     ],
-    warning: "This approach carries specific risks. Only use with proper preparation and support.",
-    custom: "Additional context and specialized information relevant to your situation.",
+    warning: [
+      "This approach carries specific risks. Only use with proper preparation and support.",
+    ],
+    custom: [
+      "Additional context and specialized information relevant to your situation.",
+    ],
   }
 
   const variants = alternates[kind] || ["Additional information goes here."]
