@@ -154,3 +154,5 @@ MIT
 ---
 
 **Questions?** Check [GitHub Issues](https://github.com/yourusername/guideforge/issues) or see `GITHUB_SETUP_GUIDE.md` for troubleshooting.
+
+Reconnect GuideForge repository
