@@ -34,6 +34,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [markedReady, setMarkedReady] = useState(false)
+  const [markReadyError, setMarkReadyError] = useState(false)
   
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -78,14 +79,61 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   const handleApplyForgeRules = () => {
-    // Mock forge rules check
+    // Mock forge rules check - deterministic based on content
     const forgeRules = suggestMockForgeRules("gaming")
-    const results = forgeRules.rules.map(rule => ({
-      ...rule,
-      passed: rule.enabled ? Math.random() > 0.2 : true // Mock: 80% pass rate
-    }))
+    
+    // Check: Do we have title?
+    const hasTitle = title.trim().length > 0
+    // Check: Do we have summary?
+    const hasSummary = summary.trim().length > 0
+    // Check: Do we have version?
+    const hasVersion = version.trim().length > 0
+    // Check: Do we have at least one section?
+    const hasSections = steps.length > 0 && steps.some(s => s.title.trim() && s.body.trim())
+    
+    const results = forgeRules.rules.map(rule => {
+      let passed = false
+      switch (rule.name.toLowerCase()) {
+        case "game name":
+          passed = hasTitle
+          break
+        case "patch/version":
+          passed = hasVersion
+          break
+        case "beginner summary":
+          passed = hasSummary
+          break
+        case "sections/steps":
+          passed = hasSections
+          break
+        case "spoiler tagging":
+        case "difficulty":
+        case "requirements":
+        case "status":
+        case "verification":
+          // Mock these as passed if enabled
+          passed = rule.enabled
+          break
+        default:
+          passed = rule.enabled ? Math.random() > 0.3 : true
+      }
+      return { ...rule, passed }
+    })
+    
     setRulesCheckResult(results)
     setRulesApplied(true)
+    
+    // Persist to localStorage with the draft
+    const updatedGuide: Guide = {
+      ...guide,
+      title,
+      summary,
+      steps,
+      version,
+      updatedAt: new Date().toISOString(),
+      forgeRulesCheckResult: results,
+    }
+    saveGuideDraft(updatedGuide)
   }
 
   const handleRegenerateSection = (stepId: string) => {
@@ -119,6 +167,16 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   }
 
   const handlePublishDraft = () => {
+    // Check if Forge Rules pass
+    if (rulesCheckResult && rulesCheckResult.length > 0) {
+      const allPassed = rulesCheckResult.every((r: any) => r.passed)
+      if (!allPassed) {
+        setMarkReadyError(true)
+        setTimeout(() => setMarkReadyError(false), 3000)
+        return
+      }
+    }
+    
     // Mock publish: update status to "ready"
     const updatedGuide: Guide = {
       ...guide,
@@ -128,6 +186,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       version,
       status: "ready",
       updatedAt: new Date().toISOString(),
+      forgeRulesCheckResult: rulesCheckResult,
     }
     saveGuideDraft(updatedGuide)
     setMarkedReady(true)
@@ -190,7 +249,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {markedReady && (
                   <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="size-4" aria-hidden="true" />
-                    Guide marked ready to publish
+                    Guide marked ready. Public publishing will be enabled after Supabase is connected.
+                  </div>
+                )}
+                {markReadyError && (
+                  <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                    <div className="size-4 rounded-full border border-current" />
+                    This guide needs to pass Forge Rules before it can be marked ready.
                   </div>
                 )}
                 <Button size="sm" variant="outline" onClick={handlePreview}>
@@ -221,7 +286,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="mt-2 border-0 bg-transparent text-2xl font-semibold"
+                className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 placeholder="Guide title"
               />
             </div>
@@ -233,7 +298,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <Textarea
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                className="mt-2 border-0 bg-transparent text-sm"
+                className="mt-2 border border-border/50 bg-muted/40 text-sm rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 placeholder="Brief description of what readers will learn..."
                 rows={2}
               />
@@ -258,7 +323,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 value={version}
                 onChange={(e) => setVersion(e.target.value)}
                 placeholder="e.g. Patch 4.2"
-                className="mt-1 h-8 border-border/50 text-sm"
+                className="mt-1 h-8 border border-border/50 bg-muted/40 text-sm rounded focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
               />
             </div>
             <div>
@@ -321,14 +386,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <Sparkles className="mt-0.5 size-4 text-primary flex-shrink-0" aria-hidden="true" />
               <div className="flex-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  {rulesApplied ? "Forge Rules Applied" : "Apply Forge Rules"}
+                  {rulesApplied ? (rulesCheckResult?.every((r: any) => r.passed) ? "Forge Rules Passed" : "Rules Need Attention") : "Forge Rules Check"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Game name, patch/version, difficulty, requirements, beginner summary, spoiler tagging, status.
                 </p>
               </div>
             </div>
-            {!rulesApplied && (
+            {!rulesApplied ? (
               <Button
                 type="button"
                 size="sm"
@@ -336,25 +401,45 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 onClick={handleApplyForgeRules}
                 className="flex-shrink-0"
               >
-                Apply
+                Check Rules
               </Button>
-            )}
-            {rulesApplied && (
-              <CheckCircle2 className="size-5 text-primary flex-shrink-0" aria-hidden="true" />
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleApplyForgeRules}
+                className="flex-shrink-0"
+              >
+                Re-check
+              </Button>
             )}
           </div>
         </Card>
 
         {/* Forge Rules Results */}
         {rulesApplied && rulesCheckResult && (
-          <Card className="border-emerald-500/30 bg-emerald-500/5 p-4">
+          <Card className={`p-4 ${rulesCheckResult.every((r: any) => r.passed) ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
             <div className="space-y-3">
               <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 size-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
-                <div className="flex-1">
-                  <p className="font-semibold text-emerald-700 dark:text-emerald-300">Rules passed — ready for review</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{rulesCheckResult.filter((r: any) => r.passed).length}/{rulesCheckResult.length} requirements met</p>
-                </div>
+                {rulesCheckResult.every((r: any) => r.passed) ? (
+                  <>
+                    <CheckCircle2 className="mt-0.5 size-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-300">Rules passed — ready for review</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{rulesCheckResult.filter((r: any) => r.passed).length}/{rulesCheckResult.length} requirements met</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-0.5 size-5 rounded-full border-2 border-amber-500 flex-shrink-0" aria-hidden="true" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-amber-700 dark:text-amber-300">Rules need attention</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{rulesCheckResult.filter((r: any) => r.passed).length}/{rulesCheckResult.length} requirements met</p>
+                      <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Fix the missing requirements, then re-check.</p>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="space-y-2">
                 {rulesCheckResult.map((result: any, idx: number) => (

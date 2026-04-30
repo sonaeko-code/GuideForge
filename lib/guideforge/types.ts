@@ -184,6 +184,9 @@ export interface Guide {
   author: GuideAuthor
   reviewer?: GuideAuthor
 
+  /** Forge Rules check results - persisted with draft. */
+  forgeRulesCheckResult?: any[]
+
   createdAt: string
   updatedAt: string
   publishedAt?: string

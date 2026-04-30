@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Edit2, Trash2, Sparkles, FileText } from "lucide-react"
+import { Eye, Edit2, Trash2, Sparkles, FileText, Lock } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { getDraftsByNetwork, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
 import { formatDistanceToNow } from "date-fns"
@@ -65,13 +65,22 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
               <div className="flex-1 space-y-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-foreground truncate">{draft.title}</h3>
-                  <Badge variant="secondary" className="flex-shrink-0">
+                  <Badge 
+                    variant={draft.status === "ready" ? "default" : "secondary"} 
+                    className="flex-shrink-0 capitalize"
+                  >
                     {draft.status}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Updated {draft.updatedAt ? formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true }) : "recently"}
                 </p>
+                {draft.status === "ready" && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lock className="size-3" aria-hidden="true" />
+                    Publish requires Supabase
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
