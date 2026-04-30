@@ -33,6 +33,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [regeneratedSections, setRegeneratedSections] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [markedReady, setMarkedReady] = useState(false)
   
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -73,14 +74,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const isPublished = guide.status === "published"
 
   // Safe .find() with defensive chaining
-  const guideHubSlug =
-    (guide.hubId ? MOCK_HUBS.find((h) => h.id === guide.hubId)?.slug : null) ||
-    "emberfall"
-
-  const handlePublish = () => {
-    // TODO: Save to Supabase and publish
-    router.push(`/n/questline/${guideHubSlug}/${guide.slug}`)
-  }
+  const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
+  const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   const handleApplyForgeRules = () => {
     // Mock forge rules check
@@ -135,11 +130,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       updatedAt: new Date().toISOString(),
     }
     saveGuideDraft(updatedGuide)
-    // In real app, would save to Supabase here
+    setMarkedReady(true)
+    
+    // Clear confirmation message after 3 seconds
+    setTimeout(() => {
+      setMarkedReady(false)
+    }, 3000)
   }
-
-  const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
-  const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   return (
     <div className="min-h-screen bg-background">
@@ -190,13 +187,19 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                     Saved
                   </div>
                 )}
+                {markedReady && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                    Guide marked ready to publish
+                  </div>
+                )}
                 <Button size="sm" variant="outline" onClick={handlePreview}>
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
                 <Button size="sm" onClick={handlePublishDraft}>
                   <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
-                  Ready to Publish
+                  Mark Ready
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -502,24 +505,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               )}
             </TabsContent>
           </Tabs>
-        </div>
-
-        {/* Action bar */}
-        <div className="flex gap-3 border-t border-border/50 pt-6">
-          <Button asChild variant="outline">
-            <Link href={`/builder/network/${networkId}/dashboard`}>
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Back to Dashboard
-            </Link>
-          </Button>
-          <Button variant="outline" onClick={() => router.push(`/n/questline/${guideHubSlug}/${guide.slug}?preview=true`)}>
-            <Eye className="mr-2 size-4" aria-hidden="true" />
-            Preview
-          </Button>
-          <Button onClick={handlePublish} disabled={!allStepsHaveContent}>
-            <Send className="mr-2 size-4" aria-hidden="true" />
-            Publish Guide
-          </Button>
         </div>
       </div>
     </div>

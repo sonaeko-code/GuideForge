@@ -9,6 +9,7 @@ import {
   FolderOpen,
   BookMarked,
   Flame,
+  ArrowLeft,
 } from "lucide-react"
 import type { Network, Hub, Collection, Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,16 @@ export default async function NetworkDashboardPage({
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
+        {/* Back to Builder Home link */}
+        <div className="mb-6">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/builder">
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Back to Builder Home
+            </Link>
+          </Button>
+        </div>
+
         {/* Network Header */}
         <div className="mb-10 flex flex-col gap-6">
           <div className="flex items-start justify-between gap-4">

@@ -60,7 +60,7 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
           <div className="text-sm text-muted-foreground">Builder</div>
         ) : (
           <Button asChild size="sm">
-            <Link href="/builder/welcome">Start building</Link>
+            <Link href="/builder">Start building</Link>
           </Button>
         )}
       </div>
