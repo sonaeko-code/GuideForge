@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DifficultyBadge, StatusBadge } from "@/components/guideforge/shared"
 import {
-  getDraftsByNetwork,
-  deleteDraft,
+  getDraftsByNetworkSync,
+  deleteDraftSync,
 } from "@/lib/guideforge/guide-drafts-storage"
 import type { Guide } from "@/lib/guideforge/types"
 import { BookMarked } from "lucide-react"
@@ -29,14 +29,14 @@ export function DraftList({ networkId }: DraftListProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const localDrafts = getDraftsByNetwork(networkId)
+    const localDrafts = getDraftsByNetworkSync(networkId)
     setDrafts(localDrafts)
     setIsLoading(false)
   }, [networkId])
 
   const handleDelete = (guideId: string) => {
     if (confirm("Delete this draft? This cannot be undone.")) {
-      deleteDraft(guideId)
+      deleteDraftSync(guideId)
       setDrafts(drafts.filter((d) => d.id !== guideId))
     }
   }
