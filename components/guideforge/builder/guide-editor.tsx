@@ -321,9 +321,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                     {(() => {
                       const optionalFailures = rulesCheckResult?.filter((r: any) => !r.passed && r.required === false) || []
                       if (optionalFailures.length > 0) {
-                        return `Guide marked ready with ${optionalFailures.length} optional recommendation${optionalFailures.length !== 1 ? "s" : ""} remaining.`
+                        return `Guide marked ready. Requirements are optional in Phase 1.`
                       }
-                      return "Guide marked ready. Public publishing will be enabled after Supabase is connected."
+                      return "Guide marked ready. Requirements are optional in Phase 1."
                     })()}
                   </div>
                 )}
