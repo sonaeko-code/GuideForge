@@ -51,6 +51,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [markReadyError, setMarkReadyError] = useState(false)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   
+  // Autosave status tracking
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  const autosaveStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -60,6 +64,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current)
     }
+
+    // Show "Saving..." immediately when changes are detected
+    console.log("[v0] Autosave triggered by: user edit")
+    setAutosaveStatus("saving")
+    console.log("[v0] Autosave indicator state: saving")
+
+    // Set a minimum visibility timer for "Saving" state (700ms)
+    const savingStartTime = Date.now()
+    const minSavingDuration = 700
 
     // Set new timer
     autosaveTimerRef.current = setTimeout(() => {
@@ -80,26 +93,93 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
 
-      console.log("[v0] Autosave status:", guideStatus)
       setIsSaving(true)
       setSaveError(null)
       ;(async () => {
         try {
           const { source, error } = await saveGuideDraft(updatedGuide)
+          const elapsed = Date.now() - savingStartTime
+          const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
+          
           setSaveSource(source)
           setLastSaved(new Date())
           
           // Show actual error if Supabase save failed
           if (source === "supabase") {
             setSaveError(null)
+            
+            // Wait for minimum saving duration, then show "Saved"
+            if (remainingMinDuration > 0) {
+              setTimeout(() => {
+                setAutosaveStatus("saved")
+                console.log("[v0] Autosave indicator state: saved")
+                
+                // Keep "Saved" for at least 2000ms
+                if (autosaveStatusTimeoutRef.current) {
+                  clearTimeout(autosaveStatusTimeoutRef.current)
+                }
+                autosaveStatusTimeoutRef.current = setTimeout(() => {
+                  setAutosaveStatus("idle")
+                  console.log("[v0] Autosave indicator state: idle")
+                }, 2000)
+              }, remainingMinDuration)
+            } else {
+              setAutosaveStatus("saved")
+              console.log("[v0] Autosave indicator state: saved")
+              
+              // Keep "Saved" for at least 2000ms
+              if (autosaveStatusTimeoutRef.current) {
+                clearTimeout(autosaveStatusTimeoutRef.current)
+              }
+              autosaveStatusTimeoutRef.current = setTimeout(() => {
+                setAutosaveStatus("idle")
+                console.log("[v0] Autosave indicator state: idle")
+              }, 2000)
+            }
           } else if (error) {
             setSaveError(`Supabase save failed: ${error}`)
+            
+            // Ensure minimum saving visibility even on error
+            if (remainingMinDuration > 0) {
+              setTimeout(() => {
+                setAutosaveStatus("failed")
+                console.log("[v0] Autosave indicator state: failed")
+              }, remainingMinDuration)
+            } else {
+              setAutosaveStatus("failed")
+              console.log("[v0] Autosave indicator state: failed")
+            }
           } else {
             setSaveError("Supabase save failed — saved locally instead")
+            
+            // Ensure minimum saving visibility
+            if (remainingMinDuration > 0) {
+              setTimeout(() => {
+                setAutosaveStatus("failed")
+                console.log("[v0] Autosave indicator state: failed")
+              }, remainingMinDuration)
+            } else {
+              setAutosaveStatus("failed")
+              console.log("[v0] Autosave indicator state: failed")
+            }
           }
         } catch (error) {
           console.error("[v0] Autosave error:", error)
+          const elapsed = Date.now() - savingStartTime
+          const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
+          
           setSaveError(`Save error: ${error instanceof Error ? error.message : "Unknown error"}`)
+          
+          // Ensure minimum saving visibility
+          if (remainingMinDuration > 0) {
+            setTimeout(() => {
+              setAutosaveStatus("failed")
+              console.log("[v0] Autosave indicator state: failed")
+            }, remainingMinDuration)
+          } else {
+            setAutosaveStatus("failed")
+            console.log("[v0] Autosave indicator state: failed")
+          }
         } finally {
           setIsSaving(false)
         }
@@ -184,6 +264,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setSteps(updatedSteps)
     setRegeneratedSections(new Set([...regeneratedSections, stepId]))
     
+    // Trigger autosave status on regenerate
+    console.log("[v0] Autosave triggered by: Regenerate section")
+    setAutosaveStatus("saving")
+    console.log("[v0] Autosave indicator state: saving")
+    
     // Clear the highlight after 2 seconds
     setTimeout(() => {
       setRegeneratedSections(prev => {
@@ -259,7 +344,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
     
     console.log("[v0] Mark Ready guide id:", guide.id)
-    console.log("[v0] Mark Ready saving status: ready")
+    console.log("[v0] Autosave triggered by: Mark Ready button")
+    setAutosaveStatus("saving")
+    console.log("[v0] Autosave indicator state: saving")
     
     const { source } = await saveGuideDraft(updatedGuide)
     console.log("[v0] Mark Ready save source:", source)
@@ -269,8 +356,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setLastSaved(new Date())
     if (source !== "supabase") {
       setSaveError("Supabase save failed — saved locally instead")
+      setAutosaveStatus("failed")
+      console.log("[v0] Autosave indicator state: failed")
     } else {
       setSaveError(null)
+      setAutosaveStatus("saved")
+      console.log("[v0] Autosave indicator state: saved")
+      
+      // Keep "Saved" status for at least 2 seconds
+      if (autosaveStatusTimeoutRef.current) {
+        clearTimeout(autosaveStatusTimeoutRef.current)
+      }
+      autosaveStatusTimeoutRef.current = setTimeout(() => {
+        setAutosaveStatus("idle")
+        console.log("[v0] Autosave indicator state: idle")
+      }, 2000)
     }
     
     setMarkedReady(true)
@@ -283,6 +383,52 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Fixed autosave toast in top-right corner */}
+      <div 
+        className={`fixed top-[88px] right-6 z-9999 transition-all duration-300 ${
+          autosaveStatus === "idle" ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className={`rounded-lg shadow-lg p-3 flex items-center gap-2 text-sm font-medium ${
+          autosaveStatus === "saving"
+            ? "bg-amber-500 text-white"
+            : autosaveStatus === "saved"
+            ? "bg-emerald-500 text-white"
+            : autosaveStatus === "failed"
+            ? "bg-red-500 text-white"
+            : "bg-muted text-foreground"
+        }`}>
+          {autosaveStatus === "saving" && (
+            <>
+              <div className="inline-flex">
+                <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+              </div>
+              <span>Saving changes...</span>
+              <span className="text-xs opacity-75 ml-2">[saving]</span>
+            </>
+          )}
+          {autosaveStatus === "saved" && (
+            <>
+              <CheckCircle2 className="size-4" />
+              <span>Saved to Supabase</span>
+              <span className="text-xs opacity-75 ml-2">[saved]</span>
+            </>
+          )}
+          {autosaveStatus === "failed" && (
+            <>
+              <AlertCircle className="size-4" />
+              <span>Save failed</span>
+              <span className="text-xs opacity-75 ml-2">[failed]</span>
+            </>
+          )}
+        </div>
+        {autosaveStatus === "failed" && saveError && (
+          <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded">
+            {saveError}
+          </div>
+        )}
+      </div>
+
       {/* Sticky top action bar */}
       <div className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-3">
@@ -324,35 +470,51 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             {/* Draft action buttons */}
             {isDraft && (
               <div className="flex gap-2 ml-auto items-center">
-                {/* Autosave status indicator */}
-                <div className="flex items-center gap-2">
-                  {isSaving ? (
-                    <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                      <div className="inline-flex animate-pulse">
-                        <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                {/* Persistent autosave status indicator */}
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  autosaveStatus === "saving"
+                    ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
+                    : autosaveStatus === "saved"
+                    ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                    : autosaveStatus === "failed"
+                    ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {autosaveStatus === "saving" && (
+                    <>
+                      <div className="inline-flex">
+                        <div className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                       </div>
                       <span>Saving...</span>
-                    </div>
-                  ) : saveError ? (
-                    <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                      <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                    </>
+                  )}
+                  {autosaveStatus === "saved" && (
+                    <>
+                      <CheckCircle2 className="size-4" aria-hidden="true" />
+                      <span>Saved to Supabase</span>
+                    </>
+                  )}
+                  {autosaveStatus === "failed" && (
+                    <>
+                      <AlertCircle className="size-4" aria-hidden="true" />
                       <span>Save failed</span>
-                    </div>
-                  ) : lastSaved && !saveError ? (
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      <span>{saveSource === "supabase" ? "Saved to Supabase" : "Saved locally"}</span>
-                    </div>
-                  ) : null}
+                    </>
+                  )}
+                  {autosaveStatus === "idle" && (
+                    <>
+                      <div className="h-1.5 w-1.5 rounded-full bg-current" />
+                      <span>Idle</span>
+                    </>
+                  )}
                 </div>
 
-                {/* Error details */}
-                {saveError && (
-                  <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded">
-                    <AlertCircle className="size-3" aria-hidden="true" />
+                {/* Error details when save fails */}
+                {autosaveStatus === "failed" && saveError && (
+                  <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
                     {saveError}
                   </div>
                 )}
+
                 {/* Dev debug info */}
                 <button
                   onClick={() => setShowDebugInfo(!showDebugInfo)}
@@ -362,27 +524,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   {showDebugInfo ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                   Config
                 </button>
-                {markedReady && (
-                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="size-4" aria-hidden="true" />
-                    Guide marked ready. Requirements are optional in Phase 1.
-                  </div>
-                )}
-                {markReadyError && (
-                  <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-                    <AlertCircle className="size-4" aria-hidden="true" />
-                    {rulesStale 
-                      ? "Rules check is stale. Re-check before marking ready."
-                      : (() => {
-                          const requiredFailures = rulesCheckResult?.filter((r: any) => !r.passed && r.required !== false) || []
-                          if (requiredFailures.length > 0) {
-                            return `Fix required issue${requiredFailures.length !== 1 ? "s" : ""}: ${requiredFailures.map((r: any) => r.rule.label).join(", ")}`
-                          }
-                          return "Rules check failed. Re-check before marking ready."
-                        })()
-                    }
-                  </div>
-                )}
+
                 <Button size="sm" variant="outline" onClick={handlePreview}>
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
