@@ -9,12 +9,12 @@
  * - Creates valid Guide object with all required fields
  * - Ensures at least one starter section exists
  * - Saves to Supabase first (when configured), falls back to localStorage
- * - Returns guide ID for routing
+ * - Returns { id, source } to indicate save success
  * - Includes comprehensive debug logging
  */
 
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"
-import { saveGuideDraft } from "./guide-drafts-storage"
+import { saveGuideDraftWithSource } from "./guide-drafts-storage"
 import { v4 as uuidv4 } from "uuid"
 
 export interface CreateGuideDraftInput {
@@ -41,12 +41,13 @@ export interface CreateGuideDraftInput {
  * Create and save a guide draft with all form data preserved.
  * 
  * @param input - All guide creation data
- * @returns Promise<string> - The saved guide ID for routing
+ * @returns Promise<{ id: string; source: "supabase" | "localStorage" }> - The saved guide ID and storage source
+ * @throws Error if save fails completely
  */
 export async function createAndSaveGuideDraft(
   input: CreateGuideDraftInput
-): Promise<string> {
-  console.log("[v0] createAndSaveGuideDraft started", {
+): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+  console.log("[v0] Create flow guide id before save:", {
     title: input.title,
     summary: input.summary?.substring(0, 60),
     guideType: input.guideType,
@@ -59,6 +60,7 @@ export async function createAndSaveGuideDraft(
 
   // Generate guide ID
   const guideId = uuidv4()
+  console.log("[v0] Generated guide id for new draft:", guideId)
   
   // Seeded dev profile ID for Phase 1 (no auth yet)
   const SEEDED_DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -136,11 +138,12 @@ export async function createAndSaveGuideDraft(
     status: guide.status,
   })
 
-  // Save to Supabase/localStorage
+  // Save to Supabase/localStorage - use saveGuideDraftWithSource to get actual storage source
   try {
-    const savedId = await saveGuideDraft(guide)
-    console.log("[v0] Guide saved successfully:", savedId)
-    return savedId
+    const result = await saveGuideDraftWithSource(guide)
+    console.log("[v0] Save returned id:", result.id)
+    console.log("[v0] Save returned source:", result.source)
+    return result
   } catch (error) {
     console.error("[v0] Error saving guide:", error)
     throw error
@@ -159,3 +162,4 @@ function generateSlug(title: string): string {
     .replace(/-+/g, "-")
     .substring(0, 100)
 }
+

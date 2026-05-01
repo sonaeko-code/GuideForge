@@ -49,6 +49,7 @@ const SEEDED_COLLECTION_ID = "character-builds"
 export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [title, setTitle] = useState("Best Fire Warden Beginner Build")
   const [guideType, setGuideType] = useState<GuideType>("character-build")
@@ -66,6 +67,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
     }
 
     setIsLoading(true)
+    setSaveError(null)
     try {
       console.log("[v0] CreateGuideForm: Generating mock guide with title:", title)
 
@@ -84,7 +86,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           sectionsCount: response.guide.sections?.length,
         })
 
-        const guideId = await createAndSaveGuideDraft({
+        const { id, source } = await createAndSaveGuideDraft({
           title: response.guide.title || title,
           summary: response.guide.summary || description,
           guideType,
@@ -101,12 +103,13 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           })),
         })
 
-        console.log("[v0] CreateGuideForm: Generated guide saved, guideId:", guideId)
-        router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
+        console.log("[v0] Redirecting to editor id:", id)
+        router.push(`/builder/network/${networkId}/guide/${id}/edit`)
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] CreateGuideForm: Error generating guide:", error)
-      alert("Failed to generate guide. Check console for details.")
+      setSaveError(`Could not save guide before opening editor: ${errorMsg}`)
     } finally {
       setIsLoading(false)
     }
@@ -119,6 +122,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
     }
 
     setIsLoading(true)
+    setSaveError(null)
     try {
       console.log("[v0] CreateGuideForm: Creating manual draft...", {
         title,
@@ -128,7 +132,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         requirements,
       })
 
-      const guideId = await createAndSaveGuideDraft({
+      const { id, source } = await createAndSaveGuideDraft({
         title,
         summary: description,
         guideType,
@@ -142,11 +146,12 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         warnings: [],
       })
 
-      console.log("[v0] CreateGuideForm: Manual guide saved, guideId:", guideId)
-      router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
+      console.log("[v0] Redirecting to editor id:", id)
+      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] CreateGuideForm: Error creating guide:", error)
-      alert("Failed to create guide. Check console for details.")
+      setSaveError(`Could not save guide before opening editor: ${errorMsg}`)
     } finally {
       setIsLoading(false)
     }
@@ -278,6 +283,12 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           Game name, patch/version, difficulty, requirements, beginner summary, spoiler tagging.
         </p>
       </div>
+
+      {saveError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-4">
+          <p className="text-sm text-red-700 dark:text-red-400">{saveError}</p>
+        </div>
+      )}
 
       <div className="flex gap-3 pt-4">
         <Button asChild variant="outline" disabled={isLoading}>
