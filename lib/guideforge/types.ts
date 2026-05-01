@@ -184,6 +184,11 @@ export interface Guide {
   author: GuideAuthor
   reviewer?: GuideAuthor
 
+  /** Forge Rules check results - persisted with draft. */
+  forgeRulesCheckResult?: any[]
+  /** Timestamp of last Forge Rules check (for staleness detection). */
+  forgeRulesCheckTimestamp?: number
+
   createdAt: string
   updatedAt: string
   publishedAt?: string

@@ -5,10 +5,11 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Edit2, Trash2, Sparkles, FileText } from "lucide-react"
+import { Eye, Edit2, Trash2, Sparkles, FileText, Lock, Plus } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { getDraftsByNetwork, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
 import { formatDistanceToNow } from "date-fns"
+import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 
 interface DraftWorkspaceProps {
   networkId: string
@@ -30,6 +31,10 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
       deleteDraft(draftId)
       setDrafts(drafts.filter(d => d.id !== draftId))
     }
+  }
+
+  const getHubName = (hubId: string) => {
+    return MOCK_HUBS.find(h => h.id === hubId)?.name || "Unknown Hub"
   }
 
   return (
@@ -61,17 +66,43 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
       ) : (
         <div className="space-y-3">
           {drafts.map((draft) => (
-            <Card key={draft.id} className="flex items-center justify-between gap-4 p-4">
-              <div className="flex-1 space-y-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-foreground truncate">{draft.title}</h3>
-                  <Badge variant="secondary" className="flex-shrink-0">
+            <Card key={draft.id} className="flex items-start justify-between gap-4 p-4">
+              <div className="flex-1 space-y-2 min-w-0">
+                <div className="flex items-start gap-2 flex-wrap">
+                  <h3 className="font-semibold text-foreground truncate flex-1">{draft.title}</h3>
+                  <Badge 
+                    variant={draft.status === "ready" ? "default" : "secondary"} 
+                    className="flex-shrink-0 capitalize"
+                  >
                     {draft.status}
                   </Badge>
                 </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="text-xs font-normal capitalize">
+                    {draft.type}
+                  </Badge>
+                  {draft.hubId && (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {getHubName(draft.hubId)}
+                    </Badge>
+                  )}
+                  {draft.difficulty && (
+                    <Badge variant="outline" className="text-xs font-normal capitalize">
+                      {draft.difficulty}
+                    </Badge>
+                  )}
+                </div>
+
                 <p className="text-xs text-muted-foreground">
                   Updated {draft.updatedAt ? formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true }) : "recently"}
                 </p>
+                {draft.status === "ready" && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lock className="size-3" aria-hidden="true" />
+                    Publish requires Supabase
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
