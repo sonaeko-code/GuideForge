@@ -124,7 +124,63 @@ function normalizeGuideDifficultyForSupabase(difficulty?: string): string | null
 }
 
 /**
- * Map frontend collection identifiers to Supabase collection UUIDs.
+ * Generate a unique slug by appending a number suffix if the slug already exists in collection.
+ * Queries Supabase to check for existing slugs and auto-increments: slug, slug-2, slug-3, etc.
+ */
+async function generateUniqueSlugForCollection(
+  baseSlug: string,
+  collectionId: string | null
+): Promise<string> {
+  if (!supabase || !collectionId) {
+    return baseSlug
+  }
+
+  try {
+    // Check if this exact slug already exists in the collection
+    const { data: existing } = await supabase
+      .from("guides")
+      .select("id")
+      .eq("slug", baseSlug)
+      .eq("collection_id", collectionId)
+      .limit(1)
+
+    if (!existing || existing.length === 0) {
+      return baseSlug
+    }
+
+    // Slug exists, find the next available number
+    console.log("[v0] Duplicate slug detected:", baseSlug)
+    let counter = 2
+    let uniqueSlug = `${baseSlug}-${counter}`
+
+    while (true) {
+      const { data: checkExisting } = await supabase
+        .from("guides")
+        .select("id")
+        .eq("slug", uniqueSlug)
+        .eq("collection_id", collectionId)
+        .limit(1)
+
+      if (!checkExisting || checkExisting.length === 0) {
+        console.log("[v0] Retrying with slug:", uniqueSlug)
+        return uniqueSlug
+      }
+
+      counter++
+      uniqueSlug = `${baseSlug}-${counter}`
+
+      // Safety limit
+      if (counter > 100) {
+        console.warn("[v0] Too many slug duplicates, using timestamp suffix")
+        return `${baseSlug}-${Date.now()}`
+      }
+    }
+  } catch (error) {
+    console.error("[v0] Error checking slug uniqueness:", error)
+    return baseSlug
+  }
+}
+
  * The frontend uses slug-like identifiers (e.g., "collection_character_builds"),
  * but Supabase stores real UUIDs. This function looks up the real UUID.
  * 
@@ -243,6 +299,20 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
       const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
 
+      // Determine save mode: update existing by id, or insert new
+      // For new guides, ensure slug is unique within the collection
+      let finalSlug = guide.slug || guide.id
+      const saveMode = guide.id && guide.id.length > 0 ? "update" : "insert"
+
+      if (saveMode === "insert") {
+        // For new guides, generate unique slug if needed
+        finalSlug = await generateUniqueSlugForCollection(finalSlug, normalizedCollectionId)
+      }
+
+      console.log("[v0] Saving guide id:", guide.id)
+      console.log("[v0] Saving guide slug:", finalSlug)
+      console.log("[v0] Save mode:", saveMode)
+
       console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
         title: guide.title,
@@ -262,7 +332,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         id: guide.id,
         collection_id: normalizedCollectionId,
         title: guide.title,
-        slug: guide.slug || guide.id,
+        slug: finalSlug,
         summary: guide.summary,
         type: normalizedType,
         difficulty: normalizedDifficulty,
