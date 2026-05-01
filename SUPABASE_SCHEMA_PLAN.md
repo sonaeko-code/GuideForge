@@ -1,82 +1,136 @@
-# GuideForge Supabase Schema Plan
+# GuideForge Supabase Schema Plan - REVISED
 
-**Status**: Planning phase - Review only. No implementation yet.
+**Status**: Revised planning phase - Review only. No implementation yet.
 
 **Date**: April 2026
 
-**Scope**: Supabase Phase 1 - Core persistence for Networks, Hubs, Collections, Guides, Forge Rules, and Generation Events.
+**Scope**: Supabase Phase 1 - Core persistence for draft guides and Forge Rules validation. Public QuestLine pages remain on localStorage for Phase 2.
 
 ---
 
 ## 1. Schema Overview
 
-GuideForge maintains a strict 5-level hierarchy:
+GuideForge maintains a 5-level hierarchy:
 ```
 Network → Hub → Collection → Guide → GuideStep
 ```
 
-Each level has independent metadata, relationships, and lifecycle tracking. The schema is generalized for **GuideForge** (builder), **QuestLine** (gaming), and future **Techsperts** (expert networks).
+### Key Changes from Original Plan
+
+1. **No denormalized ID arrays** - Use normal foreign keys only (hub_ids, collection_ids arrays removed)
+2. **Profiles table instead of users** - Align with Supabase auth.users; use profiles for display metadata
+3. **network_forge_rules join table** - Proper N:M relationship with enabled/required flags
+4. **Separate Forge Rules check structure** - forge_rule_check_runs + forge_rule_check_results for staleness detection
+5. **Simplified MVP status** - Only: draft, ready, published, archived
+6. **Verification separate from status** - unverified, rules_passed, reviewed, forge_verified, forged
+7. **MVP scope: drafts only** - First pass replaces localStorage draft persistence only
+8. **Generalized design** - Works for GuideForge, QuestLine (gaming), Techsperts (repair/SOP)
 
 ### Core Principles
 
-1. **Multi-Network Design**: All tables include `network_id` foreign key
-2. **Denormalization for Performance**: Reference IDs stored as arrays (e.g., `guide_ids` in `hubs`)
-3. **Audit Trail Ready**: All tables include `created_at`, `updated_at`, and user tracking
-4. **Status & Verification Decoupled**: `status` (lifecycle) and `verification` (trust) are independent
-5. **Draft-to-Published Pipeline**: `status` column tracks progression through draft → ready → published
-6. **Forge Rules as Configuration**: Rules defined per-network, checks stored as historical records
-7. **Generation Events for Analytics**: Track AI generation, manual edits, and publish events
+- **Multi-Network Design**: All tables include `network_id` foreign key
+- **Clean Foreign Keys**: Normal 1:N relationships, no denormalization for MVP
+- **Audit Trail Ready**: All tables include `created_at`, `updated_at`, user tracking
+- **Status & Verification Decoupled**: Lifecycle (`status`) separate from trust (`verification`)
+- **Forge Rules as Configuration**: Per-network rules with historical check runs
+- **Generation Events for Analytics**: Track AI generation and publish events
 
 ---
 
-## 2. Table-by-Table Plan
+## 2. Revised Table List (10 tables)
 
-### **2.1 networks**
+1. **profiles** - Auth-aligned user display metadata
+2. **networks** - Top-level namespace (gaming network, repair hub, SOP, etc.)
+3. **hubs** - Thematic groupings (game, product, department, topic)
+4. **collections** - Guide categories within a hub
+5. **guides** - Complete guide documents with status/verification
+6. **guide_steps** - Individual sections/steps within a guide
+7. **forge_rules** - Reusable validation rules (global library)
+8. **network_forge_rules** - N:M join table: which rules apply to which network
+9. **forge_rule_check_runs** - One record per validation session (staleness tracking)
+10. **forge_rule_check_results** - One record per rule check result (detailed validation data)
 
-The top-level namespace for a GuideForge instance or gaming hub network.
+---
 
-**Purpose**: Store network branding, visibility, and Forge Rules configuration.
+## 3. Table-by-Table Plan (Revised)
+
+### **3.1 profiles**
+
+User display metadata aligned with Supabase auth.users.
+
+**Purpose**: Store user profile, display name, avatar, bio, role.
 
 **Columns**:
+```sql
+id (uuid, primary key) -- references auth.users.id later
+display_name (text)
+handle (text, unique, nullable) - e.g., "sonaeko"
+avatar_url (text, nullable)
+bio (text, nullable)
+role (text) - enum: viewer, contributor, moderator, admin
+created_at (timestamp)
+updated_at (timestamp)
 ```
+
+**Relationships**:
+- Auth.users reference (one-to-one, later)
+- Guides created by this user
+
+**Notes**: Do not include password or auth credentials. This is display-only metadata.
+
+---
+
+### **3.2 networks**
+
+Top-level namespace for a GuideForge instance.
+
+**Purpose**: Store network branding, visibility, configuration. Can be gaming network, repair documentation hub, SOP system, training platform, creator community, etc.
+
+**Columns**:
+```sql
 id (uuid, primary key)
-slug (text, unique) - URL-friendly identifier, e.g. "questline"
-name (text) - Display name, e.g. "QuestLine"
+slug (text, unique) - e.g., "questline", "macbook-repair", "sales-sop"
+name (text) - Display name
 description (text)
 type (text) - enum: gaming, repair, sop, creator, training, community
 visibility (text) - enum: public, private, unlisted
+
+-- Branding
+primary_color (text, nullable) - e.g., "#D4A373"
+accent_color (text, nullable)
+theme (text, nullable) - enum: parchment, copper, neutral, industrial, soft, arcane, ember
+logo_url (text, nullable)
+
+-- Domain
 domain (text, nullable) - e.g., "questline.guideforge.app"
-
-branding.primary_color (text) - e.g., "#D4A373"
-branding.accent_color (text, nullable)
-branding.theme (text) - enum: parchment, copper, neutral, industrial, soft, arcane, ember
-branding.logo_url (text, nullable)
-
-forge_rule_ids (uuid[]) - References to enabled ForgeRules for this network
-hub_ids (uuid[]) - Denormalized list of hub UUIDs
 
 created_at (timestamp)
 updated_at (timestamp)
-created_by (uuid, nullable) - User who created the network
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
 - `← hubs` (1:N) - A network has many hubs
-- `← forge_rules_enabled` (N:M) - A network enables a subset of rules
-- `← generation_events` (1:N) - Track guide generations per network
+- `← network_forge_rules` (1:N) - A network enables a subset of rules
+- `← generation_events` (1:N) - Track generation events per network
+
+**MVP Notes**: In Phase 1, only draft guides are persisted. Public QuestLine guides remain on mock data.
 
 ---
 
-### **2.2 hubs**
+### **3.3 hubs**
 
-Namespaces within a network. For gaming: "Emberfall". For repair: "MacBook Pro M1". For SOP: "Sales Department".
+Thematic namespaces within a network.
 
-**Purpose**: Group collections and guides by theme/product/department.
+**Purpose**: Group collections and guides by game/product/department/topic. Examples:
+- Gaming: "Emberfall" (fantasy game), "Starfall Outriders" (sci-fi game)
+- Repair: "MacBook Pro", "iPhone 14"
+- SOP: "Sales Process", "Onboarding", "Engineering"
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-network_id (uuid, foreign key → networks.id)
+network_id (uuid, not null, foreign key → networks.id)
 slug (text, unique per network) - e.g., "emberfall"
 name (text) - e.g., "Emberfall"
 description (text)
@@ -85,1051 +139,856 @@ tagline (text, nullable) - e.g., "The realm of ancient magic"
 hub_kind (text) - enum: game, product, department, topic, channel, other
 banner_url (text, nullable)
 
-collection_ids (uuid[]) - Denormalized list of collection UUIDs
-guide_ids (uuid[]) - Denormalized list of all guide UUIDs in this hub
-
 created_at (timestamp)
 updated_at (timestamp)
-created_by (uuid, nullable)
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
 - `→ networks` (N:1) - Many hubs belong to one network
 - `← collections` (1:N) - A hub has many collections
-- `← guides` (1:N) - A hub has many guides
+- `← guides` (1:N) - Guides directly in hub (collection_id may be null)
+
+**Notes**: No denormalized collection_ids or guide_ids arrays in MVP.
 
 ---
 
-### **2.3 collections**
+### **3.4 collections**
 
-Logical groupings within a hub. For gaming: "Character Builds", "Dungeons", "Patch Notes". For repair: "Disassembly", "Troubleshooting". For SOP: "Onboarding", "Best Practices".
+Logical groupings within a hub for organizing guides by category.
 
-**Purpose**: Organize guides by category; set default guide type.
+**Purpose**: Organize guides by category/section. Set default guide type. Examples:
+- Gaming: "Character Builds", "Dungeons", "Patch Notes"
+- Repair: "Disassembly", "Troubleshooting", "Reassembly"
+- SOP: "Onboarding", "Best Practices", "Escalation"
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-network_id (uuid, foreign key → networks.id)
-hub_id (uuid, foreign key → hubs.id)
+network_id (uuid, not null, foreign key → networks.id)
+hub_id (uuid, not null, foreign key → hubs.id)
 slug (text, unique per hub) - e.g., "character-builds"
 name (text)
 description (text)
 
-default_guide_type (text) - enum from GuideType; default when creating new guides
-guide_ids (uuid[]) - Denormalized list of guide UUIDs
+default_guide_type (text, nullable) - Guide type to suggest when creating new guides
+icon_name (text, nullable) - Icon identifier for UI
 
 created_at (timestamp)
 updated_at (timestamp)
-created_by (uuid, nullable)
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
 - `→ networks` (N:1)
 - `→ hubs` (N:1)
-- `← guides` (1:N) - A collection has many guides
+- `← guides` (1:N) - A collection has many guides (collection_id not null)
+
+**Notes**: No denormalized guide_ids array in MVP.
 
 ---
 
-### **2.4 guides**
+### **3.5 guides**
 
-Full guide documents with all metadata, steps, and lifecycle tracking.
+Full guide documents with all metadata, status, verification, and Forge Rules results.
 
-**Purpose**: Store complete guide content, status, verification, and Forge Rules results.
+**Purpose**: Store complete guide content with status/verification/rules tracking.
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-network_id (uuid, foreign key → networks.id)
-hub_id (uuid, foreign key → hubs.id)
-collection_id (uuid, foreign key → collections.id)
+network_id (uuid, not null, foreign key → networks.id)
+hub_id (uuid, not null, foreign key → hubs.id)
+collection_id (uuid, nullable, foreign key → collections.id) - null if directly in hub
 slug (text, unique per network) - e.g., "best-fire-warden-beginner-build"
 
+-- Core content
 title (text)
 summary (text) - 2-3 sentence overview
-type (text) - enum: character-build, walkthrough, boss-guide, beginner-guide, etc.
-difficulty (text) - enum: beginner, intermediate, advanced, expert
+type (text) - enum: character-build, walkthrough, boss-guide, repair-guide, sop, etc.
+difficulty (text, nullable) - enum: beginner, intermediate, advanced, expert
 
-status (text) - enum: draft, in-review, ready, published, needs-update, deprecated, archived
-verification (text) - enum: unverified, reviewed, expert-reviewed, community-proven, forge-verified, forged
+-- Author metadata
+author_name (text)
+author_avatar_url (text, nullable)
 
-requirements (text[]) - Free-form list of prerequisites
-warnings (text[]) - Spoilers, dangerous steps, etc.
+-- Lifecycle status (MVP only: draft, ready, published, archived)
+status (text) - enum: draft, ready, published, archived
+published_at (timestamp, nullable)
 
-version (text, nullable) - e.g., "Patch 4.2"
-estimated_minutes (integer, nullable) - Read/completion time
+-- Verification/trust (separate from status)
+verification (text) - enum: unverified, rules_passed, reviewed, forge_verified, forged
+verified_at (timestamp, nullable)
+verified_by (uuid, nullable, references profiles.id)
 
-author_id (uuid, foreign key → users.id) - Who wrote it
-reviewer_id (uuid, nullable, foreign key → users.id) - Who reviewed it
+-- Forge Rules tracking
+latest_check_run_id (uuid, nullable, references forge_rule_check_runs.id)
+last_checked_at (timestamp, nullable)
+all_rules_passed (boolean, nullable) - Cache for UI
+
+-- Content
+body (text, nullable) - Full markdown body (optional, if not using steps)
+steps_count (integer) - Denormalized count for quick filtering
+
+-- Denormalized for performance (Phase 2+)
+views_count (integer, default 0)
+rating_avg (numeric, nullable)
 
 created_at (timestamp)
 updated_at (timestamp)
-published_at (timestamp, nullable)
-created_by (uuid, nullable)
-updated_by (uuid, nullable)
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
 - `→ networks` (N:1)
 - `→ hubs` (N:1)
-- `→ collections` (N:1)
-- `→ users` (N:1) as author
-- `→ users` (N:1, nullable) as reviewer
+- `→ collections` (N:1, nullable)
 - `← guide_steps` (1:N) - A guide has many steps
-- `← forge_rule_check_results` (1:N) - Check history for this guide
+- `← forge_rule_check_runs` (1:N) - Check history
+- `← generation_events` (1:N) - Generation/edit events
+
+**Notes**: 
+- MVP `status` simplified to: draft, ready, published, archived
+- Future statuses (in-review, needs-update, deprecated) added in Phase 2
+- Verification separate: unverified, rules_passed, reviewed, forge_verified, forged
+- `latest_check_run_id` enables staleness detection
 
 ---
 
-### **2.5 guide_steps**
+### **3.6 guide_steps**
 
-Individual sections/steps within a guide. These are ordered and keyed by `kind`.
+Individual sections/steps within a guide.
 
-**Purpose**: Store guide content, order, and metadata per section.
+**Purpose**: Store structured guide content as ordered steps/sections.
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-guide_id (uuid, foreign key → guides.id)
-order (integer) - 1, 2, 3, ... for display order
-kind (text) - enum: overview, strengths, weaknesses, gear, skill-priority, rotation, leveling, mistakes, patch-notes, final-tips, requirements, warning, custom
+guide_id (uuid, not null, foreign key → guides.id)
+network_id (uuid, not null, foreign key → networks.id)
+step_number (integer) - Order within guide
 
-title (text) - e.g., "Strengths"
+title (text)
+kind (text) - enum: intro, section, step, note, warning, tip, example, conclusion
 body (text) - Markdown content
-is_spoiler (boolean, default: false)
-callout (text, nullable) - Optional inline callout, e.g., "Requires patch 4.2+"
+
+image_url (text, nullable)
+video_url (text, nullable)
 
 created_at (timestamp)
 updated_at (timestamp)
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
 - `→ guides` (N:1)
+- `→ networks` (N:1)
+
+**Notes**: Steps ordered by (guide_id, step_number) for deterministic ordering.
 
 ---
 
-### **2.6 forge_rules**
+### **3.7 forge_rules**
 
-Master list of rules available to apply to guides in any network.
+Reusable validation rules - a global library of rules that can be enabled per-network.
 
-**Purpose**: Define the universal rule catalog; each network selects which rules to enable.
+**Purpose**: Define validation rules once, enable selectively per-network. Allows:
+- Gaming network to require "difficulty" field
+- Repair network to require "tools_needed" section
+- SOP network to require "approval_required" field
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-label (text) - e.g., "Descriptive Title"
-description (text) - Full explanation for rule editor
-category (text) - enum: metadata, structure, tone, safety, lifecycle
-applies_to (text[]) - enum array: ["gaming", "repair", "sop", ...] - default networks for this rule
-is_required (boolean) - If true, guide cannot be published without passing
+rule_id (text, unique) - Machine-friendly identifier, e.g., "descriptive-title", "game-name-present"
+label (text) - Human-friendly label, e.g., "Descriptive Title"
+category (text) - enum: content, metadata, structure, safety, performance
+description (text) - Explanation of what this rule validates
+
+applies_to (text[]) - Array of guide types that this rule applies to
+                     e.g., ["character-build", "walkthrough"]
+                     null = applies to all types
 
 created_at (timestamp)
-created_by (uuid, nullable)
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
-- `← forge_rule_checks` (1:N) - Check history for this rule
-- `← networks` (N:M via network.forge_rule_ids)
+- `← network_forge_rules` (1:N) - This rule is enabled/configured in N networks
+
+**Notes**: Rules are global; network configuration determines enabled/required status.
 
 ---
 
-### **2.7 forge_rule_check_results**
+### **3.8 network_forge_rules** (N:M Join Table)
 
-Historical record of every Forge Rules validation run.
+Maps which Forge Rules are enabled for which networks, with configuration.
 
-**Purpose**: Track validation history, debug staleness, and generate reports.
+**Purpose**: Determine which rules apply to a specific network and their configuration (enabled, required, display order).
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-guide_id (uuid, foreign key → guides.id)
-forge_rule_id (uuid, foreign key → forge_rules.id)
-network_id (uuid, foreign key → networks.id)
+network_id (uuid, not null, foreign key → networks.id)
+forge_rule_id (uuid, not null, foreign key → forge_rules.id)
 
-passed (boolean)
-reason (text, nullable) - Explanation if failed, e.g., "Title too short"
+enabled (boolean, default true) - Is this rule active for the network?
+required (boolean, default false) - Must all guides pass this rule?
+display_order (integer) - Order to display in UI
 
-check_timestamp (timestamp) - When the check ran
 created_at (timestamp)
+updated_at (timestamp)
 
--- For analytics/debug:
-content_hash (text) - Hash of guide title+summary+version at check time
--- This allows staleness detection: if current content hash differs, results are stale
+-- Constraint: unique(network_id, forge_rule_id)
+```
+
+**Relationships**:
+- `→ networks` (N:1)
+- `→ forge_rules` (N:1)
+
+**Notes**: 
+- Replace the old denormalized `networks.forge_rule_ids` array
+- Allows per-network configuration: Gaming might require difficulty, Repair might not
+- `display_order` controls rule presentation order in UI
+
+---
+
+### **3.9 forge_rule_check_runs**
+
+One record per validation session - enables staleness detection.
+
+**Purpose**: Track when guides were validated, what rules were checked, and if results are stale. Identifies when content changed since last check.
+
+**Columns**:
+```sql
+id (uuid, primary key)
+guide_id (uuid, not null, foreign key → guides.id)
+network_id (uuid, not null, foreign key → networks.id)
+
+-- Content hash for staleness detection
+content_hash (text) - SHA256 hash of (title + summary + version + steps)
+                     Used to detect if content changed since this check
+
+-- Check metadata
+total_rules (integer) - How many rules were checked
+passed_rules (integer) - How many rules passed
+all_passed (boolean) - Cache: all_rules_passed = (passed_rules == total_rules)
+
+checked_at (timestamp) - When validation occurred
+created_by (uuid, nullable, references profiles.id)
+created_at (timestamp)
 ```
 
 **Relationships**:
 - `→ guides` (N:1)
+- `→ networks` (N:1)
+- `← forge_rule_check_results` (1:N) - One result record per rule checked
+
+**Notes**:
+- Content hash enables MVP staleness detection without re-running validation
+- If content_hash changes, results are stale
+- Multiple check runs per guide for history
+
+---
+
+### **3.10 forge_rule_check_results**
+
+One record per rule check result - detailed validation data.
+
+**Purpose**: Store individual rule validation results with reasoning.
+
+**Columns**:
+```sql
+id (uuid, primary key)
+check_run_id (uuid, not null, foreign key → forge_rule_check_runs.id)
+forge_rule_id (uuid, not null, foreign key → forge_rules.id)
+network_id (uuid, not null, foreign key → networks.id)
+
+passed (boolean) - Did this guide pass this rule?
+reason (text, nullable) - Explanation if failed, e.g., "Title is too short (5 chars, need 8)"
+
+created_at (timestamp)
+```
+
+**Relationships**:
+- `→ forge_rule_check_runs` (N:1)
 - `→ forge_rules` (N:1)
 - `→ networks` (N:1)
 
+**Notes**:
+- Immutable records (no updates)
+- Reason provides user-facing feedback for failed checks
+- Indexed on (check_run_id, forge_rule_id) for quick lookups
+
 ---
 
-### **2.8 generation_events**
+### **3.11 generation_events** (Optional Phase 1)
 
-Track AI-generated guides, manual edits, publishes, and other significant events.
+Track AI generation, manual edits, and publish events for analytics.
 
-**Purpose**: Analytics, audit trail, and regeneration history.
+**Purpose**: Event log for guide lifecycle - generation, editing, publishing.
 
 **Columns**:
-```
+```sql
 id (uuid, primary key)
-network_id (uuid, foreign key → networks.id)
-guide_id (uuid, nullable, foreign key → guides.id) - May be null for failed generations
-event_type (text) - enum: guide_generated, guide_edited, guide_published, section_regenerated, guide_forged, review_completed
+network_id (uuid, not null, foreign key → networks.id)
+guide_id (uuid, not null, foreign key → guides.id)
 
-prompt (text, nullable) - User input or AI prompt that triggered generation
-model_used (text, nullable) - e.g., "gpt-4", "gpt-3.5-turbo"
-tokens_used (integer, nullable)
-
-metadata (jsonb) - Flexible object for event-specific data:
-  {
-    "prompt": "...",
-    "sections_count": 6,
-    "generation_mode": "full" | "section",
-    "section_kind": "strengths" (if section_regenerated),
-    "user_edited_summary": true,
-    ...
-  }
+event_type (text) - enum: generated, edited, published, archived
+event_data (jsonb) - Event-specific metadata, e.g., {"generator": "ai-sdk-6", "prompt_tokens": 150}
 
 created_at (timestamp)
-created_by (uuid, nullable)
+created_by (uuid, nullable, references profiles.id)
 ```
 
 **Relationships**:
 - `→ networks` (N:1)
-- `→ guides` (N:1, nullable)
+- `→ guides` (N:1)
+
+**Notes**: Low priority for MVP. Can defer to Phase 2 if time-constrained.
 
 ---
 
-### **2.9 users** (Minimal for MVP)
-
-When Supabase Auth is connected, user records sync from `auth.users`.
-
-**Purpose**: Author/reviewer attribution and activity tracking.
-
-**Columns**:
-```
-id (uuid, primary key) - Matches auth.users.id
-email (text, unique)
-display_name (text, nullable)
-handle (text, unique, nullable) - e.g., "riley.ashford"
-avatar_url (text, nullable)
-bio (text, nullable)
-role (text) - enum: user, moderator, curator, admin
-
-created_at (timestamp)
-updated_at (timestamp)
-```
-
-**Relationships**:
-- `← guides` (1:N) as author
-- `← guides` (1:N) as reviewer
-- `← generation_events` (1:N)
-
----
-
-## 3. Relationship Map
+## 4. Relationship Diagram (Revised)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       networks                               │
-│  (slug, type, visibility, branding, forge_rule_ids)        │
-└──┬──────────────────────────────────────────────────────────┘
-   │
-   ├──→ hubs (1:N)
-   │    │
-   │    └──→ collections (1:N)
-   │         │
-   │         └──→ guides (1:N)
-   │              │
-   │              ├──→ guide_steps (1:N)
-   │              ├──→ users (N:1 as author)
-   │              ├──→ users (N:1 nullable as reviewer)
-   │              └──→ forge_rule_check_results (1:N)
-   │                   │
-   │                   └──→ forge_rules (N:1)
-   │
-   ├──→ forge_rules (N:M via network.forge_rule_ids)
-   │
-   └──→ generation_events (1:N)
-        │
-        └──→ guides (N:1 nullable)
+auth.users (external)
+    ↓
+profiles (display metadata)
+    ↑
+    └─ guides.created_by
+    └─ forge_rule_check_runs.created_by
+    └─ networks.created_by
+    └─ etc.
+
+networks (1)
+    ├── hubs (1:N) ──── collections (1:N) ──── guides (1:N) ──── guide_steps (1:N)
+    │
+    └── network_forge_rules (1:N) ──┐
+                                    ├── forge_rules (N:M)
+                                    └── mapped rules per network
+    │
+    └── guides (1:N, via hub) ──── forge_rule_check_runs (1:N)
+                                    └── forge_rule_check_results (1:N)
+                                        └── forge_rules
+    │
+    └── generation_events (1:N)
+
+Staleness Detection:
+  - When user edits guide: title, summary, version, steps change
+  - Content hash no longer matches forge_rule_check_runs.content_hash
+  - UI shows: "Results Stale — Re-check Needed"
+  - User clicks "Re-check" → new fork_rule_check_run + results
 ```
 
 ---
 
-## 4. Status Model
-
-**Guide Lifecycle**:
-
-```
-draft → in-review → ready → published
-  ↓                  ↑
-  └──→ needs-update──┘
-
-published → deprecated
-published → archived
-```
-
-**Transitions**:
-- `draft` → `in-review`: User clicks "Mark Ready" (requires Forge Rules to pass)
-- `in-review` → `ready`: Reviewer approves (manual step, future)
-- `ready` → `published`: User publishes to public (requires Supabase connection)
-- `published` → `needs-update`: Guide becomes outdated (patch, new info, etc.)
-- `published` → `deprecated`: Superseded by new guide
-- Any → `archived`: Soft delete; guides remain queryable but hidden from default listings
-
-**Storage**:
-- `guides.status` column contains the current state
-- No separate status history table for MVP (can add `status_history` table later)
-
----
-
-## 5. Verification Model
-
-**Trust Tiers** (independent of lifecycle status):
-
-```
-unverified
-  ↓
-reviewed (community review or single reviewer)
-  ↓
-expert-reviewed (expert domain reviewer)
-  ↓
-community-proven (high upvotes/positive feedback)
-  ↓
-forge-verified (passed all Forge Rules + required review)
-  ↓
-forged (highest trust: forge-verified + sustained community validation)
-```
-
-**Storage**:
-- `guides.verification` column tracks current tier
-- No separate verification history table for MVP
-
-**Forge Rules Connection**:
-- A guide can only reach `forge-verified` if all required Forge Rules pass
-- Verification tier is manually set by reviewers (not automatic)
-
----
-
-## 6. Forge Rules Strategy
-
-### Rules Per Network
-
-Each network enables a subset of the universal `forge_rules` catalog:
+## 5. SQL Draft (Revised MVP)
 
 ```sql
--- In networks table:
-forge_rule_ids (uuid[]) -- e.g., [rule_1, rule_2, rule_5, rule_8]
-```
-
-### Check Pipeline
-
-1. User clicks "Check Rules" in editor → `validateForgeRules()` runs in client
-2. Deterministic validation against live guide content (no randomization)
-3. Results stored as `forge_rule_check_results` records in Supabase
-4. User can click "Re-check" anytime; each check creates a new record
-5. "Mark Ready" button checks:
-   - All required Forge Rules passed
-   - Results are not stale (content changed since last check)
-
-### Staleness Detection
-
-- `forge_rule_check_results.check_timestamp` tracks when validation ran
-- `forge_rule_check_results.content_hash` stores hash of guide title+summary+version at check time
-- Client compares current content hash to stored hash; if different, results are stale
-- Stale results block "Mark Ready" → forces re-check
-
----
-
-## 7. RLS Strategy (Review Only - Not Implemented)
-
-Assuming Supabase Auth with `auth.users` table.
-
-### Public (Unauthenticated)
-
-```sql
--- Readable:
-- networks WHERE visibility = 'public'
-- hubs WHERE hub.network_id IN public networks
-- collections WHERE collection.hub_id IN readable hubs
-- guides WHERE status = 'published' AND guide.hub_id IN readable hubs
-- guide_steps WHERE guide_id IN readable guides
-
--- Not readable:
-- drafts, in-review, or ready guides (even if status != published)
-```
-
-### Authenticated Users
-
-```sql
--- Can read:
-- All public guides (same as above)
-- Draft/in-review guides they authored
-- Their own network/hub/collection drafts (if they have network access)
-
--- Can create/edit:
-- Guides in their networks (via network_id + user_id match)
-- Guide steps only if guide owner or reviewer
-- Generation events (own only)
-
--- Moderators/Curators:
-- Can view any guide regardless of status
-- Can transition status (draft → in-review, etc.)
-- Can set verification tier
-
--- Admins:
-- Full read/write/delete access
-```
-
-### Detailed RLS Policies (for future implementation)
-
-```sql
--- guides: users can read published guides OR drafts they own
-CREATE POLICY "guides_select" ON guides
-  FOR SELECT USING (
-    status = 'published' 
-    OR author_id = auth.uid()
-    OR reviewer_id = auth.uid()
-  );
-
--- guides: users can update only their own drafts
-CREATE POLICY "guides_update" ON guides
-  FOR UPDATE USING (author_id = auth.uid() AND status = 'draft');
-
--- guide_steps: can only edit if guide is owned by user and status = 'draft'
-CREATE POLICY "guide_steps_update" ON guide_steps
-  FOR UPDATE USING (
-    guide_id IN (
-      SELECT id FROM guides 
-      WHERE author_id = auth.uid() AND status = 'draft'
-    )
-  );
-```
-
----
-
-## 8. Migration Order
-
-### Phase 1: Core Tables (Weeks 1-2)
-
-1. `networks` - Top-level namespace
-2. `hubs` - Organize by product/game
-3. `collections` - Organize by category
-4. `guides` - Core content
-5. `guide_steps` - Guide sections
-6. `users` - Basic user records (sync with Auth)
-
-### Phase 2: Forge Rules & Validation (Weeks 2-3)
-
-7. `forge_rules` - Rule definitions
-8. `forge_rule_check_results` - Validation history
-
-### Phase 3: Analytics & Events (Week 3)
-
-9. `generation_events` - Track all edits and generations
-
-### Phase 4: Secondary Tables (Week 4+)
-
-- `favorites` (if adding favorites feature)
-- `feedback` (if adding rating/feedback)
-- `subscriptions` (if adding notifications)
-
----
-
-## 9. localStorage → Supabase Mapping
-
-### Current localStorage Structure
-
-```
-guideforge:drafts:[draftId] → Full Guide object
-  {
-    id, collectionId, hubId, networkId, slug,
-    title, summary, type, difficulty, status, verification,
-    requirements[], warnings[], version, estimatedMinutes,
-    steps: GuideStep[], author, reviewer,
-    forgeRulesCheckResult[], forgeRulesCheckTimestamp,
-    createdAt, updatedAt, publishedAt
-  }
-```
-
-### Mapping to Supabase
-
-| localStorage Field | Supabase Table | Column | Notes |
-|---|---|---|---|
-| `id` | guides | id | UUID, primary key |
-| `networkId` | guides | network_id | Foreign key |
-| `hubId` | guides | hub_id | Foreign key |
-| `collectionId` | guides | collection_id | Foreign key |
-| `slug` | guides | slug | Unique per network |
-| `title` | guides | title | |
-| `summary` | guides | summary | |
-| `type` | guides | type | |
-| `difficulty` | guides | difficulty | |
-| `status` | guides | status | |
-| `verification` | guides | verification | |
-| `requirements[]` | guides | requirements | Array column |
-| `warnings[]` | guides | warnings | Array column |
-| `version` | guides | version | |
-| `estimatedMinutes` | guides | estimated_minutes | |
-| `steps: GuideStep[]` | guide_steps | (rows) | One row per step |
-| `steps[].id` | guide_steps | id | |
-| `steps[].guideId` | guide_steps | guide_id | Foreign key |
-| `steps[].order` | guide_steps | order | |
-| `steps[].kind` | guide_steps | kind | |
-| `steps[].title` | guide_steps | title | |
-| `steps[].body` | guide_steps | body | |
-| `steps[].isSpoiler` | guide_steps | is_spoiler | |
-| `steps[].callout` | guide_steps | callout | |
-| `author` | guides | author_id | Foreign key to users |
-| `reviewer` | guides | reviewer_id | Foreign key to users (nullable) |
-| `forgeRulesCheckResult[]` | forge_rule_check_results | (rows) | One row per rule checked |
-| `forgeRulesCheckTimestamp` | forge_rule_check_results | check_timestamp | Latest timestamp |
-| `createdAt` | guides | created_at | |
-| `updatedAt` | guides | updated_at | |
-| `publishedAt` | guides | published_at | |
-
----
-
-## 10. Frontend Files That Will Change
-
-### Core Changes (Essential)
-
-**Storage Layer** → Replace localStorage functions:
-- `/lib/guideforge/guide-drafts-storage.ts` → Wrap Supabase queries
-  - `saveGuideDraft(guide)` → `INSERT guide` + `INSERT guide_steps` + `INSERT forge_rule_check_results`
-  - `loadGuideDraft(draftId)` → `SELECT guide + JOIN guide_steps + JOIN forge_rule_check_results`
-  - `deleteDraft(draftId)` → `DELETE guide` (cascade to steps/checks)
-  - `getDraftsByNetwork(networkId)` → `SELECT * WHERE network_id = $1 AND status = 'draft'`
-
-**Data Loading** → Replace mock data:
-- `/lib/guideforge/mock-data.ts` → Replace with Supabase queries
-  - `MOCK_NETWORKS` → `SELECT * FROM networks`
-  - `MOCK_HUBS` → `SELECT * FROM hubs WHERE network_id = $1`
-  - `MOCK_COLLECTIONS` → `SELECT * FROM collections WHERE hub_id = $1`
-  - `MOCK_GUIDES` → `SELECT * FROM guides WHERE collection_id = $1`
-
-### Editor & Builder Components
-
-- `/components/guideforge/builder/guide-editor.tsx` → Add Supabase client call on save
-- `/components/guideforge/builder/draft-workspace.tsx` → Use real query instead of `getDraftsByNetwork`
-- `/components/guideforge/builder/network-workspace.tsx` → Load real hubs/collections
-- `/app/builder/network/[networkId]/dashboard/page.tsx` → Fetch from Supabase, not mock data
-
-### Generation Pipeline
-
-- `/lib/guideforge/mock-generator.ts` → Stays largely same (local validation)
-- `/app/builder/network/[networkId]/generate/page.tsx` → Save generated guides to Supabase instead of localStorage
-  - POST `/api/guides` endpoint to handle guide creation + forge rules check
-
-### Public Pages
-
-- `/n/questline/[slug]` pages → Query Supabase for public guides
-- `/n/questline/[slug]/guide/[guideSlug]` → Fetch guide + steps from Supabase
-
-### New API Routes Needed
-
-- `POST /api/guides` - Create guide (with Forge Rules check)
-- `PATCH /api/guides/[id]` - Update guide
-- `DELETE /api/guides/[id]` - Delete guide
-- `GET /api/guides/[id]/forge-rules-check` - Run validation
-- `GET /api/networks/[id]/hubs` - Get hubs for network
-- `GET /api/hubs/[id]/collections` - Get collections for hub
-- `GET /api/collections/[id]/guides` - Get guides for collection
-
----
-
-## 11. SQL Draft (Review Only)
-
-```sql
--- ============================================
--- GuideForge Supabase Schema Draft
--- Review Only - Do Not Execute
--- ============================================
-
 -- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "moddatetime";
+create extension if not exists "uuid-ossp";
 
--- ============================================
--- 1. USERS
--- ============================================
+-- ============================================================================
+-- 1. PROFILES (aligned with Supabase auth.users)
+-- ============================================================================
 
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  handle TEXT UNIQUE,
-  avatar_url TEXT,
-  bio TEXT,
-  role TEXT DEFAULT 'user', -- user, moderator, curator, admin
+create table public.profiles (
+  id uuid primary key,
+  display_name text,
+  handle text unique,
+  avatar_url text,
+  bio text,
+  role text check (role in ('viewer', 'contributor', 'moderator', 'admin')) default 'contributor',
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
--- ============================================
+alter table public.profiles enable row level security;
+
+create policy "profiles_public_read" on public.profiles
+  for select to authenticated using (true);
+
+-- ============================================================================
 -- 2. NETWORKS
--- ============================================
+-- ============================================================================
 
-CREATE TABLE networks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  type TEXT NOT NULL, -- gaming, repair, sop, creator, training, community
-  visibility TEXT DEFAULT 'public', -- public, private, unlisted
-  domain TEXT,
+create table public.networks (
+  id uuid primary key default uuid_generate_v4(),
+  slug text unique not null,
+  name text not null,
+  description text,
+  type text check (type in ('gaming', 'repair', 'sop', 'creator', 'training', 'community')) not null,
+  visibility text check (visibility in ('public', 'private', 'unlisted')) default 'public',
   
-  -- Branding (could be JSONB, but here as columns for clarity)
-  branding_primary_color TEXT DEFAULT '#D4A373',
-  branding_accent_color TEXT,
-  branding_theme TEXT DEFAULT 'parchment', -- parchment, copper, neutral, ...
-  branding_logo_url TEXT,
+  primary_color text,
+  accent_color text,
+  theme text check (theme in ('parchment', 'copper', 'neutral', 'industrial', 'soft', 'arcane', 'ember')),
+  logo_url text,
   
-  -- Denormalized IDs
-  forge_rule_ids UUID[] DEFAULT '{}',
-  hub_ids UUID[] DEFAULT '{}',
+  domain text unique,
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id)
 );
 
--- ============================================
+alter table public.networks enable row level security;
+
+create policy "networks_public_read" on public.networks
+  for select using (visibility = 'public' or auth.uid() = created_by);
+
+-- ============================================================================
 -- 3. HUBS
--- ============================================
+-- ============================================================================
 
-CREATE TABLE hubs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  network_id UUID NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
-  slug TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  tagline TEXT,
-  hub_kind TEXT DEFAULT 'game', -- game, product, department, topic, channel, other
-  banner_url TEXT,
+create table public.hubs (
+  id uuid primary key default uuid_generate_v4(),
+  network_id uuid not null references public.networks(id) on delete cascade,
+  slug text not null,
+  name text not null,
+  description text,
+  tagline text,
+  hub_kind text check (hub_kind in ('game', 'product', 'department', 'topic', 'channel', 'other')) not null,
+  banner_url text,
   
-  -- Denormalized IDs
-  collection_ids UUID[] DEFAULT '{}',
-  guide_ids UUID[] DEFAULT '{}',
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id),
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  
-  UNIQUE(network_id, slug)
+  unique(network_id, slug)
 );
 
--- ============================================
+alter table public.hubs enable row level security;
+
+create policy "hubs_read" on public.hubs
+  for select using (exists (
+    select 1 from public.networks n 
+    where n.id = hubs.network_id and (n.visibility = 'public' or auth.uid() = n.created_by)
+  ));
+
+-- ============================================================================
 -- 4. COLLECTIONS
--- ============================================
+-- ============================================================================
 
-CREATE TABLE collections (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  network_id UUID NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
-  hub_id UUID NOT NULL REFERENCES hubs(id) ON DELETE CASCADE,
-  slug TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  default_guide_type TEXT, -- character-build, walkthrough, boss-guide, ...
+create table public.collections (
+  id uuid primary key default uuid_generate_v4(),
+  network_id uuid not null references public.networks(id) on delete cascade,
+  hub_id uuid not null references public.hubs(id) on delete cascade,
+  slug text not null,
+  name text not null,
+  description text,
+  default_guide_type text,
+  icon_name text,
   
-  -- Denormalized IDs
-  guide_ids UUID[] DEFAULT '{}',
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id),
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  
-  UNIQUE(hub_id, slug)
+  unique(hub_id, slug)
 );
 
--- ============================================
+alter table public.collections enable row level security;
+
+create policy "collections_read" on public.collections
+  for select using (exists (
+    select 1 from public.networks n 
+    where n.id = collections.network_id and (n.visibility = 'public' or auth.uid() = n.created_by)
+  ));
+
+-- ============================================================================
 -- 5. GUIDES
--- ============================================
+-- ============================================================================
 
-CREATE TABLE guides (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  network_id UUID NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
-  hub_id UUID NOT NULL REFERENCES hubs(id) ON DELETE CASCADE,
-  collection_id UUID NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-  slug TEXT NOT NULL,
+create table public.guides (
+  id uuid primary key default uuid_generate_v4(),
+  network_id uuid not null references public.networks(id) on delete cascade,
+  hub_id uuid not null references public.hubs(id) on delete cascade,
+  collection_id uuid references public.collections(id) on delete set null,
+  slug text not null,
   
-  title TEXT NOT NULL,
-  summary TEXT,
-  type TEXT NOT NULL, -- character-build, walkthrough, boss-guide, ...
-  difficulty TEXT DEFAULT 'beginner', -- beginner, intermediate, advanced, expert
+  title text not null,
+  summary text,
+  type text not null,
+  difficulty text,
   
-  status TEXT DEFAULT 'draft', -- draft, in-review, ready, published, needs-update, deprecated, archived
-  verification TEXT DEFAULT 'unverified', -- unverified, reviewed, expert-reviewed, community-proven, forge-verified, forged
+  author_name text,
+  author_avatar_url text,
   
-  requirements TEXT[] DEFAULT '{}',
-  warnings TEXT[] DEFAULT '{}',
+  status text check (status in ('draft', 'ready', 'published', 'archived')) default 'draft',
+  published_at timestamp with time zone,
   
-  version TEXT,
-  estimated_minutes INTEGER,
+  verification text check (verification in ('unverified', 'rules_passed', 'reviewed', 'forge_verified', 'forged')) default 'unverified',
+  verified_at timestamp with time zone,
+  verified_by uuid references public.profiles(id),
   
-  author_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  reviewer_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  latest_check_run_id uuid,
+  last_checked_at timestamp with time zone,
+  all_rules_passed boolean,
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  published_at TIMESTAMP WITH TIME ZONE,
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  body text,
+  steps_count integer default 0,
   
-  UNIQUE(network_id, slug)
+  views_count integer default 0,
+  rating_avg numeric(3,2),
+  
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id),
+  
+  unique(network_id, slug)
 );
 
--- Index for common queries
-CREATE INDEX idx_guides_network_status ON guides(network_id, status);
-CREATE INDEX idx_guides_hub_status ON guides(hub_id, status);
-CREATE INDEX idx_guides_collection ON guides(collection_id);
-CREATE INDEX idx_guides_author ON guides(author_id);
+alter table public.guides enable row level security;
 
--- ============================================
+create policy "guides_draft_private" on public.guides
+  for select using (
+    status != 'draft' or auth.uid() = created_by
+  );
+
+create policy "guides_published_public" on public.guides
+  for select using (status = 'published');
+
+-- ============================================================================
 -- 6. GUIDE_STEPS
--- ============================================
+-- ============================================================================
 
-CREATE TABLE guide_steps (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guide_id UUID NOT NULL REFERENCES guides(id) ON DELETE CASCADE,
+create table public.guide_steps (
+  id uuid primary key default uuid_generate_v4(),
+  guide_id uuid not null references public.guides(id) on delete cascade,
+  network_id uuid not null references public.networks(id) on delete cascade,
+  step_number integer not null,
   
-  "order" INTEGER NOT NULL,
-  kind TEXT NOT NULL, -- overview, strengths, weaknesses, gear, skill-priority, rotation, ...
-  title TEXT NOT NULL,
-  body TEXT NOT NULL,
-  is_spoiler BOOLEAN DEFAULT FALSE,
-  callout TEXT,
+  title text not null,
+  kind text check (kind in ('intro', 'section', 'step', 'note', 'warning', 'tip', 'example', 'conclusion')) default 'section',
+  body text,
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  image_url text,
+  video_url text,
+  
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id),
+  
+  unique(guide_id, step_number)
 );
 
--- Index for sequential retrieval
-CREATE INDEX idx_guide_steps_guide_order ON guide_steps(guide_id, "order");
+alter table public.guide_steps enable row level security;
 
--- ============================================
--- 7. FORGE_RULES (Master Catalog)
--- ============================================
+create policy "guide_steps_read" on public.guide_steps
+  for select using (exists (
+    select 1 from public.guides g 
+    where g.id = guide_steps.guide_id and (g.status = 'published' or auth.uid() = g.created_by)
+  ));
 
-CREATE TABLE forge_rules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  label TEXT NOT NULL,
-  description TEXT NOT NULL,
-  category TEXT NOT NULL, -- metadata, structure, tone, safety, lifecycle
-  applies_to TEXT[] NOT NULL, -- Array of network types: gaming, repair, sop, ...
-  is_required BOOLEAN DEFAULT TRUE,
+-- ============================================================================
+-- 7. FORGE_RULES (global rule library)
+-- ============================================================================
+
+create table public.forge_rules (
+  id uuid primary key default uuid_generate_v4(),
+  rule_id text unique not null,
+  label text not null,
+  category text check (category in ('content', 'metadata', 'structure', 'safety', 'performance')),
+  description text,
+  applies_to text[],
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL
+  created_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id)
 );
 
--- ============================================
--- 8. FORGE_RULE_CHECK_RESULTS
--- ============================================
+alter table public.forge_rules enable row level security;
 
-CREATE TABLE forge_rule_check_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guide_id UUID NOT NULL REFERENCES guides(id) ON DELETE CASCADE,
-  forge_rule_id UUID NOT NULL REFERENCES forge_rules(id) ON DELETE CASCADE,
-  network_id UUID NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+create policy "forge_rules_public_read" on public.forge_rules
+  for select using (true);
+
+-- ============================================================================
+-- 8. NETWORK_FORGE_RULES (N:M join table)
+-- ============================================================================
+
+create table public.network_forge_rules (
+  id uuid primary key default uuid_generate_v4(),
+  network_id uuid not null references public.networks(id) on delete cascade,
+  forge_rule_id uuid not null references public.forge_rules(id) on delete cascade,
   
-  passed BOOLEAN NOT NULL,
-  reason TEXT,
+  enabled boolean default true,
+  required boolean default false,
+  display_order integer,
   
-  check_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-  content_hash TEXT, -- SHA256 hash of guide.title + guide.summary + guide.version
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
   
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  unique(network_id, forge_rule_id)
 );
 
--- Index for fetching latest results per guide+rule
-CREATE INDEX idx_forge_check_guide_rule ON forge_rule_check_results(guide_id, forge_rule_id, check_timestamp DESC);
-CREATE INDEX idx_forge_check_network ON forge_rule_check_results(network_id, check_timestamp DESC);
+alter table public.network_forge_rules enable row level security;
 
--- ============================================
--- 9. GENERATION_EVENTS (Analytics)
--- ============================================
+create policy "network_forge_rules_read" on public.network_forge_rules
+  for select using (exists (
+    select 1 from public.networks n 
+    where n.id = network_forge_rules.network_id and (n.visibility = 'public' or auth.uid() = n.created_by)
+  ));
 
-CREATE TABLE generation_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  network_id UUID NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
-  guide_id UUID REFERENCES guides(id) ON DELETE SET NULL,
+-- ============================================================================
+-- 9. FORGE_RULE_CHECK_RUNS (staleness detection)
+-- ============================================================================
+
+create table public.forge_rule_check_runs (
+  id uuid primary key default uuid_generate_v4(),
+  guide_id uuid not null references public.guides(id) on delete cascade,
+  network_id uuid not null references public.networks(id) on delete cascade,
   
-  event_type TEXT NOT NULL, -- guide_generated, guide_edited, guide_published, section_regenerated, guide_forged, review_completed
+  content_hash text not null, -- SHA256 of (title + summary + version + steps)
   
-  prompt TEXT,
-  model_used TEXT, -- gpt-4, gpt-3.5-turbo, etc.
-  tokens_used INTEGER,
+  total_rules integer,
+  passed_rules integer,
+  all_passed boolean,
   
-  metadata JSONB DEFAULT '{}', -- flexible object for event-specific data
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL
+  checked_at timestamp with time zone default now(),
+  created_by uuid references public.profiles(id),
+  created_at timestamp with time zone default now()
 );
 
-CREATE INDEX idx_generation_events_network ON generation_events(network_id, created_at DESC);
-CREATE INDEX idx_generation_events_guide ON generation_events(guide_id);
+alter table public.forge_rule_check_runs enable row level security;
 
--- ============================================
--- Triggers for updated_at
--- ============================================
+create policy "forge_rule_check_runs_read" on public.forge_rule_check_runs
+  for select using (exists (
+    select 1 from public.guides g 
+    where g.id = forge_rule_check_runs.guide_id and (g.status = 'published' or auth.uid() = g.created_by)
+  ));
 
-CREATE TRIGGER handle_networks_updated_at BEFORE UPDATE ON networks
-  FOR EACH ROW EXECUTE FUNCTION moddatetime.update_updated_at();
+create index idx_forge_rule_check_runs_guide_id on public.forge_rule_check_runs(guide_id);
+create index idx_forge_rule_check_runs_created_at on public.forge_rule_check_runs(created_at desc);
 
-CREATE TRIGGER handle_hubs_updated_at BEFORE UPDATE ON hubs
-  FOR EACH ROW EXECUTE FUNCTION moddatetime.update_updated_at();
+-- ============================================================================
+-- 10. FORGE_RULE_CHECK_RESULTS (detailed validation)
+-- ============================================================================
 
-CREATE TRIGGER handle_collections_updated_at BEFORE UPDATE ON collections
-  FOR EACH ROW EXECUTE FUNCTION moddatetime.update_updated_at();
+create table public.forge_rule_check_results (
+  id uuid primary key default uuid_generate_v4(),
+  check_run_id uuid not null references public.forge_rule_check_runs(id) on delete cascade,
+  forge_rule_id uuid not null references public.forge_rules(id) on delete cascade,
+  network_id uuid not null references public.networks(id) on delete cascade,
+  
+  passed boolean not null,
+  reason text,
+  
+  created_at timestamp with time zone default now()
+);
 
-CREATE TRIGGER handle_guides_updated_at BEFORE UPDATE ON guides
-  FOR EACH ROW EXECUTE FUNCTION moddatetime.update_updated_at();
+alter table public.forge_rule_check_results enable row level security;
 
-CREATE TRIGGER handle_guide_steps_updated_at BEFORE UPDATE ON guide_steps
-  FOR EACH ROW EXECUTE FUNCTION moddatetime.update_updated_at();
+create policy "forge_rule_check_results_read" on public.forge_rule_check_results
+  for select using (exists (
+    select 1 from public.forge_rule_check_runs run
+    join public.guides g on g.id = run.guide_id
+    where run.id = forge_rule_check_results.check_run_id and (g.status = 'published' or auth.uid() = g.created_by)
+  ));
 
-CREATE TRIGGER handle_users_updated_at BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION moddatetime.update_updated_at();
+create index idx_forge_rule_check_results_check_run_id on public.forge_rule_check_results(check_run_id);
+create index idx_forge_rule_check_results_rule_id on public.forge_rule_check_results(forge_rule_id);
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+create index idx_guides_network_id on public.guides(network_id);
+create index idx_guides_hub_id on public.guides(hub_id);
+create index idx_guides_collection_id on public.guides(collection_id);
+create index idx_guides_created_by on public.guides(created_by);
+create index idx_guides_status on public.guides(status);
+create index idx_guides_created_at on public.guides(created_at desc);
+
+create index idx_hubs_network_id on public.hubs(network_id);
+create index idx_collections_hub_id on public.collections(hub_id);
+create index idx_collections_network_id on public.collections(network_id);
+
+create index idx_network_forge_rules_network_id on public.network_forge_rules(network_id);
+create index idx_network_forge_rules_forge_rule_id on public.network_forge_rules(forge_rule_id);
 ```
 
 ---
 
-## 12. Migration Plan: localStorage → Supabase
+## 6. Revised Implementation Order (MVP Phase 1 Only)
 
-### Step 1: Schema Creation (Manual)
-- User provides Supabase project connection details
-- Run SQL schema above in Supabase console
-- Verify tables created, indexes ready
+### Scope: Replace localStorage draft persistence
 
-### Step 2: Seed Initial Data (One-time Script)
+**Goal**: Drafts created in the builder are saved to Supabase, not localStorage.
 
-Create `/scripts/migrate-to-supabase.ts`:
+**Order**:
 
-```typescript
-// Pseudo-code:
-import { createClient } from '@supabase/supabase-js';
+1. **Create Supabase project** (user responsibility, not v0)
+   - Provision managed Postgres
+   - Create public schema
+   - Generate service role key and anon key
 
-const supabase = createClient(url, key);
+2. **Run schema creation** (user runs provided SQL)
+   - Create all 10 tables: profiles, networks, hubs, collections, guides, guide_steps, forge_rules, network_forge_rules, forge_rule_check_runs, forge_rule_check_results
+   - Create indexes
+   - Create RLS policies (public read for published content, authenticated edit for drafts)
 
-// 1. Insert mock networks
-const networks = await supabase.from('networks').insert([...]);
+3. **Seed data** (optional for testing)
+   - Create test network: e.g., "local-test"
+   - Create test hubs: "Emberfall", "Starfall"
+   - Create test collections: "Character Builds", "Dungeons"
+   - Load forge_rules library
+   - Configure network_forge_rules for test network
 
-// 2. Insert mock hubs
-const hubs = await supabase.from('hubs').insert([...]);
+4. **Update GuideForge storage layer** (v0 code changes)
+   - Create `lib/supabase/client.ts` - Supabase client initialization
+   - Replace `lib/guideforge/guide-drafts-storage.ts` functions:
+     - `saveGuideDraft()` → POST to `guides` table
+     - `loadGuideDraft()` → GET from `guides` table
+     - `getDraftsByNetwork()` → Query `guides` where status='draft'
+     - `deleteDraft()` → DELETE from `guides` table
+   - Keep localStorage functions for fallback/offline mode
 
-// 3. Insert mock collections
-const collections = await supabase.from('collections').insert([...]);
+5. **Update guide-editor component** (v0 code changes)
+   - Wire `handleSaveDraft()` to call Supabase `saveGuideDraft()`
+   - Wire `handleLoadDraft()` to call Supabase `loadGuideDraft()`
+   - Show loading states while saving to Supabase
+   - Handle errors: show toast if save fails, offer fallback
 
-// 4. Insert mock guides + steps
-for (const guide of mockGuides) {
-  const { data: guideData } = await supabase
-    .from('guides')
-    .insert([...])
-    .select();
-  
-  const stepsData = guide.steps.map(s => ({ ...s, guide_id: guideData[0].id }));
-  await supabase.from('guide_steps').insert(stepsData);
-}
+6. **Update builder home/draft-workspace** (v0 code changes)
+   - Load drafts from `queries.getDraftsByNetwork()` instead of localStorage
+   - Show drafts in UI with Supabase data
+   - Delete drafts via Supabase DELETE
 
-// 5. Insert forge rules
-await supabase.from('forge_rules').insert([...]);
-```
+7. **Testing**
+   - Create draft guide → saved to Supabase
+   - Reload page → draft loads from Supabase
+   - Edit draft → changes persist to Supabase
+   - Delete draft → removed from Supabase
+   - Network offline → fallback to localStorage
 
-Run script once to populate Supabase with mock data from current codebase.
-
-### Step 3: Update Storage Layer
-
-Replace `/lib/guideforge/guide-drafts-storage.ts`:
-
-```typescript
-// Before (localStorage):
-export function saveGuideDraft(guide: Guide): string {
-  const key = `${STORAGE_PREFIX}${guide.id}`;
-  localStorage.setItem(key, JSON.stringify(guide));
-  return guide.id;
-}
-
-// After (Supabase):
-export async function saveGuideDraft(guide: Guide): Promise<string> {
-  const supabase = createClient(url, key);
-  
-  // Save guide
-  const { data: guideData, error: guideError } = await supabase
-    .from('guides')
-    .upsert(guide)
-    .select();
-  
-  if (guideError) throw guideError;
-  
-  // Save steps (delete old, insert new)
-  await supabase
-    .from('guide_steps')
-    .delete()
-    .eq('guide_id', guide.id);
-  
-  const stepsData = guide.steps.map(s => ({
-    ...s,
-    guide_id: guide.id,
-  }));
-  
-  const { error: stepsError } = await supabase
-    .from('guide_steps')
-    .insert(stepsData);
-  
-  if (stepsError) throw stepsError;
-  
-  return guide.id;
-}
-```
-
-### Step 4: Update Data Loading
-
-Replace `/lib/guideforge/mock-data.ts` with dynamic queries:
-
-```typescript
-// Before (mock data):
-export const MOCK_NETWORKS = [...];
-export const MOCK_HUBS = [...];
-
-// After (Supabase):
-export async function getNetworks() {
-  const supabase = createClient(url, key);
-  const { data } = await supabase.from('networks').select();
-  return data || [];
-}
-
-export async function getHubs(networkId: string) {
-  const supabase = createClient(url, key);
-  const { data } = await supabase
-    .from('hubs')
-    .select()
-    .eq('network_id', networkId);
-  return data || [];
-}
-```
-
-### Step 5: Add Supabase Client Setup
-
-Create `/lib/guideforge/supabase.ts`:
-
-```typescript
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-```
-
-Add env vars to `.env.local`:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-### Step 6: Update Editor Component
-
-Modify `/components/guideforge/builder/guide-editor.tsx`:
-
-```typescript
-// In handlePublishDraft():
-const updatedGuide: Guide = { ...guide, status: 'ready', ... };
-// Before:
-saveGuideDraft(updatedGuide);
-// After:
-await saveGuideDraft(updatedGuide); // Now async
-
-// Add error handling:
-try {
-  await saveGuideDraft(updatedGuide);
-  setMarkedReady(true);
-} catch (error) {
-  setMarkReadyError(true);
-  console.error('Failed to mark ready:', error);
-}
-```
-
-### Step 7: Test & Rollback
-
-- Test draft creation, editing, viewing in staging environment
-- Verify Forge Rules checks still work
-- Fallback: localStorage still present; easy to revert if issues
+### NOT in Phase 1:
+- Public QuestLine guides remain on mock data / localStorage
+- Generation events (optional, can add later)
+- Advanced RLS policies for teams/permissions
+- Analytics / usage tracking
+- Mod tools / content review workflows
 
 ---
 
-## 13. Risks & Questions Before Implementation
+## 7. Frontend Changes Required (High Level)
+
+Files that will need updates when Supabase is connected:
+
+1. **Storage Layer**:
+   - `lib/guideforge/guide-drafts-storage.ts` - Migrate from localStorage to Supabase
+
+2. **Components**:
+   - `components/guideforge/builder/guide-editor.tsx` - Call Supabase save/load
+   - `components/guideforge/builder/draft-workspace.tsx` - Query Supabase drafts
+   - `components/guideforge/builder/builder-workspace.tsx` - Hook up Supabase queries
+
+3. **API Routes** (if needed):
+   - `app/api/guideforge/drafts/[draftId].ts` - GET/PUT/DELETE draft
+   - `app/api/guideforge/forge-rules/check.ts` - POST validation check
+
+4. **Config**:
+   - `.env.local` - Add SUPABASE_URL, SUPABASE_ANON_KEY (user adds this)
+
+---
+
+## 8. Risks & Questions (Revised)
 
 ### Architectural Risks
 
-1. **Denormalization Trade-off**: Arrays like `hub_ids` in `networks` provide fast reads but risk inconsistency if hubs deleted. Solution: Add trigger to update parent array on hub delete.
+1. **Auth Integration Timing**
+   - **Risk**: Supabase auth not yet connected; created_by field will be null
+   - **Mitigation**: Use session storage or mock user ID for MVP; upgrade when auth ready
+   - **Question**: When should we connect Supabase auth? (separate project phase?)
 
-2. **Cascade Delete Complexity**: Should deleting a network cascade to all hubs/collections/guides? Or soft-delete with `archived` status? → Recommend: Soft delete via status column + cleanup script for true purges.
+2. **Offline-First Design**
+   - **Risk**: NetworkForge builder is offline-first (localStorage); Supabase adds latency
+   - **Mitigation**: Implement optimistic updates; keep localStorage cache; sync in background
+   - **Question**: Should drafts save to localStorage immediately, then sync to Supabase?
 
-3. **Auth Integration**: Schema assumes Supabase Auth user IDs exist. If Auth connected later, orphaned records possible. → Solution: Add nullable `user_id` fields initially; require auth later.
+3. **Content Hash for Staleness**
+   - **Risk**: SHA256 hashing guide content on every edit is expensive
+   - **Mitigation**: Hash on "Re-check" button only, not on every keystroke
+   - **Question**: Should we compute hash on frontend or backend?
 
-4. **Forge Rules Versioning**: If rule text changes, old check results may not reflect current rule. Need version column? → For MVP: Accept this limitation. Add `rule_version` column later if needed.
+### Data Model Risks
 
-### Performance Risks
+4. **Network-First vs. Guide-First Queries**
+   - **Risk**: Most queries filter by (network_id, status); might slow without composite indexes
+   - **Mitigation**: Create composite indexes on (network_id, status, created_at)
+   - **Question**: Do we need additional denormalization for performance?
 
-1. **Querying Nested Data**: Fetching a guide + 10 steps + forge rule results requires 3+ queries (N+1 problem). → Solution: Use `SELECT *, guide_steps(*), forge_rule_check_results(*)` with Supabase joins.
+5. **Forge Rules Check Run Retention**
+   - **Risk**: Check runs accumulate over time; table grows unbounded
+   - **Mitigation**: Archive old runs after 90 days; keep recent runs for staleness tracking
+   - **Question**: What's the retention policy for check runs?
 
-2. **Array Columns**: Querying `forge_rule_ids` array with containment checks (`forge_rule_ids @> ARRAY['rule_1']`) may be slow at scale. → For MVP: Acceptable. Separate `network_forge_rules` junction table if needed later.
-
-3. **Index Coverage**: Queries like "All published guides in hub" need `idx_guides_hub_status`. → Verify indexes added.
-
-### Data Risks
-
-1. **Content Hash for Staleness**: What if hash algorithm changes or is wrong? → Solution: Accept potential false-negatives (user re-checks manually). Good enough for MVP.
-
-2. **Migration Script**: One-time seed script may fail partway. → Solution: Add idempotency; safe to re-run if interrupted.
-
-3. **Timezone Handling**: Guide timestamps in ISO format (UTC). Supabase timestamps with time zone. Ensure conversion correct. → Use `TIMESTAMP WITH TIME ZONE` everywhere; app handles UTC.
+6. **Denormalization Trade-offs**
+   - **Risk**: Removed ID arrays; queries now require joins
+   - **Mitigation**: Joins on foreign keys are fast with indexes; trade simplicity for performance
+   - **Question**: If performance degrades, add `guides_count` to hubs?
 
 ### Integration Risks
 
-1. **OpenAI Integration Later**: Generated guides must have `created_by = null` initially? Or default to system user? → Solution: Create `system` user record; assign generations there.
+7. **Supabase Pricing Model**
+   - **Risk**: Large datasets (many drafts, check runs) might exceed free tier
+   - **Mitigation**: Estimate row counts; archive old data; upgrade tier if needed
+   - **Question**: What are the storage/compute budgets for Phase 1?
 
-2. **Auth Later**: Current users in mock data (Riley, Nova, etc.) have hardcoded UUIDs. If real auth later, IDs won't match. → Solution: Update mock data IDs to match future auth IDs, or treat mocks as separate test users.
-
-3. **Environment Variable Secrets**: Supabase anon key is public; should be safe per RLS policies. → Solution: Implement RLS strictly; test before production.
+8. **RLS Policy Complexity**
+   - **Risk**: Policies checking multiple joins (guides → networks → users) are slow
+   - **Mitigation**: Start with simple policies; optimize after profiling
+   - **Question**: Should we simplify RLS for MVP and enhance later?
 
 ### Operational Questions
 
-1. **Backup Strategy**: Does Supabase auto-backup? When? → Verify backup plan with user before going live.
+9. **Seed Data Strategy**
+   - **Risk**: How do we populate test networks/hubs/collections for testing?
+   - **Mitigation**: Provide SQL seed script; docs for manual setup
+   - **Question**: Should seed data be idempotent (safe to run multiple times)?
 
-2. **Rate Limits**: Supabase free tier has limits. If guide generation spikes, will hit limits? → Plan for upgrade path or caching layer.
+10. **Validation Determinism**
+    - **Risk**: validateForgeRules() might change over time; old check runs become invalid
+    - **Mitigation**: Version the validation rules; store rule version in check run
+    - **Question**: Should we add `forge_rules_version` to forge_rule_check_runs?
 
-3. **Real-time Sync**: Schema doesn't include `realtime` subscriptions. If needed later, which tables? → Defer to Phase 2.
+11. **Preview vs. Published**
+    - **Risk**: MVP only handles drafts; public QuestLine stays on mock data
+    - **Mitigation**: Clear separation: Supabase for builder drafts, mock data for public guides
+    - **Question**: When do we migrate public guides to Supabase? (Phase 2)
 
-### MVP Scope Questions
+12. **Concurrent Edits**
+    - **Risk**: Two users editing the same draft simultaneously
+    - **Mitigation**: Last-write-wins (simple); or implement conflict-free data structure (complex)
+    - **Question**: Do we need conflict resolution or is last-write-wins acceptable?
 
-1. **User Management**: Schema includes `users` table, but no sign-up/sign-in UI yet. Should we include placeholder or stub? → Recommended: Stub `users` table; auth UI in Phase 2.
-
-2. **Collections Editing**: Can users create collections? Or only admins? → For MVP: Hardcoded collections via seed data. UI in Phase 2.
-
-3. **Publish to Public**: Schema supports `published` status, but no public URL routing yet. Should guide creation skip to `draft` only? → Recommended: Yes; `published` status set manually by admins for demo purposes.
-
-4. **Workflow Approval**: `in-review` status implies review queue, but no review UI. Should this status exist for MVP? → Recommended: Simplify to `draft` → `ready` → `published` for MVP. Add `in-review` in Phase 2.
+13. **Performance at Scale**
+    - **Risk**: 1000+ drafts, 100+ networks, lots of concurrent check runs
+    - **Mitigation**: Add caching layer (Redis); pagination in UI; background jobs for heavy queries
+    - **Question**: What are the scaling limits? Should we add caching upfront or wait?
 
 ---
 
-## Summary
+## 9. Success Criteria
 
-This schema provides a production-ready foundation for GuideForge while remaining flexible for QuestLine (gaming), Techsperts (expert networks), and repair/SOP use cases. The key design decisions:
+MVP Phase 1 is complete when:
 
-1. **5-level hierarchy** (Network → Hub → Collection → Guide → Step) enforced via foreign keys
-2. **Denormalized ID arrays** for fast reads with trade-off on consistency
-3. **Separate status and verification** tiers for flexibility
-4. **Deterministic Forge Rules** with staleness detection
-5. **Generation event tracking** for analytics and audit trail
-6. **RLS-ready** structure, with policies to be added when auth implemented
+- ✓ All 10 tables created in Supabase
+- ✓ RLS policies enabled and tested
+- ✓ Draft save/load working end-to-end (editor → Supabase → draft list)
+- ✓ Forge Rules check runs and results stored correctly
+- ✓ Staleness detection working (content change detected, marked stale)
+- ✓ Public QuestLine guides still work (mock data, no regression)
+- ✓ Tests pass: offline fallback, error handling, concurrent saves
+- ✓ Documentation complete: schema, API, RLS, migration guide
 
-**Next Steps**:
-- [ ] User reviews schema for business logic alignment
-- [ ] Confirm environment variables and Supabase project details
-- [ ] Create seed data migration script
-- [ ] Update frontend layer (async/await for all storage calls)
-- [ ] Test end-to-end in staging Supabase project
-- [ ] Deploy to production with fallback to localStorage
+---
+
+## 10. Next Steps (Not in Scope)
+
+After Phase 1 MVP:
+
+- **Phase 2**: Migrate public QuestLine guides to Supabase
+- **Phase 3**: Add Supabase auth (profiles linked to auth.users)
+- **Phase 4**: Add generation_events analytics, advanced RLS for teams
+- **Phase 5**: Add mod tools, content review workflows, performance optimization
