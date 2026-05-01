@@ -59,10 +59,17 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         break
 
       case "minimum 3 sections":
+        // Check if this rule is marked as required (default true if not specified)
+        const isSectionsRequired = rule.required !== false
+        
         // Pass only if 3+ sections exist
         passed = validSectionsCount >= 3
         if (!passed) {
-          reason = `At least 3 sections needed (you have ${validSectionsCount}).`
+          if (isSectionsRequired) {
+            reason = `At least 3 sections needed (you have ${validSectionsCount}).`
+          } else {
+            reason = `${validSectionsCount} section${validSectionsCount !== 1 ? "s" : ""} present — 3+ recommended for this guide.`
+          }
         }
         break
 
@@ -101,18 +108,15 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         break
 
       case "requirements listed":
-        // Check if this rule is marked as required
-        const isRequired = rule.required !== false  // default true if not specified
+        // Phase 1: Requirements are always optional and non-blocking
+        const isPhase1 = true // Phase 1 toggle - requirements do not block Mark Ready
         
         // Pass only if at least 1 requirement
         passed = requirementsCount >= 1
         if (!passed) {
           console.log("[v0] Requirements validation failed - guide.requirements:", guide.requirements)
-          if (isRequired) {
-            reason = "At least one requirement must be listed."
-          } else {
-            reason = "No requirements listed — optional for this guide."
-          }
+          // Always show as optional in Phase 1
+          reason = "No requirements listed — optional for this guide."
         }
         break
 
@@ -151,10 +155,12 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         id: rule.id || rule.ruleId || "",
         label: rule.label || rule.name || "",
         description: rule.description || "",
-        required: rule.required !== false, // default to required if not specified
+        // Phase 1: Requirements Listed is always optional
+        required: ruleName === "requirements listed" ? false : (rule.required !== false),
       },
       passed,
-      required: rule.required !== false,
+      // Phase 1: Requirements Listed is always optional
+      required: ruleName === "requirements listed" ? false : (rule.required !== false),
       reason: passed ? undefined : reason,
     }
   })

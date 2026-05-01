@@ -209,10 +209,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       return
     }
 
-    // Check if Forge Rules pass
+    // Check if REQUIRED Forge Rules pass
     if (rulesCheckResult && rulesCheckResult.length > 0) {
-      const allPassed = rulesCheckResult.every((r: any) => r.passed)
-      if (!allPassed) {
+      const requiredFailures = rulesCheckResult.filter(
+        (r: any) => !r.passed && (r.required !== false)
+      )
+      if (requiredFailures.length > 0) {
+        console.log("[v0] Mark Ready blocked by required failures:", requiredFailures)
         setMarkReadyError(true)
         setTimeout(() => setMarkReadyError(false), 3000)
         return
@@ -315,7 +318,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {markedReady && (
                   <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="size-4" aria-hidden="true" />
-                    Guide marked ready. Public publishing will be enabled after Supabase is connected.
+                    {(() => {
+                      const optionalFailures = rulesCheckResult?.filter((r: any) => !r.passed && r.required === false) || []
+                      if (optionalFailures.length > 0) {
+                        return `Guide marked ready. Requirements are optional in Phase 1.`
+                      }
+                      return "Guide marked ready. Requirements are optional in Phase 1."
+                    })()}
                   </div>
                 )}
                 {markReadyError && (
@@ -323,7 +332,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                     <div className="size-4 rounded-full border border-current" />
                     {rulesStale 
                       ? "Rules check is stale. Re-check before marking ready."
-                      : "This guide needs to pass all Forge Rules before it can be marked ready."
+                      : (() => {
+                          const requiredFailures = rulesCheckResult?.filter((r: any) => !r.passed && r.required !== false) || []
+                          if (requiredFailures.length > 0) {
+                            return `Fix required issue${requiredFailures.length !== 1 ? "s" : ""}: ${requiredFailures.map((r: any) => r.rule.label).join(", ")}`
+                          }
+                          return "Rules check failed. Re-check before marking ready."
+                        })()
                     }
                   </div>
                 )}
@@ -509,7 +524,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <>
                     <CheckCircle2 className="mt-0.5 size-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
                     <div className="flex-1">
-                      <p className="font-semibold text-emerald-700 dark:text-emerald-300">Rules passed — ready for review</p>
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-300">All rules passed — ready for review</p>
                       <p className="mt-1 text-xs text-muted-foreground">{rulesCheckResult.filter((r: any) => r.passed).length}/{rulesCheckResult.length} requirements met</p>
                     </div>
                   </>
@@ -517,9 +532,31 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <>
                     <div className="mt-0.5 size-5 rounded-full border-2 border-amber-500 flex-shrink-0" aria-hidden="true" />
                     <div className="flex-1">
-                      <p className="font-semibold text-amber-700 dark:text-amber-300">Rules need attention</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{rulesCheckResult.filter((r: any) => r.passed).length}/{rulesCheckResult.length} requirements met</p>
-                      <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Fix the missing requirements, then re-check.</p>
+                      {(() => {
+                        const requiredFailures = rulesCheckResult.filter((r: any) => !r.passed && r.required !== false)
+                        const optionalFailures = rulesCheckResult.filter((r: any) => !r.passed && r.required === false)
+                        
+                        if (requiredFailures.length > 0) {
+                          return (
+                            <>
+                              <p className="font-semibold text-amber-700 dark:text-amber-300">
+                                {requiredFailures.length} required rule{requiredFailures.length !== 1 ? "s" : ""} need{requiredFailures.length !== 1 ? "" : "s"} fixing
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">{requiredFailures.map((r: any) => r.rule.label).join(", ")}</p>
+                              <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Fix these required issues to mark ready.</p>
+                            </>
+                          )
+                        } else if (optionalFailures.length > 0) {
+                          return (
+                            <>
+                              <p className="font-semibold text-blue-700 dark:text-blue-300">Optional recommendations remain</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{optionalFailures.map((r: any) => r.rule.label).join(", ")}</p>
+                              <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">These are suggestions but won&apos;t block marking ready.</p>
+                            </>
+                          )
+                        }
+                        return null
+                      })()}
                     </div>
                   </>
                 )}
