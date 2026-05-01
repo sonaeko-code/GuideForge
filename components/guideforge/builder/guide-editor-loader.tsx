@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Plus, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,7 +25,6 @@ export function GuideEditorLoader({
   guideId,
   fallback,
 }: GuideEditorLoaderProps) {
-  const router = useRouter()
   const [guide, setGuide] = useState<Guide | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)

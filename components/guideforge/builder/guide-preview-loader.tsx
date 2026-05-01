@@ -6,7 +6,6 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { loadGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
-import { normalizeGeneratedGuide } from "@/lib/guideforge/normalize-generated-guide"
 import type { Guide } from "@/lib/guideforge/types"
 
 interface GuidePreviewLoaderProps {
@@ -17,29 +16,78 @@ interface GuidePreviewLoaderProps {
 
 /**
  * Client-side preview loader for builder drafts.
- * Shows a read-only view of the guide as it would appear when published.
+ * Uses the same async loadGuideDraft path as GuideEditorLoader — both read
+ * from the same source of truth so Preview always shows what the Editor has.
  */
 export function GuidePreviewLoader({
   networkId,
   guideId,
   fallback,
 }: GuidePreviewLoaderProps) {
-  const [guide, setGuide] = useState<Guide>(fallback)
+  const [guide, setGuide] = useState<Guide | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    const draft = loadGuideDraft(guideId)
-    if (draft) {
-      const normalized = normalizeGeneratedGuide(draft, guideId)
-      setGuide(normalized)
+    const loadGuide = async () => {
+      try {
+        console.log("[v0] PreviewLoader: Loading draft for guideId:", guideId)
+
+        const draft = await loadGuideDraft(guideId)
+
+        if (draft) {
+          console.log("[v0] PreviewLoader: Draft loaded from storage:", {
+            id: draft.id,
+            title: draft.title,
+            stepsCount: draft.steps?.length ?? 0,
+          })
+          setGuide(draft)
+          setNotFound(false)
+        } else if (fallback && fallback.id === guideId) {
+          console.log("[v0] PreviewLoader: Using fallback guide")
+          setGuide(fallback)
+          setNotFound(false)
+        } else {
+          console.warn("[v0] PreviewLoader: Draft not found:", guideId)
+          setNotFound(true)
+          setGuide(null)
+        }
+      } catch (error) {
+        console.error("[v0] PreviewLoader: Error loading draft:", error)
+        setNotFound(true)
+        setGuide(null)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    setIsLoading(false)
-  }, [guideId])
+
+    loadGuide()
+  }, [guideId, fallback])
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Loading preview...</p>
+      </div>
+    )
+  }
+
+  if (notFound || !guide) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Button asChild variant="ghost" size="sm">
+            <Link href={`/builder/network/${networkId}/guide/${guideId}/edit`}>
+              <ArrowLeft className="size-4 mr-2" aria-hidden="true" />
+              Back to editor
+            </Link>
+          </Button>
+        </div>
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">
+            Draft not found. Go back to the editor to make sure the guide has been saved.
+          </p>
+        </Card>
       </div>
     )
   }

@@ -48,13 +48,13 @@ export async function createAndSaveGuideDraft(
 ): Promise<string> {
   console.log("[v0] createAndSaveGuideDraft started", {
     title: input.title,
-    summary: input.summary.substring(0, 50) + "...",
+    summary: input.summary?.substring(0, 60),
     guideType: input.guideType,
     difficulty: input.difficulty,
     networkId: input.networkId,
     hubId: input.hubId,
     collectionId: input.collectionId,
-    stepsCount: input.steps?.length || 0,
+    inputStepsCount: input.steps?.length ?? 0,
   })
 
   // Generate guide ID
@@ -63,31 +63,33 @@ export async function createAndSaveGuideDraft(
   // Seeded dev profile ID for Phase 1 (no auth yet)
   const SEEDED_DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
-  // Create starter section if none provided
-  const starterStep: GuideStep = {
-    id: uuidv4(),
-    guideId,
-    order: 0,
-    kind: "overview",
-    title: "Overview",
-    body: input.summary || "Start writing this guide section.",
-    isSpoiler: false,
-  }
+  // Build steps array.
+  // If steps were provided (generate path), use them directly — do NOT prepend a starter.
+  // If no steps were provided (manual create path), add a single starter Overview section.
+  const hasProvidedSteps = input.steps && input.steps.length > 0
 
-  // Build steps array
-  const steps: GuideStep[] = [
-    starterStep,
-    ...(input.steps?.map((step, index) => ({
-      id: step.id || uuidv4(),
-      guideId,
-      order: index + 1,
-      kind: step.kind || "custom",
-      title: step.title || "Untitled Step",
-      body: step.body || "",
-      isSpoiler: step.isSpoiler || false,
-      callout: step.callout,
-    })) || []),
-  ]
+  const steps: GuideStep[] = hasProvidedSteps
+    ? input.steps!.map((step, index) => ({
+        id: step.id || uuidv4(),
+        guideId,
+        order: index,
+        kind: step.kind || "custom",
+        title: step.title || "Untitled Step",
+        body: step.body || "",
+        isSpoiler: step.isSpoiler || false,
+        callout: step.callout,
+      }))
+    : [
+        {
+          id: uuidv4(),
+          guideId,
+          order: 0,
+          kind: "overview" as const,
+          title: "Overview",
+          body: input.summary || "Start writing this guide section.",
+          isSpoiler: false,
+        },
+      ]
 
   // Build complete Guide object
   const guide: Guide = {
@@ -123,10 +125,11 @@ export async function createAndSaveGuideDraft(
     updatedAt: new Date().toISOString(),
   }
 
-  console.log("[v0] Created guide object:", {
+  console.log("[v0] createAndSaveGuideDraft: canonical guide object built", {
     id: guide.id,
     title: guide.title,
     stepsCount: guide.steps.length,
+    stepTitles: guide.steps.map((s) => s.title),
     hubId: guide.hubId,
     collectionId: guide.collectionId,
     networkId: guide.networkId,
