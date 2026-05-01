@@ -21,6 +21,74 @@ import { LocalStoragePersistenceAdapter } from "./persistence"
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
 /**
+ * Map frontend collection identifiers to Supabase collection UUIDs.
+ * The frontend uses slug-like identifiers (e.g., "collection_character_builds"),
+ * but Supabase stores real UUIDs. This function looks up the real UUID.
+ * 
+ * During Phase 1, we query the database to find UUIDs by slug.
+ * Unknown slugs return null (which allows null collection_id in guides).
+ */
+async function normalizeCollectionIdForSupabase(
+  collectionId: string | null | undefined
+): Promise<string | null> {
+  if (!collectionId) {
+    console.log("[v0] Original collectionId: (empty/null)")
+    console.log("[v0] Supabase collection_id: null")
+    return null
+  }
+
+  console.log("[v0] Original collectionId:", collectionId)
+
+  // If it's already a UUID format (has dashes), assume it's real
+  if (collectionId.includes("-") && collectionId.length === 36) {
+    console.log("[v0] Supabase collection_id:", collectionId, "(already UUID)")
+    return collectionId
+  }
+
+  // For slug-like identifiers, try to look up the UUID
+  if (supabase) {
+    try {
+      // Map known frontend collection slugs to Supabase slugs
+      // Frontend uses "collection_character_builds", Supabase stores "character-builds"
+      let supabaseSlug = collectionId
+
+      if (collectionId === "collection_character_builds") {
+        supabaseSlug = "character-builds"
+      } else if (collectionId === "character-builds") {
+        supabaseSlug = "character-builds"
+      } else if (collectionId === "collection_boss_strategies" || collectionId === "boss-strategies") {
+        supabaseSlug = "boss-strategies"
+      }
+
+      console.log("[v0] Looking up collection UUID for slug:", supabaseSlug)
+
+      const { data, error } = await supabase
+        .from("collections")
+        .select("id")
+        .eq("slug", supabaseSlug)
+        .single()
+
+      if (error) {
+        console.warn("[v0] Collection lookup failed for slug", supabaseSlug, ":", error.message)
+        console.log("[v0] Supabase collection_id: null (lookup failed)")
+        return null
+      }
+
+      if (data?.id) {
+        console.log("[v0] Supabase collection_id:", data.id)
+        return data.id
+      }
+    } catch (error) {
+      console.error("[v0] Error looking up collection UUID:", error)
+    }
+  }
+
+  console.warn(`[v0] Unknown collection identifier: ${collectionId}, using null`)
+  console.log("[v0] Supabase collection_id: null (unknown identifier)")
+  return null
+}
+
+/**
  * Supabase implementation of GuidePersistenceAdapter
  * Includes localStorage fallback and seeded dev profile support for Phase 1
  */
@@ -64,14 +132,13 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
     try {
       const authorId = await this.getAuthorId()
 
-      // The guides table only has collection_id - no hub_id or network_id columns
-      // collection_id can be null if not set
-      const collectionId = guide.collectionId || null
+      // Normalize collection_id: convert frontend slug to real Supabase UUID
+      const normalizedCollectionId = await normalizeCollectionIdForSupabase(guide.collectionId)
 
       console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
         title: guide.title,
-        collectionId,
+        collectionId: normalizedCollectionId,
         authorId,
         stepsCount: guide.steps?.length ?? 0,
       })
@@ -82,7 +149,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // published_at, created_at, updated_at
       const guideData = {
         id: guide.id,
-        collection_id: collectionId,
+        collection_id: normalizedCollectionId,
         title: guide.title,
         slug: guide.slug || guide.id,
         summary: guide.summary,
