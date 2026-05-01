@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Flame, ChevronRight, Copy, Check, ArrowLeft } from "lucide-react"
+import { Flame, ChevronRight, Copy, Check, ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -22,8 +22,7 @@ import type {
   GenerationSession,
 } from "@/lib/guideforge/generation-schemas"
 import { generateMockResponse } from "@/lib/guideforge/mock-generator"
-import { saveGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
-import { generatedGuideToGuide } from "@/lib/guideforge/guide-mapper"
+import { createAndSaveGuideDraft } from "@/lib/guideforge/create-and-save-guide-draft"
 import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
 import {
   getNetworkById,
@@ -44,6 +43,7 @@ export default function GeneratorPage({
     guideType: "character-build",
     preferredDifficulty: "intermediate",
   })
+  const [isSending, setIsSending] = useState(false)
 
   // Load network on mount
   useEffect(() => {
@@ -90,6 +90,7 @@ export default function GeneratorPage({
       return
     }
 
+    setIsSending(true)
     try {
       console.log("[v0] handleSendToEditor started")
       const generatedGuide = session.response.guide
@@ -104,34 +105,32 @@ export default function GeneratorPage({
 
       // Use seeded IDs from Supabase schema
       // For Phase 1: Use emberfall hub and character-builds collection
-      // These are created by the seed SQL and can be resolved by slug
-      const guide = generatedGuideToGuide(generatedGuide, {
+      const guideId = await createAndSaveGuideDraft({
+        title: generatedGuide.title,
+        summary: generatedGuide.summary,
+        guideType: formState.guideType,
+        difficulty: generatedGuide.difficulty,
         networkId: networkId,
-        hubId: "emberfall", // Seeded hub slug from seed SQL
-        collectionId: "character-builds", // Seeded collection slug from seed SQL
+        hubId: "emberfall",
+        collectionId: "character-builds",
+        requirements: generatedGuide.requirements,
+        warnings: generatedGuide.warnings,
+        steps: generatedGuide.sections?.map((section) => ({
+          title: section.title,
+          body: section.body,
+          kind: section.kind,
+        })),
       })
 
-      console.log("[v0] Mapped guide before save:", {
-        id: guide.id,
-        title: guide.title,
-        summary: guide.summary,
-        stepsCount: guide.steps.length,
-        status: guide.status,
-        networkId: guide.networkId,
-        hubId: guide.hubId,
-        collectionId: guide.collectionId,
-      })
+      console.log("[v0] Saved guide with guideId:", guideId)
 
-      // Save generated guide with proper async flow
-      const draftId = await saveGuideDraft(guide)
-
-      console.log("[v0] Saved guide with draftId:", draftId)
-
-      // Redirect to guide editor with draft ID
-      router.push(`/builder/network/${networkId}/guide/${draftId}/edit`)
+      // Redirect to guide editor with guide ID
+      router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
     } catch (error) {
       console.error("[v0] Error in handleSendToEditor:", error)
       alert("Failed to save guide. See console for details.")
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -386,13 +385,20 @@ export default function GeneratorPage({
                         </div>
 
                         {/* Send to Editor */}
-                        <Button
-                          onClick={handleSendToEditor}
-                          className="w-full"
-                          variant="default"
-                        >
-                          Send to Editor
-                        </Button>
+            <Button
+              onClick={handleSendToEditor}
+              disabled={!session?.response?.guide || isSending}
+              size="lg"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                  Saving...
+                </>
+              ) : (
+                "Send to Editor"
+              )}
+            </Button>
                       </>
                     ) : (
                       <div className="text-center py-6">

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Sparkles } from "lucide-react"
+import { ArrowLeft, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -21,11 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { GuideType, DifficultyLevel, Guide, GuideAuthor } from "@/lib/guideforge/types"
-import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
-import { saveGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
+import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
+import { createAndSaveGuideDraft } from "@/lib/guideforge/create-and-save-guide-draft"
 import { generateMockResponse } from "@/lib/guideforge/mock-generator"
-import { normalizeGeneratedGuide } from "@/lib/guideforge/normalize-generated-guide"
 
 interface CreateGuideFormProps {
   networkId: string
@@ -46,10 +44,10 @@ const AUDIENCES = ["New Players", "Intermediate", "Advanced", "Hardcore", "PvP",
 
 export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  
   const [title, setTitle] = useState("Best Fire Warden Beginner Build")
   const [guideType, setGuideType] = useState<GuideType>("character-build")
-  const [hubId, setHubId] = useState("hub_emberfall")
-  const [collectionId, setCollectionId] = useState("collection_character_builds")
   const [audience, setAudience] = useState(["New Players"])
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("beginner")
   const [requirements, setRequirements] = useState("Character level 10 or higher")
@@ -57,72 +55,94 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
     "A forgiving sustain-mage build for new Emberfall players. Learn the fights without getting punished."
   )
 
-  const hubs = getHubsByNetwork(networkId)
-  const collections = hubId ? getCollectionsByHub(hubId) : []
-
-  // Mock author
-  const mockAuthor: GuideAuthor = {
-    id: "user_builder",
-    displayName: "You",
-    handle: "@builder",
-  }
-
-  const createEmptyGuide = (): Guide => {
-    const draftId = `draft_${Date.now()}`
-    return {
-      id: draftId,
-      networkId,
-      hubId,
-      collectionId,
-      slug: draftId,
-      title: title || "Untitled Guide",
-      summary: description || "",
-      type: guideType,
-      difficulty,
-      status: "draft",
-      verification: "unverified",
-      requirements: requirements ? requirements.split(",").map((r) => r.trim()) : [],
-      warnings: [],
-      version: "",
-      steps: [],
-      author: mockAuthor,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-  }
+  // Use seeded values for Phase 1 (questline/emberfall/character-builds)
+  const seededHubId = "emberfall"
+  const seededCollectionId = "character-builds"
 
   const handleGenerateMock = async () => {
-    // Create empty guide first
-    const guide = createEmptyGuide()
+    if (!title.trim()) {
+      alert("Please enter a guide title")
+      return
+    }
 
-    // Generate mock content using proper GenerationRequest format
-    const response = await generateMockResponse({
-      prompt: title || "Create a helpful guide",
-      guideType,
-      preferredDifficulty: difficulty,
-      targetHubId: hubId,
-      targetCollectionId: collectionId,
-    })
+    setIsLoading(true)
+    try {
+      console.log("[v0] Generating mock guide with title:", title)
 
-    if (response.guide) {
-      // Normalize generated guide to editor shape
-      const normalized = normalizeGeneratedGuide(response.guide, guide.id)
-      
-      // Save to localStorage
-      saveGuideDraft(normalized)
+      // Generate mock content
+      const response = await generateMockResponse({
+        prompt: title || "Create a helpful guide",
+        guideType,
+        preferredDifficulty: difficulty,
+        targetHubId: seededHubId,
+        targetCollectionId: seededCollectionId,
+      })
 
-      // Navigate to editor
-      router.push(`/builder/network/${networkId}/guide/${guide.id}/edit`)
+      if (response.guide) {
+        console.log("[v0] Mock generation complete, creating draft...")
+
+        // Use centralized function to create and save draft
+        const guideId = await createAndSaveGuideDraft({
+          title: response.guide.title || title,
+          summary: response.guide.summary || description,
+          guideType,
+          difficulty,
+          networkId,
+          hubId: seededHubId,
+          collectionId: seededCollectionId,
+          requirements: response.guide.requirements,
+          warnings: response.guide.warnings,
+          steps: response.guide.sections?.map((section) => ({
+            title: section.title,
+            body: section.body,
+            kind: section.kind,
+          })),
+          audience: audience,
+        })
+
+        console.log("[v0] Generated guide saved, redirecting to editor")
+        router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
+      }
+    } catch (error) {
+      console.error("[v0] Error generating guide:", error)
+      alert("Failed to generate guide. Check console for details.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleContinueToEditor = () => {
-    // Create empty guide and save to localStorage
-    const guide = createEmptyGuide()
-    saveGuideDraft(guide)
+  const handleContinueToEditor = async () => {
+    if (!title.trim()) {
+      alert("Please enter a guide title")
+      return
+    }
 
-    // Navigate to editor
-    router.push(`/builder/network/${networkId}/guide/${guide.id}/edit`)
+    setIsLoading(true)
+    try {
+      console.log("[v0] Creating manual guide draft...")
+
+      // Use centralized function to create and save manual draft
+      const guideId = await createAndSaveGuideDraft({
+        title,
+        summary: description,
+        guideType,
+        difficulty,
+        networkId,
+        hubId: seededHubId,
+        collectionId: seededCollectionId,
+        requirements: requirements ? requirements.split(",").map((r) => r.trim()) : [],
+        warnings: [],
+        audience: audience,
+      })
+
+      console.log("[v0] Manual guide created, redirecting to editor")
+      router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
+    } catch (error) {
+      console.error("[v0] Error creating guide:", error)
+      alert("Failed to create guide. Check console for details.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -274,18 +294,34 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
       </div>
 
       <div className="flex gap-3 pt-4">
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" disabled={isLoading}>
           <Link href={`/builder/network/${networkId}/dashboard`}>
             <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
             Back
           </Link>
         </Button>
-        <Button onClick={handleGenerateMock} variant="secondary">
-          <Sparkles className="mr-2 size-4" aria-hidden="true" />
-          Generate Mock Guide
+        <Button onClick={handleGenerateMock} variant="secondary" disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 size-4" aria-hidden="true" />
+              Generate Mock Guide
+            </>
+          )}
         </Button>
-        <Button onClick={handleContinueToEditor}>
-          Continue to Editor
+        <Button onClick={handleContinueToEditor} disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+              Creating...
+            </>
+          ) : (
+            "Continue to Editor"
+          )}
         </Button>
       </div>
     </div>
