@@ -14,7 +14,7 @@ import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
-import { saveGuideDraft, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { saveGuideDraftSync, deleteDraftSync, updateDraftStatusSync } from "@/lib/guideforge/guide-drafts-storage"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -60,7 +60,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
       setIsSaving(true)
-      saveGuideDraft(updatedGuide)
+      saveGuideDraftSync(updatedGuide)
       setLastSaved(new Date())
       setIsSaving(false)
     }, 300)
@@ -110,7 +110,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: results as any,
       forgeRulesCheckTimestamp: checkTimestamp,
     }
-    saveGuideDraft(updatedGuide)
+    saveGuideDraftSync(updatedGuide)
   }
 
   // Check if validation needs refreshing when content changes
@@ -146,7 +146,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   const handleDelete = () => {
     if (confirm("Are you sure you want to delete this draft? This cannot be undone.")) {
-      deleteDraft(guide.id)
+      deleteDraftSync(guide.id)
       router.push(`/builder/network/${networkId}/dashboard`)
     }
   }
@@ -181,7 +181,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: rulesCheckResult as any,
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
-    saveGuideDraft(updatedGuide)
+    saveGuideDraftSync(updatedGuide)
     setMarkedReady(true)
     
     // Clear confirmation message after 3 seconds

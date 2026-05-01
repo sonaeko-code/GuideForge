@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Eye, Edit2, Trash2, Sparkles, FileText, Lock, Plus } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
-import { getDraftsByNetwork, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { getDraftsByNetworkSync, deleteDraftSync } from "@/lib/guideforge/guide-drafts-storage"
 import { formatDistanceToNow } from "date-fns"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 
@@ -21,14 +21,14 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
 
   useEffect(() => {
     // Load drafts from localStorage
-    const networkDrafts = getDraftsByNetwork(networkId)
+    const networkDrafts = getDraftsByNetworkSync(networkId)
     setDrafts(networkDrafts)
     setIsLoading(false)
   }, [networkId])
 
   const handleDelete = (draftId: string) => {
     if (confirm("Delete this draft? This cannot be undone.")) {
-      deleteDraft(draftId)
+      deleteDraftSync(draftId)
       setDrafts(drafts.filter(d => d.id !== draftId))
     }
   }
