@@ -58,38 +58,36 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
   /**
    * Save a guide draft to Supabase and return source.
    * Returns { id, source: "supabase" } if save succeeds.
-   * Returns { id, source: "localStorage" } if save fails or Supabase unavailable.
+   * Returns { id, source: "localStorage", error } if save fails or Supabase unavailable.
    */
-  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> {
     const configured = isSupabaseConfigured()
 
     if (!configured || !supabase) {
-      console.log("[v0] saveDraft: Supabase not configured — using localStorage")
+      const reason = !supabase 
+        ? "Supabase client not initialized" 
+        : "Supabase env vars missing or invalid"
+      console.log("[v0] saveDraft:", reason, "— using localStorage")
       this.localStorageAdapter.saveDraftSync(guide)
-      return { id: guide.id, source: "localStorage" }
+      return { id: guide.id, source: "localStorage", error: reason }
     }
 
     try {
       const authorId = await this.getAuthorId()
 
-      // Map input IDs to seeded Supabase UUIDs
-      // Input may contain slugs or partial IDs, so map to known seeded IDs
-      let hubId = guide.hubId || SEEDED_IDS.hubs.emberfall
-      let collectionId = guide.collectionId || SEEDED_IDS.collections.characterBuilds
-      let networkId = guide.networkId || SEEDED_IDS.networkId
+      // Use the IDs from the guide directly - they should match what's in Supabase
+      // If they're slugs/non-UUIDs, the DB will reject them with a clear error
+      const hubId = guide.hubId || null
+      const collectionId = guide.collectionId || null
+      const networkId = guide.networkId || null
 
-      // Map common slug formats to seeded UUIDs
-      if (hubId === "emberfall") hubId = SEEDED_IDS.hubs.emberfall
-      if (collectionId === "character-builds") collectionId = SEEDED_IDS.collections.characterBuilds
-      if (networkId === "questline") networkId = SEEDED_IDS.networkId
-
-      console.log("[v0] saveDraft: New guide object before save:", {
+      console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
         title: guide.title,
-        networkId: guide.networkId,
-        hubId: guide.hubId,
-        collectionId: guide.collectionId,
-        authorId: guide.author?.id,
+        networkId,
+        hubId,
+        collectionId,
+        authorId,
         stepsCount: guide.steps?.length ?? 0,
       })
 
@@ -112,31 +110,28 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         published_at: guide.publishedAt || null,
       }
 
-      console.log("[v0] Supabase guide insert/upsert payload:", {
+      console.log("[v0] Supabase guide upsert payload:", JSON.stringify({
         id: guideData.id,
         title: guideData.title.substring(0, 50),
         hub_id: guideData.hub_id,
         collection_id: guideData.collection_id,
         network_id: guideData.network_id,
         author_id: guideData.author_id,
-      })
+        type: guideData.type,
+        difficulty: guideData.difficulty,
+        status: guideData.status,
+      }, null, 2))
 
       const { error: guideError } = await supabase
         .from("guides")
         .upsert(guideData, { onConflict: "id" })
 
-      console.log("[v0] Supabase guide save result: error =", guideError)
-      
       if (guideError) {
-        console.error("[v0] Supabase guide save error:", {
-          code: guideError.code,
-          message: guideError.message,
-          details: guideError.details,
-          hint: guideError.hint,
-        })
-        console.log("[v0] saveDraft: Falling back to localStorage")
+        const errorMsg = `${guideError.code}: ${guideError.message}${guideError.hint ? ` (${guideError.hint})` : ""}`
+        console.error("[v0] Supabase guide save FAILED:", errorMsg)
+        console.error("[v0] Full error:", JSON.stringify(guideError, null, 2))
         this.localStorageAdapter.saveDraftSync(guide)
-        return { id: guide.id, source: "localStorage" }
+        return { id: guide.id, source: "localStorage", error: errorMsg }
       }
 
       console.log("[v0] saveDraft: Supabase guides upsert SUCCESS")

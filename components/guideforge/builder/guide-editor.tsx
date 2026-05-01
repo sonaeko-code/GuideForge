@@ -66,13 +66,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       setSaveError(null)
       ;(async () => {
         try {
-          const { source } = await saveGuideDraft(updatedGuide)
+          const { source, error } = await saveGuideDraft(updatedGuide)
           setSaveSource(source)
           setLastSaved(new Date())
           
-          // Only clear error if save was to Supabase, otherwise show fallback message
+          // Show actual error if Supabase save failed
           if (source === "supabase") {
             setSaveError(null)
+          } else if (error) {
+            setSaveError(`Supabase save failed: ${error}`)
           } else {
             setSaveError("Supabase save failed — saved locally instead")
           }

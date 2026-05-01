@@ -18,9 +18,9 @@ import type { Guide } from "./types"
 export interface GuidePersistenceAdapter {
   /**
    * Save or update a guide draft.
-   * Returns { id, source } indicating where the guide was saved.
+   * Returns { id, source, error? } indicating where the guide was saved and any error.
    */
-  saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage" }>
+  saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }>
 
   /**
    * Load a guide draft by ID.
@@ -75,7 +75,7 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
     return typeof window !== "undefined" && typeof localStorage !== "undefined"
   }
 
-  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> {
     return { id: this.saveDraftSync(guide), source: "localStorage" }
   }
 
