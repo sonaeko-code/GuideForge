@@ -14,7 +14,7 @@ import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
-import { saveGuideDraftWithSource, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
+import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -66,7 +66,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       setSaveError(null)
       ;(async () => {
         try {
-          const { source } = await saveGuideDraftWithSource(updatedGuide)
+          const { source } = await saveGuideDraft(updatedGuide)
           setSaveSource(source)
           setLastSaved(new Date())
           
@@ -129,7 +129,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: results as any,
       forgeRulesCheckTimestamp: checkTimestamp,
     }
-    const { source } = await saveGuideDraftWithSource(updatedGuide)
+    const { source } = await saveGuideDraft(updatedGuide)
     setSaveSource(source)
     setLastSaved(new Date())
     if (source !== "supabase") {
@@ -207,7 +207,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: rulesCheckResult as any,
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
-    const { source } = await saveGuideDraftWithSource(updatedGuide)
+    const { source } = await saveGuideDraft(updatedGuide)
     setSaveSource(source)
     setLastSaved(new Date())
     if (source !== "supabase") {
