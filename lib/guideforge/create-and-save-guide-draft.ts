@@ -14,7 +14,7 @@
  */
 
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"
-import { saveGuideDraftWithSource, loadGuideDraft } from "./guide-drafts-storage"
+import { saveGuideDraft, loadGuideDraft } from "./guide-drafts-storage"
 import { v4 as uuidv4 } from "uuid"
 
 export interface CreateGuideDraftInput {
@@ -146,14 +146,14 @@ export async function createAndSaveGuideDraft(
     status: guide.status,
   })
 
-  // Save to Supabase/localStorage - use saveGuideDraftWithSource to get actual storage source
+  // Save to Supabase/localStorage - use saveGuideDraft to get actual storage source
   let saveResult: { id: string; source: "supabase" | "localStorage" }
   try {
-    saveResult = await saveGuideDraftWithSource(guide)
-    console.log("[v0] Save returned id:", saveResult.id)
-    console.log("[v0] Save returned source:", saveResult.source)
+    saveResult = await saveGuideDraft(guide)
+    console.log("[v0] createAndSaveGuideDraft: Save returned id:", saveResult.id)
+    console.log("[v0] createAndSaveGuideDraft: Save returned source:", saveResult.source)
   } catch (error) {
-    console.error("[v0] Error saving guide:", error)
+    console.error("[v0] createAndSaveGuideDraft: Error saving guide:", error)
     return {
       id: guide.id,
       source: "localStorage",
@@ -163,12 +163,12 @@ export async function createAndSaveGuideDraft(
   }
 
   // HARD-STOP VERIFICATION: Immediately reload the saved guide
-  console.log("[v0] Attempting immediate reload of saved guide:", saveResult.id)
+  console.log("[v0] createAndSaveGuideDraft: Attempting immediate reload of saved guide:", saveResult.id)
   try {
     const reloadedGuide = await loadGuideDraft(saveResult.id)
     
     if (!reloadedGuide) {
-      console.error("[v0] Immediate reload result: null (FAILED)")
+      console.error("[v0] createAndSaveGuideDraft: Immediate reload result: null (FAILED)")
       
       // Log debug info
       if (typeof window !== "undefined") {
@@ -181,13 +181,13 @@ export async function createAndSaveGuideDraft(
         id: saveResult.id,
         source: saveResult.source,
         verified: false,
-        error: "Guide saved failed verification. Could not reload saved guide.",
+        error: "Guide save failed verification. Could not reload saved guide.",
       }
     }
     
-    console.log("[v0] Immediate reload result: SUCCESS")
-    console.log("[v0] Reloaded guide title:", reloadedGuide.title)
-    console.log("[v0] Reloaded guide steps:", reloadedGuide.steps.length)
+    console.log("[v0] createAndSaveGuideDraft: Immediate reload result: SUCCESS")
+    console.log("[v0] createAndSaveGuideDraft: Reloaded guide title:", reloadedGuide.title)
+    console.log("[v0] createAndSaveGuideDraft: Reloaded guide steps:", reloadedGuide.steps.length)
     
     return {
       id: saveResult.id,
@@ -195,7 +195,7 @@ export async function createAndSaveGuideDraft(
       verified: true,
     }
   } catch (reloadError) {
-    console.error("[v0] Immediate reload error:", reloadError)
+    console.error("[v0] createAndSaveGuideDraft: Immediate reload error:", reloadError)
     return {
       id: saveResult.id,
       source: saveResult.source,
