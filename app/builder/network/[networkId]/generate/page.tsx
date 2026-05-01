@@ -30,6 +30,11 @@ import {
   getCollectionsByHub,
 } from "@/lib/guideforge/mock-data"
 
+// Phase 1: Seeded IDs for QuestLine network (actual Supabase UUIDs)
+const SEEDED_NETWORK_ID = "network_questline"
+const SEEDED_HUB_ID = "hub_emberfall"
+const SEEDED_COLLECTION_ID = "collection_character_builds"
+
 export default function GeneratorPage({
   params,
 }: {
@@ -112,9 +117,9 @@ export default function GeneratorPage({
         summary: generatedGuide.summary,
         guideType: formState.guideType,
         difficulty: generatedGuide.difficulty,
-        networkId: networkId,
-        hubId: "emberfall",
-        collectionId: "character-builds",
+        networkId: SEEDED_NETWORK_ID,
+        hubId: SEEDED_HUB_ID,
+        collectionId: SEEDED_COLLECTION_ID,
         requirements: generatedGuide.requirements,
         warnings: generatedGuide.warnings,
         steps: generatedGuide.sections?.map((section) => ({
@@ -133,7 +138,7 @@ export default function GeneratorPage({
       console.log("[v0] handleSendToEditor: Verification succeeded, redirecting to editor id:", id)
 
       // Redirect to guide editor with guide ID
-      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
+      router.push(`/builder/network/${SEEDED_NETWORK_ID}/guide/${id}/edit`)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] Error in handleSendToEditor:", error)

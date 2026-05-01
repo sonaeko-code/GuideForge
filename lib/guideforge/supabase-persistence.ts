@@ -20,17 +20,14 @@ import { LocalStoragePersistenceAdapter } from "./persistence"
 // Phase 1: Seeded dev profile UUID
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
-// Phase 1: Known seeded IDs from seed data
+// Phase 1: Known seeded IDs from seed data (these are the actual UUIDs used in Supabase, not slugs)
 const SEEDED_IDS = {
-  networkId: "questline", // Will be resolved by slug
+  networkId: "network_questline", // Actual UUID, not slug
   hubs: {
-    emberfall: "emberfall",
-    starfallOutriders: "starfall-outriders",
+    emberfall: "hub_emberfall",
   },
   collections: {
-    characterBuilds: "character-builds",
-    bossBattles: "boss-battles",
-    quests: "quests",
+    characterBuilds: "collection_character_builds", // Actual UUID, not slug
   },
 }
 
@@ -75,9 +72,26 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
     try {
       const authorId = await this.getAuthorId()
 
-      const hubId = guide.hubId || "emberfall"
-      const collectionId = guide.collectionId || "character-builds"
-      const networkId = guide.networkId || "questline"
+      // Map input IDs to seeded Supabase UUIDs
+      // Input may contain slugs or partial IDs, so map to known seeded IDs
+      let hubId = guide.hubId || SEEDED_IDS.hubs.emberfall
+      let collectionId = guide.collectionId || SEEDED_IDS.collections.characterBuilds
+      let networkId = guide.networkId || SEEDED_IDS.networkId
+
+      // Map common slug formats to seeded UUIDs
+      if (hubId === "emberfall") hubId = SEEDED_IDS.hubs.emberfall
+      if (collectionId === "character-builds") collectionId = SEEDED_IDS.collections.characterBuilds
+      if (networkId === "questline") networkId = SEEDED_IDS.networkId
+
+      console.log("[v0] saveDraft: New guide object before save:", {
+        id: guide.id,
+        title: guide.title,
+        networkId: guide.networkId,
+        hubId: guide.hubId,
+        collectionId: guide.collectionId,
+        authorId: guide.author?.id,
+        stepsCount: guide.steps?.length ?? 0,
+      })
 
       const guideData = {
         id: guide.id,
@@ -98,7 +112,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         published_at: guide.publishedAt || null,
       }
 
-      console.log("[v0] saveDraft: Upserting guide to Supabase", {
+      console.log("[v0] Supabase guide insert/upsert payload:", {
         id: guideData.id,
         title: guideData.title.substring(0, 50),
         hub_id: guideData.hub_id,
@@ -111,8 +125,10 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         .from("guides")
         .upsert(guideData, { onConflict: "id" })
 
+      console.log("[v0] Supabase guide save result: error =", guideError)
+      
       if (guideError) {
-        console.error("[v0] saveDraft: Supabase guides upsert FAILED", {
+        console.error("[v0] Supabase guide save error:", {
           code: guideError.code,
           message: guideError.message,
           details: guideError.details,
@@ -127,6 +143,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0
+      console.log("[v0] Supabase steps payload count:", stepCount)
+      
       if (stepCount > 0) {
         const stepsData = guide.steps!.map((step) => ({
           id: step.id,
@@ -147,6 +165,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           .from("guide_steps")
           .insert(stepsData)
 
+        console.log("[v0] Supabase steps save error:", stepsError)
+        
         if (stepsError) {
           console.error("[v0] saveDraft: guide_steps insert FAILED", {
             code: stepsError.code,
