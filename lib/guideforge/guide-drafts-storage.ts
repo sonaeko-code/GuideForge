@@ -130,15 +130,16 @@ export async function saveGuideDraft(guide: Guide): Promise<string> {
 export async function saveGuideDraftWithSource(
   guide: Guide
 ): Promise<{ id: string; source: "supabase" | "localStorage" }> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const isConfigured = !!(supabaseUrl && supabaseAnonKey)
-
-  const id = await getAdapter().saveDraft(guide)
-  // If Supabase is configured the adapter will have tried Supabase first.
-  // We infer the source from whether Supabase is configured.
-  const source: "supabase" | "localStorage" = isConfigured ? "supabase" : "localStorage"
-  return { id, source }
+  const adapter = getAdapter()
+  
+  // If adapter has saveDraftWithSource, use it (Supabase adapter)
+  if ("saveDraftWithSource" in adapter) {
+    return (adapter as any).saveDraftWithSource(guide)
+  }
+  
+  // Fallback: just save and assume localStorage
+  const id = await adapter.saveDraft(guide)
+  return { id, source: "localStorage" }
 }
 
 /**
