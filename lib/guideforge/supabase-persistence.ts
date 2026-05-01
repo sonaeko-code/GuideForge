@@ -181,6 +181,8 @@ async function generateUniqueSlugForCollection(
   }
 }
 
+/**
+ * Map frontend collection identifiers to Supabase collection UUIDs.
  * The frontend uses slug-like identifiers (e.g., "collection_character_builds"),
  * but Supabase stores real UUIDs. This function looks up the real UUID.
  * 
