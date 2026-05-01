@@ -1,8 +1,9 @@
 import type { Guide, ForgeRule } from "./types"
 
 export interface ForgeRulesCheckResult {
-  rule: { id: string; label: string; description: string }
+  rule: { id: string; label: string; description: string; required?: boolean }
   passed: boolean
+  required?: boolean
   reason?: string
 }
 
@@ -100,11 +101,18 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         break
 
       case "requirements listed":
+        // Check if this rule is marked as required
+        const isRequired = rule.required !== false  // default true if not specified
+        
         // Pass only if at least 1 requirement
         passed = requirementsCount >= 1
         if (!passed) {
           console.log("[v0] Requirements validation failed - guide.requirements:", guide.requirements)
-          reason = "At least one requirement must be listed."
+          if (isRequired) {
+            reason = "At least one requirement must be listed."
+          } else {
+            reason = "No requirements listed — optional for this guide."
+          }
         }
         break
 
@@ -143,8 +151,10 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         id: rule.id || rule.ruleId || "",
         label: rule.label || rule.name || "",
         description: rule.description || "",
+        required: rule.required !== false, // default to required if not specified
       },
       passed,
+      required: rule.required !== false,
       reason: passed ? undefined : reason,
     }
   })
