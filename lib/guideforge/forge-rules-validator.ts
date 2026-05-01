@@ -18,6 +18,9 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
   const validSectionsCount = guide.steps?.filter(s => s.title?.trim() && s.body?.trim()).length || 0
   const requirementsCount = guide.requirements?.length || 0
 
+  console.log("[v0] Forge rules requirements value:", guide.requirements)
+  console.log("[v0] Forge rules requirements count:", requirementsCount)
+
   return availableRules.map((rule) => {
     let passed = false
     let reason: string | undefined
@@ -100,6 +103,7 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         // Pass only if at least 1 requirement
         passed = requirementsCount >= 1
         if (!passed) {
+          console.log("[v0] Requirements validation failed - guide.requirements:", guide.requirements)
           reason = "At least one requirement must be listed."
         }
         break

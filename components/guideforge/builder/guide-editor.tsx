@@ -24,11 +24,18 @@ interface GuideEditorProps {
 
 export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const router = useRouter()
-  const [title, setTitle] = useState(guide.title || "")
-  const [summary, setSummary] = useState(guide.summary || "")
+  // Ensure requirements is always an array
+  const normalizedGuide = {
+    ...guide,
+    requirements: guide.requirements && Array.isArray(guide.requirements) ? guide.requirements : [],
+    warnings: guide.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
+  }
+  
+  const [title, setTitle] = useState(normalizedGuide.title || "")
+  const [summary, setSummary] = useState(normalizedGuide.summary || "")
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
-  const [steps, setSteps] = useState(guide.steps || [])
-  const [version, setVersion] = useState(guide.version || "")
+  const [steps, setSteps] = useState(normalizedGuide.steps || [])
+  const [version, setVersion] = useState(normalizedGuide.version || "")
   const [rulesApplied, setRulesApplied] = useState(false)
   const [rulesCheckResult, setRulesCheckResult] = useState<ForgeRulesCheckResult[] | null>(null)
   const [rulesCheckTimestamp, setRulesCheckTimestamp] = useState<number | null>(null)
@@ -55,7 +62,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     // Set new timer
     autosaveTimerRef.current = setTimeout(() => {
       const updatedGuide: Guide = {
-        ...guide,
+        ...normalizedGuide,
         title,
         summary,
         steps,
@@ -92,12 +99,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, steps, version, guide])
+  }, [title, summary, steps, version, normalizedGuide])
 
   // Mock state tracking for draft/ready/published flow
-  const isDraft = guide.status === "draft"
-  const isReady = guide.status === "ready"
-  const isPublished = guide.status === "published"
+  const isDraft = normalizedGuide.status === "draft"
+  const isReady = normalizedGuide.status === "ready"
+  const isPublished = normalizedGuide.status === "published"
 
   // Safe .find() with defensive chaining
   const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
@@ -106,7 +113,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const handleApplyForgeRules = async () => {
     // Get the complete guide object
     const currentGuide: Guide = {
-      ...guide,
+      ...normalizedGuide,
       title,
       summary,
       steps,
@@ -410,13 +417,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
         {/* Requirements and warnings */}
         <div className="grid gap-4 md:grid-cols-2">
-          {guide.requirements.length > 0 && (
+          {normalizedGuide.requirements.length > 0 && (
             <Card className="border-border/50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Requirements
               </p>
               <ul className="mt-3 space-y-1">
-                {guide.requirements.map((req, idx) => (
+                {normalizedGuide.requirements.map((req, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
                     <span className="mt-1 size-1 flex-shrink-0 rounded-full bg-primary" />
                     {req}
@@ -426,13 +433,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </Card>
           )}
 
-          {guide.warnings.length > 0 && (
+          {normalizedGuide.warnings.length > 0 && (
             <Card className="border-amber-500/20 bg-amber-500/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                 Warnings
               </p>
               <ul className="mt-3 space-y-1">
-                {guide.warnings.map((warn, idx) => (
+                {normalizedGuide.warnings.map((warn, idx) => (
                   <li key={idx} className="text-sm text-amber-700 dark:text-amber-400">
                     ⚠ {warn}
                   </li>
