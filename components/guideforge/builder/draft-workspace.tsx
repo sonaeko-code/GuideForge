@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Eye, Edit2, Trash2, Sparkles, FileText, Lock, Plus, Database, HardDrive } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
-import { getDraftsByNetwork, deleteDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { getDraftsByNetwork, deleteDraft, getPersistenceSource } from "@/lib/guideforge/guide-drafts-storage"
 import { formatDistanceToNow } from "date-fns"
 import { MOCK_HUBS, MOCK_COLLECTIONS } from "@/lib/guideforge/mock-data"
 
@@ -57,16 +57,16 @@ const isSupabaseConfigured =
 
 export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
   const [drafts, setDrafts] = useState<Guide[]>([])
-  const [draftSource, setDraftSource] = useState<"supabase" | "localStorage" | null>(null)
+  const [draftSource, setDraftSource] = useState<"supabase" | "localStorage">(getPersistenceSource())
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const loadDrafts = async () => {
       const networkDrafts = await getDraftsByNetwork(networkId)
       setDrafts(networkDrafts)
-      // Infer source: if Supabase configured, the adapter tried Supabase first
-      setDraftSource(isSupabaseConfigured ? "supabase" : "localStorage")
-      console.log("[v0] Dashboard loaded draft source:", isSupabaseConfigured ? "supabase" : "localStorage", "| count:", networkDrafts.length)
+      // Use getPersistenceSource to get the actual source
+      setDraftSource(getPersistenceSource())
+      console.log("[v0] DraftWorkspace loaded from", getPersistenceSource(), "| count:", networkDrafts.length)
       setIsLoading(false)
     }
     loadDrafts()
