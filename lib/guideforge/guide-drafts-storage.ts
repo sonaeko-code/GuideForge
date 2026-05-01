@@ -121,21 +121,18 @@ export async function saveGuideDraft(guide: Guide): Promise<string> {
 }
 
 /**
- * Save a guide draft and return both the ID and which storage was used.
- * Used by the editor to show "Saved to Supabase" vs "Saved locally".
+ * Save a guide draft and return both ID and storage source.
+ * Used by create/generate flows to verify save succeeded before redirecting.
  * 
  * @param guide - The Guide object to save
- * @returns Promise<{ id: string; source: "supabase" | "localStorage" }>
+ * @returns Promise<{ id: string; source: "supabase" | "localStorage" }> - Save result with storage source
  */
-export async function saveGuideDraftWithSource(
+export async function saveGuideDraft(
   guide: Guide
 ): Promise<{ id: string; source: "supabase" | "localStorage" }> {
   const adapter = getAdapter()
-  
-  // If adapter has saveDraftWithSource, use it (Supabase adapter)
-  if ("saveDraftWithSource" in adapter) {
-    return (adapter as any).saveDraftWithSource(guide)
-  }
+  return adapter.saveDraft(guide)
+}
   
   // Fallback: just save and assume localStorage
   const id = await adapter.saveDraft(guide)
