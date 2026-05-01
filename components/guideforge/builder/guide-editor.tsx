@@ -50,7 +50,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
 
     // Set new timer
-    autosaveTimerRef.current = setTimeout(async () => {
+    autosaveTimerRef.current = setTimeout(() => {
       const updatedGuide: Guide = {
         ...guide,
         title,
@@ -60,9 +60,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
       setIsSaving(true)
-      await saveGuideDraft(updatedGuide)
-      setLastSaved(new Date())
-      setIsSaving(false)
+      ;(async () => {
+        await saveGuideDraft(updatedGuide)
+        setLastSaved(new Date())
+        setIsSaving(false)
+      })()
     }, 300)
 
     return () => {
