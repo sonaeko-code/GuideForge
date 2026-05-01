@@ -7,6 +7,7 @@ import { DifficultyBadge } from "@/components/guideforge/shared"
 import { QuestLineHeader } from "@/components/questline/site-header"
 import { QuestLineFooter } from "@/components/questline/site-footer"
 import { MOCK_GUIDES, MOCK_HUBS, getCollectionsByHub } from "@/lib/guideforge/mock-data"
+import { loadPublishedGuide, loadPublishedGuides } from "@/lib/guideforge/supabase-public"
 
 export default async function PublicGuidePage({
   params,
@@ -19,7 +20,12 @@ export default async function PublicGuidePage({
 }) {
   const { hubSlug, guideSlug } = await params
   const hub = MOCK_HUBS.find((h) => h.slug === hubSlug)
-  const guide = MOCK_GUIDES.find((g) => g.slug === guideSlug)
+  
+  // Try to load from Supabase first, then fallback to mock data
+  let guide = await loadPublishedGuide(guideSlug)
+  if (!guide) {
+    guide = MOCK_GUIDES.find((g) => g.slug === guideSlug && g.status === "published")
+  }
 
   if (!guide || !hub) {
     return (
@@ -46,7 +52,9 @@ export default async function PublicGuidePage({
   const collection = collections.find((c) => c.guideIds.includes(guide.id))
 
   // Find related guides (other published guides in same hub, excluding current)
-  const relatedGuides = MOCK_GUIDES.filter(
+  const supabaseGuides = await loadPublishedGuides()
+  const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : MOCK_GUIDES
+  const relatedGuides = allPublishedGuides.filter(
     (g) => g.hubId === hub.id && g.id !== guide.id && g.status === "published",
   ).slice(0, 3)
 

@@ -21,14 +21,19 @@ import {
   getGuidesByCollection,
   getGuidesByHub,
 } from "@/lib/guideforge/mock-data"
+import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
 import { QUESTLINE_NEWS } from "@/lib/questline/mock-news"
 
 export default async function EmberfallHubPage() {
   const hub = EMBERFALL_HUB
   const collections = getCollectionsByHub(hub.id)
-  const allHubGuides = getGuidesByHub(hub.id).filter(
-    (g) => g.status === "published",
-  )
+  
+  // Load published guides: prefer Supabase, fallback to mock data
+  const supabaseGuides = await loadPublishedGuides()
+  const allHubGuides = (supabaseGuides.length > 0 
+    ? supabaseGuides 
+    : getGuidesByHub(hub.id).filter((g) => g.status === "published")
+  ).filter((g) => g.hubId === hub.id || !g.hubId) // Support both old and new format
 
   const featured =
     allHubGuides.find((g) => g.verification === "forge-verified") ??

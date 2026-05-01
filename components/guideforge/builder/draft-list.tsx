@@ -101,9 +101,10 @@ export function DraftList({ networkId }: DraftListProps) {
     )
   }
 
-  // Separate drafts and ready guides
+  // Separate drafts, ready, and published guides
   const draftGuides = drafts.filter(g => g.status === "draft")
   const readyGuides = drafts.filter(g => g.status === "ready")
+  const publishedGuides = drafts.filter(g => g.status === "published")
 
   return (
     <div className="space-y-6">
@@ -125,6 +126,18 @@ export function DraftList({ networkId }: DraftListProps) {
           <h3 className="mb-3 text-sm font-semibold text-foreground">Ready to publish ({readyGuides.length})</h3>
           <div className="space-y-2">
             {readyGuides.map((draft) => (
+              <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Published Guides Section */}
+      {publishedGuides.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Published ({publishedGuides.length})</h3>
+          <div className="space-y-2">
+            {publishedGuides.map((draft) => (
               <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
             ))}
           </div>
