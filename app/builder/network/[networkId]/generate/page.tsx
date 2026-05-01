@@ -102,11 +102,13 @@ export default function GeneratorPage({
         difficulty: generatedGuide.difficulty,
       })
 
-      // Map GeneratedGuide to Guide with proper field conversions
+      // Use seeded IDs from Supabase schema
+      // For Phase 1: Use emberfall hub and character-builds collection
+      // These are created by the seed SQL and can be resolved by slug
       const guide = generatedGuideToGuide(generatedGuide, {
         networkId: networkId,
-        hubId: "mock-hub", // TODO: Get from form state
-        collectionId: "mock-collection", // TODO: Get from form state
+        hubId: "emberfall", // Seeded hub slug from seed SQL
+        collectionId: "character-builds", // Seeded collection slug from seed SQL
       })
 
       console.log("[v0] Mapped guide before save:", {
@@ -115,6 +117,9 @@ export default function GeneratorPage({
         summary: guide.summary,
         stepsCount: guide.steps.length,
         status: guide.status,
+        networkId: guide.networkId,
+        hubId: guide.hubId,
+        collectionId: guide.collectionId,
       })
 
       // Save generated guide with proper async flow
