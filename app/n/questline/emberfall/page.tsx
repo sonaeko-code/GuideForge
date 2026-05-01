@@ -35,6 +35,21 @@ export default async function EmberfallHubPage() {
     : getGuidesByHub(hub.id).filter((g) => g.status === "published")
   ).filter((g) => g.hubId === hub.id || !g.hubId) // Support both old and new format
 
+  // Show empty state if no published guides for this hub
+  if (allHubGuides.length === 0) {
+    return (
+      <main className="min-h-screen bg-background">
+        <QuestLineHeader />
+        <div className="mx-auto w-full max-w-6xl px-4 py-24 md:px-6">
+          <div className="text-center">
+            <p className="text-lg text-muted-foreground">No published guides yet for {hub.displayName}.</p>
+          </div>
+        </div>
+        <QuestLineFooter />
+      </main>
+    )
+  }
+
   const featured =
     allHubGuides.find((g) => g.verification === "forge-verified") ??
     allHubGuides[0]

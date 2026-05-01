@@ -44,6 +44,21 @@ export default async function QuestLineHomePage() {
     ? supabaseGuides 
     : MOCK_GUIDES.filter((g) => g.status === "published")
 
+  // Show empty state if no published guides
+  if (guides.length === 0) {
+    return (
+      <main className="min-h-screen bg-background">
+        <QuestLineHeader />
+        <div className="mx-auto w-full max-w-6xl px-4 py-24 md:px-6">
+          <div className="text-center">
+            <p className="text-lg text-muted-foreground">No published guides yet.</p>
+          </div>
+        </div>
+        <QuestLineFooter />
+      </main>
+    )
+  }
+
   const featured = guides.find((g) => g.verification === "forge-verified") ?? guides[0]
   const featuredHub = hubs.find((h) => h.id === featured.hubId)
 
