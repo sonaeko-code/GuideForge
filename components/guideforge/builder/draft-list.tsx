@@ -29,14 +29,17 @@ export function DraftList({ networkId }: DraftListProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const localDrafts = getDraftsByNetwork(networkId)
-    setDrafts(localDrafts)
-    setIsLoading(false)
+    const loadDrafts = async () => {
+      const localDrafts = await getDraftsByNetwork(networkId)
+      setDrafts(localDrafts)
+      setIsLoading(false)
+    }
+    loadDrafts()
   }, [networkId])
 
-  const handleDelete = (guideId: string) => {
+  const handleDelete = async (guideId: string) => {
     if (confirm("Delete this draft? This cannot be undone.")) {
-      deleteDraft(guideId)
+      await deleteDraft(guideId)
       setDrafts(drafts.filter((d) => d.id !== guideId))
     }
   }

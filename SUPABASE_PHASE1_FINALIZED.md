@@ -2,6 +2,14 @@
 
 Status: ✅ Ready for manual SQL execution (all 7 issues fixed)
 
+## Persistence Adapter Status
+
+**Persistence adapter created.** localStorage remains active. Supabase adapter is placeholder only.
+- `lib/guideforge/persistence.ts` - Core abstraction layer with localStorage implementation
+- `lib/guideforge/supabase-persistence.ts` - Phase 2 placeholder (no Supabase client/env/secrets)
+- Components use sync helpers in Phase 1; async helpers ready for Phase 2
+- See `PERSISTENCE_ADAPTER_LAYER.md` for full documentation
+
 ## Summary of Fixes Applied
 
 All 7 issues from the review have been systematically corrected in the SQL files:

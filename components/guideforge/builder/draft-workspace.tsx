@@ -20,15 +20,18 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Load drafts from localStorage
-    const networkDrafts = getDraftsByNetwork(networkId)
-    setDrafts(networkDrafts)
-    setIsLoading(false)
+    const loadDrafts = async () => {
+      // Load drafts from Supabase first, fall back to localStorage
+      const networkDrafts = await getDraftsByNetwork(networkId)
+      setDrafts(networkDrafts)
+      setIsLoading(false)
+    }
+    loadDrafts()
   }, [networkId])
 
-  const handleDelete = (draftId: string) => {
+  const handleDelete = async (draftId: string) => {
     if (confirm("Delete this draft? This cannot be undone.")) {
-      deleteDraft(draftId)
+      await deleteDraft(draftId)
       setDrafts(drafts.filter(d => d.id !== draftId))
     }
   }

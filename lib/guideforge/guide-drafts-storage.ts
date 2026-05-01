@@ -1,120 +1,216 @@
 /**
  * Guide Drafts Storage
- * Manages localStorage persistence for generated guide drafts.
+ * Manages draft persistence for GuideForge.
+ * 
+ * This module provides a high-level API that currently uses localStorage
+ * but is abstracted via a persistence adapter to support Supabase in Phase 2.
  * 
  * localStorage key: "guideforge:drafts:[draftId]"
  * Each draft stores the full Guide object for retrieval in the editor.
  */
 
 import type { Guide } from "./types"
-
-const STORAGE_PREFIX = "guideforge:drafts:"
+import { getPersistenceAdapter, getLocalStorageAdapter } from "./persistence"
 
 /**
- * Save a generated guide draft to localStorage.
+ * Get the active persistence adapter.
+ * Abstraction for storage implementation (localStorage now, Supabase in Phase 2).
+ */
+function getAdapter() {
+  return getPersistenceAdapter()
+}
+
+// ============================================================================
+// SYNCHRONOUS HELPERS (Phase 1)
+// ============================================================================
+// For components that need synchronous localStorage access directly.
+// These call the sync methods on LocalStoragePersistenceAdapter.
+// Phase 2: These will become async wrapper calls to the persistence layer.
+
+/**
+ * Save a generated guide draft to localStorage (synchronous).
+ * Phase 1 compatibility method for components like guide-editor.
+ * 
+ * @param guide - The Guide object to save
+ * @returns string - The draftId of the saved guide
+ */
+export function saveGuideDraftSync(guide: Guide): string {
+  return getLocalStorageAdapter().saveDraftSync(guide)
+}
+
+/**
+ * Load a guide draft from localStorage (synchronous).
+ * Phase 1 compatibility method.
+ * 
+ * @param draftId - The ID of the draft to load
+ * @returns Guide | null - The loaded Guide or null if not found
+ */
+export function loadGuideDraftSync(draftId: string): Guide | null {
+  return getLocalStorageAdapter().loadDraftSync(draftId)
+}
+
+/**
+ * Check if a draft exists (synchronous).
+ * Phase 1 compatibility method.
+ * 
+ * @param draftId - The ID to check
+ * @returns boolean - True if draft exists
+ */
+export function hasDraftSync(draftId: string): boolean {
+  return getLocalStorageAdapter().hasDraftSync(draftId)
+}
+
+/**
+ * Delete a draft from localStorage (synchronous).
+ * Phase 1 compatibility method.
+ * 
+ * @param draftId - The ID of the draft to delete
+ */
+export function deleteDraftSync(draftId: string): void {
+  return getLocalStorageAdapter().deleteDraftSync(draftId)
+}
+
+/**
+ * Get all draft objects (synchronous).
+ * Phase 1 compatibility method.
+ * 
+ * @returns Guide[] - Array of all loaded Guide objects
+ */
+export function getAllDraftObjectsSync(): Guide[] {
+  return getLocalStorageAdapter().getAllDraftsSync()
+}
+
+/**
+ * Get drafts for a specific network (synchronous).
+ * Phase 1 compatibility method.
+ * 
+ * @param networkId - The network ID to filter by
+ * @returns Guide[] - Array of Guide objects for the network
+ */
+export function getDraftsByNetworkSync(networkId: string): Guide[] {
+  return getLocalStorageAdapter().getDraftsByNetworkSync(networkId)
+}
+
+/**
+ * Update a draft's status (synchronous).
+ * Phase 1 compatibility method.
+ * 
+ * @param draftId - The ID of the draft to update
+ * @param status - The new status value
+ */
+export function updateDraftStatusSync(draftId: string, status: string): void {
+  return getLocalStorageAdapter().updateDraftStatusSync(draftId, status)
+}
+
+// ============================================================================
+// ASYNC HELPERS (Phase 2)
+// ============================================================================
+// These wrap the persistence adapter for future async/Supabase support.
+// Phase 1: These resolve immediately since localStorage is sync.
+// Phase 2: These will properly handle Supabase async calls.
+
+/**
+ * Save a generated guide draft.
  * Returns the draftId for routing (uses guide.id if available, otherwise generates timestamp-based ID).
+ * 
+ * @param guide - The Guide object to save
+ * @returns Promise<string> - The draftId of the saved guide
  */
-export function saveGuideDraft(guide: Guide): string {
-  const draftId = guide.id || `draft_${Date.now()}`
-  const key = `${STORAGE_PREFIX}${draftId}`
-  localStorage.setItem(key, JSON.stringify(guide))
-  return draftId
+export async function saveGuideDraft(guide: Guide): Promise<string> {
+  return getAdapter().saveDraft(guide)
 }
 
 /**
- * Load a guide draft from localStorage by draftId.
+ * Load a guide draft by draftId.
  * Returns null if not found or expired.
+ * 
+ * @param draftId - The ID of the draft to load
+ * @returns Promise<Guide | null> - The loaded Guide or null if not found
  */
-export function loadGuideDraft(draftId: string): Guide | null {
-  const key = `${STORAGE_PREFIX}${draftId}`
-  const stored = localStorage.getItem(key)
-  if (!stored) return null
-  try {
-    return JSON.parse(stored)
-  } catch {
-    return null
-  }
+export async function loadGuideDraft(draftId: string): Promise<Guide | null> {
+  return getAdapter().loadDraft(draftId)
 }
 
 /**
- * Check if a draftId exists in localStorage.
+ * Check if a draftId exists.
+ * 
+ * @param draftId - The ID to check
+ * @returns Promise<boolean> - True if draft exists
  */
-export function hasDraft(draftId: string): boolean {
-  const key = `${STORAGE_PREFIX}${draftId}`
-  return localStorage.getItem(key) !== null
+export async function hasDraft(draftId: string): Promise<boolean> {
+  return getAdapter().hasDraft(draftId)
 }
 
 /**
- * Delete a draft from localStorage.
+ * Delete a draft by draftId.
+ * 
+ * @param draftId - The ID of the draft to delete
+ * @returns Promise<void>
  */
-export function deleteDraft(draftId: string): void {
-  const key = `${STORAGE_PREFIX}${draftId}`
-  localStorage.removeItem(key)
+export async function deleteDraft(draftId: string): Promise<void> {
+  return getAdapter().deleteDraft(draftId)
 }
 
 /**
- * Clear all guide drafts from localStorage.
+ * Clear all guide drafts.
+ * WARNING: This is a destructive operation.
+ * 
+ * @returns Promise<void>
  */
-export function clearAllDrafts(): void {
-  const keys = Object.keys(localStorage).filter((k) =>
-    k.startsWith(STORAGE_PREFIX)
-  )
-  keys.forEach((key) => localStorage.removeItem(key))
+export async function clearAllDrafts(): Promise<void> {
+  return getAdapter().clearAllDrafts()
 }
 
 /**
- * Get all draft IDs stored in localStorage.
+ * Get all draft IDs stored.
+ * DEPRECATED: Use getAllDraftObjects() instead for full Guide objects.
+ * 
+ * @returns Promise<string[]> - Array of draft IDs
  */
-export function getAllDrafts(): string[] {
-  const drafts: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith(STORAGE_PREFIX)) {
-      const draftId = key.replace(STORAGE_PREFIX, "")
-      drafts.push(draftId)
-    }
-  }
-  return drafts
+export async function getAllDrafts(): Promise<string[]> {
+  const drafts = await getAdapter().getAllDrafts()
+  return drafts.map((d) => d.id)
 }
 
 /**
  * Get all draft objects (loaded from storage).
+ * 
+ * @returns Promise<Guide[]> - Array of loaded Guide objects
  */
-export function getAllDraftObjects(): Guide[] {
-  const drafts: Guide[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith(STORAGE_PREFIX)) {
-      const data = localStorage.getItem(key)
-      if (data) {
-        try {
-          drafts.push(JSON.parse(data) as Guide)
-        } catch (e) {
-          console.error(`[v0] Failed to parse draft from key ${key}:`, e)
-        }
-      }
-    }
-  }
-  return drafts
+export async function getAllDraftObjects(): Promise<Guide[]> {
+  return getAdapter().getAllDrafts()
 }
 
 /**
  * Get most recent draft objects sorted by updatedAt (newest first).
+ * 
+ * @param limit - Maximum number of drafts to return (default: 10)
+ * @returns Promise<Guide[]> - Array of recent Guide objects
  */
-export function getRecentDrafts(limit = 10): Guide[] {
-  const all = getAllDraftObjects()
-  return all
-    .sort((a, b) => {
-      const aDate = new Date(a.updatedAt || 0).getTime()
-      const bDate = new Date(b.updatedAt || 0).getTime()
-      return bDate - aDate
-    })
-    .slice(0, limit)
+export async function getRecentDrafts(limit = 10): Promise<Guide[]> {
+  return getAdapter().getRecentDrafts(limit)
 }
 
 /**
  * Get drafts for a specific network.
+ * 
+ * @param networkId - The network ID to filter by
+ * @returns Promise<Guide[]> - Array of Guide objects for the network
  */
-export function getDraftsByNetwork(networkId: string): Guide[] {
-  return getAllDraftObjects().filter((g) => g.networkId === networkId)
+export async function getDraftsByNetwork(networkId: string): Promise<Guide[]> {
+  return getAdapter().getDraftsByNetwork(networkId)
+}
+
+/**
+ * Update a draft's status (draft, ready, published, archived).
+ * 
+ * @param draftId - The ID of the draft to update
+ * @param status - The new status value
+ * @returns Promise<void>
+ */
+export async function updateDraftStatus(
+  draftId: string,
+  status: string
+): Promise<void> {
+  return getAdapter().updateDraftStatus(draftId, status)
 }
