@@ -20,15 +20,72 @@ import { LocalStoragePersistenceAdapter } from "./persistence"
 // Phase 1: Seeded dev profile UUID
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
-// Phase 1: Known seeded IDs from seed data (these are the actual UUIDs used in Supabase, not slugs)
-const SEEDED_IDS = {
-  networkId: "network_questline", // Actual UUID, not slug
-  hubs: {
-    emberfall: "hub_emberfall",
-  },
-  collections: {
-    characterBuilds: "collection_character_builds", // Actual UUID, not slug
-  },
+/**
+ * Map frontend collection identifiers to Supabase collection UUIDs.
+ * The frontend uses slug-like identifiers (e.g., "collection_character_builds"),
+ * but Supabase stores real UUIDs. This function looks up the real UUID.
+ * 
+ * During Phase 1, we query the database to find UUIDs by slug.
+ * Unknown slugs return null (which allows null collection_id in guides).
+ */
+async function normalizeCollectionIdForSupabase(
+  collectionId: string | null | undefined
+): Promise<string | null> {
+  if (!collectionId) {
+    console.log("[v0] Original collectionId: (empty/null)")
+    console.log("[v0] Supabase collection_id: null")
+    return null
+  }
+
+  console.log("[v0] Original collectionId:", collectionId)
+
+  // If it's already a UUID format (has dashes), assume it's real
+  if (collectionId.includes("-") && collectionId.length === 36) {
+    console.log("[v0] Supabase collection_id:", collectionId, "(already UUID)")
+    return collectionId
+  }
+
+  // For slug-like identifiers, try to look up the UUID
+  if (supabase) {
+    try {
+      // Map known frontend collection slugs to Supabase slugs
+      // Frontend uses "collection_character_builds", Supabase stores "character-builds"
+      let supabaseSlug = collectionId
+
+      if (collectionId === "collection_character_builds") {
+        supabaseSlug = "character-builds"
+      } else if (collectionId === "character-builds") {
+        supabaseSlug = "character-builds"
+      } else if (collectionId === "collection_boss_strategies" || collectionId === "boss-strategies") {
+        supabaseSlug = "boss-strategies"
+      }
+
+      console.log("[v0] Looking up collection UUID for slug:", supabaseSlug)
+
+      const { data, error } = await supabase
+        .from("collections")
+        .select("id")
+        .eq("slug", supabaseSlug)
+        .single()
+
+      if (error) {
+        console.warn("[v0] Collection lookup failed for slug", supabaseSlug, ":", error.message)
+        console.log("[v0] Supabase collection_id: null (lookup failed)")
+        return null
+      }
+
+      if (data?.id) {
+        console.log("[v0] Supabase collection_id:", data.id)
+        return data.id
+      }
+    } catch (error) {
+      console.error("[v0] Error looking up collection UUID:", error)
+    }
+  }
+
+  console.warn(`[v0] Unknown collection identifier: ${collectionId}, using null`)
+  console.log("[v0] Supabase collection_id: null (unknown identifier)")
+  return null
 }
 
 /**
@@ -75,27 +132,24 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
     try {
       const authorId = await this.getAuthorId()
 
-      // Use the IDs from the guide directly - they should match what's in Supabase
-      // If they're slugs/non-UUIDs, the DB will reject them with a clear error
-      const hubId = guide.hubId || null
-      const collectionId = guide.collectionId || null
-      const networkId = guide.networkId || null
+      // Normalize collection_id: convert frontend slug to real Supabase UUID
+      const normalizedCollectionId = await normalizeCollectionIdForSupabase(guide.collectionId)
 
       console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
         title: guide.title,
-        networkId,
-        hubId,
-        collectionId,
+        collectionId: normalizedCollectionId,
         authorId,
         stepsCount: guide.steps?.length ?? 0,
       })
 
+      // Only include columns that exist in the guides table schema:
+      // id, collection_id, title, slug, summary, type, difficulty, version,
+      // author_id, reviewer_id, status, verification_status, latest_check_run_id,
+      // published_at, created_at, updated_at
       const guideData = {
         id: guide.id,
-        collection_id: collectionId,
-        hub_id: hubId,
-        network_id: networkId,
+        collection_id: normalizedCollectionId,
         title: guide.title,
         slug: guide.slug || guide.id,
         summary: guide.summary,
@@ -113,9 +167,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       console.log("[v0] Supabase guide upsert payload:", JSON.stringify({
         id: guideData.id,
         title: guideData.title.substring(0, 50),
-        hub_id: guideData.hub_id,
         collection_id: guideData.collection_id,
-        network_id: guideData.network_id,
         author_id: guideData.author_id,
         type: guideData.type,
         difficulty: guideData.difficulty,
@@ -231,11 +283,13 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       console.log("[v0] Steps data:", stepsData)
 
       // Reconstruct guide from Supabase data
+      // Note: guides table does NOT have hub_id or network_id columns
+      // Those are derived from the collection -> hub -> network hierarchy
       const guide: Guide = {
         id: guideData.id,
-        collectionId: guideData.collection_id,
-        hubId: guideData.hub_id || "",
-        networkId: guideData.network_id || "",
+        collectionId: guideData.collection_id || "",
+        hubId: "", // Not stored in guides table - derive from collection if needed
+        networkId: "", // Not stored in guides table - derive from collection->hub if needed
         slug: guideData.slug,
         title: guideData.title,
         summary: guideData.summary,
@@ -330,29 +384,36 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
   /**
    * Get all drafts for a network from Supabase
-   * Falls back to localStorage if Supabase unavailable
+   * Note: The guides table does NOT have a network_id column.
+   * Network is derived via: guide -> collection -> hub -> network
+   * For Phase 1, we fetch all drafts and filter by author, or use localStorage.
    */
   async getDraftsByNetwork(networkId: string): Promise<Guide[]> {
+    // Since guides table has no network_id column, we need to join through
+    // collections -> hubs -> networks. For Phase 1, use getAllDrafts instead.
+    // The frontend stores networkId in localStorage guides, so that works.
     if (!isSupabaseConfigured() || !supabase) {
       return this.localStorageAdapter.getDraftsByNetworkSync(networkId)
     }
 
     try {
+      // Fetch all drafts for the current author (no network filter at DB level)
+      const authorId = await this.getAuthorId()
       const { data: guidesData, error } = await supabase
         .from("guides")
         .select("*, guide_steps(*)")
-        .eq("network_id", networkId)
+        .eq("author_id", authorId)
         .order("updated_at", { ascending: false })
 
       if (error) {
-        console.warn("[v0] Failed to fetch network drafts from Supabase:", error.message)
+        console.warn("[v0] Failed to fetch drafts from Supabase:", error.message)
         const localDrafts = this.localStorageAdapter.getDraftsByNetworkSync(networkId)
         console.log("[v0] Dashboard loaded draft source:localStorage | count:", localDrafts.length)
         return localDrafts
       }
 
       if (!guidesData || guidesData.length === 0) {
-        console.log("[v0] No drafts found in Supabase for network:", networkId, "— checking localStorage")
+        console.log("[v0] No drafts found in Supabase — checking localStorage")
         const localDrafts = this.localStorageAdapter.getDraftsByNetworkSync(networkId)
         console.log("[v0] Dashboard loaded draft source:localStorage | count:", localDrafts.length)
         return localDrafts
@@ -360,12 +421,12 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       console.log("[v0] Dashboard loaded draft source:supabase | count:", guidesData.length)
 
-      // Reconstruct guides
+      // Reconstruct guides (networkId not stored in DB, set to empty)
       return guidesData.map((guideData: any) => ({
         id: guideData.id,
-        collectionId: guideData.collection_id,
-        hubId: guideData.hub_id || "",
-        networkId: guideData.network_id || "",
+        collectionId: guideData.collection_id || "",
+        hubId: "", // Not in guides table
+        networkId: "", // Not in guides table
         slug: guideData.slug,
         title: guideData.title,
         summary: guideData.summary,
@@ -419,9 +480,9 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       return guidesData.map((guideData: any) => ({
         id: guideData.id,
-        collectionId: guideData.collection_id,
-        hubId: guideData.hub_id || "",
-        networkId: guideData.network_id || "",
+        collectionId: guideData.collection_id || "",
+        hubId: "", // Not in guides table
+        networkId: "", // Not in guides table
         slug: guideData.slug,
         title: guideData.title,
         summary: guideData.summary,
