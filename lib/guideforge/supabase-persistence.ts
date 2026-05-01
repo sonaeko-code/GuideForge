@@ -93,7 +93,7 @@ export class SupabasePersistenceAdapter {
         published_at: guide.publishedAt || null,
       }
 
-      console.log("[v0] Saving guide to Supabase:", guide.id)
+      console.log("[v0] Supabase guides insert payload:", guideData)
 
       // Insert or update guide
       const { error: guideError } = await supabase
@@ -120,6 +120,8 @@ export class SupabasePersistenceAdapter {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }))
+
+        console.log("[v0] Supabase guide_steps insert payload:", stepsData)
 
         // Delete existing steps for this guide, then insert new ones
         const { error: deleteError } = await supabase
@@ -161,6 +163,8 @@ export class SupabasePersistenceAdapter {
     }
 
     try {
+      console.log("[v0] Loading draft from Supabase:", draftId)
+      
       // Fetch guide
       const { data: guideData, error: guideError } = await supabase
         .from("guides")
@@ -174,6 +178,8 @@ export class SupabasePersistenceAdapter {
         return this.localStorageAdapter.loadDraftSync(draftId)
       }
 
+      console.log("[v0] Loaded guide from Supabase:", guideData)
+
       // Fetch steps
       const { data: stepsData, error: stepsError } = await supabase
         .from("guide_steps")
@@ -184,6 +190,9 @@ export class SupabasePersistenceAdapter {
       if (stepsError) {
         console.warn("[v0] Failed to load guide steps:", stepsError.message)
       }
+
+      console.log("[v0] Loaded", (stepsData || []).length, "steps from Supabase")
+      console.log("[v0] Steps data:", stepsData)
 
       // Reconstruct guide from Supabase data
       const guide: Guide = {
@@ -219,7 +228,13 @@ export class SupabasePersistenceAdapter {
         publishedAt: guideData.published_at,
       }
 
-      console.log("[v0] Loaded guide from Supabase:", draftId)
+      console.log("[v0] Reconstructed guide from Supabase:", {
+        id: guide.id,
+        title: guide.title,
+        summary: guide.summary,
+        stepsCount: guide.steps.length,
+      })
+
       return guide
     } catch (error) {
       console.error("[v0] Supabase load error:", error)

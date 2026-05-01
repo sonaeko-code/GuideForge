@@ -23,6 +23,7 @@ import type {
 } from "@/lib/guideforge/generation-schemas"
 import { generateMockResponse } from "@/lib/guideforge/mock-generator"
 import { saveGuideDraft } from "@/lib/guideforge/guide-drafts-storage"
+import { generatedGuideToGuide } from "@/lib/guideforge/guide-mapper"
 import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
 import {
   getNetworkById,
@@ -89,25 +90,44 @@ export default function GeneratorPage({
       return
     }
 
-    const guide = session.response.guide
+    try {
+      console.log("[v0] handleSendToEditor started")
+      const generatedGuide = session.response.guide
 
-    // Convert GeneratedGuide to Guide-like object with required fields
-    const guideData = {
-      ...guide,
-      id: `draft_${Date.now()}`,
-      collectionId: "mock-collection",
-      hubId: "mock-hub",
-      networkId: networkId,
-      status: "draft" as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      console.log("[v0] Generated guide:", {
+        title: generatedGuide.title,
+        summary: generatedGuide.summary,
+        sections: generatedGuide.sections?.length || 0,
+        requirements: generatedGuide.requirements,
+        difficulty: generatedGuide.difficulty,
+      })
+
+      // Map GeneratedGuide to Guide with proper field conversions
+      const guide = generatedGuideToGuide(generatedGuide, {
+        networkId: networkId,
+        hubId: "mock-hub", // TODO: Get from form state
+        collectionId: "mock-collection", // TODO: Get from form state
+      })
+
+      console.log("[v0] Mapped guide before save:", {
+        id: guide.id,
+        title: guide.title,
+        summary: guide.summary,
+        stepsCount: guide.steps.length,
+        status: guide.status,
+      })
+
+      // Save generated guide with proper async flow
+      const draftId = await saveGuideDraft(guide)
+
+      console.log("[v0] Saved guide with draftId:", draftId)
+
+      // Redirect to guide editor with draft ID
+      router.push(`/builder/network/${networkId}/guide/${draftId}/edit`)
+    } catch (error) {
+      console.error("[v0] Error in handleSendToEditor:", error)
+      alert("Failed to save guide. See console for details.")
     }
-
-    // Save generated guide to localStorage
-    const draftId = saveGuideDraft(guideData as any)
-
-    // Redirect to guide editor with draft ID
-    router.push(`/builder/network/${networkId}/guide/${draftId}/edit`)
   }
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
