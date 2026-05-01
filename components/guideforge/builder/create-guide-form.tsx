@@ -42,22 +42,22 @@ const DIFFICULTY_LEVELS: DifficultyLevel[] = ["beginner", "intermediate", "advan
 
 const AUDIENCES = ["New Players", "Intermediate", "Advanced", "Hardcore", "PvP", "PvE"]
 
+// Phase 1: fixed seeded hub/collection for questline network
+const SEEDED_HUB_ID = "emberfall"
+const SEEDED_COLLECTION_ID = "character-builds"
+
 export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  
+
   const [title, setTitle] = useState("Best Fire Warden Beginner Build")
   const [guideType, setGuideType] = useState<GuideType>("character-build")
-  const [audience, setAudience] = useState(["New Players"])
+  const [audience, setAudience] = useState<string[]>(["New Players"])
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("beginner")
   const [requirements, setRequirements] = useState("Character level 10 or higher")
   const [description, setDescription] = useState(
     "A forgiving sustain-mage build for new Emberfall players. Learn the fights without getting punished."
   )
-
-  // Use seeded values for Phase 1 (questline/emberfall/character-builds)
-  const seededHubId = "emberfall"
-  const seededCollectionId = "character-builds"
 
   const handleGenerateMock = async () => {
     if (!title.trim()) {
@@ -67,29 +67,31 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
 
     setIsLoading(true)
     try {
-      console.log("[v0] Generating mock guide with title:", title)
+      console.log("[v0] CreateGuideForm: Generating mock guide with title:", title)
 
-      // Generate mock content
       const response = await generateMockResponse({
-        prompt: title || "Create a helpful guide",
+        prompt: title,
         guideType,
         preferredDifficulty: difficulty,
-        targetHubId: seededHubId,
-        targetCollectionId: seededCollectionId,
+        targetHubId: SEEDED_HUB_ID,
+        targetCollectionId: SEEDED_COLLECTION_ID,
       })
 
       if (response.guide) {
-        console.log("[v0] Mock generation complete, creating draft...")
+        console.log("[v0] CreateGuideForm: Mock generated, saving draft...", {
+          title: response.guide.title,
+          summary: response.guide.summary?.substring(0, 60),
+          sectionsCount: response.guide.sections?.length,
+        })
 
-        // Use centralized function to create and save draft
         const guideId = await createAndSaveGuideDraft({
           title: response.guide.title || title,
           summary: response.guide.summary || description,
           guideType,
           difficulty,
           networkId,
-          hubId: seededHubId,
-          collectionId: seededCollectionId,
+          hubId: SEEDED_HUB_ID,
+          collectionId: SEEDED_COLLECTION_ID,
           requirements: response.guide.requirements,
           warnings: response.guide.warnings,
           steps: response.guide.sections?.map((section) => ({
@@ -97,14 +99,13 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
             body: section.body,
             kind: section.kind,
           })),
-          audience: audience,
         })
 
-        console.log("[v0] Generated guide saved, redirecting to editor")
+        console.log("[v0] CreateGuideForm: Generated guide saved, guideId:", guideId)
         router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
       }
     } catch (error) {
-      console.error("[v0] Error generating guide:", error)
+      console.error("[v0] CreateGuideForm: Error generating guide:", error)
       alert("Failed to generate guide. Check console for details.")
     } finally {
       setIsLoading(false)
@@ -119,26 +120,32 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
 
     setIsLoading(true)
     try {
-      console.log("[v0] Creating manual guide draft...")
+      console.log("[v0] CreateGuideForm: Creating manual draft...", {
+        title,
+        summary: description?.substring(0, 60),
+        difficulty,
+        guideType,
+        requirements,
+      })
 
-      // Use centralized function to create and save manual draft
       const guideId = await createAndSaveGuideDraft({
         title,
         summary: description,
         guideType,
         difficulty,
         networkId,
-        hubId: seededHubId,
-        collectionId: seededCollectionId,
-        requirements: requirements ? requirements.split(",").map((r) => r.trim()) : [],
+        hubId: SEEDED_HUB_ID,
+        collectionId: SEEDED_COLLECTION_ID,
+        requirements: requirements
+          ? requirements.split(",").map((r) => r.trim()).filter(Boolean)
+          : [],
         warnings: [],
-        audience: audience,
       })
 
-      console.log("[v0] Manual guide created, redirecting to editor")
+      console.log("[v0] CreateGuideForm: Manual guide saved, guideId:", guideId)
       router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
     } catch (error) {
-      console.error("[v0] Error creating guide:", error)
+      console.error("[v0] CreateGuideForm: Error creating guide:", error)
       alert("Failed to create guide. Check console for details.")
     } finally {
       setIsLoading(false)
@@ -167,48 +174,20 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           <FieldDescription>
             Determines default sections and Forge Rules applied.
           </FieldDescription>
-          <Select value={guideType} onValueChange={(v) => setGuideType(v as GuideType)}>
+          <Select
+            value={guideType}
+            onValueChange={(v) => setGuideType(v as GuideType)}
+          >
             <SelectTrigger id="guide-type" className="mt-2">
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
               {GUIDE_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
-                  {type.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="hub">Hub</FieldLabel>
-          <FieldDescription>Which hub does this guide belong to?</FieldDescription>
-          <Select value={hubId} onValueChange={setHubId}>
-            <SelectTrigger id="hub" className="mt-2">
-              <SelectValue placeholder="Select hub" />
-            </SelectTrigger>
-            <SelectContent>
-              {hubs.map((hub) => (
-                <SelectItem key={hub.id} value={hub.id}>
-                  {hub.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="collection">Collection</FieldLabel>
-          <FieldDescription>Which collection holds this guide?</FieldDescription>
-          <Select value={collectionId} onValueChange={setCollectionId}>
-            <SelectTrigger id="collection" className="mt-2">
-              <SelectValue placeholder="Select collection" />
-            </SelectTrigger>
-            <SelectContent>
-              {collections.map((col) => (
-                <SelectItem key={col.id} value={col.id}>
-                  {col.name}
+                  {type
+                    .split("-")
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(" ")}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -225,7 +204,9 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
                 type="button"
                 onClick={() =>
                   setAudience((prev) =>
-                    prev.includes(aud) ? prev.filter((a) => a !== aud) : [...prev, aud]
+                    prev.includes(aud)
+                      ? prev.filter((a) => a !== aud)
+                      : [...prev, aud]
                   )
                 }
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
@@ -242,8 +223,13 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
 
         <Field>
           <FieldLabel htmlFor="difficulty">Difficulty</FieldLabel>
-          <FieldDescription>What skill level does this guide assume?</FieldDescription>
-          <Select value={difficulty} onValueChange={(v) => setDifficulty(v as DifficultyLevel)}>
+          <FieldDescription>
+            What skill level does this guide assume?
+          </FieldDescription>
+          <Select
+            value={difficulty}
+            onValueChange={(v) => setDifficulty(v as DifficultyLevel)}
+          >
             <SelectTrigger id="difficulty" className="mt-2">
               <SelectValue placeholder="Select difficulty" />
             </SelectTrigger>
@@ -288,8 +274,8 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
 
       <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
         <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">Forge Rules applied:</span> Game name,
-          patch/version, difficulty, requirements, beginner summary, spoiler tagging.
+          <span className="font-semibold text-foreground">Forge Rules applied:</span>{" "}
+          Game name, patch/version, difficulty, requirements, beginner summary, spoiler tagging.
         </p>
       </div>
 
