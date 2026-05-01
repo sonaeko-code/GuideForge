@@ -83,7 +83,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
-  const handleApplyForgeRules = () => {
+  const handleApplyForgeRules = async () => {
     // Get the complete guide object
     const currentGuide: Guide = {
       ...guide,
