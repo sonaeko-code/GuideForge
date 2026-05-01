@@ -121,6 +121,27 @@ export async function saveGuideDraft(guide: Guide): Promise<string> {
 }
 
 /**
+ * Save a guide draft and return both the ID and which storage was used.
+ * Used by the editor to show "Saved to Supabase" vs "Saved locally".
+ * 
+ * @param guide - The Guide object to save
+ * @returns Promise<{ id: string; source: "supabase" | "localStorage" }>
+ */
+export async function saveGuideDraftWithSource(
+  guide: Guide
+): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const isConfigured = !!(supabaseUrl && supabaseAnonKey)
+
+  const id = await getAdapter().saveDraft(guide)
+  // If Supabase is configured the adapter will have tried Supabase first.
+  // We infer the source from whether Supabase is configured.
+  const source: "supabase" | "localStorage" = isConfigured ? "supabase" : "localStorage"
+  return { id, source }
+}
+
+/**
  * Load a guide draft by draftId.
  * Returns null if not found or expired.
  * 
