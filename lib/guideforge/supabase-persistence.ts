@@ -301,40 +301,78 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0
-      console.log("[v0] Supabase steps payload count:", stepCount)
+      console.log("[v0] Guide steps before Supabase save:", guide.steps)
+      console.log("[v0] Step count:", stepCount)
       
       if (stepCount > 0) {
-        const stepsData = guide.steps!.map((step) => ({
-          id: step.id,
-          guide_id: guide.id,
-          title: step.title,
-          body: step.body,
-          kind: step.kind,
-          order_index: step.order,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
+        const stepsData = guide.steps!.map((step, idx) => {
+          // Normalize step.kind to Supabase-allowed values
+          // Frontend uses: overview, strengths, weaknesses, gear, skill-priority, rotation, leveling, mistakes, patch-notes, final-tips, requirements, warning, custom
+          // Supabase allows: intro, section, step, tip, warning, summary, example, conclusion
+          let normalizedKind: string = "section"
+          const stepKind = (step.kind || "custom").toLowerCase()
+          
+          if (stepKind === "overview" || stepKind === "intro") {
+            normalizedKind = "intro"
+          } else if (stepKind === "warning") {
+            normalizedKind = "warning"
+          } else if (stepKind === "tip" || stepKind === "final-tips") {
+            normalizedKind = "tip"
+          } else if (stepKind === "summary" || stepKind === "conclusion") {
+            normalizedKind = "summary"
+          } else if (stepKind === "example") {
+            normalizedKind = "example"
+          } else {
+            // Default all other frontend kinds to "section"
+            normalizedKind = "section"
+          }
 
-        console.log("[v0] saveDraft: Deleting old guide_steps for guide", guide.id)
-        await supabase.from("guide_steps").delete().eq("guide_id", guide.id)
+          const stepData = {
+            id: step.id,
+            guide_id: guide.id,
+            title: step.title,
+            body: step.body,
+            kind: normalizedKind,
+            order_index: step.order,
+            is_spoiler: step.isSpoiler || false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          
+          if (idx === 0) {
+            console.log("[v0] First step payload:", JSON.stringify(stepData, null, 2))
+          }
+          
+          return stepData
+        })
 
-        console.log("[v0] saveDraft: Inserting", stepCount, "new guide_steps")
+        console.log("[v0] guide_steps delete starting for guide", guide.id)
+        const { error: deleteError } = await supabase.from("guide_steps").delete().eq("guide_id", guide.id)
+        if (deleteError) {
+          console.log("[v0] guide_steps delete error:", deleteError.message)
+        } else {
+          console.log("[v0] guide_steps delete succeeded")
+        }
+
+        console.log("[v0] guide_steps insert starting:", stepCount, "steps")
         const { error: stepsError } = await supabase
           .from("guide_steps")
           .insert(stepsData)
 
-        console.log("[v0] Supabase steps save error:", stepsError)
+        console.log("[v0] guide_steps insert error:", stepsError)
         
         if (stepsError) {
-          console.error("[v0] saveDraft: guide_steps insert FAILED", {
+          console.error("[v0] guide_steps insert FAILED:", {
             code: stepsError.code,
             message: stepsError.message,
             details: stepsError.details,
             stepCount,
           })
         } else {
-          console.log("[v0] saveDraft: guide_steps insert SUCCESS —", stepCount, "steps")
+          console.log("[v0] guide_steps insert SUCCESS:", stepCount, "steps saved")
         }
+      } else {
+        console.log("[v0] No guide steps found to save")
       }
 
       // Mirror to localStorage
@@ -391,7 +429,9 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       }
 
       console.log("[v0] Loaded", (stepsData || []).length, "steps from Supabase")
-      console.log("[v0] Steps data:", stepsData)
+      if ((stepsData || []).length > 0) {
+        console.log("[v0] First step:", stepsData?.[0])
+      }
 
       // Reconstruct guide from Supabase data
       // Note: guides table does NOT have hub_id or network_id columns
@@ -418,6 +458,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           kind: step.kind,
           title: step.title,
           body: step.body,
+          isSpoiler: step.is_spoiler || false,
+          callout: step.callout,
         })),
         author: {
           id: guideData.author_id || "",
@@ -555,6 +597,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           kind: step.kind,
           title: step.title,
           body: step.body,
+          isSpoiler: step.is_spoiler || false,
+          callout: step.callout,
         })),
         author: {
           id: guideData.author_id || "",
@@ -611,6 +655,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           kind: step.kind,
           title: step.title,
           body: step.body,
+          isSpoiler: step.is_spoiler || false,
+          callout: step.callout,
         })),
         author: {
           id: guideData.author_id || "",
