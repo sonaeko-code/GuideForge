@@ -60,22 +60,33 @@ export class SupabasePersistenceAdapter {
   /**
    * Save a guide draft to Supabase
    * Inserts/updates guide record and related guide_steps
-   * Falls back to localStorage on error
+   * Returns the guide ID (success or failure - check logs for errors)
+   * 
+   * NOTE: Use saveDraftWithSource() to know if Supabase succeeded or fell back.
    */
   async saveDraft(guide: Guide): Promise<string> {
+    // Just delegate to saveDraftWithSource and ignore source
+    const result = await this.saveDraftWithSource(guide)
+    return result.id
+  }
+
+  /**
+   * Save a guide draft to Supabase and return source.
+   * Returns { id, source: "supabase" } if save succeeds.
+   * Returns { id, source: "localStorage" } if save fails or Supabase unavailable.
+   */
+  async saveDraftWithSource(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage" }> {
     const configured = isSupabaseConfigured()
-    console.log("[v0] saveDraft: Supabase configured =", configured, "| guide.id =", guide.id)
 
     if (!configured || !supabase) {
-      console.log("[v0] saveDraft: No Supabase — using localStorage only")
+      console.log("[v0] saveDraftWithSource: Supabase not configured — using localStorage")
       this.localStorageAdapter.saveDraftSync(guide)
-      return guide.id
+      return { id: guide.id, source: "localStorage" }
     }
 
     try {
       const authorId = await this.getAuthorId()
 
-      // Resolve IDs to seeded values
       const hubId = guide.hubId || "emberfall"
       const collectionId = guide.collectionId || "character-builds"
       const networkId = guide.networkId || "questline"
@@ -99,7 +110,7 @@ export class SupabasePersistenceAdapter {
         published_at: guide.publishedAt || null,
       }
 
-      console.log("[v0] saveDraft: Upserting guide to Supabase", {
+      console.log("[v0] saveDraftWithSource: Upserting guide to Supabase", {
         id: guideData.id,
         title: guideData.title.substring(0, 50),
         hub_id: guideData.hub_id,
@@ -108,28 +119,28 @@ export class SupabasePersistenceAdapter {
         author_id: guideData.author_id,
       })
 
-      const { data: upsertResult, error: guideError } = await supabase
+      const { error: guideError } = await supabase
         .from("guides")
         .upsert(guideData, { onConflict: "id" })
 
       if (guideError) {
-        console.error("[v0] saveDraft: Supabase guides insert FAILED", {
+        console.error("[v0] saveDraftWithSource: Supabase guides upsert FAILED", {
           code: guideError.code,
           message: guideError.message,
           details: guideError.details,
           hint: guideError.hint,
         })
-        console.log("[v0] saveDraft: Falling back to localStorage because Supabase insert failed")
+        console.log("[v0] saveDraftWithSource: Falling back to localStorage")
         this.localStorageAdapter.saveDraftSync(guide)
-        return guide.id
+        return { id: guide.id, source: "localStorage" }
       }
 
-      console.log("[v0] saveDraft: Supabase guides upsert SUCCESS")
+      console.log("[v0] saveDraftWithSource: Supabase guides upsert SUCCESS")
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0
       if (stepCount > 0) {
-        const stepsData = guide.steps!.map((step, index) => ({
+        const stepsData = guide.steps!.map((step) => ({
           id: step.id,
           guide_id: guide.id,
           title: step.title,
@@ -140,52 +151,38 @@ export class SupabasePersistenceAdapter {
           updated_at: new Date().toISOString(),
         }))
 
-        console.log("[v0] saveDraft: Deleting old guide_steps for guide", guide.id)
-        const { error: deleteError } = await supabase
-          .from("guide_steps")
-          .delete()
-          .eq("guide_id", guide.id)
+        console.log("[v0] saveDraftWithSource: Deleting old guide_steps for guide", guide.id)
+        await supabase.from("guide_steps").delete().eq("guide_id", guide.id)
 
-        if (deleteError) {
-          console.warn("[v0] saveDraft: Warning deleting old steps:", deleteError.message)
-        }
-
-        console.log("[v0] saveDraft: Inserting", stepCount, "new guide_steps")
+        console.log("[v0] saveDraftWithSource: Inserting", stepCount, "new guide_steps")
         const { error: stepsError } = await supabase
           .from("guide_steps")
           .insert(stepsData)
 
         if (stepsError) {
-          console.error("[v0] saveDraft: Supabase guide_steps insert FAILED", {
+          console.error("[v0] saveDraftWithSource: guide_steps insert FAILED", {
             code: stepsError.code,
             message: stepsError.message,
             details: stepsError.details,
             stepCount,
           })
         } else {
-          console.log("[v0] saveDraft: Supabase guide_steps insert SUCCESS —", stepCount, "steps")
+          console.log("[v0] saveDraftWithSource: guide_steps insert SUCCESS —", stepCount, "steps")
         }
       }
 
-      // Mirror to localStorage after successful Supabase save
+      // Mirror to localStorage
       this.localStorageAdapter.saveDraftSync(guide)
-      console.log("[v0] saveDraft: Also mirrored to localStorage")
-
-      return guide.id
+      console.log("[v0] saveDraftWithSource: Supabase save complete, returning source:supabase")
+      return { id: guide.id, source: "supabase" }
     } catch (error) {
-      console.error("[v0] saveDraft: Unexpected error", error)
-      console.log("[v0] saveDraft: Falling back to localStorage because of exception")
+      console.error("[v0] saveDraftWithSource: Unexpected error", error)
       this.localStorageAdapter.saveDraftSync(guide)
-      return guide.id
+      return { id: guide.id, source: "localStorage" }
     }
   }
 
   /**
-   * Load a guide draft from Supabase
-   * Reconstructs guide with related steps
-   * Falls back to localStorage if not found or error
-   */
-  async loadDraft(draftId: string): Promise<Guide | null> {
     if (!isSupabaseConfigured() || !supabase) {
       const guide = this.localStorageAdapter.loadDraftSync(draftId)
       if (guide) {
