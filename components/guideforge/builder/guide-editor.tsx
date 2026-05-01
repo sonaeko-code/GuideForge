@@ -222,11 +222,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       }
     }
     
+    // Normalize requirements from textarea for save
+    const requirementsArray = requirementsText
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+
+    console.log("[v0] Mark Ready guide id:", guide.id)
+    console.log("[v0] Mark Ready saving status: ready")
+    
     // Update status to "ready" in Supabase
     const updatedGuide: Guide = {
       ...guide,
       title,
       summary,
+      requirements: requirementsArray,
       steps,
       version,
       status: "ready",
@@ -234,7 +244,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: rulesCheckResult as any,
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
+    
     const { source } = await saveGuideDraft(updatedGuide)
+    console.log("[v0] Mark Ready save result:", { source, guideId: guide.id, status: "ready" })
+    
     setSaveSource(source)
     setLastSaved(new Date())
     if (source !== "supabase") {
@@ -242,13 +255,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     } else {
       setSaveError(null)
     }
-    await updateDraftStatus(guide.id, "ready")
+    
     setMarkedReady(true)
     
-    // Clear confirmation message after 3 seconds
+    // Clear confirmation message after 5 seconds
     setTimeout(() => {
       setMarkedReady(false)
-    }, 3000)
+    }, 5000)
   }
 
   return (
