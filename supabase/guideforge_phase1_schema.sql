@@ -1,351 +1,466 @@
 -- GuideForge Phase 1 Schema
--- MVP focus: Draft persistence for authenticated users
--- Does NOT replace public QuestLine guides yet (Phase 2)
+-- MVP focus: Supabase-backed draft persistence.
+-- This does NOT replace public QuestLine pages yet.
 --
 -- IMPORTANT: Auth Strategy for Phase 1
--- - profiles.id is a standalone UUID primary key (NOT linked to auth.users yet)
--- - This allows seeded dev profiles to work without requiring Supabase Auth
--- - Phase 2 will migrate to auth_user_id foreign key + separate auth.users linkage
--- - Client direct writes are NOT enabled (no INSERT/UPDATE policies for phase 1)
--- - All writes happen server-side through secure API routes (implemented in Phase 2)
-
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- - profiles.id is a standalone UUID primary key.
+-- - profiles.id does NOT reference auth.users yet.
+-- - This allows one seeded dev profile without requiring Supabase Auth.
+-- - Phase 2 can add auth_user_id or migrate profiles.id to auth.users linkage.
+-- - Direct client writes are intentionally not enabled in Phase 1.
+-- - App writes should happen later through controlled server/API routes.
 
 -- ============================================================================
--- CORE TABLES
+-- EXTENSIONS
 -- ============================================================================
 
--- Profiles: Minimal user data
--- Created first to be referenced by other tables
--- NOTE: Phase 1 uses standalone UUID; Phase 2 will add auth_user_id for Supabase Auth linkage
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  display_name TEXT NOT NULL DEFAULT 'Anonymous',
-  handle TEXT UNIQUE,
-  avatar_url TEXT,
-  bio TEXT,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'moderator', 'admin')),
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+create extension if not exists "pgcrypto";
+
+-- ============================================================================
+-- UTILITY: updated_at trigger
+-- ============================================================================
+
+create or replace function public.update_updated_at_column()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+-- ============================================================================
+-- 1. PROFILES
+-- ============================================================================
+
+create table if not exists public.profiles (
+  id uuid primary key default gen_random_uuid(),
+  display_name text not null default 'Anonymous',
+  handle text unique,
+  avatar_url text,
+  bio text,
+  role text not null default 'user'
+    check (role in ('user', 'moderator', 'admin')),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
 );
 
--- Networks: Top-level namespace (e.g., QuestLine, future Techsperts)
-CREATE TABLE IF NOT EXISTS public.networks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  description TEXT,
-  owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  type TEXT NOT NULL DEFAULT 'gaming' CHECK (type IN ('gaming', 'repair', 'sop', 'training', 'community')),
-  is_public BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+create trigger update_profiles_updated_at
+before update on public.profiles
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 2. NETWORKS
+-- ============================================================================
+
+create table if not exists public.networks (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text unique not null,
+  description text,
+  owner_id uuid references public.profiles(id) on delete set null,
+  type text not null default 'gaming'
+    check (type in ('gaming', 'repair', 'sop', 'training', 'community', 'creator')),
+  is_public boolean not null default false,
+  primary_color text,
+  accent_color text,
+  theme text,
+  logo_url text,
+  domain text unique,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
 );
 
--- Hubs: Collections within a network (e.g., Emberfall, StarFall Outriders)
-CREATE TABLE IF NOT EXISTS public.hubs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  network_id UUID NOT NULL REFERENCES public.networks(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL,
-  description TEXT,
-  icon_emoji TEXT,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  UNIQUE(network_id, slug)
+create index if not exists idx_networks_owner_id on public.networks(owner_id);
+create index if not exists idx_networks_slug on public.networks(slug);
+create index if not exists idx_networks_is_public on public.networks(is_public);
+
+create trigger update_networks_updated_at
+before update on public.networks
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 3. HUBS
+-- ============================================================================
+
+create table if not exists public.hubs (
+  id uuid primary key default gen_random_uuid(),
+  network_id uuid not null references public.networks(id) on delete cascade,
+  name text not null,
+  slug text not null,
+  description text,
+  tagline text,
+  hub_kind text not null default 'topic'
+    check (hub_kind in ('game', 'product', 'department', 'topic', 'channel', 'other')),
+  icon_emoji text,
+  banner_url text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique(network_id, slug)
 );
 
--- Collections: Categories within a hub (e.g., Character Builds, Boss Strategies)
-CREATE TABLE IF NOT EXISTS public.collections (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  hub_id UUID NOT NULL REFERENCES public.hubs(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  UNIQUE(hub_id, slug)
+create index if not exists idx_hubs_network_id on public.hubs(network_id);
+create index if not exists idx_hubs_slug on public.hubs(slug);
+
+create trigger update_hubs_updated_at
+before update on public.hubs
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 4. COLLECTIONS
+-- ============================================================================
+
+create table if not exists public.collections (
+  id uuid primary key default gen_random_uuid(),
+  hub_id uuid not null references public.hubs(id) on delete cascade,
+  name text not null,
+  slug text not null,
+  description text,
+  default_guide_type text,
+  icon_name text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique(hub_id, slug)
 );
 
--- Guides: The main content entity (drafts, published, archived)
--- NOTE: latest_check_run_id FK added later after forge_rule_check_runs table exists
-CREATE TABLE IF NOT EXISTS public.guides (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  collection_id UUID NOT NULL REFERENCES public.collections(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  slug TEXT NOT NULL,
-  summary TEXT,
-  type TEXT NOT NULL DEFAULT 'guide' CHECK (type IN ('guide', 'build', 'strategy', 'quest', 'custom')),
-  difficulty TEXT CHECK (difficulty IN ('beginner', 'intermediate', 'advanced', 'expert')),
-  version TEXT,
-  author_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  reviewer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'ready', 'published', 'archived')),
-  verification_status TEXT NOT NULL DEFAULT 'unverified' CHECK (verification_status IN ('unverified', 'rules_passed', 'reviewed', 'forge_verified', 'forged')),
-  latest_check_run_id UUID, -- FK added as constraint after table creation
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  published_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(collection_id, slug)
+create index if not exists idx_collections_hub_id on public.collections(hub_id);
+create index if not exists idx_collections_slug on public.collections(slug);
+
+create trigger update_collections_updated_at
+before update on public.collections
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 5. GUIDES
+-- ============================================================================
+
+create table if not exists public.guides (
+  id uuid primary key default gen_random_uuid(),
+  collection_id uuid references public.collections(id) on delete set null,
+  title text not null,
+  slug text not null,
+  summary text,
+  type text not null default 'guide'
+    check (type in ('guide', 'build', 'strategy', 'quest', 'walkthrough', 'repair', 'sop', 'custom')),
+  difficulty text
+    check (difficulty in ('beginner', 'intermediate', 'advanced', 'expert')),
+  version text,
+  author_id uuid references public.profiles(id) on delete set null,
+  reviewer_id uuid references public.profiles(id) on delete set null,
+  status text not null default 'draft'
+    check (status in ('draft', 'ready', 'published', 'archived')),
+  verification_status text not null default 'unverified'
+    check (verification_status in ('unverified', 'rules_passed', 'reviewed', 'forge_verified', 'forged')),
+  latest_check_run_id uuid,
+  published_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique(collection_id, slug)
 );
 
--- Guide Steps: Individual sections/steps within a guide
-CREATE TABLE IF NOT EXISTS public.guide_steps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  guide_id UUID NOT NULL REFERENCES public.guides(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  body TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'section' CHECK (kind IN ('intro', 'section', 'tip', 'warning', 'summary')),
-  order_index INTEGER NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  UNIQUE(guide_id, order_index)
+create index if not exists idx_guides_collection_id on public.guides(collection_id);
+create index if not exists idx_guides_author_id on public.guides(author_id);
+create index if not exists idx_guides_status on public.guides(status);
+create index if not exists idx_guides_verification_status on public.guides(verification_status);
+create index if not exists idx_guides_latest_check_run_id on public.guides(latest_check_run_id);
+
+create trigger update_guides_updated_at
+before update on public.guides
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 6. GUIDE STEPS
+-- ============================================================================
+
+create table if not exists public.guide_steps (
+  id uuid primary key default gen_random_uuid(),
+  guide_id uuid not null references public.guides(id) on delete cascade,
+  title text not null,
+  body text not null,
+  kind text not null default 'section'
+    check (kind in ('intro', 'section', 'step', 'tip', 'warning', 'summary', 'example', 'conclusion')),
+  order_index integer not null,
+  is_spoiler boolean not null default false,
+  callout text,
+  image_url text,
+  video_url text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique(guide_id, order_index)
 );
 
+create index if not exists idx_guide_steps_guide_id on public.guide_steps(guide_id);
+create index if not exists idx_guide_steps_order on public.guide_steps(guide_id, order_index);
+
+create trigger update_guide_steps_updated_at
+before update on public.guide_steps
+for each row execute function public.update_updated_at_column();
+
 -- ============================================================================
--- FORGE RULES SYSTEM
+-- 7. FORGE RULES
 -- ============================================================================
 
--- Forge Rules: Global quality standards (name, description, category)
-CREATE TABLE IF NOT EXISTS public.forge_rules (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL UNIQUE,
-  label TEXT NOT NULL,
-  description TEXT,
-  category TEXT CHECK (category IN ('content', 'metadata', 'formatting', 'verification')),
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+create table if not exists public.forge_rules (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  label text not null,
+  description text,
+  category text
+    check (category in ('content', 'metadata', 'formatting', 'verification', 'safety', 'structure')),
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
 );
 
--- Network Forge Rules: Per-network configuration (which rules apply, are required, order)
-CREATE TABLE IF NOT EXISTS public.network_forge_rules (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  network_id UUID NOT NULL REFERENCES public.networks(id) ON DELETE CASCADE,
-  forge_rule_id UUID NOT NULL REFERENCES public.forge_rules(id) ON DELETE CASCADE,
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  required BOOLEAN NOT NULL DEFAULT FALSE,
-  display_order INTEGER,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  UNIQUE(network_id, forge_rule_id)
+create index if not exists idx_forge_rules_name on public.forge_rules(name);
+
+create trigger update_forge_rules_updated_at
+before update on public.forge_rules
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 8. NETWORK FORGE RULES
+-- ============================================================================
+
+create table if not exists public.network_forge_rules (
+  id uuid primary key default gen_random_uuid(),
+  network_id uuid not null references public.networks(id) on delete cascade,
+  forge_rule_id uuid not null references public.forge_rules(id) on delete cascade,
+  enabled boolean not null default true,
+  required boolean not null default false,
+  display_order integer,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique(network_id, forge_rule_id)
 );
 
--- Forge Rule Check Runs: Track validation sessions with content hash for staleness
-CREATE TABLE IF NOT EXISTS public.forge_rule_check_runs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  guide_id UUID NOT NULL REFERENCES public.guides(id) ON DELETE CASCADE,
-  content_hash TEXT, -- Hash of title+summary+version+steps for staleness detection
-  checked_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  passed BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+create index if not exists idx_network_forge_rules_network_id on public.network_forge_rules(network_id);
+create index if not exists idx_network_forge_rules_forge_rule_id on public.network_forge_rules(forge_rule_id);
+
+create trigger update_network_forge_rules_updated_at
+before update on public.network_forge_rules
+for each row execute function public.update_updated_at_column();
+
+-- ============================================================================
+-- 9. FORGE RULE CHECK RUNS
+-- ============================================================================
+
+create table if not exists public.forge_rule_check_runs (
+  id uuid primary key default gen_random_uuid(),
+  guide_id uuid not null references public.guides(id) on delete cascade,
+  content_hash text,
+  checked_at timestamp with time zone not null default now(),
+  total_rules integer not null default 0,
+  passed_rules integer not null default 0,
+  passed boolean not null default false,
+  created_at timestamp with time zone not null default now(),
+  created_by uuid references public.profiles(id) on delete set null
 );
 
--- Forge Rule Check Results: Individual rule results per check run
-CREATE TABLE IF NOT EXISTS public.forge_rule_check_results (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  check_run_id UUID NOT NULL REFERENCES public.forge_rule_check_runs(id) ON DELETE CASCADE,
-  forge_rule_id UUID NOT NULL REFERENCES public.forge_rules(id) ON DELETE CASCADE,
-  passed BOOLEAN NOT NULL DEFAULT FALSE,
-  reason TEXT,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  UNIQUE(check_run_id, forge_rule_id)
+create index if not exists idx_forge_rule_check_runs_guide_id on public.forge_rule_check_runs(guide_id);
+create index if not exists idx_forge_rule_check_runs_checked_at on public.forge_rule_check_runs(checked_at desc);
+
+-- Add latest_check_run_id FK after forge_rule_check_runs exists.
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where constraint_name = 'guides_latest_check_run_id_fkey'
+      and table_schema = 'public'
+      and table_name = 'guides'
+  ) then
+    alter table public.guides
+    add constraint guides_latest_check_run_id_fkey
+    foreign key (latest_check_run_id)
+    references public.forge_rule_check_runs(id)
+    on delete set null;
+  end if;
+end $$;
+
+-- ============================================================================
+-- 10. FORGE RULE CHECK RESULTS
+-- ============================================================================
+
+create table if not exists public.forge_rule_check_results (
+  id uuid primary key default gen_random_uuid(),
+  check_run_id uuid not null references public.forge_rule_check_runs(id) on delete cascade,
+  forge_rule_id uuid not null references public.forge_rules(id) on delete cascade,
+  passed boolean not null default false,
+  reason text,
+  created_at timestamp with time zone not null default now(),
+  unique(check_run_id, forge_rule_id)
 );
 
--- Generation Events: Track AI-generated guide events (optional, low-risk)
-CREATE TABLE IF NOT EXISTS public.generation_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  guide_id UUID NOT NULL REFERENCES public.guides(id) ON DELETE CASCADE,
-  prompt TEXT NOT NULL,
-  model TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
-  error_message TEXT,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE
+create index if not exists idx_forge_rule_check_results_check_run_id on public.forge_rule_check_results(check_run_id);
+create index if not exists idx_forge_rule_check_results_forge_rule_id on public.forge_rule_check_results(forge_rule_id);
+
+-- ============================================================================
+-- 11. GENERATION EVENTS
+-- ============================================================================
+
+create table if not exists public.generation_events (
+  id uuid primary key default gen_random_uuid(),
+  guide_id uuid references public.guides(id) on delete set null,
+  event_type text not null default 'generated'
+    check (event_type in ('generated', 'edited', 'section_regenerated', 'marked_ready', 'published', 'archived', 'failed')),
+  prompt text,
+  model text,
+  status text not null default 'completed'
+    check (status in ('pending', 'completed', 'failed')),
+  error_message text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  completed_at timestamp with time zone,
+  created_by uuid references public.profiles(id) on delete set null
 );
 
--- ============================================================================
--- ADD DEFERRED FOREIGN KEY CONSTRAINTS
--- ============================================================================
-
--- Add FK for latest_check_run_id now that forge_rule_check_runs exists
-ALTER TABLE public.guides
-ADD CONSTRAINT fk_guides_latest_check_run_id 
-FOREIGN KEY (latest_check_run_id) REFERENCES public.forge_rule_check_runs(id) ON DELETE SET NULL;
+create index if not exists idx_generation_events_guide_id on public.generation_events(guide_id);
+create index if not exists idx_generation_events_status on public.generation_events(status);
+create index if not exists idx_generation_events_created_at on public.generation_events(created_at desc);
 
 -- ============================================================================
--- INDEXES
+-- ROW LEVEL SECURITY
 -- ============================================================================
 
-CREATE INDEX idx_profiles_handle ON public.profiles(handle);
-CREATE INDEX idx_profiles_role ON public.profiles(role);
-
-CREATE INDEX idx_networks_owner_id ON public.networks(owner_id);
-CREATE INDEX idx_networks_slug ON public.networks(slug);
-
-CREATE INDEX idx_hubs_network_id ON public.hubs(network_id);
-CREATE INDEX idx_hubs_slug ON public.hubs(slug);
-
-CREATE INDEX idx_collections_hub_id ON public.collections(hub_id);
-CREATE INDEX idx_collections_slug ON public.collections(slug);
-
-CREATE INDEX idx_guides_collection_id ON public.guides(collection_id);
-CREATE INDEX idx_guides_author_id ON public.guides(author_id);
-CREATE INDEX idx_guides_status ON public.guides(status);
-CREATE INDEX idx_guides_verification_status ON public.guides(verification_status);
-CREATE INDEX idx_guides_latest_check_run_id ON public.guides(latest_check_run_id);
-
-CREATE INDEX idx_guide_steps_guide_id ON public.guide_steps(guide_id);
-CREATE INDEX idx_guide_steps_order ON public.guide_steps(guide_id, order_index);
-
-CREATE INDEX idx_network_forge_rules_network_id ON public.network_forge_rules(network_id);
-CREATE INDEX idx_network_forge_rules_forge_rule_id ON public.network_forge_rules(forge_rule_id);
-
-CREATE INDEX idx_forge_rule_check_runs_guide_id ON public.forge_rule_check_runs(guide_id);
-CREATE INDEX idx_forge_rule_check_runs_checked_at ON public.forge_rule_check_runs(checked_at);
-
-CREATE INDEX idx_forge_rule_check_results_check_run_id ON public.forge_rule_check_results(check_run_id);
-
-CREATE INDEX idx_generation_events_guide_id ON public.generation_events(guide_id);
-CREATE INDEX idx_generation_events_status ON public.generation_events(status);
+alter table public.profiles enable row level security;
+alter table public.networks enable row level security;
+alter table public.hubs enable row level security;
+alter table public.collections enable row level security;
+alter table public.guides enable row level security;
+alter table public.guide_steps enable row level security;
+alter table public.forge_rules enable row level security;
+alter table public.network_forge_rules enable row level security;
+alter table public.forge_rule_check_runs enable row level security;
+alter table public.forge_rule_check_results enable row level security;
+alter table public.generation_events enable row level security;
 
 -- ============================================================================
--- UPDATED_AT TRIGGER FUNCTION
+-- RLS POLICIES: READ-ORIENTED PHASE 1
 -- ============================================================================
+-- Phase 1 note:
+-- - Public read policies are included for public content.
+-- - Direct client INSERT/UPDATE/DELETE policies are intentionally not broad.
+-- - Draft writes should later happen through controlled server/API routes.
+-- - This keeps Vercel/v0 from relying on unsafe anonymous client writes.
 
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Profiles: public read.
+create policy "profiles_select_all"
+on public.profiles
+for select
+using (true);
 
--- Apply trigger to all tables with updated_at
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_networks_updated_at BEFORE UPDATE ON public.networks
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_hubs_updated_at BEFORE UPDATE ON public.hubs
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_collections_updated_at BEFORE UPDATE ON public.collections
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_guides_updated_at BEFORE UPDATE ON public.guides
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_guide_steps_updated_at BEFORE UPDATE ON public.guide_steps
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_forge_rules_updated_at BEFORE UPDATE ON public.forge_rules
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_network_forge_rules_updated_at BEFORE UPDATE ON public.network_forge_rules
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ============================================================================
--- ROW LEVEL SECURITY (RLS)
--- ============================================================================
-
--- Enable RLS on all tables
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.networks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.hubs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.guides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.guide_steps ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.forge_rules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.network_forge_rules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.forge_rule_check_runs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.forge_rule_check_results ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.generation_events ENABLE ROW LEVEL SECURITY;
-
--- ============================================================================
--- RLS POLICIES - READ ONLY (Phase 1)
--- ============================================================================
--- Phase 1 NOTE: INSERT/UPDATE/DELETE policies are intentionally minimal
--- All write operations happen server-side through secure API routes (Phase 2)
--- Direct client writes are not supported yet
-
--- Profiles: Users can view all, but no direct client writes
-CREATE POLICY "Profiles are viewable by all" ON public.profiles
-FOR SELECT USING (true);
-
--- Networks: Public networks viewable by all, private by owner
-CREATE POLICY "Public networks viewable by all" ON public.networks
-FOR SELECT USING (is_public = true OR owner_id = auth.uid());
-
--- Hubs: Inherit visibility from parent network
-CREATE POLICY "Hubs inherit network visibility" ON public.hubs
-FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.networks 
-          WHERE id = hubs.network_id 
-          AND (is_public = true OR owner_id = auth.uid()))
+-- Networks: public networks visible to all; private visible to owner.
+create policy "networks_select_public_or_owner"
+on public.networks
+for select
+using (
+  is_public = true
+  or owner_id = auth.uid()
 );
 
--- Collections: Inherit visibility from hub/network
-CREATE POLICY "Collections inherit visibility from parent hub" ON public.collections
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.hubs h
-    JOIN public.networks n ON h.network_id = n.id
-    WHERE h.id = collections.hub_id 
-    AND (n.is_public = true OR n.owner_id = auth.uid())
+-- Hubs: inherit visibility from parent network.
+create policy "hubs_select_by_network_visibility"
+on public.hubs
+for select
+using (
+  exists (
+    select 1
+    from public.networks n
+    where n.id = hubs.network_id
+      and (n.is_public = true or n.owner_id = auth.uid())
   )
 );
 
--- Guides: Published by all, drafts only by author
-CREATE POLICY "Guides: published for all, drafts for author only" ON public.guides
-FOR SELECT USING (
-  status = 'published' OR author_id = auth.uid()
-);
-
-CREATE POLICY "Guide steps visible with parent guide" ON public.guide_steps
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.guides 
-    WHERE id = guide_id AND (status = 'published' OR author_id = auth.uid())
+-- Collections: inherit visibility from parent hub/network.
+create policy "collections_select_by_network_visibility"
+on public.collections
+for select
+using (
+  exists (
+    select 1
+    from public.hubs h
+    join public.networks n on n.id = h.network_id
+    where h.id = collections.hub_id
+      and (n.is_public = true or n.owner_id = auth.uid())
   )
 );
 
--- Forge Rules: Viewable by all
-CREATE POLICY "Forge rules viewable by all" ON public.forge_rules
-FOR SELECT USING (true);
+-- Guides: published guides visible to all; drafts visible to author.
+create policy "guides_select_published_or_author"
+on public.guides
+for select
+using (
+  status = 'published'
+  or author_id = auth.uid()
+);
 
--- Network Forge Rules: Viewable by all
-CREATE POLICY "Network forge rules viewable by all" ON public.network_forge_rules
-FOR SELECT USING (true);
-
--- Check Runs: Authors can view own only
-CREATE POLICY "Check runs visible to author only" ON public.forge_rule_check_runs
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.guides 
-    WHERE id = forge_rule_check_runs.guide_id 
-    AND author_id = auth.uid()
+-- Guide steps: inherit visibility from parent guide.
+create policy "guide_steps_select_by_guide_visibility"
+on public.guide_steps
+for select
+using (
+  exists (
+    select 1
+    from public.guides g
+    where g.id = guide_steps.guide_id
+      and (g.status = 'published' or g.author_id = auth.uid())
   )
 );
 
--- Check Results: Visible with parent check run
-CREATE POLICY "Check results visible to author only" ON public.forge_rule_check_results
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.forge_rule_check_runs fcr
-    JOIN public.guides g ON fcr.guide_id = g.id
-    WHERE fcr.id = forge_rule_check_results.check_run_id 
-    AND g.author_id = auth.uid()
+-- Forge rules: public read.
+create policy "forge_rules_select_all"
+on public.forge_rules
+for select
+using (true);
+
+-- Network Forge Rules: visible if parent network is visible.
+create policy "network_forge_rules_select_by_network_visibility"
+on public.network_forge_rules
+for select
+using (
+  exists (
+    select 1
+    from public.networks n
+    where n.id = network_forge_rules.network_id
+      and (n.is_public = true or n.owner_id = auth.uid())
   )
 );
 
--- Generation Events: Authors can view own
-CREATE POLICY "Generation events visible to author only" ON public.generation_events
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.guides
-    WHERE id = generation_events.guide_id 
-    AND author_id = auth.uid()
+-- Check runs: visible if parent guide is visible.
+create policy "forge_rule_check_runs_select_by_guide_visibility"
+on public.forge_rule_check_runs
+for select
+using (
+  exists (
+    select 1
+    from public.guides g
+    where g.id = forge_rule_check_runs.guide_id
+      and (g.status = 'published' or g.author_id = auth.uid())
+  )
+);
+
+-- Check results: visible if parent check run/guide is visible.
+create policy "forge_rule_check_results_select_by_guide_visibility"
+on public.forge_rule_check_results
+for select
+using (
+  exists (
+    select 1
+    from public.forge_rule_check_runs r
+    join public.guides g on g.id = r.guide_id
+    where r.id = forge_rule_check_results.check_run_id
+      and (g.status = 'published' or g.author_id = auth.uid())
+  )
+);
+
+-- Generation events: visible if parent guide is visible.
+create policy "generation_events_select_by_guide_visibility"
+on public.generation_events
+for select
+using (
+  exists (
+    select 1
+    from public.guides g
+    where g.id = generation_events.guide_id
+      and (g.status = 'published' or g.author_id = auth.uid())
   )
 );
