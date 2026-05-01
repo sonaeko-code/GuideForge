@@ -24,11 +24,19 @@ interface GuideEditorProps {
 
 export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const router = useRouter()
-  const [title, setTitle] = useState(guide.title || "")
-  const [summary, setSummary] = useState(guide.summary || "")
+  // Ensure requirements is always an array
+  const normalizedGuide = {
+    ...guide,
+    requirements: guide.requirements && Array.isArray(guide.requirements) ? guide.requirements : [],
+    warnings: guide.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
+  }
+  
+  const [title, setTitle] = useState(normalizedGuide.title || "")
+  const [summary, setSummary] = useState(normalizedGuide.summary || "")
+  const [requirementsText, setRequirementsText] = useState(normalizedGuide.requirements.join("\n") || "")
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
-  const [steps, setSteps] = useState(guide.steps || [])
-  const [version, setVersion] = useState(guide.version || "")
+  const [steps, setSteps] = useState(normalizedGuide.steps || [])
+  const [version, setVersion] = useState(normalizedGuide.version || "")
   const [rulesApplied, setRulesApplied] = useState(false)
   const [rulesCheckResult, setRulesCheckResult] = useState<ForgeRulesCheckResult[] | null>(null)
   const [rulesCheckTimestamp, setRulesCheckTimestamp] = useState<number | null>(null)
@@ -54,10 +62,17 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
     // Set new timer
     autosaveTimerRef.current = setTimeout(() => {
+      // Normalize requirements from textarea (one per line)
+      const requirementsArray = requirementsText
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+
       const updatedGuide: Guide = {
-        ...guide,
+        ...normalizedGuide,
         title,
         summary,
+        requirements: requirementsArray,
         steps,
         version,
         updatedAt: new Date().toISOString(),
@@ -92,23 +107,30 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, steps, version, guide])
+  }, [title, summary, requirementsText, steps, version, normalizedGuide])
 
   // Mock state tracking for draft/ready/published flow
-  const isDraft = guide.status === "draft"
-  const isReady = guide.status === "ready"
-  const isPublished = guide.status === "published"
+  const isDraft = normalizedGuide.status === "draft"
+  const isReady = normalizedGuide.status === "ready"
+  const isPublished = normalizedGuide.status === "published"
 
   // Safe .find() with defensive chaining
   const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   const handleApplyForgeRules = async () => {
+    // Normalize requirements from textarea
+    const requirementsArray = requirementsText
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+
     // Get the complete guide object
     const currentGuide: Guide = {
-      ...guide,
+      ...normalizedGuide,
       title,
       summary,
+      requirements: requirementsArray,
       steps,
       version,
       updatedAt: new Date().toISOString(),
@@ -410,29 +432,36 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
         {/* Requirements and warnings */}
         <div className="grid gap-4 md:grid-cols-2">
-          {guide.requirements.length > 0 && (
-            <Card className="border-border/50 p-4">
+          {/* Editable Requirements */}
+          <Card className="border-border/50 p-4">
+            <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Requirements
               </p>
-              <ul className="mt-3 space-y-1">
-                {guide.requirements.map((req, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-                    <span className="mt-1 size-1 flex-shrink-0 rounded-full bg-primary" />
-                    {req}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
+              {requirementsText.trim().length > 0 && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  {requirementsText.split("\n").filter(l => l.trim().length > 0).length} item{requirementsText.split("\n").filter(l => l.trim().length > 0).length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <textarea
+              value={requirementsText}
+              onChange={(e) => setRequirementsText(e.target.value)}
+              placeholder="Add requirements here, one per line:&#10;• Level 30+&#10;• Completion of main questline"
+              className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              One requirement per line. Leave empty if not applicable.
+            </p>
+          </Card>
 
-          {guide.warnings.length > 0 && (
+          {normalizedGuide.warnings.length > 0 && (
             <Card className="border-amber-500/20 bg-amber-500/5 p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                 Warnings
               </p>
               <ul className="mt-3 space-y-1">
-                {guide.warnings.map((warn, idx) => (
+                {normalizedGuide.warnings.map((warn, idx) => (
                   <li key={idx} className="text-sm text-amber-700 dark:text-amber-400">
                     ⚠ {warn}
                   </li>
@@ -496,25 +525,35 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 )}
               </div>
               <div className="space-y-2">
-                {rulesCheckResult.map((result: ForgeRulesCheckResult, idx: number) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs">
-                      {result.passed ? (
-                        <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden="true" />
-                      ) : (
-                        <div className="size-3.5 rounded-full border border-amber-500" aria-hidden="true" />
+                {rulesCheckResult.map((result: ForgeRulesCheckResult, idx: number) => {
+                  const isFailedRequired = !result.passed && result.required !== false
+                  const isFailedOptional = !result.passed && result.required === false
+
+                  return (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs">
+                        {result.passed ? (
+                          <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden="true" />
+                        ) : isFailedRequired ? (
+                          <div className="size-3.5 rounded-full border border-amber-500 bg-amber-500/10" aria-hidden="true" />
+                        ) : (
+                          <div className="size-3.5 rounded-full border border-blue-400 bg-blue-400/10" aria-hidden="true" />
+                        )}
+                        <span className={result.passed ? "text-foreground font-medium" : isFailedRequired ? "text-amber-600 font-medium" : "text-blue-600 dark:text-blue-400 font-medium"}>
+                          {result.rule.label}
+                          {!result.passed && result.required === false && (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">(optional)</span>
+                          )}
+                        </span>
+                      </div>
+                      {result.reason && (
+                        <p className={`ml-5 text-xs ${isFailedRequired ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>
+                          {result.reason}
+                        </p>
                       )}
-                      <span className={result.passed ? "text-foreground font-medium" : "text-amber-600 font-medium"}>
-                        {result.rule.label}
-                      </span>
                     </div>
-                    {result.reason && (
-                      <p className="ml-5 text-xs text-amber-600 dark:text-amber-400">
-                        {result.reason}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </Card>

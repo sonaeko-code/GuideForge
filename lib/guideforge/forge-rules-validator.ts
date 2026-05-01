@@ -1,8 +1,9 @@
 import type { Guide, ForgeRule } from "./types"
 
 export interface ForgeRulesCheckResult {
-  rule: { id: string; label: string; description: string }
+  rule: { id: string; label: string; description: string; required?: boolean }
   passed: boolean
+  required?: boolean
   reason?: string
 }
 
@@ -17,6 +18,9 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
   const stepsCount = guide.steps?.length || 0
   const validSectionsCount = guide.steps?.filter(s => s.title?.trim() && s.body?.trim()).length || 0
   const requirementsCount = guide.requirements?.length || 0
+
+  console.log("[v0] Forge rules requirements value:", guide.requirements)
+  console.log("[v0] Forge rules requirements count:", requirementsCount)
 
   return availableRules.map((rule) => {
     let passed = false
@@ -97,10 +101,18 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         break
 
       case "requirements listed":
+        // Check if this rule is marked as required
+        const isRequired = rule.required !== false  // default true if not specified
+        
         // Pass only if at least 1 requirement
         passed = requirementsCount >= 1
         if (!passed) {
-          reason = "At least one requirement must be listed."
+          console.log("[v0] Requirements validation failed - guide.requirements:", guide.requirements)
+          if (isRequired) {
+            reason = "At least one requirement must be listed."
+          } else {
+            reason = "No requirements listed — optional for this guide."
+          }
         }
         break
 
@@ -139,8 +151,10 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         id: rule.id || rule.ruleId || "",
         label: rule.label || rule.name || "",
         description: rule.description || "",
+        required: rule.required !== false, // default to required if not specified
       },
       passed,
+      required: rule.required !== false,
       reason: passed ? undefined : reason,
     }
   })

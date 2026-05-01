@@ -217,3 +217,29 @@ export async function updateDraftStatus(
 ): Promise<void> {
   return getAdapter().updateDraftStatus(draftId, status)
 }
+
+/**
+ * Get the source (Supabase or localStorage) that the persistence layer is using.
+ * Useful for UI to show which storage backend is active.
+ * 
+ * @returns "supabase" if Supabase is configured and valid, otherwise "localStorage"
+ */
+export function getPersistenceSource(): "supabase" | "localStorage" {
+  const configured =
+    typeof process !== "undefined" &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!configured) {
+    return "localStorage"
+  }
+
+  // Validate Supabase URL and key format
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || ""
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || ""
+
+  const urlValid = url.startsWith("https://") && url.includes("supabase.co")
+  const keyValid = key.includes(".") && key.length > 50
+
+  return urlValid && keyValid ? "supabase" : "localStorage"
+}

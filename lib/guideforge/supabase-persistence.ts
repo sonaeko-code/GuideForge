@@ -21,6 +21,167 @@ import { LocalStoragePersistenceAdapter } from "./persistence"
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
 /**
+ * Normalize frontend guide type to Supabase-allowed values.
+ * Frontend uses descriptive names like "character-build", "boss-guide", etc.
+ * Supabase only allows: 'guide', 'build', 'strategy', 'quest', 'walkthrough', 'repair', 'sop', 'custom'
+ */
+function normalizeGuideTypeForSupabase(type?: string): string {
+  if (!type) {
+    console.log("[v0] Original guide type: (empty/null)")
+    console.log("[v0] Supabase guide type: guide")
+    return "guide"
+  }
+
+  console.log("[v0] Original guide type:", type)
+
+  let normalized: string
+  const lowerType = type.toLowerCase()
+
+  // Map frontend types to Supabase allowed values
+  if (lowerType.includes("build") || lowerType === "character-build") {
+    normalized = "build"
+  } else if (lowerType.includes("boss") || lowerType === "strategy") {
+    normalized = "strategy"
+  } else if (lowerType.includes("quest") || lowerType === "quest") {
+    normalized = "quest"
+  } else if (lowerType === "walkthrough") {
+    normalized = "walkthrough"
+  } else if (lowerType.includes("repair") || lowerType === "repair-procedure") {
+    normalized = "repair"
+  } else if (lowerType === "sop") {
+    normalized = "sop"
+  } else if (lowerType.includes("beginner") || lowerType.includes("tutorial")) {
+    normalized = "guide"
+  } else if (lowerType.includes("reference") || lowerType.includes("guide")) {
+    normalized = "guide"
+  } else {
+    normalized = "custom"
+  }
+
+  console.log("[v0] Supabase guide type:", normalized)
+  return normalized
+}
+
+/**
+ * Normalize frontend guide status to Supabase-allowed values.
+ * Frontend uses: 'draft', 'in-review', 'ready', 'published', 'needs-update', 'deprecated', 'archived'
+ * Supabase only allows: 'draft', 'ready', 'published', 'archived'
+ */
+function normalizeGuideStatusForSupabase(status?: string): string {
+  if (!status) {
+    console.log("[v0] Original guide status: (empty/null)")
+    console.log("[v0] Supabase guide status: draft")
+    return "draft"
+  }
+
+  console.log("[v0] Original guide status:", status)
+
+  let normalized: string
+  const lowerStatus = status.toLowerCase()
+
+  // Map frontend statuses to Supabase allowed values
+  if (lowerStatus === "draft") {
+    normalized = "draft"
+  } else if (lowerStatus === "in-review" || lowerStatus === "ready" || lowerStatus === "needs-update") {
+    normalized = "ready"
+  } else if (lowerStatus === "published") {
+    normalized = "published"
+  } else if (lowerStatus === "archived" || lowerStatus === "deprecated") {
+    normalized = "archived"
+  } else {
+    normalized = "draft"
+  }
+
+  console.log("[v0] Supabase guide status:", normalized)
+  return normalized
+}
+
+/**
+ * Normalize frontend difficulty to Supabase-allowed values.
+ * Frontend uses: 'beginner', 'intermediate', 'advanced', 'expert'
+ * Supabase allows: 'beginner', 'intermediate', 'advanced', 'expert' (same!)
+ */
+function normalizeGuideDifficultyForSupabase(difficulty?: string): string | null {
+  if (!difficulty) {
+    console.log("[v0] Original guide difficulty: (empty/null)")
+    console.log("[v0] Supabase guide difficulty: null")
+    return null
+  }
+
+  console.log("[v0] Original guide difficulty:", difficulty)
+
+  const lowerDifficulty = difficulty.toLowerCase()
+  const allowed = ["beginner", "intermediate", "advanced", "expert"]
+
+  if (allowed.includes(lowerDifficulty)) {
+    console.log("[v0] Supabase guide difficulty:", lowerDifficulty)
+    return lowerDifficulty
+  }
+
+  console.warn(`[v0] Unknown difficulty: ${difficulty}, using null`)
+  console.log("[v0] Supabase guide difficulty: null")
+  return null
+}
+
+/**
+ * Generate a unique slug by appending a number suffix if the slug already exists in collection.
+ * Queries Supabase to check for existing slugs and auto-increments: slug, slug-2, slug-3, etc.
+ */
+async function generateUniqueSlugForCollection(
+  baseSlug: string,
+  collectionId: string | null
+): Promise<string> {
+  if (!supabase || !collectionId) {
+    return baseSlug
+  }
+
+  try {
+    // Check if this exact slug already exists in the collection
+    const { data: existing } = await supabase
+      .from("guides")
+      .select("id")
+      .eq("slug", baseSlug)
+      .eq("collection_id", collectionId)
+      .limit(1)
+
+    if (!existing || existing.length === 0) {
+      return baseSlug
+    }
+
+    // Slug exists, find the next available number
+    console.log("[v0] Duplicate slug detected:", baseSlug)
+    let counter = 2
+    let uniqueSlug = `${baseSlug}-${counter}`
+
+    while (true) {
+      const { data: checkExisting } = await supabase
+        .from("guides")
+        .select("id")
+        .eq("slug", uniqueSlug)
+        .eq("collection_id", collectionId)
+        .limit(1)
+
+      if (!checkExisting || checkExisting.length === 0) {
+        console.log("[v0] Retrying with slug:", uniqueSlug)
+        return uniqueSlug
+      }
+
+      counter++
+      uniqueSlug = `${baseSlug}-${counter}`
+
+      // Safety limit
+      if (counter > 100) {
+        console.warn("[v0] Too many slug duplicates, using timestamp suffix")
+        return `${baseSlug}-${Date.now()}`
+      }
+    }
+  } catch (error) {
+    console.error("[v0] Error checking slug uniqueness:", error)
+    return baseSlug
+  }
+}
+
+/**
  * Map frontend collection identifiers to Supabase collection UUIDs.
  * The frontend uses slug-like identifiers (e.g., "collection_character_builds"),
  * but Supabase stores real UUIDs. This function looks up the real UUID.
@@ -135,10 +296,32 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // Normalize collection_id: convert frontend slug to real Supabase UUID
       const normalizedCollectionId = await normalizeCollectionIdForSupabase(guide.collectionId)
 
+      // Normalize type, status, and difficulty to Supabase-allowed values
+      const normalizedType = normalizeGuideTypeForSupabase(guide.type)
+      const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
+      const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
+
+      // Determine save mode: update existing by id, or insert new
+      // For new guides, ensure slug is unique within the collection
+      let finalSlug = guide.slug || guide.id
+      const saveMode = guide.id && guide.id.length > 0 ? "update" : "insert"
+
+      if (saveMode === "insert") {
+        // For new guides, generate unique slug if needed
+        finalSlug = await generateUniqueSlugForCollection(finalSlug, normalizedCollectionId)
+      }
+
+      console.log("[v0] Saving guide id:", guide.id)
+      console.log("[v0] Saving guide slug:", finalSlug)
+      console.log("[v0] Save mode:", saveMode)
+
       console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
         title: guide.title,
         collectionId: normalizedCollectionId,
+        type: normalizedType,
+        status: normalizedStatus,
+        difficulty: normalizedDifficulty,
         authorId,
         stepsCount: guide.steps?.length ?? 0,
       })
@@ -151,13 +334,13 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         id: guide.id,
         collection_id: normalizedCollectionId,
         title: guide.title,
-        slug: guide.slug || guide.id,
+        slug: finalSlug,
         summary: guide.summary,
-        type: guide.type,
-        difficulty: guide.difficulty,
+        type: normalizedType,
+        difficulty: normalizedDifficulty,
         version: guide.version || null,
         author_id: authorId,
-        status: guide.status || "draft",
+        status: normalizedStatus,
         verification_status: guide.verification || "unverified",
         created_at: guide.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -190,40 +373,78 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0
-      console.log("[v0] Supabase steps payload count:", stepCount)
+      console.log("[v0] Guide steps before Supabase save:", guide.steps)
+      console.log("[v0] Step count:", stepCount)
       
       if (stepCount > 0) {
-        const stepsData = guide.steps!.map((step) => ({
-          id: step.id,
-          guide_id: guide.id,
-          title: step.title,
-          body: step.body,
-          kind: step.kind,
-          order_index: step.order,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
+        const stepsData = guide.steps!.map((step, idx) => {
+          // Normalize step.kind to Supabase-allowed values
+          // Frontend uses: overview, strengths, weaknesses, gear, skill-priority, rotation, leveling, mistakes, patch-notes, final-tips, requirements, warning, custom
+          // Supabase allows: intro, section, step, tip, warning, summary, example, conclusion
+          let normalizedKind: string = "section"
+          const stepKind = (step.kind || "custom").toLowerCase()
+          
+          if (stepKind === "overview" || stepKind === "intro") {
+            normalizedKind = "intro"
+          } else if (stepKind === "warning") {
+            normalizedKind = "warning"
+          } else if (stepKind === "tip" || stepKind === "final-tips") {
+            normalizedKind = "tip"
+          } else if (stepKind === "summary" || stepKind === "conclusion") {
+            normalizedKind = "summary"
+          } else if (stepKind === "example") {
+            normalizedKind = "example"
+          } else {
+            // Default all other frontend kinds to "section"
+            normalizedKind = "section"
+          }
 
-        console.log("[v0] saveDraft: Deleting old guide_steps for guide", guide.id)
-        await supabase.from("guide_steps").delete().eq("guide_id", guide.id)
+          const stepData = {
+            id: step.id,
+            guide_id: guide.id,
+            title: step.title,
+            body: step.body,
+            kind: normalizedKind,
+            order_index: step.order,
+            is_spoiler: step.isSpoiler || false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          
+          if (idx === 0) {
+            console.log("[v0] First step payload:", JSON.stringify(stepData, null, 2))
+          }
+          
+          return stepData
+        })
 
-        console.log("[v0] saveDraft: Inserting", stepCount, "new guide_steps")
+        console.log("[v0] guide_steps delete starting for guide", guide.id)
+        const { error: deleteError } = await supabase.from("guide_steps").delete().eq("guide_id", guide.id)
+        if (deleteError) {
+          console.log("[v0] guide_steps delete error:", deleteError.message)
+        } else {
+          console.log("[v0] guide_steps delete succeeded")
+        }
+
+        console.log("[v0] guide_steps insert starting:", stepCount, "steps")
         const { error: stepsError } = await supabase
           .from("guide_steps")
           .insert(stepsData)
 
-        console.log("[v0] Supabase steps save error:", stepsError)
+        console.log("[v0] guide_steps insert error:", stepsError)
         
         if (stepsError) {
-          console.error("[v0] saveDraft: guide_steps insert FAILED", {
+          console.error("[v0] guide_steps insert FAILED:", {
             code: stepsError.code,
             message: stepsError.message,
             details: stepsError.details,
             stepCount,
           })
         } else {
-          console.log("[v0] saveDraft: guide_steps insert SUCCESS —", stepCount, "steps")
+          console.log("[v0] guide_steps insert SUCCESS:", stepCount, "steps saved")
         }
+      } else {
+        console.log("[v0] No guide steps found to save")
       }
 
       // Mirror to localStorage
@@ -280,7 +501,9 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       }
 
       console.log("[v0] Loaded", (stepsData || []).length, "steps from Supabase")
-      console.log("[v0] Steps data:", stepsData)
+      if ((stepsData || []).length > 0) {
+        console.log("[v0] First step:", stepsData?.[0])
+      }
 
       // Reconstruct guide from Supabase data
       // Note: guides table does NOT have hub_id or network_id columns
@@ -307,6 +530,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           kind: step.kind,
           title: step.title,
           body: step.body,
+          isSpoiler: step.is_spoiler || false,
+          callout: step.callout,
         })),
         author: {
           id: guideData.author_id || "",
@@ -444,6 +669,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           kind: step.kind,
           title: step.title,
           body: step.body,
+          isSpoiler: step.is_spoiler || false,
+          callout: step.callout,
         })),
         author: {
           id: guideData.author_id || "",
@@ -500,6 +727,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           kind: step.kind,
           title: step.title,
           body: step.body,
+          isSpoiler: step.is_spoiler || false,
+          callout: step.callout,
         })),
         author: {
           id: guideData.author_id || "",
