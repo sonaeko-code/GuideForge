@@ -147,11 +147,14 @@ export async function createAndSaveGuideDraft(
   })
 
   // Save to Supabase/localStorage - use saveGuideDraft to get actual storage source
-  let saveResult: { id: string; source: "supabase" | "localStorage" }
+  let saveResult: { id: string; source: "supabase" | "localStorage"; error?: string }
   try {
     saveResult = await saveGuideDraft(guide)
     console.log("[v0] createAndSaveGuideDraft: Save returned id:", saveResult.id)
     console.log("[v0] createAndSaveGuideDraft: Save returned source:", saveResult.source)
+    if (saveResult.error) {
+      console.log("[v0] createAndSaveGuideDraft: Save returned error:", saveResult.error)
+    }
   } catch (error) {
     console.error("[v0] createAndSaveGuideDraft: Error saving guide:", error)
     return {
@@ -189,10 +192,12 @@ export async function createAndSaveGuideDraft(
     console.log("[v0] createAndSaveGuideDraft: Reloaded guide title:", reloadedGuide.title)
     console.log("[v0] createAndSaveGuideDraft: Reloaded guide steps:", reloadedGuide.steps.length)
     
+    // Pass through any Supabase error even if localStorage fallback succeeded
     return {
       id: saveResult.id,
       source: saveResult.source,
       verified: true,
+      error: saveResult.error, // Will be undefined if Supabase succeeded
     }
   } catch (reloadError) {
     console.error("[v0] createAndSaveGuideDraft: Immediate reload error:", reloadError)

@@ -18,9 +18,9 @@ import type { Guide } from "./types"
 export interface GuidePersistenceAdapter {
   /**
    * Save or update a guide draft.
-   * Returns { id, source } indicating where the guide was saved.
+   * Returns { id, source, error? } indicating where the guide was saved and any error.
    */
-  saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage" }>
+  saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }>
 
   /**
    * Load a guide draft by ID.
@@ -71,7 +71,11 @@ export interface GuidePersistenceAdapter {
 export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
   private readonly prefix = "guideforge:drafts:"
 
-  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+  private isBrowser(): boolean {
+    return typeof window !== "undefined" && typeof localStorage !== "undefined"
+  }
+
+  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> {
     return { id: this.saveDraftSync(guide), source: "localStorage" }
   }
 
@@ -81,8 +85,13 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    */
   saveDraftSync(guide: Guide): string {
     const draftId = guide.id || `draft_${Date.now()}`
+    if (!this.isBrowser()) {
+      console.warn("[v0] localStorage not available (SSR context), save skipped for:", draftId)
+      return draftId
+    }
     const key = `${this.prefix}${draftId}`
     localStorage.setItem(key, JSON.stringify(guide))
+    console.log("[v0] localStorage save succeeded for:", draftId)
     return draftId
   }
 
@@ -94,11 +103,20 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    * Synchronous version of loadDraft for direct localStorage usage.
    */
   loadDraftSync(draftId: string): Guide | null {
+    if (!this.isBrowser()) {
+      console.warn("[v0] localStorage not available (SSR context), load skipped for:", draftId)
+      return null
+    }
     const key = `${this.prefix}${draftId}`
     const stored = localStorage.getItem(key)
-    if (!stored) return null
+    if (!stored) {
+      console.log("[v0] localStorage load: no data found for:", draftId)
+      return null
+    }
     try {
-      return JSON.parse(stored) as Guide
+      const guide = JSON.parse(stored) as Guide
+      console.log("[v0] localStorage load succeeded for:", draftId, "title:", guide.title)
+      return guide
     } catch (error) {
       console.error(`[v0] Failed to parse draft ${draftId}:`, error)
       return null
@@ -113,6 +131,7 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    * Synchronous version of hasDraft.
    */
   hasDraftSync(draftId: string): boolean {
+    if (!this.isBrowser()) return false
     const key = `${this.prefix}${draftId}`
     return localStorage.getItem(key) !== null
   }
@@ -125,6 +144,7 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    * Synchronous version of deleteDraft.
    */
   deleteDraftSync(draftId: string): void {
+    if (!this.isBrowser()) return
     const key = `${this.prefix}${draftId}`
     localStorage.removeItem(key)
   }
@@ -137,6 +157,7 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    * Synchronous version of getAllDrafts.
    */
   getAllDraftsSync(): Guide[] {
+    if (!this.isBrowser()) return []
     const drafts: Guide[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
@@ -192,6 +213,7 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    * Synchronous version of clearAllDrafts.
    */
   clearAllDraftsSync(): void {
+    if (!this.isBrowser()) return
     const keys: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
@@ -210,6 +232,7 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
    * Synchronous version of updateDraftStatus.
    */
   updateDraftStatusSync(draftId: string, status: string): void {
+    if (!this.isBrowser()) return
     const key = `${this.prefix}${draftId}`
     const stored = localStorage.getItem(key)
     if (stored) {

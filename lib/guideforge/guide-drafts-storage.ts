@@ -110,33 +110,17 @@ export function updateDraftStatusSync(draftId: string, status: string): void {
 // Phase 2: These will properly handle Supabase async calls.
 
 /**
- * Save a generated guide draft.
- * Returns the draftId for routing (uses guide.id if available, otherwise generates timestamp-based ID).
- * 
- * @param guide - The Guide object to save
- * @returns Promise<string> - The draftId of the saved guide
- */
-export async function saveGuideDraft(guide: Guide): Promise<string> {
-  return getAdapter().saveDraft(guide)
-}
-
-/**
  * Save a guide draft and return both ID and storage source.
  * Used by create/generate flows to verify save succeeded before redirecting.
  * 
  * @param guide - The Guide object to save
- * @returns Promise<{ id: string; source: "supabase" | "localStorage" }> - Save result with storage source
+ * @returns Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> - Save result with storage source and any error
  */
 export async function saveGuideDraft(
   guide: Guide
-): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> {
   const adapter = getAdapter()
   return adapter.saveDraft(guide)
-}
-  
-  // Fallback: just save and assume localStorage
-  const id = await adapter.saveDraft(guide)
-  return { id, source: "localStorage" }
 }
 
 /**
