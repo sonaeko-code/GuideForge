@@ -32,6 +32,10 @@ import {
   getGuidesByCollection,
   MOCK_HUBS,
 } from "@/lib/guideforge/mock-data"
+import {
+  getHubsByNetworkId,
+  getCollectionsByHubId,
+} from "@/lib/guideforge/supabase-networks"
 import { cn } from "@/lib/utils"
 
 export default async function NetworkDashboardPage({
@@ -55,8 +59,24 @@ export default async function NetworkDashboardPage({
     )
   }
 
-  const hubs = getHubsByNetwork(network.id)
-  const collections = hubs.flatMap((h: Hub) => getCollectionsByHub(h.id))
+  // Try to load hubs from Supabase first, fallback to mock data
+  let hubs = await getHubsByNetworkId(networkId)
+  if (hubs.length === 0) {
+    hubs = getHubsByNetwork(network.id)
+  }
+
+  // Load collections for each hub, preferring Supabase
+  let collections: Collection[] = []
+  for (const hub of hubs) {
+    const hubCollections = await getCollectionsByHubId(hub.id)
+    if (hubCollections.length === 0) {
+      // Fallback to mock data
+      collections = collections.concat(getCollectionsByHub(hub.id))
+    } else {
+      collections = collections.concat(hubCollections)
+    }
+  }
+
   const guides = collections.flatMap((c: Collection) =>
     getGuidesByCollection(c.id)
   )
