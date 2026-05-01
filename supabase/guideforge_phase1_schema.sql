@@ -1,6 +1,13 @@
 -- GuideForge Phase 1 Schema
 -- MVP focus: Draft persistence for authenticated users
 -- Does NOT replace public QuestLine guides yet (Phase 2)
+--
+-- IMPORTANT: Auth Strategy for Phase 1
+-- - profiles.id is a standalone UUID primary key (NOT linked to auth.users yet)
+-- - This allows seeded dev profiles to work without requiring Supabase Auth
+-- - Phase 2 will migrate to auth_user_id foreign key + separate auth.users linkage
+-- - Client direct writes are NOT enabled (no INSERT/UPDATE policies for phase 1)
+-- - All writes happen server-side through secure API routes (implemented in Phase 2)
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -9,10 +16,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- CORE TABLES
 -- ============================================================================
 
--- Profiles: Minimal user data, aligned with Supabase auth.users
+-- Profiles: Minimal user data
 -- Created first to be referenced by other tables
+-- NOTE: Phase 1 uses standalone UUID; Phase 2 will add auth_user_id for Supabase Auth linkage
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   display_name TEXT NOT NULL DEFAULT 'Anonymous',
   handle TEXT UNIQUE,
   avatar_url TEXT,
@@ -71,7 +79,7 @@ CREATE TABLE IF NOT EXISTS public.guides (
   type TEXT NOT NULL DEFAULT 'guide' CHECK (type IN ('guide', 'build', 'strategy', 'quest', 'custom')),
   difficulty TEXT CHECK (difficulty IN ('beginner', 'intermediate', 'advanced', 'expert')),
   version TEXT,
-  author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
+  author_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   reviewer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'ready', 'published', 'archived')),
   verification_status TEXT NOT NULL DEFAULT 'unverified' CHECK (verification_status IN ('unverified', 'rules_passed', 'reviewed', 'forge_verified', 'forged')),
@@ -255,46 +263,45 @@ ALTER TABLE public.forge_rule_check_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forge_rule_check_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.generation_events ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Users can view all, edit own
+-- ============================================================================
+-- RLS POLICIES - READ ONLY (Phase 1)
+-- ============================================================================
+-- Phase 1 NOTE: INSERT/UPDATE/DELETE policies are intentionally minimal
+-- All write operations happen server-side through secure API routes (Phase 2)
+-- Direct client writes are not supported yet
+
+-- Profiles: Users can view all, but no direct client writes
 CREATE POLICY "Profiles are viewable by all" ON public.profiles
 FOR SELECT USING (true);
 
-CREATE POLICY "Users can update own profile" ON public.profiles
-FOR UPDATE USING (auth.uid() = id);
-
--- Networks: Public networks viewable by all, private only by owner/admin
+-- Networks: Public networks viewable by all, private by owner
 CREATE POLICY "Public networks viewable by all" ON public.networks
 FOR SELECT USING (is_public = true OR owner_id = auth.uid());
 
-CREATE POLICY "Users can create networks" ON public.networks
-FOR INSERT WITH CHECK (owner_id = auth.uid());
-
-CREATE POLICY "Network owners can update" ON public.networks
-FOR UPDATE USING (owner_id = auth.uid());
-
 -- Hubs: Inherit visibility from parent network
-CREATE POLICY "Hubs viewable by all (via network visibility)" ON public.hubs
+CREATE POLICY "Hubs inherit network visibility" ON public.hubs
 FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.networks WHERE id = hub_id AND (is_public OR owner_id = auth.uid()))
+  EXISTS (SELECT 1 FROM public.networks 
+          WHERE id = hubs.network_id 
+          AND (is_public = true OR owner_id = auth.uid()))
 );
 
--- Collections, Guides, Guide Steps: Inherit visibility from hub
-CREATE POLICY "Collections viewable by all (via network visibility)" ON public.collections
+-- Collections: Inherit visibility from hub/network
+CREATE POLICY "Collections inherit visibility from parent hub" ON public.collections
 FOR SELECT USING (
   EXISTS (
-    SELECT 1 FROM public.hubs h 
-    JOIN public.networks n ON h.network_id = n.id 
-    WHERE h.id = collection_id AND (n.is_public OR n.owner_id = auth.uid())
+    SELECT 1 FROM public.hubs h
+    JOIN public.networks n ON h.network_id = n.id
+    WHERE h.id = collections.hub_id 
+    AND (n.is_public = true OR n.owner_id = auth.uid())
   )
 );
 
-CREATE POLICY "Guides viewable by all if published, drafts only by author" ON public.guides
+-- Guides: Published by all, drafts only by author
+CREATE POLICY "Guides: published for all, drafts for author only" ON public.guides
 FOR SELECT USING (
   status = 'published' OR author_id = auth.uid()
 );
-
-CREATE POLICY "Authors can update own drafts" ON public.guides
-FOR UPDATE USING (author_id = auth.uid() AND status = 'draft');
 
 CREATE POLICY "Guide steps visible with parent guide" ON public.guide_steps
 FOR SELECT USING (
@@ -308,36 +315,37 @@ FOR SELECT USING (
 CREATE POLICY "Forge rules viewable by all" ON public.forge_rules
 FOR SELECT USING (true);
 
--- Network Forge Rules: Viewable by all, edited by network owner only
+-- Network Forge Rules: Viewable by all
 CREATE POLICY "Network forge rules viewable by all" ON public.network_forge_rules
 FOR SELECT USING (true);
 
-CREATE POLICY "Network owners can manage forge rules" ON public.network_forge_rules
-FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.networks WHERE id = network_id AND owner_id = auth.uid())
-);
-
--- Check Runs & Results: Authors can view own, admins can view all
-CREATE POLICY "Users can view own check runs" ON public.forge_rule_check_runs
+-- Check Runs: Authors can view own only
+CREATE POLICY "Check runs visible to author only" ON public.forge_rule_check_runs
 FOR SELECT USING (
   EXISTS (
-    SELECT 1 FROM public.guides WHERE id = guide_id AND author_id = auth.uid()
+    SELECT 1 FROM public.guides 
+    WHERE id = forge_rule_check_runs.guide_id 
+    AND author_id = auth.uid()
   )
 );
 
-CREATE POLICY "Users can view own check results" ON public.forge_rule_check_results
+-- Check Results: Visible with parent check run
+CREATE POLICY "Check results visible to author only" ON public.forge_rule_check_results
 FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM public.forge_rule_check_runs fcr
     JOIN public.guides g ON fcr.guide_id = g.id
-    WHERE fcr.id = check_run_id AND g.author_id = auth.uid()
+    WHERE fcr.id = forge_rule_check_results.check_run_id 
+    AND g.author_id = auth.uid()
   )
 );
 
 -- Generation Events: Authors can view own
-CREATE POLICY "Users can view own generation events" ON public.generation_events
+CREATE POLICY "Generation events visible to author only" ON public.generation_events
 FOR SELECT USING (
   EXISTS (
-    SELECT 1 FROM public.guides WHERE id = guide_id AND author_id = auth.uid()
+    SELECT 1 FROM public.guides
+    WHERE id = generation_events.guide_id 
+    AND author_id = auth.uid()
   )
 );

@@ -1,6 +1,12 @@
 -- GuideForge Phase 1 Seed Data
 -- Starter data for development and manual testing
 -- This assumes one seeded dev profile owns the test network
+--
+-- IMPORTANT: Auth-Light Design for Phase 1
+-- - The seeded dev profile uses a fixed UUID and does NOT require a real Supabase Auth user
+-- - profiles.id is a standalone UUID primary key (NOT linked to auth.users)
+-- - This allows local testing without Supabase Auth
+-- - Phase 2 will add auth_user_id field for real user linkage
 
 -- ============================================================================
 -- SEED PROFILES
