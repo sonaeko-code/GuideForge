@@ -44,6 +44,7 @@ export default function GeneratorPage({
     preferredDifficulty: "intermediate",
   })
   const [isSending, setIsSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   // Load network on mount
   useEffect(() => {
@@ -91,6 +92,7 @@ export default function GeneratorPage({
     }
 
     setIsSending(true)
+    setSendError(null)
     try {
       console.log("[v0] handleSendToEditor started")
       const generatedGuide = session.response.guide
@@ -105,7 +107,7 @@ export default function GeneratorPage({
 
       // Use seeded IDs from Supabase schema
       // For Phase 1: Use emberfall hub and character-builds collection
-      const guideId = await createAndSaveGuideDraft({
+      const { id, source } = await createAndSaveGuideDraft({
         title: generatedGuide.title,
         summary: generatedGuide.summary,
         guideType: formState.guideType,
@@ -122,13 +124,14 @@ export default function GeneratorPage({
         })),
       })
 
-      console.log("[v0] Saved guide with guideId:", guideId)
+      console.log("[v0] Redirecting to editor id:", id)
 
       // Redirect to guide editor with guide ID
-      router.push(`/builder/network/${networkId}/guide/${guideId}/edit`)
+      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] Error in handleSendToEditor:", error)
-      alert("Failed to save guide. See console for details.")
+      setSendError(`Could not save guide before opening editor: ${errorMsg}`)
     } finally {
       setIsSending(false)
     }
@@ -399,6 +402,12 @@ export default function GeneratorPage({
                 "Send to Editor"
               )}
             </Button>
+
+            {sendError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-4">
+                <p className="text-sm text-red-700 dark:text-red-400">{sendError}</p>
+              </div>
+            )}
                       </>
                     ) : (
                       <div className="text-center py-6">

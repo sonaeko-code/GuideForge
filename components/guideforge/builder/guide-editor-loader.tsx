@@ -32,12 +32,14 @@ export function GuideEditorLoader({
   useEffect(() => {
     const loadGuide = async () => {
       try {
-        console.log("[v0] EditorLoader: Loading draft for guideId:", guideId)
+        console.log("[v0] Editor loader requested id:", guideId)
 
         // Try to load from Supabase/localStorage (async)
         const draft = await loadGuideDraft(guideId)
         
         if (draft) {
+          console.log("[v0] Editor loader found guide: true")
+          console.log("[v0] Editor loader source:", "supabase/localStorage")
           console.log("[v0] EditorLoader: Draft loaded from storage:", {
             id: draft.id,
             title: draft.title,
@@ -50,11 +52,14 @@ export function GuideEditorLoader({
           setNotFound(false)
         } else if (fallback && fallback.id === guideId) {
           // Check if it's a known static/mock guide
+          console.log("[v0] Editor loader found guide: true (fallback)")
+          console.log("[v0] Editor loader source: fallback")
           console.log("[v0] EditorLoader: Using fallback guide")
           setGuide(fallback)
           setNotFound(false)
         } else {
           // Draft not found
+          console.log("[v0] Editor loader found guide: false")
           console.warn("[v0] EditorLoader: Draft not found:", guideId)
           setNotFound(true)
           setGuide(null)
