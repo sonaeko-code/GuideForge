@@ -14,7 +14,7 @@ import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
-import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
+import { saveGuideDraftWithSource, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -36,6 +36,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [regeneratedSections, setRegeneratedSections] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [saveSource, setSaveSource] = useState<"supabase" | "localStorage" | null>(null)
   const [markedReady, setMarkedReady] = useState(false)
   const [markReadyError, setMarkReadyError] = useState(false)
   
@@ -61,7 +62,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       }
       setIsSaving(true)
       ;(async () => {
-        await saveGuideDraft(updatedGuide)
+        const { source } = await saveGuideDraftWithSource(updatedGuide)
+        setSaveSource(source)
         setLastSaved(new Date())
         setIsSaving(false)
       })()
@@ -106,13 +108,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setRulesApplied(true)
     setRulesStale(false)
     
-    // Persist to localStorage with the draft
     const updatedGuide: Guide = {
       ...currentGuide,
       forgeRulesCheckResult: results as any,
       forgeRulesCheckTimestamp: checkTimestamp,
     }
-    await saveGuideDraft(updatedGuide)
+    const { source } = await saveGuideDraftWithSource(updatedGuide)
+    setSaveSource(source)
+    setLastSaved(new Date())
   }
 
   // Check if validation needs refreshing when content changes
@@ -183,7 +186,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: rulesCheckResult as any,
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
-    await saveGuideDraft(updatedGuide)
+    const { source } = await saveGuideDraftWithSource(updatedGuide)
+    setSaveSource(source)
+    setLastSaved(new Date())
     await updateDraftStatus(guide.id, "ready")
     setMarkedReady(true)
     
@@ -239,7 +244,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {lastSaved && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Saved
+                    {saveSource === "supabase" ? "Saved to Supabase" : "Saved locally"}
                   </div>
                 )}
                 {markedReady && (
