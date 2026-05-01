@@ -24,6 +24,7 @@ import {
   MOCK_GUIDES,
   getHubsByNetwork,
 } from "@/lib/guideforge/mock-data"
+import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
 import { QUESTLINE_NEWS } from "@/lib/questline/mock-news"
 
 function formatPublished(iso: string) {
@@ -36,7 +37,12 @@ function formatPublished(iso: string) {
 export default async function QuestLineHomePage() {
   const network = QUESTLINE_NETWORK
   const hubs = getHubsByNetwork(network.id)
-  const guides = MOCK_GUIDES.filter((g) => g.status === "published")
+  
+  // Load published guides: prefer Supabase, fallback to mock data
+  const supabaseGuides = await loadPublishedGuides()
+  const guides = supabaseGuides.length > 0 
+    ? supabaseGuides 
+    : MOCK_GUIDES.filter((g) => g.status === "published")
 
   const featured = guides.find((g) => g.verification === "forge-verified") ?? guides[0]
   const featuredHub = hubs.find((h) => h.id === featured.hubId)

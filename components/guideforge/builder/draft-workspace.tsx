@@ -179,6 +179,26 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
                 })}
             </div>
           )}
+
+          {/* Published Guides */}
+          {drafts.filter(d => d.status === "published").length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Published ({drafts.filter(d => d.status === "published").length})</h3>
+              {drafts
+                .filter(d => d.status === "published")
+                .map((draft) => {
+                  const hubName = getHubName(draft.hubId)
+                  const collectionName = getCollectionName(draft.collectionId)
+                  const stepCount = draft.steps?.length ?? 0
+
+                  return (
+                    <Card key={draft.id} className="flex items-start justify-between gap-4 p-4 border-emerald-500/30 bg-emerald-500/5">
+                      <DraftCardContent draft={draft} hubName={hubName} collectionName={collectionName} stepCount={stepCount} draftSource={draftSource} isSupabaseConfigured={isSupabaseConfigured} networkId={networkId} onDelete={handleDelete} />
+                    </Card>
+                  )
+                })}
+            </div>
+          )}
         </div>
       )}
     </section>

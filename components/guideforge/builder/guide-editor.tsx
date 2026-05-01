@@ -10,6 +10,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
@@ -50,6 +59,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [markedReady, setMarkedReady] = useState(false)
   const [markReadyError, setMarkReadyError] = useState(false)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishedMessage, setPublishedMessage] = useState(false)
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -381,8 +393,93 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }, 5000)
   }
 
+  const handlePublish = async () => {
+    setShowPublishDialog(false)
+    setIsPublishing(true)
+    
+    console.log("[v0] Publishing guide id:", guide.id)
+    console.log("[v0] Autosave triggered by: Publish button")
+    setAutosaveStatus("saving")
+    
+    try {
+      // Normalize requirements from textarea
+      const requirementsArray = requirementsText
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+
+      // Update guide to published status
+      const publishedGuide: Guide = {
+        ...guide,
+        title,
+        summary,
+        requirements: requirementsArray,
+        steps,
+        version,
+        status: "published",
+        publishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        forgeRulesCheckResult: rulesCheckResult as any,
+        forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
+      }
+
+      const { source } = await saveGuideDraft(publishedGuide)
+      console.log("[v0] Publish save result:", { source, guideId: guide.id, status: "published" })
+      
+      setSaveSource(source)
+      setLastSaved(new Date())
+      
+      if (source === "supabase") {
+        setSaveError(null)
+        setGuideStatus("published")
+        setAutosaveStatus("saved")
+        console.log("[v0] Autosave indicator state: saved")
+        setPublishedMessage(true)
+        
+        // Keep "Saved" visible for 2 seconds
+        setTimeout(() => {
+          setAutosaveStatus("idle")
+          console.log("[v0] Autosave indicator state: idle")
+        }, 2000)
+        
+        // Clear published message after 5 seconds
+        setTimeout(() => {
+          setPublishedMessage(false)
+        }, 5000)
+      } else {
+        setSaveError("Supabase publish failed — saved locally instead")
+        setAutosaveStatus("failed")
+        console.log("[v0] Autosave indicator state: failed")
+      }
+    } catch (error) {
+      console.error("[v0] Publish error:", error)
+      setSaveError(`Publish error: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setAutosaveStatus("failed")
+      console.log("[v0] Autosave indicator state: failed")
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Publish confirmation dialog */}
+      <AlertDialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publish this guide?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Published guides will appear on QuestLine public pages and can be seen by everyone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-3">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePublish} disabled={isPublishing}>
+              {isPublishing ? "Publishing..." : "Publish"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* Fixed autosave toast in top-right corner */}
       <div 
         className={`fixed top-[88px] right-6 z-9999 transition-all duration-300 ${
@@ -550,13 +647,37 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
-                <Button size="sm" disabled title="Publishing coming in Phase 3">
+                <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={isPublishing}>
                   <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
-                  Publish (coming soon)
+                  {isPublishing ? "Publishing..." : "Publish"}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
+              </div>
+            )}
+
+            {/* Published state actions */}
+            {isPublished && (
+              <div className="flex gap-2 ml-auto items-center">
+                <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="size-4" aria-hidden="true" />
+                  Published to QuestLine
+                </div>
+                <Button size="sm" variant="outline" onClick={handlePreview}>
+                  <Eye className="size-4 mr-1" aria-hidden="true" />
+                  Preview
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleDelete}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+            
+            {publishedMessage && (
+              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 ml-auto">
+                <CheckCircle2 className="size-4" aria-hidden="true" />
+                Guide published to QuestLine.
               </div>
             )}
           </div>
