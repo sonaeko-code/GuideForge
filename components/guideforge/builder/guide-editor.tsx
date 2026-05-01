@@ -34,6 +34,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [title, setTitle] = useState(normalizedGuide.title || "")
   const [summary, setSummary] = useState(normalizedGuide.summary || "")
   const [requirementsText, setRequirementsText] = useState(normalizedGuide.requirements.join("\n") || "")
+  const [guideStatus, setGuideStatus] = useState(normalizedGuide.status ?? "draft")
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [steps, setSteps] = useState(normalizedGuide.steps || [])
   const [version, setVersion] = useState(normalizedGuide.version || "")
@@ -75,8 +76,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         requirements: requirementsArray,
         steps,
         version,
+        status: guideStatus,
         updatedAt: new Date().toISOString(),
       }
+
+      console.log("[v0] Autosave status:", guideStatus)
       setIsSaving(true)
       setSaveError(null)
       ;(async () => {
@@ -107,12 +111,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, requirementsText, steps, version, normalizedGuide])
+  }, [title, summary, requirementsText, steps, version, guideStatus, normalizedGuide])
 
   // Mock state tracking for draft/ready/published flow
-  const isDraft = normalizedGuide.status === "draft"
-  const isReady = normalizedGuide.status === "ready"
-  const isPublished = normalizedGuide.status === "published"
+  const isDraft = guideStatus === "draft"
+  const isReady = guideStatus === "ready"
+  const isPublished = guideStatus === "published"
 
   // Safe .find() with defensive chaining
   const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
@@ -202,6 +206,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   }
 
   const handlePublishDraft = async () => {
+    console.log("[v0] Mark Ready status before:", guideStatus)
+    
     // Check if validation is stale
     if (rulesStale) {
       setMarkReadyError(true)
@@ -222,14 +228,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       }
     }
     
+    // Cancel any pending autosave before changing status
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = null
+    }
+    
     // Normalize requirements from textarea for save
     const requirementsArray = requirementsText
       .split("\n")
       .map(line => line.trim())
       .filter(line => line.length > 0)
 
-    console.log("[v0] Mark Ready guide id:", guide.id)
-    console.log("[v0] Mark Ready saving status: ready")
+    // Update status to "ready"
+    setGuideStatus("ready")
+    console.log("[v0] Mark Ready status after: ready")
     
     // Update status to "ready" in Supabase
     const updatedGuide: Guide = {
@@ -245,7 +258,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
     
+    console.log("[v0] Mark Ready guide id:", guide.id)
+    console.log("[v0] Mark Ready saving status: ready")
+    
     const { source } = await saveGuideDraft(updatedGuide)
+    console.log("[v0] Mark Ready save source:", source)
     console.log("[v0] Mark Ready save result:", { source, guideId: guide.id, status: "ready" })
     
     setSaveSource(source)
@@ -359,9 +376,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
-                <Button size="sm" onClick={handlePublishDraft}>
+                <Button size="sm" onClick={handlePublishDraft} disabled={isReady}>
                   <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
-                  Mark Ready
+                  {isReady ? "Ready" : "Mark Ready"}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
