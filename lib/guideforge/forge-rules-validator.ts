@@ -59,10 +59,17 @@ export function validateForgeRules(guide: Guide, availableRules: any[]): ForgeRu
         break
 
       case "minimum 3 sections":
+        // Check if this rule is marked as required (default true if not specified)
+        const isSectionsRequired = rule.required !== false
+        
         // Pass only if 3+ sections exist
         passed = validSectionsCount >= 3
         if (!passed) {
-          reason = `At least 3 sections needed (you have ${validSectionsCount}).`
+          if (isSectionsRequired) {
+            reason = `At least 3 sections needed (you have ${validSectionsCount}).`
+          } else {
+            reason = `${validSectionsCount} section${validSectionsCount !== 1 ? "s" : ""} present — 3+ recommended for this guide.`
+          }
         }
         break
 
