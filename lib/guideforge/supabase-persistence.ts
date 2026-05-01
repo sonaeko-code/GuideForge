@@ -21,7 +21,108 @@ import { LocalStoragePersistenceAdapter } from "./persistence"
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
 /**
- * Map frontend collection identifiers to Supabase collection UUIDs.
+ * Normalize frontend guide type to Supabase-allowed values.
+ * Frontend uses descriptive names like "character-build", "boss-guide", etc.
+ * Supabase only allows: 'guide', 'build', 'strategy', 'quest', 'walkthrough', 'repair', 'sop', 'custom'
+ */
+function normalizeGuideTypeForSupabase(type?: string): string {
+  if (!type) {
+    console.log("[v0] Original guide type: (empty/null)")
+    console.log("[v0] Supabase guide type: guide")
+    return "guide"
+  }
+
+  console.log("[v0] Original guide type:", type)
+
+  let normalized: string
+  const lowerType = type.toLowerCase()
+
+  // Map frontend types to Supabase allowed values
+  if (lowerType.includes("build") || lowerType === "character-build") {
+    normalized = "build"
+  } else if (lowerType.includes("boss") || lowerType === "strategy") {
+    normalized = "strategy"
+  } else if (lowerType.includes("quest") || lowerType === "quest") {
+    normalized = "quest"
+  } else if (lowerType === "walkthrough") {
+    normalized = "walkthrough"
+  } else if (lowerType.includes("repair") || lowerType === "repair-procedure") {
+    normalized = "repair"
+  } else if (lowerType === "sop") {
+    normalized = "sop"
+  } else if (lowerType.includes("beginner") || lowerType.includes("tutorial")) {
+    normalized = "guide"
+  } else if (lowerType.includes("reference") || lowerType.includes("guide")) {
+    normalized = "guide"
+  } else {
+    normalized = "custom"
+  }
+
+  console.log("[v0] Supabase guide type:", normalized)
+  return normalized
+}
+
+/**
+ * Normalize frontend guide status to Supabase-allowed values.
+ * Frontend uses: 'draft', 'in-review', 'ready', 'published', 'needs-update', 'deprecated', 'archived'
+ * Supabase only allows: 'draft', 'ready', 'published', 'archived'
+ */
+function normalizeGuideStatusForSupabase(status?: string): string {
+  if (!status) {
+    console.log("[v0] Original guide status: (empty/null)")
+    console.log("[v0] Supabase guide status: draft")
+    return "draft"
+  }
+
+  console.log("[v0] Original guide status:", status)
+
+  let normalized: string
+  const lowerStatus = status.toLowerCase()
+
+  // Map frontend statuses to Supabase allowed values
+  if (lowerStatus === "draft") {
+    normalized = "draft"
+  } else if (lowerStatus === "in-review" || lowerStatus === "ready" || lowerStatus === "needs-update") {
+    normalized = "ready"
+  } else if (lowerStatus === "published") {
+    normalized = "published"
+  } else if (lowerStatus === "archived" || lowerStatus === "deprecated") {
+    normalized = "archived"
+  } else {
+    normalized = "draft"
+  }
+
+  console.log("[v0] Supabase guide status:", normalized)
+  return normalized
+}
+
+/**
+ * Normalize frontend difficulty to Supabase-allowed values.
+ * Frontend uses: 'beginner', 'intermediate', 'advanced', 'expert'
+ * Supabase allows: 'beginner', 'intermediate', 'advanced', 'expert' (same!)
+ */
+function normalizeGuideDifficultyForSupabase(difficulty?: string): string | null {
+  if (!difficulty) {
+    console.log("[v0] Original guide difficulty: (empty/null)")
+    console.log("[v0] Supabase guide difficulty: null")
+    return null
+  }
+
+  console.log("[v0] Original guide difficulty:", difficulty)
+
+  const lowerDifficulty = difficulty.toLowerCase()
+  const allowed = ["beginner", "intermediate", "advanced", "expert"]
+
+  if (allowed.includes(lowerDifficulty)) {
+    console.log("[v0] Supabase guide difficulty:", lowerDifficulty)
+    return lowerDifficulty
+  }
+
+  console.warn(`[v0] Unknown difficulty: ${difficulty}, using null`)
+  console.log("[v0] Supabase guide difficulty: null")
+  return null
+}
+
  * The frontend uses slug-like identifiers (e.g., "collection_character_builds"),
  * but Supabase stores real UUIDs. This function looks up the real UUID.
  * 
@@ -135,10 +236,18 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // Normalize collection_id: convert frontend slug to real Supabase UUID
       const normalizedCollectionId = await normalizeCollectionIdForSupabase(guide.collectionId)
 
+      // Normalize type, status, and difficulty to Supabase-allowed values
+      const normalizedType = normalizeGuideTypeForSupabase(guide.type)
+      const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
+      const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
+
       console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
         title: guide.title,
         collectionId: normalizedCollectionId,
+        type: normalizedType,
+        status: normalizedStatus,
+        difficulty: normalizedDifficulty,
         authorId,
         stepsCount: guide.steps?.length ?? 0,
       })
@@ -153,11 +262,11 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         title: guide.title,
         slug: guide.slug || guide.id,
         summary: guide.summary,
-        type: guide.type,
-        difficulty: guide.difficulty,
+        type: normalizedType,
+        difficulty: normalizedDifficulty,
         version: guide.version || null,
         author_id: authorId,
-        status: guide.status || "draft",
+        status: normalizedStatus,
         verification_status: guide.verification || "unverified",
         created_at: guide.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
