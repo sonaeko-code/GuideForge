@@ -27,6 +27,8 @@ import { generateMockResponse } from "@/lib/guideforge/mock-generator"
 
 interface CreateGuideFormProps {
   networkId: string
+  hubs?: any[]
+  collectionsMap?: { [hubId: string]: any[] }
 }
 
 const GUIDE_TYPES: GuideType[] = [
@@ -48,7 +50,7 @@ const SEEDED_NETWORK_ID = "network_questline"
 const SEEDED_HUB_ID = "hub_emberfall"
 const SEEDED_COLLECTION_ID = "collection_character_builds"
 
-export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
+export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: CreateGuideFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -61,6 +63,19 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   const [description, setDescription] = useState(
     "A forgiving sustain-mage build for new Emberfall players. Learn the fights without getting punished."
   )
+
+  // Hub and collection selection
+  const [selectedHubId, setSelectedHubId] = useState<string>(
+    hubs.length > 0 ? hubs[0].id : SEEDED_HUB_ID
+  )
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
+    hubs.length > 0 && collectionsMap[hubs[0].id]?.length > 0
+      ? collectionsMap[hubs[0].id][0].id
+      : SEEDED_COLLECTION_ID
+  )
+
+  // Update available collections when hub changes
+  const availableCollections = collectionsMap[selectedHubId] || []
 
   const handleGenerateMock = async () => {
     if (!title.trim()) {
@@ -77,8 +92,8 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         prompt: title,
         guideType,
         preferredDifficulty: difficulty,
-        targetHubId: SEEDED_HUB_ID,
-        targetCollectionId: SEEDED_COLLECTION_ID,
+        targetHubId: selectedHubId || SEEDED_HUB_ID,
+        targetCollectionId: selectedCollectionId || SEEDED_COLLECTION_ID,
       })
 
       if (response.guide) {
@@ -93,9 +108,9 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           summary: response.guide.summary || description,
           guideType,
           difficulty,
-          networkId: SEEDED_NETWORK_ID,
-          hubId: SEEDED_HUB_ID,
-          collectionId: SEEDED_COLLECTION_ID,
+          networkId,
+          hubId: selectedHubId || SEEDED_HUB_ID,
+          collectionId: selectedCollectionId || SEEDED_COLLECTION_ID,
           requirements: response.guide.requirements,
           warnings: response.guide.warnings,
           steps: response.guide.sections?.map((section) => ({
@@ -112,7 +127,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         }
 
         console.log("[v0] CreateGuideForm: Verification succeeded, redirecting to editor id:", id)
-        router.push(`/builder/network/${SEEDED_NETWORK_ID}/guide/${id}/edit`)
+        router.push(`/builder/network/${networkId}/guide/${id}/edit`)
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
@@ -145,9 +160,9 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         summary: description,
         guideType,
         difficulty,
-        networkId: SEEDED_NETWORK_ID,
-        hubId: SEEDED_HUB_ID,
-        collectionId: SEEDED_COLLECTION_ID,
+        networkId,
+        hubId: selectedHubId || SEEDED_HUB_ID,
+        collectionId: selectedCollectionId || SEEDED_COLLECTION_ID,
         requirements: requirements
           ? requirements.split(",").map((r) => r.trim()).filter(Boolean)
           : [],
@@ -161,7 +176,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
       }
 
       console.log("[v0] CreateGuideForm: Verification succeeded, redirecting to editor id:", id)
-      router.push(`/builder/network/${SEEDED_NETWORK_ID}/guide/${id}/edit`)
+      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] CreateGuideForm: Error creating guide:", error)
@@ -174,6 +189,51 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   return (
     <div className="space-y-8">
       <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="hub-select">Hub</FieldLabel>
+          <FieldDescription>
+            Select which hub (game/product/topic) this guide belongs to.
+          </FieldDescription>
+          <Select value={selectedHubId} onValueChange={(v) => {
+            setSelectedHubId(v)
+            // Reset collection to first available when hub changes
+            const collections = collectionsMap[v] || []
+            if (collections.length > 0) {
+              setSelectedCollectionId(collections[0].id)
+            }
+          }}>
+            <SelectTrigger id="hub-select" className="mt-2">
+              <SelectValue placeholder="Select hub" />
+            </SelectTrigger>
+            <SelectContent>
+              {hubs.map((hub) => (
+                <SelectItem key={hub.id} value={hub.id}>
+                  {hub.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="collection-select">Collection</FieldLabel>
+          <FieldDescription>
+            Select which collection within the hub this guide belongs to.
+          </FieldDescription>
+          <Select value={selectedCollectionId} onValueChange={setSelectedCollectionId}>
+            <SelectTrigger id="collection-select" className="mt-2">
+              <SelectValue placeholder="Select collection" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableCollections.map((collection) => (
+                <SelectItem key={collection.id} value={collection.id}>
+                  {collection.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
         <Field>
           <FieldLabel htmlFor="guide-title">Guide title</FieldLabel>
           <FieldDescription>
