@@ -69,7 +69,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           const { source } = await saveGuideDraftWithSource(updatedGuide)
           setSaveSource(source)
           setLastSaved(new Date())
-          // Only show actual errors, not "Supabase not configured" (logged in console instead)
+          
+          // Only clear error if save was to Supabase, otherwise show fallback message
+          if (source === "supabase") {
+            setSaveError(null)
+          } else {
+            setSaveError("Supabase save failed — saved locally instead")
+          }
         } catch (error) {
           console.error("[v0] Autosave error:", error)
           setSaveError(`Save error: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -126,6 +132,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     const { source } = await saveGuideDraftWithSource(updatedGuide)
     setSaveSource(source)
     setLastSaved(new Date())
+    if (source !== "supabase") {
+      setSaveError("Supabase save failed — saved locally instead")
+    } else {
+      setSaveError(null)
+    }
   }
 
   // Check if validation needs refreshing when content changes
@@ -199,6 +210,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     const { source } = await saveGuideDraftWithSource(updatedGuide)
     setSaveSource(source)
     setLastSaved(new Date())
+    if (source !== "supabase") {
+      setSaveError("Supabase save failed — saved locally instead")
+    } else {
+      setSaveError(null)
+    }
     await updateDraftStatus(guide.id, "ready")
     setMarkedReady(true)
     
