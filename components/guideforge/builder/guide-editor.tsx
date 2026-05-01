@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2 } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -40,6 +40,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [markedReady, setMarkedReady] = useState(false)
   const [markReadyError, setMarkReadyError] = useState(false)
+  const [showDebugInfo, setShowDebugInfo] = useState(false)
   
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -68,9 +69,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           const { source } = await saveGuideDraftWithSource(updatedGuide)
           setSaveSource(source)
           setLastSaved(new Date())
-          if (source !== "supabase") {
-            setSaveError("Supabase not configured — saving locally")
-          }
+          // Only show actual errors, not "Supabase not configured" (logged in console instead)
         } catch (error) {
           console.error("[v0] Autosave error:", error)
           setSaveError(`Save error: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -264,6 +263,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                     {saveSource === "supabase" ? "Saved to Supabase" : "Saved locally"}
                   </div>
                 )}
+                {/* Dev debug info */}
+                <button
+                  onClick={() => setShowDebugInfo(!showDebugInfo)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                  title="Toggle Supabase configuration debug info"
+                >
+                  {showDebugInfo ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  Config
+                </button>
                 {markedReady && (
                   <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="size-4" aria-hidden="true" />
@@ -365,6 +373,22 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </Badge>
           </div>
         </div>
+
+        {/* Debug Config Panel */}
+        {showDebugInfo && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20 p-3 space-y-2 text-xs font-mono">
+            <div className="font-semibold text-amber-900 dark:text-amber-300">Supabase Configuration Debug</div>
+            <div className="space-y-1 text-amber-800 dark:text-amber-200">
+              <div>URL present: {process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ yes" : "✗ no"}</div>
+              <div>Anon key present: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "✓ yes" : "✗ no"}</div>
+              <div>Last save target: {saveSource || "not yet"}</div>
+              <div>Adapter: {saveSource === "supabase" ? "Supabase" : "localStorage"}</div>
+              <div className="text-xs text-amber-700 dark:text-amber-300 pt-1">
+                Check browser console for detailed [v0] logs about configuration detection and adapter selection.
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Requirements and warnings */}
         <div className="grid gap-4 md:grid-cols-2">

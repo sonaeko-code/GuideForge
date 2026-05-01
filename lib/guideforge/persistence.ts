@@ -231,14 +231,34 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
  */
 export function getPersistenceAdapter(): GuidePersistenceAdapter {
   // Check if Supabase environment variables are present
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
 
+  // Validate that both are present
+  const urlPresent = !!supabaseUrl
+  const keyPresent = !!supabaseAnonKey
+  
   // If Supabase is configured, use Supabase adapter
-  if (supabaseUrl && supabaseAnonKey) {
-    // Lazy import to avoid circular dependency issues
-    const { SupabasePersistenceAdapter } = require("./supabase-persistence")
-    return new SupabasePersistenceAdapter()
+  if (urlPresent && keyPresent) {
+    // Additional validation
+    const urlValid = supabaseUrl.startsWith("https://") && supabaseUrl.includes("supabase.co")
+    const keyValid = supabaseAnonKey.includes(".") && supabaseAnonKey.length > 50
+    
+    if (urlValid && keyValid) {
+      console.log("[v0] Persistence adapter selected: Supabase")
+      // Lazy import to avoid circular dependency issues
+      const { SupabasePersistenceAdapter } = require("./supabase-persistence")
+      return new SupabasePersistenceAdapter()
+    } else {
+      console.log("[v0] Persistence adapter selected: localStorage because Supabase env vars present but invalid")
+      if (!urlValid) console.log("[v0]   - URL invalid: must start with https:// and include supabase.co")
+      if (!keyValid) console.log("[v0]   - Key invalid: must contain . and be > 50 chars")
+    }
+  } else {
+    const missing: string[] = []
+    if (!urlPresent) missing.push("NEXT_PUBLIC_SUPABASE_URL")
+    if (!keyPresent) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    console.log("[v0] Persistence adapter selected: localStorage because missing:", missing.join(", "))
   }
 
   // Default to localStorage
