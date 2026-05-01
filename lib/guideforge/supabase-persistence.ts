@@ -1,26 +1,61 @@
 /**
  * Supabase Persistence Adapter
- * Phase 2: Browser-based draft persistence using Supabase
+ * Phase 1: Browser-based draft persistence using Supabase with seeded dev profile fallback
  * 
  * Uses public anon key with row-level security (RLS) policies.
+ * Uses seeded dev profile (550e8400-e29b-41d4-a716-446655440000) when no session.
  * Falls back to localStorage if Supabase is unavailable or on error.
  * 
  * Saves to:
  * - guides: Main guide data
  * - guide_steps: Individual guide steps
- * - generation_events: Track AI generation events
+ * - generation_events: Track AI generation events (optional)
  */
 
 import type { Guide, GuideStep } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
 
+// Phase 1: Seeded dev profile UUID
+const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+// Phase 1: Known seeded IDs from seed data
+const SEEDED_IDS = {
+  networkId: "questline", // Will be resolved by slug
+  hubs: {
+    emberfall: "emberfall",
+    starfallOutriders: "starfall-outriders",
+  },
+  collections: {
+    characterBuilds: "character-builds",
+    bossBattles: "boss-battles",
+    quests: "quests",
+  },
+}
+
 /**
  * Supabase implementation of GuidePersistenceAdapter
- * Includes localStorage fallback for resilience
+ * Includes localStorage fallback and seeded dev profile support for Phase 1
  */
 export class SupabasePersistenceAdapter {
   private localStorageAdapter = new LocalStoragePersistenceAdapter()
+
+  /**
+   * Get effective author ID for Supabase writes.
+   * Uses authenticated user ID if available, else seeded dev profile ID.
+   */
+  private async getAuthorId(): Promise<string> {
+    try {
+      const session = await getSupabaseSession()
+      if (session?.user?.id) {
+        return session.user.id
+      }
+    } catch (error) {
+      console.warn("[v0] Failed to get session, using dev profile", error)
+    }
+    console.log("[v0] Using seeded dev profile:", DEV_PROFILE_ID)
+    return DEV_PROFILE_ID
+  }
 
   /**
    * Save a guide draft to Supabase
@@ -28,38 +63,37 @@ export class SupabasePersistenceAdapter {
    * Falls back to localStorage on error
    */
   async saveDraft(guide: Guide): Promise<string> {
+    console.log("[v0] Supabase configured:", isSupabaseConfigured())
+    
     if (!isSupabaseConfigured() || !supabase) {
       console.warn("[v0] Supabase not configured, falling back to localStorage")
       return this.localStorageAdapter.saveDraftSync(guide)
     }
 
     try {
-      const session = await getSupabaseSession()
-      
-      // For Phase 2: Either user is authenticated or we skip Supabase
-      // Phase 1 uses localStorage fallback
-      if (!session) {
-        console.warn("[v0] No Supabase session, using localStorage fallback")
-        return this.localStorageAdapter.saveDraftSync(guide)
-      }
+      const authorId = await this.getAuthorId()
 
       // Prepare guide data for Supabase (snake_case mapping)
       const guideData = {
         id: guide.id,
         collection_id: guide.collectionId,
+        hub_id: guide.hubId,
+        network_id: guide.networkId,
         title: guide.title,
         slug: guide.slug,
         summary: guide.summary,
         type: guide.type,
         difficulty: guide.difficulty,
         version: guide.version || null,
-        author_id: session.user.id, // Use authenticated user ID
-        status: guide.status,
+        author_id: authorId,
+        status: guide.status || "draft",
         verification_status: guide.verification,
         created_at: guide.createdAt,
         updated_at: guide.updatedAt,
         published_at: guide.publishedAt || null,
       }
+
+      console.log("[v0] Saving guide to Supabase:", guide.id)
 
       // Insert or update guide
       const { error: guideError } = await supabase
@@ -68,8 +102,11 @@ export class SupabasePersistenceAdapter {
 
       if (guideError) {
         console.error("[v0] Failed to save guide to Supabase:", guideError.message)
+        console.log("[v0] Falling back to localStorage")
         return this.localStorageAdapter.saveDraftSync(guide)
       }
+
+      console.log("[v0] Saved guide to Supabase:", guide.id)
 
       // Save guide steps
       if (guide.steps && guide.steps.length > 0) {
@@ -104,10 +141,10 @@ export class SupabasePersistenceAdapter {
         }
       }
 
-      console.log("[v0] Successfully saved guide to Supabase:", guide.id)
       return guide.id
     } catch (error) {
       console.error("[v0] Supabase save error:", error)
+      console.log("[v0] Falling back to localStorage")
       // Fallback to localStorage on any error
       return this.localStorageAdapter.saveDraftSync(guide)
     }
@@ -132,6 +169,7 @@ export class SupabasePersistenceAdapter {
         .single()
 
       if (guideError || !guideData) {
+        console.log("[v0] Guide not found in Supabase, trying localStorage:", draftId)
         // Fall back to localStorage
         return this.localStorageAdapter.loadDraftSync(draftId)
       }
@@ -261,9 +299,12 @@ export class SupabasePersistenceAdapter {
         return this.localStorageAdapter.getDraftsByNetworkSync(networkId)
       }
 
-      if (!guidesData) {
+      if (!guidesData || guidesData.length === 0) {
+        console.log("[v0] No drafts found in Supabase for network:", networkId)
         return this.localStorageAdapter.getDraftsByNetworkSync(networkId)
       }
+
+      console.log("[v0] Loaded", guidesData.length, "drafts from Supabase for network:", networkId)
 
       // Reconstruct guides
       return guidesData.map((guideData: any) => ({
@@ -403,6 +444,8 @@ export class SupabasePersistenceAdapter {
     }
 
     try {
+      console.log("[v0] Updating draft status to", status, ":", draftId)
+      
       const { error } = await supabase
         .from("guides")
         .update({ status, updated_at: new Date().toISOString() })
@@ -410,6 +453,8 @@ export class SupabasePersistenceAdapter {
 
       if (error) {
         console.warn("[v0] Failed to update status in Supabase:", error.message)
+      } else {
+        console.log("[v0] Updated draft status in Supabase:", draftId)
       }
     } catch (error) {
       console.warn("[v0] Supabase updateDraftStatus error:", error)

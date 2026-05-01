@@ -14,7 +14,7 @@ import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
-import { saveGuideDraftSync, deleteDraftSync, updateDraftStatusSync } from "@/lib/guideforge/guide-drafts-storage"
+import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -50,7 +50,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
 
     // Set new timer
-    autosaveTimerRef.current = setTimeout(() => {
+    autosaveTimerRef.current = setTimeout(async () => {
       const updatedGuide: Guide = {
         ...guide,
         title,
@@ -60,7 +60,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
       setIsSaving(true)
-      saveGuideDraftSync(updatedGuide)
+      await saveGuideDraft(updatedGuide)
       setLastSaved(new Date())
       setIsSaving(false)
     }, 300)
@@ -110,7 +110,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: results as any,
       forgeRulesCheckTimestamp: checkTimestamp,
     }
-    saveGuideDraftSync(updatedGuide)
+    await saveGuideDraft(updatedGuide)
   }
 
   // Check if validation needs refreshing when content changes
@@ -144,14 +144,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     router.push(`/builder/network/${networkId}/guide/${guide.id}/preview`)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm("Are you sure you want to delete this draft? This cannot be undone.")) {
-      deleteDraftSync(guide.id)
+      await deleteDraft(guide.id)
       router.push(`/builder/network/${networkId}/dashboard`)
     }
   }
 
-  const handlePublishDraft = () => {
+  const handlePublishDraft = async () => {
     // Check if validation is stale
     if (rulesStale) {
       setMarkReadyError(true)
@@ -169,7 +169,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       }
     }
     
-    // Mock publish: update status to "ready"
+    // Update status to "ready" in Supabase
     const updatedGuide: Guide = {
       ...guide,
       title,
@@ -181,7 +181,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckResult: rulesCheckResult as any,
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
-    saveGuideDraftSync(updatedGuide)
+    await saveGuideDraft(updatedGuide)
+    await updateDraftStatus(guide.id, "ready")
     setMarkedReady(true)
     
     // Clear confirmation message after 3 seconds
