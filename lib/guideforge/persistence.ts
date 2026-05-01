@@ -227,16 +227,21 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
 
 /**
  * Factory function to get the active persistence adapter.
- * Phase 1: Returns localStorage adapter.
- * Phase 2: Will accept environment variable or config to switch.
+ * Automatically selects Supabase if configured, otherwise falls back to localStorage.
  */
 export function getPersistenceAdapter(): GuidePersistenceAdapter {
-  // Phase 1: Always use localStorage
-  // Phase 2: Add logic like:
-  // const adapterType = process.env.NEXT_PUBLIC_GUIDEFORGE_STORAGE || 'localStorage'
-  // if (adapterType === 'supabase') return new SupabasePersistenceAdapter()
-  // return new LocalStoragePersistenceAdapter()
+  // Check if Supabase environment variables are present
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+  // If Supabase is configured, use Supabase adapter
+  if (supabaseUrl && supabaseAnonKey) {
+    // Lazy import to avoid circular dependency issues
+    const { SupabasePersistenceAdapter } = require("./supabase-persistence")
+    return new SupabasePersistenceAdapter()
+  }
+
+  // Default to localStorage
   return new LocalStoragePersistenceAdapter()
 }
 
