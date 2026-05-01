@@ -70,6 +70,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setAutosaveStatus("saving")
     console.log("[v0] Autosave indicator state: saving")
 
+    // Set a minimum visibility timer for "Saving" state (700ms)
+    const savingStartTime = Date.now()
+    const minSavingDuration = 700
+
     // Set new timer
     autosaveTimerRef.current = setTimeout(() => {
       // Normalize requirements from textarea (one per line)
@@ -94,37 +98,88 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       ;(async () => {
         try {
           const { source, error } = await saveGuideDraft(updatedGuide)
+          const elapsed = Date.now() - savingStartTime
+          const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
+          
           setSaveSource(source)
           setLastSaved(new Date())
           
           // Show actual error if Supabase save failed
           if (source === "supabase") {
             setSaveError(null)
-            setAutosaveStatus("saved")
-            console.log("[v0] Autosave indicator state: saved")
             
-            // Keep "Saved" status for at least 2 seconds
-            if (autosaveStatusTimeoutRef.current) {
-              clearTimeout(autosaveStatusTimeoutRef.current)
+            // Wait for minimum saving duration, then show "Saved"
+            if (remainingMinDuration > 0) {
+              setTimeout(() => {
+                setAutosaveStatus("saved")
+                console.log("[v0] Autosave indicator state: saved")
+                
+                // Keep "Saved" for at least 2000ms
+                if (autosaveStatusTimeoutRef.current) {
+                  clearTimeout(autosaveStatusTimeoutRef.current)
+                }
+                autosaveStatusTimeoutRef.current = setTimeout(() => {
+                  setAutosaveStatus("idle")
+                  console.log("[v0] Autosave indicator state: idle")
+                }, 2000)
+              }, remainingMinDuration)
+            } else {
+              setAutosaveStatus("saved")
+              console.log("[v0] Autosave indicator state: saved")
+              
+              // Keep "Saved" for at least 2000ms
+              if (autosaveStatusTimeoutRef.current) {
+                clearTimeout(autosaveStatusTimeoutRef.current)
+              }
+              autosaveStatusTimeoutRef.current = setTimeout(() => {
+                setAutosaveStatus("idle")
+                console.log("[v0] Autosave indicator state: idle")
+              }, 2000)
             }
-            autosaveStatusTimeoutRef.current = setTimeout(() => {
-              setAutosaveStatus("idle")
-              console.log("[v0] Autosave indicator state: idle")
-            }, 2000)
           } else if (error) {
             setSaveError(`Supabase save failed: ${error}`)
-            setAutosaveStatus("failed")
-            console.log("[v0] Autosave indicator state: failed")
+            
+            // Ensure minimum saving visibility even on error
+            if (remainingMinDuration > 0) {
+              setTimeout(() => {
+                setAutosaveStatus("failed")
+                console.log("[v0] Autosave indicator state: failed")
+              }, remainingMinDuration)
+            } else {
+              setAutosaveStatus("failed")
+              console.log("[v0] Autosave indicator state: failed")
+            }
           } else {
             setSaveError("Supabase save failed — saved locally instead")
-            setAutosaveStatus("failed")
-            console.log("[v0] Autosave indicator state: failed")
+            
+            // Ensure minimum saving visibility
+            if (remainingMinDuration > 0) {
+              setTimeout(() => {
+                setAutosaveStatus("failed")
+                console.log("[v0] Autosave indicator state: failed")
+              }, remainingMinDuration)
+            } else {
+              setAutosaveStatus("failed")
+              console.log("[v0] Autosave indicator state: failed")
+            }
           }
         } catch (error) {
           console.error("[v0] Autosave error:", error)
+          const elapsed = Date.now() - savingStartTime
+          const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
+          
           setSaveError(`Save error: ${error instanceof Error ? error.message : "Unknown error"}`)
-          setAutosaveStatus("failed")
-          console.log("[v0] Autosave indicator state: failed")
+          
+          // Ensure minimum saving visibility
+          if (remainingMinDuration > 0) {
+            setTimeout(() => {
+              setAutosaveStatus("failed")
+              console.log("[v0] Autosave indicator state: failed")
+            }, remainingMinDuration)
+          } else {
+            setAutosaveStatus("failed")
+            console.log("[v0] Autosave indicator state: failed")
+          }
         } finally {
           setIsSaving(false)
         }
@@ -328,6 +383,52 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Fixed autosave toast in top-right corner */}
+      <div 
+        className={`fixed top-[88px] right-6 z-9999 transition-all duration-300 ${
+          autosaveStatus === "idle" ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className={`rounded-lg shadow-lg p-3 flex items-center gap-2 text-sm font-medium ${
+          autosaveStatus === "saving"
+            ? "bg-amber-500 text-white"
+            : autosaveStatus === "saved"
+            ? "bg-emerald-500 text-white"
+            : autosaveStatus === "failed"
+            ? "bg-red-500 text-white"
+            : "bg-muted text-foreground"
+        }`}>
+          {autosaveStatus === "saving" && (
+            <>
+              <div className="inline-flex">
+                <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+              </div>
+              <span>Saving changes...</span>
+              <span className="text-xs opacity-75 ml-2">[saving]</span>
+            </>
+          )}
+          {autosaveStatus === "saved" && (
+            <>
+              <CheckCircle2 className="size-4" />
+              <span>Saved to Supabase</span>
+              <span className="text-xs opacity-75 ml-2">[saved]</span>
+            </>
+          )}
+          {autosaveStatus === "failed" && (
+            <>
+              <AlertCircle className="size-4" />
+              <span>Save failed</span>
+              <span className="text-xs opacity-75 ml-2">[failed]</span>
+            </>
+          )}
+        </div>
+        {autosaveStatus === "failed" && saveError && (
+          <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded">
+            {saveError}
+          </div>
+        )}
+      </div>
+
       {/* Sticky top action bar */}
       <div className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-3">
