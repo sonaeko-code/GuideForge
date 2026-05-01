@@ -42,9 +42,11 @@ const DIFFICULTY_LEVELS: DifficultyLevel[] = ["beginner", "intermediate", "advan
 
 const AUDIENCES = ["New Players", "Intermediate", "Advanced", "Hardcore", "PvP", "PvE"]
 
-// Phase 1: fixed seeded hub/collection for questline network
-const SEEDED_HUB_ID = "emberfall"
-const SEEDED_COLLECTION_ID = "character-builds"
+// Phase 1: Seeded IDs for QuestLine network
+// These are the actual UUIDs used in Supabase seed data, not slugs
+const SEEDED_NETWORK_ID = "network_questline"
+const SEEDED_HUB_ID = "hub_emberfall"
+const SEEDED_COLLECTION_ID = "collection_character_builds"
 
 export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
   const router = useRouter()
@@ -91,7 +93,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           summary: response.guide.summary || description,
           guideType,
           difficulty,
-          networkId,
+          networkId: SEEDED_NETWORK_ID,
           hubId: SEEDED_HUB_ID,
           collectionId: SEEDED_COLLECTION_ID,
           requirements: response.guide.requirements,
@@ -110,7 +112,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         }
 
         console.log("[v0] CreateGuideForm: Verification succeeded, redirecting to editor id:", id)
-        router.push(`/builder/network/${networkId}/guide/${id}/edit`)
+        router.push(`/builder/network/${SEEDED_NETWORK_ID}/guide/${id}/edit`)
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
@@ -143,7 +145,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         summary: description,
         guideType,
         difficulty,
-        networkId,
+        networkId: SEEDED_NETWORK_ID,
         hubId: SEEDED_HUB_ID,
         collectionId: SEEDED_COLLECTION_ID,
         requirements: requirements
@@ -159,7 +161,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
       }
 
       console.log("[v0] CreateGuideForm: Verification succeeded, redirecting to editor id:", id)
-      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
+      router.push(`/builder/network/${SEEDED_NETWORK_ID}/guide/${id}/edit`)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] CreateGuideForm: Error creating guide:", error)
