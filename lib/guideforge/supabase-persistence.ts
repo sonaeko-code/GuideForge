@@ -21,6 +21,34 @@ import { LocalStoragePersistenceAdapter } from "./persistence"
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
 /**
+ * Normalize requirements for Supabase storage.
+ * Converts string array or multiline string to trimmed string array, removing empty lines.
+ */
+function normalizeRequirementsForSupabase(requirements?: string | string[] | null): string[] {
+  if (!requirements) {
+    return []
+  }
+
+  let items: string[] = []
+
+  if (typeof requirements === "string") {
+    // Split by newlines, trim, and filter
+    items = requirements
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+  } else if (Array.isArray(requirements)) {
+    // Already an array, just trim each item and filter
+    items = requirements
+      .map(item => (typeof item === "string" ? item.trim() : String(item)))
+      .filter(item => item.length > 0)
+  }
+
+  console.log("[v0] Saving requirements:", items)
+  return items
+}
+
+/**
  * Normalize frontend guide type to Supabase-allowed values.
  * Frontend uses descriptive names like "character-build", "boss-guide", etc.
  * Supabase only allows: 'guide', 'build', 'strategy', 'quest', 'walkthrough', 'repair', 'sop', 'custom'
@@ -326,10 +354,13 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         stepsCount: guide.steps?.length ?? 0,
       })
 
+      // Normalize requirements to Supabase format
+      const normalizedRequirements = normalizeRequirementsForSupabase(guide.requirements)
+
       // Only include columns that exist in the guides table schema:
       // id, collection_id, title, slug, summary, type, difficulty, version,
       // author_id, reviewer_id, status, verification_status, latest_check_run_id,
-      // published_at, created_at, updated_at
+      // published_at, created_at, updated_at, requirements
       const guideData = {
         id: guide.id,
         collection_id: normalizedCollectionId,
@@ -345,6 +376,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         created_at: guide.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
         published_at: guide.publishedAt || null,
+        requirements: normalizedRequirements,
       }
 
       console.log("[v0] Supabase guide upsert payload:", JSON.stringify({
@@ -505,6 +537,9 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         console.log("[v0] First step:", stepsData?.[0])
       }
 
+      // Log loaded requirements
+      console.log("[v0] Loaded requirements:", guideData.requirements)
+
       // Reconstruct guide from Supabase data
       // Note: guides table does NOT have hub_id or network_id columns
       // Those are derived from the collection -> hub -> network hierarchy
@@ -520,7 +555,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         difficulty: guideData.difficulty,
         status: guideData.status,
         verification: guideData.verification_status,
-        requirements: [],
+        requirements: Array.isArray(guideData.requirements) ? guideData.requirements : [],
         warnings: [],
         version: guideData.version,
         steps: (stepsData || []).map((step: any) => ({
@@ -717,7 +752,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         difficulty: guideData.difficulty,
         status: guideData.status,
         verification: guideData.verification_status,
-        requirements: [],
+        requirements: Array.isArray(guideData.requirements) ? guideData.requirements : [],
         warnings: [],
         version: guideData.version,
         steps: (guideData.guide_steps || []).map((step: any) => ({
