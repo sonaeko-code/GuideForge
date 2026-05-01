@@ -4,8 +4,8 @@
  * Strategy pattern for swapping between localStorage and Supabase storage.
  * Allows GuideForge to remain storage-agnostic during the migration to Supabase.
  * 
- * Phase 1: localStorage implementation
- * Phase 2: Supabase implementation (new adapter added)
+ * Phase 1: localStorage implementation (currently active)
+ * Phase 2: Supabase implementation (in supabase-persistence.ts)
  * Phase 3: Runtime configuration to switch adapters
  */
 
@@ -222,53 +222,6 @@ export class LocalStoragePersistenceAdapter implements GuidePersistenceAdapter {
         console.error(`[v0] Failed to update draft status ${draftId}:`, error)
       }
     }
-  }
-}
-
-/**
- * Stub Supabase implementation of GuidePersistenceAdapter.
- * Phase 2: Will be implemented when Supabase integration is ready.
- * 
- * This stub allows code to prepare for Supabase without breaking Phase 1.
- */
-export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
-  // TODO: Implement in Phase 2
-  // Will require: supabase client, auth context, RLS policies
-
-  async saveDraft(guide: Guide): Promise<string> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async loadDraft(draftId: string): Promise<Guide | null> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async hasDraft(draftId: string): Promise<boolean> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async deleteDraft(draftId: string): Promise<void> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async getAllDrafts(): Promise<Guide[]> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async getRecentDrafts(limit?: number): Promise<Guide[]> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async getDraftsByNetwork(networkId: string): Promise<Guide[]> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async clearAllDrafts(): Promise<void> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
-  }
-
-  async updateDraftStatus(draftId: string, status: string): Promise<void> {
-    throw new Error("Supabase adapter not implemented yet (Phase 2)")
   }
 }
 

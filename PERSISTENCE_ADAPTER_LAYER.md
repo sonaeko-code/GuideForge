@@ -11,22 +11,28 @@ Components (guide-editor, draft-workspace, draft-list)
          ↓
 Sync Helpers (guide-drafts-storage.ts)
          ↓
-Persistence Adapter (persistence-adapter.ts)
+Persistence Adapter (persistence.ts)
          ↓
 [localStorage - Phase 1] or [Supabase - Phase 2]
 ```
 
 ## Files
 
-### 1. `lib/guideforge/persistence-adapter.ts` (NEW)
+### 1. `lib/guideforge/persistence.ts` (NEW)
 Core abstraction layer with:
 - **GuidePersistenceAdapter Interface**: Defines contract for storage implementations
 - **LocalStoragePersistenceAdapter**: Phase 1 implementation with sync/async methods
-- **SupabasePersistenceAdapter**: Stub for Phase 2 implementation (not implemented yet)
 - **getPersistenceAdapter()**: Factory function that returns active adapter
 - **getLocalStorageAdapter()**: Direct access to sync localStorage methods
 
-### 2. `lib/guideforge/guide-drafts-storage.ts` (REFACTORED)
+### 2. `lib/guideforge/supabase-persistence.ts` (NEW - Placeholder)
+Phase 2 Supabase adapter stub:
+- **SupabasePersistenceAdapter**: Placeholder implementation with detailed comments
+- All methods throw Phase 2 not-implemented errors
+- Ready for Phase 2 Supabase client integration
+- No Supabase dependencies, env vars, or secrets in Phase 1
+
+### 3. `lib/guideforge/guide-drafts-storage.ts` (REFACTORED)
 Storage layer now provides:
 
 #### Synchronous Helpers (Phase 1 - for components)

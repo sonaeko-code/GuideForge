@@ -10,7 +10,7 @@
  */
 
 import type { Guide } from "./types"
-import { getPersistenceAdapter, getLocalStorageAdapter } from "./persistence-adapter"
+import { getPersistenceAdapter, getLocalStorageAdapter } from "./persistence"
 
 /**
  * Get the active persistence adapter.
