@@ -107,7 +107,7 @@ export default function GeneratorPage({
 
       // Use seeded IDs from Supabase schema
       // For Phase 1: Use emberfall hub and character-builds collection
-      const { id, source } = await createAndSaveGuideDraft({
+      const { id, source, verified, error } = await createAndSaveGuideDraft({
         title: generatedGuide.title,
         summary: generatedGuide.summary,
         guideType: formState.guideType,
@@ -124,7 +124,13 @@ export default function GeneratorPage({
         })),
       })
 
-      console.log("[v0] Redirecting to editor id:", id)
+      if (!verified) {
+        console.error("[v0] handleSendToEditor: Verification failed:", error)
+        setSendError(error || "Guide save verification failed. Please try again.")
+        return
+      }
+
+      console.log("[v0] handleSendToEditor: Verification succeeded, redirecting to editor id:", id)
 
       // Redirect to guide editor with guide ID
       router.push(`/builder/network/${networkId}/guide/${id}/edit`)

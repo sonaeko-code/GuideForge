@@ -14,7 +14,7 @@
  */
 
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"
-import { saveGuideDraftWithSource } from "./guide-drafts-storage"
+import { saveGuideDraftWithSource, loadGuideDraft } from "./guide-drafts-storage"
 import { v4 as uuidv4 } from "uuid"
 
 export interface CreateGuideDraftInput {
@@ -37,16 +37,24 @@ export interface CreateGuideDraftInput {
   authorId?: string
 }
 
+export interface CreateGuideDraftResult {
+  id: string
+  source: "supabase" | "localStorage"
+  verified: boolean
+  error?: string
+}
+
 /**
  * Create and save a guide draft with all form data preserved.
+ * HARD-STOP: Verifies save-then-load before returning success.
+ * If immediate reload fails, returns error and verified: false.
  * 
  * @param input - All guide creation data
- * @returns Promise<{ id: string; source: "supabase" | "localStorage" }> - The saved guide ID and storage source
- * @throws Error if save fails completely
+ * @returns Promise<CreateGuideDraftResult> - Result with id, source, verified status, and optional error
  */
 export async function createAndSaveGuideDraft(
   input: CreateGuideDraftInput
-): Promise<{ id: string; source: "supabase" | "localStorage" }> {
+): Promise<CreateGuideDraftResult> {
   console.log("[v0] Create flow guide id before save:", {
     title: input.title,
     summary: input.summary?.substring(0, 60),
@@ -139,14 +147,61 @@ export async function createAndSaveGuideDraft(
   })
 
   // Save to Supabase/localStorage - use saveGuideDraftWithSource to get actual storage source
+  let saveResult: { id: string; source: "supabase" | "localStorage" }
   try {
-    const result = await saveGuideDraftWithSource(guide)
-    console.log("[v0] Save returned id:", result.id)
-    console.log("[v0] Save returned source:", result.source)
-    return result
+    saveResult = await saveGuideDraftWithSource(guide)
+    console.log("[v0] Save returned id:", saveResult.id)
+    console.log("[v0] Save returned source:", saveResult.source)
   } catch (error) {
     console.error("[v0] Error saving guide:", error)
-    throw error
+    return {
+      id: guide.id,
+      source: "localStorage",
+      verified: false,
+      error: `Save failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    }
+  }
+
+  // HARD-STOP VERIFICATION: Immediately reload the saved guide
+  console.log("[v0] Attempting immediate reload of saved guide:", saveResult.id)
+  try {
+    const reloadedGuide = await loadGuideDraft(saveResult.id)
+    
+    if (!reloadedGuide) {
+      console.error("[v0] Immediate reload result: null (FAILED)")
+      
+      // Log debug info
+      if (typeof window !== "undefined") {
+        const keys = Object.keys(localStorage)
+        const guideforgeKeys = keys.filter((k) => k.includes("guideforge"))
+        console.log("[v0] localStorage keys:", guideforgeKeys)
+      }
+      
+      return {
+        id: saveResult.id,
+        source: saveResult.source,
+        verified: false,
+        error: "Guide saved failed verification. Could not reload saved guide.",
+      }
+    }
+    
+    console.log("[v0] Immediate reload result: SUCCESS")
+    console.log("[v0] Reloaded guide title:", reloadedGuide.title)
+    console.log("[v0] Reloaded guide steps:", reloadedGuide.steps.length)
+    
+    return {
+      id: saveResult.id,
+      source: saveResult.source,
+      verified: true,
+    }
+  } catch (reloadError) {
+    console.error("[v0] Immediate reload error:", reloadError)
+    return {
+      id: saveResult.id,
+      source: saveResult.source,
+      verified: false,
+      error: `Verification failed: ${reloadError instanceof Error ? reloadError.message : "Unknown error"}`,
+    }
   }
 }
 

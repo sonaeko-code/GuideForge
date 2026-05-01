@@ -86,7 +86,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           sectionsCount: response.guide.sections?.length,
         })
 
-        const { id, source } = await createAndSaveGuideDraft({
+        const { id, source, verified, error } = await createAndSaveGuideDraft({
           title: response.guide.title || title,
           summary: response.guide.summary || description,
           guideType,
@@ -103,7 +103,13 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
           })),
         })
 
-        console.log("[v0] Redirecting to editor id:", id)
+        if (!verified) {
+          console.error("[v0] CreateGuideForm: Verification failed:", error)
+          setSaveError(error || "Guide save verification failed. Please try again.")
+          return
+        }
+
+        console.log("[v0] CreateGuideForm: Verification succeeded, redirecting to editor id:", id)
         router.push(`/builder/network/${networkId}/guide/${id}/edit`)
       }
     } catch (error) {
@@ -132,7 +138,7 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         requirements,
       })
 
-      const { id, source } = await createAndSaveGuideDraft({
+      const { id, source, verified, error } = await createAndSaveGuideDraft({
         title,
         summary: description,
         guideType,
@@ -146,7 +152,13 @@ export function CreateGuideForm({ networkId }: CreateGuideFormProps) {
         warnings: [],
       })
 
-      console.log("[v0] Redirecting to editor id:", id)
+      if (!verified) {
+        console.error("[v0] CreateGuideForm: Verification failed:", error)
+        setSaveError(error || "Guide save verification failed. Please try again.")
+        return
+      }
+
+      console.log("[v0] CreateGuideForm: Verification succeeded, redirecting to editor id:", id)
       router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
