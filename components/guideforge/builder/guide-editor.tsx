@@ -37,6 +37,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [saveSource, setSaveSource] = useState<"supabase" | "localStorage" | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [markedReady, setMarkedReady] = useState(false)
   const [markReadyError, setMarkReadyError] = useState(false)
   
@@ -61,11 +62,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
       setIsSaving(true)
+      setSaveError(null)
       ;(async () => {
-        const { source } = await saveGuideDraftWithSource(updatedGuide)
-        setSaveSource(source)
-        setLastSaved(new Date())
-        setIsSaving(false)
+        try {
+          const { source } = await saveGuideDraftWithSource(updatedGuide)
+          setSaveSource(source)
+          setLastSaved(new Date())
+          if (source !== "supabase") {
+            setSaveError("Supabase not configured — saving locally")
+          }
+        } catch (error) {
+          console.error("[v0] Autosave error:", error)
+          setSaveError(`Save error: ${error instanceof Error ? error.message : "Unknown error"}`)
+        } finally {
+          setIsSaving(false)
+        }
       })()
     }, 300)
 
@@ -241,7 +252,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             {/* Draft action buttons */}
             {isDraft && (
               <div className="flex gap-2 ml-auto">
-                {lastSaved && (
+                {saveError && (
+                  <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded">
+                    <div className="size-2 rounded-full bg-red-500" />
+                    {saveError}
+                  </div>
+                )}
+                {lastSaved && !saveError && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
                     {saveSource === "supabase" ? "Saved to Supabase" : "Saved locally"}

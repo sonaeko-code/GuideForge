@@ -64,11 +64,10 @@ export class SupabasePersistenceAdapter {
    */
   async saveDraft(guide: Guide): Promise<string> {
     const configured = isSupabaseConfigured()
-    console.log("[v0] Supabase configured:", configured)
-    console.log("[v0] Saving guide draft — target:", configured ? "supabase" : "localStorage", "| id:", guide.id, "| title:", guide.title)
+    console.log("[v0] saveDraft: Supabase configured =", configured, "| guide.id =", guide.id)
 
     if (!configured || !supabase) {
-      console.log("[v0] localStorage fallback used — Supabase not configured")
+      console.log("[v0] saveDraft: No Supabase — using localStorage only")
       this.localStorageAdapter.saveDraftSync(guide)
       return guide.id
     }
@@ -76,8 +75,7 @@ export class SupabasePersistenceAdapter {
     try {
       const authorId = await this.getAuthorId()
 
-      // Always resolve hubId and collectionId to their seeded slug values
-      // The seeded Supabase tables use slugs as IDs (e.g. "emberfall", "character-builds")
+      // Resolve IDs to seeded values
       const hubId = guide.hubId || "emberfall"
       const collectionId = guide.collectionId || "character-builds"
       const networkId = guide.networkId || "questline"
@@ -101,35 +99,37 @@ export class SupabasePersistenceAdapter {
         published_at: guide.publishedAt || null,
       }
 
-      console.log("[v0] Supabase guide payload:", {
+      console.log("[v0] saveDraft: Upserting guide to Supabase", {
         id: guideData.id,
-        title: guideData.title,
+        title: guideData.title.substring(0, 50),
         hub_id: guideData.hub_id,
         collection_id: guideData.collection_id,
         network_id: guideData.network_id,
         author_id: guideData.author_id,
-        status: guideData.status,
       })
 
-      const { error: guideError } = await supabase
+      const { data: upsertResult, error: guideError } = await supabase
         .from("guides")
         .upsert(guideData, { onConflict: "id" })
 
       if (guideError) {
-        console.error("[v0] Supabase save failed:", guideError.message, guideError)
-        console.log("[v0] localStorage fallback used — Supabase guide insert failed")
+        console.error("[v0] saveDraft: Supabase guides insert FAILED", {
+          code: guideError.code,
+          message: guideError.message,
+          details: guideError.details,
+          hint: guideError.hint,
+        })
+        console.log("[v0] saveDraft: Falling back to localStorage because Supabase insert failed")
         this.localStorageAdapter.saveDraftSync(guide)
         return guide.id
       }
 
-      console.log("[v0] Supabase save success — guide id:", guide.id)
+      console.log("[v0] saveDraft: Supabase guides upsert SUCCESS")
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0
-      console.log("[v0] Supabase steps payload count:", stepCount)
-
       if (stepCount > 0) {
-        const stepsData = guide.steps!.map((step) => ({
+        const stepsData = guide.steps!.map((step, index) => ({
           id: step.id,
           guide_id: guide.id,
           title: step.title,
@@ -140,33 +140,41 @@ export class SupabasePersistenceAdapter {
           updated_at: new Date().toISOString(),
         }))
 
+        console.log("[v0] saveDraft: Deleting old guide_steps for guide", guide.id)
         const { error: deleteError } = await supabase
           .from("guide_steps")
           .delete()
           .eq("guide_id", guide.id)
 
         if (deleteError) {
-          console.warn("[v0] Warning deleting old steps:", deleteError.message)
+          console.warn("[v0] saveDraft: Warning deleting old steps:", deleteError.message)
         }
 
+        console.log("[v0] saveDraft: Inserting", stepCount, "new guide_steps")
         const { error: stepsError } = await supabase
           .from("guide_steps")
           .insert(stepsData)
 
         if (stepsError) {
-          console.error("[v0] Supabase save error (steps):", stepsError.message, stepsError)
+          console.error("[v0] saveDraft: Supabase guide_steps insert FAILED", {
+            code: stepsError.code,
+            message: stepsError.message,
+            details: stepsError.details,
+            stepCount,
+          })
         } else {
-          console.log("[v0] Supabase steps saved:", stepCount)
+          console.log("[v0] saveDraft: Supabase guide_steps insert SUCCESS —", stepCount, "steps")
         }
       }
 
-      // Also mirror to localStorage so offline/fallback load works
+      // Mirror to localStorage after successful Supabase save
       this.localStorageAdapter.saveDraftSync(guide)
+      console.log("[v0] saveDraft: Also mirrored to localStorage")
 
       return guide.id
     } catch (error) {
-      console.error("[v0] Supabase save error:", error)
-      console.log("[v0] localStorage fallback used — unexpected error")
+      console.error("[v0] saveDraft: Unexpected error", error)
+      console.log("[v0] saveDraft: Falling back to localStorage because of exception")
       this.localStorageAdapter.saveDraftSync(guide)
       return guide.id
     }
