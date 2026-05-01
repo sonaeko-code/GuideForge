@@ -113,10 +113,14 @@ export function generateMockGuide(
     })
   )
 
+  const title = generateTitle(request)
+  const summary = generateSummary(request)
+  const slug = generateSlug(title)
+  
   const guide: GeneratedGuide = {
-    title: generateTitle(request),
-    slug: generateSlug(request),
-    summary: generateSummary(request),
+    title,
+    slug,
+    summary,
     type: request.guideType,
     difficulty: request.preferredDifficulty || template.defaultDifficulty,
     estimatedMinutes: 15 + Math.floor(Math.random() * 20),
@@ -138,6 +142,18 @@ export function generateMockGuide(
     targetHubId: request.targetHubId,
     targetCollectionId: request.targetCollectionId,
   }
+
+  console.log("[v0] Generated mock guide:", {
+    title: guide.title,
+    slug: guide.slug,
+    summary: guide.summary,
+    type: guide.type,
+    difficulty: guide.difficulty,
+    sectionsCount: guide.sections.length,
+    requirements: guide.requirements,
+    targetHubId: guide.targetHubId,
+    targetCollectionId: guide.targetCollectionId,
+  })
 
   return guide
 }
@@ -376,22 +392,49 @@ export function generateMockResponse(
 // ---------- Helper functions ----------
 
 function generateTitle(request: GenerationRequest): string {
-  const gameContext = request.targetHubId ? "[Game]" : "Ultimate"
-  const typeLabel = request.guideType.replace("-", " ")
-
-  const variations = [
-    `Complete ${typeLabel} Guide`,
-    `${gameContext} ${typeLabel} Guide`,
-    `Beginner's ${typeLabel}`,
-    `Master ${typeLabel}`,
-    `Advanced ${typeLabel}`,
-  ]
-
-  return variations[Math.floor(Math.random() * variations.length)]
+  const prompt = request.prompt.toLowerCase()
+  
+  // Extract keywords from prompt for a more contextual title
+  let titleContext = ""
+  
+  if (prompt.includes("frost") || prompt.includes("ice")) {
+    titleContext = "Frost Shaman"
+  } else if (prompt.includes("fire") || prompt.includes("blaze")) {
+    titleContext = "Fire Warden"
+  } else if (prompt.includes("shadow") || prompt.includes("rogue")) {
+    titleContext = "Shadow Assassin"
+  } else if (prompt.includes("holy") || prompt.includes("priest")) {
+    titleContext = "Holy Priest"
+  } else if (prompt.includes("ranger") || prompt.includes("bow")) {
+    titleContext = "Ranger"
+  } else {
+    titleContext = "Character Build"
+  }
+  
+  let gameContext = ""
+  if (prompt.includes("emberfall")) {
+    gameContext = "Emberfall"
+  } else if (prompt.includes("starfall")) {
+    gameContext = "StarFall Outriders"
+  } else if (prompt.includes("hollowspire")) {
+    gameContext = "HollowSpire"
+  }
+  
+  const difficulties = {
+    "beginner": "Beginner",
+    "intermediate": "Complete",
+    "advanced": "Advanced"
+  }
+  
+  const difficulty = difficulties[request.preferredDifficulty as keyof typeof difficulties] || "Complete"
+  
+  if (gameContext) {
+    return `${difficulty} ${titleContext} Guide for ${gameContext}`
+  }
+  return `${difficulty} ${titleContext} Guide`
 }
 
-function generateSlug(request: GenerationRequest): string {
-  const title = generateTitle(request)
+function generateSlug(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -400,8 +443,22 @@ function generateSlug(request: GenerationRequest): string {
 }
 
 function generateSummary(request: GenerationRequest): string {
+  const prompt = request.prompt.toLowerCase()
+  
+  // Extract keywords from prompt
+  let characterClass = "character build"
+  if (prompt.includes("frost")) characterClass = "Frost Shaman build"
+  else if (prompt.includes("fire")) characterClass = "Fire Warden build"
+  else if (prompt.includes("shadow")) characterClass = "Shadow Assassin build"
+  else if (prompt.includes("holy")) characterClass = "Holy Priest build"
+  else if (prompt.includes("ranger")) characterClass = "Ranger build"
+  
+  let gameContext = "Emberfall"
+  if (prompt.includes("starfall")) gameContext = "StarFall Outriders"
+  else if (prompt.includes("hollowspire")) gameContext = "HollowSpire"
+  
   const typeLabel = request.guideType.replace("-", " ")
-  return `A comprehensive ${typeLabel} designed to help you understand core mechanics and strategies. Learn best practices, avoid common mistakes, and master the content.`
+  return `A comprehensive ${characterClass} for ${gameContext} designed to help you understand core mechanics, optimal rotations, gear selection, and strategies. Learn best practices, avoid common mistakes, and master this ${typeLabel}.`
 }
 
 function formatSectionTitle(kind: GuideSectionKind): string {
