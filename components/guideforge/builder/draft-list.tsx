@@ -88,7 +88,7 @@ export function DraftList({ networkId }: DraftListProps) {
     return (
       <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
         <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
-        <p className="font-semibold text-foreground">No draft guides</p>
+        <p className="font-semibold text-foreground">No guides</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Start by creating or generating your first guide.
         </p>
@@ -101,83 +101,111 @@ export function DraftList({ networkId }: DraftListProps) {
     )
   }
 
-  return (
-    <div className="space-y-2">
-      {drafts.map((draft) => {
-        const stepCount = draft.steps?.length ?? 0
+  // Separate drafts and ready guides
+  const draftGuides = drafts.filter(g => g.status === "draft")
+  const readyGuides = drafts.filter(g => g.status === "ready")
 
-        return (
-          <Card
-            key={draft.id}
-            className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <h3 className="flex items-center gap-2 font-semibold text-foreground truncate">
-                    <BookMarked className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate">{draft.title || "Untitled"}</span>
-                  </h3>
-                  <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed flex-shrink-0">
-                    {draftSource === "supabase" ? (
-                      <><Database className="size-2.5 mr-1" />Supabase</>
-                    ) : (
-                      <><HardDrive className="size-2.5 mr-1" />Local</>
-                    )}
-                  </Badge>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <StatusBadge status={draft.status} />
-                  {draft.difficulty && <DifficultyBadge difficulty={draft.difficulty} />}
-                  {draft.type && (
-                    <Badge variant="outline" className="text-xs font-normal capitalize">
-                      {draft.type}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
-                    {stepCount} {stepCount === 1 ? "step" : "steps"}
-                  </Badge>
-                  {draft.updatedAt && (
-                    <span className="text-xs text-muted-foreground">
-                      Updated {formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true })}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/builder/network/${networkId}/guide/${draft.id}/edit`}>
-                    <Edit2 className="size-3.5 mr-1.5" aria-hidden="true" />
-                    <span>Edit</span>
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/builder/network/${networkId}/guide/${draft.id}/preview`}>
-                    <Eye className="size-3.5 mr-1.5" aria-hidden="true" />
-                    <span>Preview</span>
-                  </Link>
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-9 w-9">
-                      <MoreVertical className="size-4" aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(draft.id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="size-3.5 mr-2" aria-hidden="true" />
-                      <span>Delete</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </Card>
-        )
-      })}
+  return (
+    <div className="space-y-6">
+      {/* Draft Guides Section */}
+      {draftGuides.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Drafts ({draftGuides.length})</h3>
+          <div className="space-y-2">
+            {draftGuides.map((draft) => (
+              <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ready Guides Section */}
+      {readyGuides.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Ready to publish ({readyGuides.length})</h3>
+          <div className="space-y-2">
+            {readyGuides.map((draft) => (
+              <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function GuideCard({ draft, networkId, draftSource, onDelete }: any) {
+  const stepCount = draft.steps?.length ?? 0
+
+  return (
+    <Card
+      key={draft.id}
+      className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <h3 className="flex items-center gap-2 font-semibold text-foreground truncate">
+              <BookMarked className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+              <span className="truncate">{draft.title || "Untitled"}</span>
+            </h3>
+            <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed flex-shrink-0">
+              {draftSource === "supabase" ? (
+                <><Database className="size-2.5 mr-1" />Supabase</>
+              ) : (
+                <><HardDrive className="size-2.5 mr-1" />Local</>
+              )}
+            </Badge>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <StatusBadge status={draft.status} />
+            {draft.difficulty && <DifficultyBadge difficulty={draft.difficulty} />}
+            {draft.type && (
+              <Badge variant="outline" className="text-xs font-normal capitalize">
+                {draft.type}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
+              {stepCount} {stepCount === 1 ? "step" : "steps"}
+            </Badge>
+            {draft.updatedAt && (
+              <span className="text-xs text-muted-foreground">
+                Updated {formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/builder/network/${networkId}/guide/${draft.id}/edit`}>
+              <Edit2 className="size-3.5 mr-1.5" aria-hidden="true" />
+              <span>Edit</span>
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/builder/network/${networkId}/guide/${draft.id}/preview`}>
+              <Eye className="size-3.5 mr-1.5" aria-hidden="true" />
+              <span>Preview</span>
+            </Link>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-9 w-9">
+                <MoreVertical className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => onDelete(draft.id)}
+                className="text-destructive"
+              >
+                <Trash2 className="size-3.5 mr-2" aria-hidden="true" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </Card>
   )
 }

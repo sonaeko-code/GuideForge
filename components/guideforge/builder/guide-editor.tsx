@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -323,17 +323,34 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
             {/* Draft action buttons */}
             {isDraft && (
-              <div className="flex gap-2 ml-auto">
+              <div className="flex gap-2 ml-auto items-center">
+                {/* Autosave status indicator */}
+                <div className="flex items-center gap-2">
+                  {isSaving ? (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                      <div className="inline-flex animate-pulse">
+                        <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      </div>
+                      <span>Saving...</span>
+                    </div>
+                  ) : saveError ? (
+                    <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                      <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                      <span>Save failed</span>
+                    </div>
+                  ) : lastSaved && !saveError ? (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span>{saveSource === "supabase" ? "Saved to Supabase" : "Saved locally"}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Error details */}
                 {saveError && (
                   <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded">
-                    <div className="size-2 rounded-full bg-red-500" />
+                    <AlertCircle className="size-3" aria-hidden="true" />
                     {saveError}
-                  </div>
-                )}
-                {lastSaved && !saveError && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                    {saveSource === "supabase" ? "Saved to Supabase" : "Saved locally"}
                   </div>
                 )}
                 {/* Dev debug info */}
@@ -348,18 +365,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {markedReady && (
                   <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="size-4" aria-hidden="true" />
-                    {(() => {
-                      const optionalFailures = rulesCheckResult?.filter((r: any) => !r.passed && r.required === false) || []
-                      if (optionalFailures.length > 0) {
-                        return `Guide marked ready. Requirements are optional in Phase 1.`
-                      }
-                      return "Guide marked ready. Requirements are optional in Phase 1."
-                    })()}
+                    Guide marked ready. Requirements are optional in Phase 1.
                   </div>
                 )}
                 {markReadyError && (
                   <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-                    <div className="size-4 rounded-full border border-current" />
+                    <AlertCircle className="size-4" aria-hidden="true" />
                     {rulesStale 
                       ? "Rules check is stale. Re-check before marking ready."
                       : (() => {
@@ -379,6 +390,27 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 <Button size="sm" onClick={handlePublishDraft} disabled={isReady}>
                   <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
                   {isReady ? "Ready" : "Mark Ready"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleDelete}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+
+            {/* Ready state actions */}
+            {isReady && (
+              <div className="flex gap-2 ml-auto items-center">
+                <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  Ready to publish
+                </div>
+                <Button size="sm" variant="outline" onClick={handlePreview}>
+                  <Eye className="size-4 mr-1" aria-hidden="true" />
+                  Preview
+                </Button>
+                <Button size="sm" disabled title="Publishing coming in Phase 3">
+                  <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
+                  Publish (coming soon)
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />

@@ -139,104 +139,140 @@ export function DraftWorkspace({ networkId }: DraftWorkspaceProps) {
           </div>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {drafts.map((draft) => {
-            const hubName = getHubName(draft.hubId)
-            const collectionName = getCollectionName(draft.collectionId)
-            const stepCount = draft.steps?.length ?? 0
+        <div className="space-y-6">
+          {/* Draft Guides */}
+          {drafts.filter(d => d.status === "draft").length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Drafts ({drafts.filter(d => d.status === "draft").length})</h3>
+              {drafts
+                .filter(d => d.status === "draft")
+                .map((draft) => {
+                  const hubName = getHubName(draft.hubId)
+                  const collectionName = getCollectionName(draft.collectionId)
+                  const stepCount = draft.steps?.length ?? 0
 
-            return (
-              <Card key={draft.id} className="flex items-start justify-between gap-4 p-4">
-                <div className="flex-1 space-y-2 min-w-0">
-                  <div className="flex items-start gap-2 flex-wrap">
-                    <h3 className="font-semibold text-foreground truncate flex-1">
-                      {draft.title}
-                    </h3>
-                    <Badge
-                      variant={draft.status === "ready" ? "default" : "secondary"}
-                      className="flex-shrink-0 capitalize"
-                    >
-                      {draft.status}
-                    </Badge>
-                  </div>
+                  return (
+                    <Card key={draft.id} className="flex items-start justify-between gap-4 p-4">
+                      <DraftCardContent draft={draft} hubName={hubName} collectionName={collectionName} stepCount={stepCount} draftSource={draftSource} isSupabaseConfigured={isSupabaseConfigured} networkId={networkId} onDelete={handleDelete} />
+                    </Card>
+                  )
+                })}
+            </div>
+          )}
 
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="text-xs font-normal capitalize">
-                      {draft.type}
-                    </Badge>
-                    {hubName && (
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {hubName}
-                      </Badge>
-                    )}
-                    {collectionName && (
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {collectionName}
-                      </Badge>
-                    )}
-                    {draft.difficulty && (
-                      <Badge variant="outline" className="text-xs font-normal capitalize">
-                        {draft.difficulty}
-                      </Badge>
-                    )}
-                  </div>
+          {/* Ready Guides */}
+          {drafts.filter(d => d.status === "ready").length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Ready to publish ({drafts.filter(d => d.status === "ready").length})</h3>
+              {drafts
+                .filter(d => d.status === "ready")
+                .map((draft) => {
+                  const hubName = getHubName(draft.hubId)
+                  const collectionName = getCollectionName(draft.collectionId)
+                  const stepCount = draft.steps?.length ?? 0
 
-                  {/* Dev debug badge */}
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
-                      {draftSource === "supabase" ? (
-                        <><Database className="size-2.5 mr-1" />Supabase</>
-                      ) : (
-                        <><HardDrive className="size-2.5 mr-1" />Local</>
-                      )}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
-                      {stepCount} {stepCount === 1 ? "step" : "steps"}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
-                      Hub: {hubName}
-                    </Badge>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Updated{" "}
-                    {draft.updatedAt
-                      ? formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true })
-                      : "recently"}
-                  </p>
-
-                  {draft.status === "ready" && !isSupabaseConfigured && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Lock className="size-3" aria-hidden="true" />
-                      Publish requires Supabase
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/builder/network/${networkId}/guide/${draft.id}/edit`}>
-                      <Edit2 className="mr-1 size-4" aria-hidden="true" />
-                      Edit
-                    </Link>
-                  </Button>
-
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/builder/network/${networkId}/guide/${draft.id}/preview`}>
-                      <Eye className="mr-1 size-4" aria-hidden="true" />
-                      Preview
-                    </Link>
-                  </Button>
-
-                  <Button size="sm" variant="ghost" onClick={() => handleDelete(draft.id)}>
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </Button>
-                </div>
-              </Card>
-            )
-          })}
+                  return (
+                    <Card key={draft.id} className="flex items-start justify-between gap-4 p-4 border-amber-500/30 bg-amber-500/5">
+                      <DraftCardContent draft={draft} hubName={hubName} collectionName={collectionName} stepCount={stepCount} draftSource={draftSource} isSupabaseConfigured={isSupabaseConfigured} networkId={networkId} onDelete={handleDelete} />
+                    </Card>
+                  )
+                })}
+            </div>
+          )}
         </div>
       )}
     </section>
+  )
+}
+
+function DraftCardContent({ draft, hubName, collectionName, stepCount, draftSource, isSupabaseConfigured, networkId, onDelete }: any) {
+  return (
+    <>
+      <div className="flex-1 space-y-2 min-w-0">
+        <div className="flex items-start gap-2 flex-wrap">
+          <h3 className="font-semibold text-foreground truncate flex-1">
+            {draft.title}
+          </h3>
+          <Badge
+            variant={draft.status === "ready" ? "default" : "secondary"}
+            className="flex-shrink-0 capitalize"
+          >
+            {draft.status}
+          </Badge>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="text-xs font-normal capitalize">
+            {draft.type}
+          </Badge>
+          {hubName && (
+            <Badge variant="outline" className="text-xs font-normal">
+              {hubName}
+            </Badge>
+          )}
+          {collectionName && (
+            <Badge variant="outline" className="text-xs font-normal">
+              {collectionName}
+            </Badge>
+          )}
+          {draft.difficulty && (
+            <Badge variant="outline" className="text-xs font-normal capitalize">
+              {draft.difficulty}
+            </Badge>
+          )}
+        </div>
+
+        {/* Dev debug badge */}
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
+            {draftSource === "supabase" ? (
+              <><Database className="size-2.5 mr-1" />Supabase</>
+            ) : (
+              <><HardDrive className="size-2.5 mr-1" />Local</>
+            )}
+          </Badge>
+          <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
+            {stepCount} {stepCount === 1 ? "step" : "steps"}
+          </Badge>
+          <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed">
+            Hub: {hubName}
+          </Badge>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Updated{" "}
+          {draft.updatedAt
+            ? formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true })
+            : "recently"}
+        </p>
+
+        {draft.status === "ready" && !isSupabaseConfigured && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Lock className="size-3" aria-hidden="true" />
+            Publish requires Supabase
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Button asChild size="sm" variant="outline">
+          <Link href={`/builder/network/${networkId}/guide/${draft.id}/edit`}>
+            <Edit2 className="mr-1 size-4" aria-hidden="true" />
+            Edit
+          </Link>
+        </Button>
+
+        <Button asChild size="sm" variant="outline">
+          <Link href={`/builder/network/${networkId}/guide/${draft.id}/preview`}>
+            <Eye className="mr-1 size-4" aria-hidden="true" />
+            Preview
+          </Link>
+        </Button>
+
+        <Button size="sm" variant="ghost" onClick={() => onDelete(draft.id)}>
+          <Trash2 className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </>
   )
 }
