@@ -129,7 +129,9 @@ export default async function NetworkDashboardPage({
     drafts = guides.filter((g: any) => g.status === "draft" || g.status === "in-review")
   }
 
-  console.log("[v0] Network guides:", guides.length)
+  console.log("[v0] Dashboard scoped guides passed to list:", drafts.length)
+  console.log("[v0] - Draft guides:", drafts.length)
+  console.log("[v0] - Published guides:", published.length)
 
   return (
     <main className="min-h-screen bg-background">
@@ -243,7 +245,7 @@ export default async function NetworkDashboardPage({
               </Button>
             </div>
 
-            <DraftList networkId={networkId} />
+            <DraftList networkId={networkId} scopedDrafts={drafts} scopedPublished={published} />
           </TabsContent>
 
           {/* Hubs tab */}
@@ -431,7 +433,8 @@ export default async function NetworkDashboardPage({
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/n/questline/${MOCK_HUBS.find(h => h.id === guide.hubId)?.slug || "emberfall"}/${guide.slug}`}>
+                            {/* Guide preview link - use guide's hub slug if available */}
+                            <Link href={`/n/${network.slug || "questline"}/${guide.hubId || "emberfall"}/${guide.slug}`}>
                               Preview
                             </Link>
                           </DropdownMenuItem>
