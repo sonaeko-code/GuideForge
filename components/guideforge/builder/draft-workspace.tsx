@@ -214,8 +214,10 @@ function DraftCardContent({ draft, hubName, collectionName, stepCount, draftSour
             {draft.title}
           </h3>
           <Badge
-            variant={draft.status === "ready" ? "default" : "secondary"}
-            className="flex-shrink-0 capitalize"
+            variant={draft.status === "ready" ? "default" : draft.status === "published" ? "default" : "secondary"}
+            className={`flex-shrink-0 capitalize ${
+              draft.status === "published" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200" : ""
+            }`}
           >
             {draft.status}
           </Badge>

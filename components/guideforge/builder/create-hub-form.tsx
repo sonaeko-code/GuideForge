@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Sparkles, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -21,10 +21,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { generateMockHubDraft } from "@/lib/guideforge/mock-generator"
-import type { Hub } from "@/lib/guideforge/types"
+import { createHub, createCollection } from "@/lib/guideforge/supabase-networks"
+import type { Hub, Collection } from "@/lib/guideforge/types"
 
 interface CreateHubFormProps {
   networkId: string
+}
+
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
 }
 
 export function CreateHubForm({ networkId }: CreateHubFormProps) {
@@ -41,6 +51,8 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
     "Patch Notes",
   ])
   const [generationAttempted, setGenerationAttempted] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleGenerateDraft = () => {
     const draft = generateMockHubDraft(hubKind)
@@ -50,9 +62,61 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
     setGenerationAttempted(true)
   }
 
-  const handleSave = () => {
-    // TODO: Save hub to Supabase
-    router.push(`/builder/network/${networkId}/dashboard`)
+  const handleSave = async () => {
+    setError(null)
+    setIsSaving(true)
+
+    try {
+      // Create the hub
+      const hubSlug = slugify(name)
+      const { hub, source, error: hubError } = await createHub(networkId, {
+        id: "",
+        networkId,
+        slug: hubSlug,
+        name,
+        description,
+        hubKind,
+        collectionIds: [],
+      })
+
+      if (hubError || !hub.id) {
+        setError(hubError || "Failed to create hub")
+        setIsSaving(false)
+        return
+      }
+
+      console.log("[v0] Hub created, now creating collections")
+
+      // Create collections for this hub
+      for (const collName of collectionNames) {
+        const collSlug = slugify(collName)
+        const { source: collSource, error: collError } = await createCollection(
+          networkId,
+          hub.id,
+          {
+            slug: collSlug,
+            name: collName,
+            description: `${collName} for ${name}`,
+            defaultGuideType: "guide",
+            guideIds: [],
+          }
+        )
+
+        if (collError) {
+          console.warn(`[v0] Failed to create collection ${collName}:`, collError)
+          // Continue with other collections even if one fails
+        }
+      }
+
+      console.log("[v0] Hub and collections created successfully")
+      router.push(`/builder/network/${networkId}/dashboard`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error"
+      setError(message)
+      console.error("[v0] Hub creation exception:", message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -73,6 +137,15 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
         )}
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 flex items-start gap-3">
+          <AlertCircle className="size-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          </div>
+        </div>
+      )}
+
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="hub-name">Hub name</FieldLabel>
@@ -83,13 +156,14 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="mt-2"
+            disabled={isSaving}
           />
         </Field>
 
         <Field>
           <FieldLabel htmlFor="hub-kind">Hub type</FieldLabel>
           <FieldDescription>Determines how the hub is presented in navigation and cards.</FieldDescription>
-          <Select value={hubKind} onValueChange={(v) => setHubKind(v as Hub["hubKind"])}>
+          <Select value={hubKind} onValueChange={(v) => setHubKind(v as Hub["hubKind"])} disabled={isSaving}>
             <SelectTrigger id="hub-kind" className="mt-2">
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
@@ -113,6 +187,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="mt-2"
+            disabled={isSaving}
           />
         </Field>
 
@@ -132,6 +207,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
                     setCollectionNames(collectionNames.filter((_, i) => i !== idx))
                   }
                   className="text-xs text-muted-foreground hover:text-foreground"
+                  disabled={isSaving}
                 >
                   Remove
                 </button>
@@ -142,14 +218,24 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
       </FieldGroup>
 
       <div className="flex gap-3 pt-4">
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" disabled={isSaving}>
           <Link href={`/builder/network/${networkId}/dashboard`}>
             <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
             Cancel
           </Link>
         </Button>
-        <Button onClick={handleGenerateDraft} variant="secondary">
+        <Button onClick={handleGenerateDraft} variant="secondary" disabled={isSaving}>
           <Sparkles className="mr-2 size-4" aria-hidden="true" />
+          Generate Draft
+        </Button>
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save Hub"}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
           Generate Draft
         </Button>
         <Button onClick={handleSave}>Save Hub</Button>

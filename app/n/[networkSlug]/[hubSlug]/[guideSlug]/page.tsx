@@ -8,6 +8,7 @@ import { QuestLineHeader } from "@/components/questline/site-header"
 import { QuestLineFooter } from "@/components/questline/site-footer"
 import { MOCK_GUIDES, MOCK_HUBS, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 import { loadPublishedGuide, loadPublishedGuides } from "@/lib/guideforge/supabase-public"
+import { getHubBySlug, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 
 export default async function PublicGuidePage({
   params,
@@ -19,7 +20,12 @@ export default async function PublicGuidePage({
   }>
 }) {
   const { hubSlug, guideSlug } = await params
-  const hub = MOCK_HUBS.find((h) => h.slug === hubSlug)
+  
+  // Try to load hub from Supabase first, then fallback to mock data
+  let hub = await getHubBySlug(hubSlug)
+  if (!hub) {
+    hub = MOCK_HUBS.find((h) => h.slug === hubSlug)
+  }
   
   // Try to load from Supabase first, then fallback to mock data
   let guide = await loadPublishedGuide(guideSlug)
@@ -48,8 +54,12 @@ export default async function PublicGuidePage({
     )
   }
 
-  const collections = getCollectionsByHub(hub.id)
-  const collection = collections.find((c) => c.guideIds.includes(guide.id))
+  // Load collections, preferring Supabase
+  let collections = await getCollectionsByHubId(hub.id)
+  if (collections.length === 0) {
+    collections = getCollectionsByHub(hub.id)
+  }
+  const collection = collections.find((c) => c.guideIds?.includes(guide.id))
 
   // Find related guides (other published guides in same hub, excluding current)
   const supabaseGuides = await loadPublishedGuides()

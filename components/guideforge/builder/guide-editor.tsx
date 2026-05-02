@@ -72,6 +72,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   // Autosave effect - debounced by 300ms
   useEffect(() => {
+    // Skip autosave if guide is published or if this is the initial load
+    if (guideStatus === "published") {
+      console.log("[v0] Autosave skipped: guide is published")
+      return
+    }
+
     // Clear existing timer
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current)
@@ -79,8 +85,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
     // Show "Saving..." immediately when changes are detected
     console.log("[v0] Autosave triggered by: user edit")
+    console.log("[v0] Autosave toast state changed: saving")
     setAutosaveStatus("saving")
-    console.log("[v0] Autosave indicator state: saving")
 
     // Set a minimum visibility timer for "Saving" state (700ms)
     const savingStartTime = Date.now()
@@ -124,7 +130,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             if (remainingMinDuration > 0) {
               setTimeout(() => {
                 setAutosaveStatus("saved")
-                console.log("[v0] Autosave indicator state: saved")
+                console.log("[v0] Autosave completed: saved to Supabase")
+                console.log("[v0] Autosave toast state changed: saved")
                 
                 // Keep "Saved" for at least 2000ms
                 if (autosaveStatusTimeoutRef.current) {
@@ -132,12 +139,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 }
                 autosaveStatusTimeoutRef.current = setTimeout(() => {
                   setAutosaveStatus("idle")
-                  console.log("[v0] Autosave indicator state: idle")
+                  console.log("[v0] Autosave idle: returning to idle state")
+                  console.log("[v0] Autosave toast state changed: idle")
                 }, 2000)
               }, remainingMinDuration)
             } else {
               setAutosaveStatus("saved")
-              console.log("[v0] Autosave indicator state: saved")
+              console.log("[v0] Autosave completed: saved to Supabase")
+              console.log("[v0] Autosave toast state changed: saved")
               
               // Keep "Saved" for at least 2000ms
               if (autosaveStatusTimeoutRef.current) {
@@ -145,7 +154,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               }
               autosaveStatusTimeoutRef.current = setTimeout(() => {
                 setAutosaveStatus("idle")
-                console.log("[v0] Autosave indicator state: idle")
+                console.log("[v0] Autosave idle: returning to idle state")
+                console.log("[v0] Autosave toast state changed: idle")
               }, 2000)
             }
           } else if (error) {
@@ -155,11 +165,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             if (remainingMinDuration > 0) {
               setTimeout(() => {
                 setAutosaveStatus("failed")
-                console.log("[v0] Autosave indicator state: failed")
+                console.log("[v0] Autosave toast state changed: failed")
               }, remainingMinDuration)
             } else {
               setAutosaveStatus("failed")
-              console.log("[v0] Autosave indicator state: failed")
+              console.log("[v0] Autosave toast state changed: failed")
             }
           } else {
             setSaveError("Supabase save failed — saved locally instead")
@@ -168,11 +178,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             if (remainingMinDuration > 0) {
               setTimeout(() => {
                 setAutosaveStatus("failed")
-                console.log("[v0] Autosave indicator state: failed")
+                console.log("[v0] Autosave toast state changed: failed")
               }, remainingMinDuration)
             } else {
               setAutosaveStatus("failed")
-              console.log("[v0] Autosave indicator state: failed")
+              console.log("[v0] Autosave toast state changed: failed")
             }
           }
         } catch (error) {
@@ -186,11 +196,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           if (remainingMinDuration > 0) {
             setTimeout(() => {
               setAutosaveStatus("failed")
-              console.log("[v0] Autosave indicator state: failed")
+              console.log("[v0] Autosave toast state changed: failed")
             }, remainingMinDuration)
           } else {
             setAutosaveStatus("failed")
-            console.log("[v0] Autosave indicator state: failed")
+            console.log("[v0] Autosave toast state changed: failed")
           }
         } finally {
           setIsSaving(false)
@@ -203,7 +213,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, requirementsText, steps, version, guideStatus, normalizedGuide])
+  }, [title, summary, requirementsText, steps, version, guideStatus])
 
   // Mock state tracking for draft/ready/published flow
   const isDraft = guideStatus === "draft"
@@ -563,6 +573,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 </Badge>
               )}
             </div>
+
+            {/* Published guide warning */}
+            {isPublished && (
+              <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
+                <AlertCircle className="size-3" aria-hidden="true" />
+                <span>Published guide. Editing changes will update the live guide.</span>
+              </div>
+            )}
 
             {/* Draft action buttons */}
             {isDraft && (
