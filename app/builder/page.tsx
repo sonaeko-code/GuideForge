@@ -1,6 +1,9 @@
 import Link from "next/link"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { BuilderWorkspace } from "@/components/guideforge/builder/builder-workspace"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Folder, Plus } from "lucide-react"
 
 export default async function BuilderPage() {
   return (
@@ -20,8 +23,46 @@ export default async function BuilderPage() {
           </p>
         </div>
 
+        {/* Quick Actions Grid */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
+            <div className="flex items-start justify-between">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Folder className="size-4" aria-hidden="true" />
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">All Networks</h3>
+              <p className="text-sm text-muted-foreground">
+                Open and manage created networks
+              </p>
+            </div>
+            <Button asChild size="sm" variant="outline" className="w-full">
+              <Link href="/builder/networks">View Networks</Link>
+            </Button>
+          </Card>
+
+          <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
+            <div className="flex items-start justify-between">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Plus className="size-4" aria-hidden="true" />
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">Create Network</h3>
+              <p className="text-sm text-muted-foreground">
+                Start building a new guide network
+              </p>
+            </div>
+            <Button asChild size="sm" className="w-full">
+              <Link href="/builder/network/new">Create Network</Link>
+            </Button>
+          </Card>
+        </div>
+
         <BuilderWorkspace />
       </div>
     </main>
   )
 }
+
