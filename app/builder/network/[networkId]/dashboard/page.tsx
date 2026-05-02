@@ -44,10 +44,13 @@ import { cn } from "@/lib/utils"
 
 export default async function NetworkDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ networkId: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { networkId } = await params
+  const { tab } = await searchParams
   
   // Use the robust resolver to load network by UUID, slug, or mock ID
   let network: Network | null = await resolveNetworkParam(networkId)
@@ -217,7 +220,7 @@ export default async function NetworkDashboardPage({
         </div>
 
         {/* Main tabs */}
-        <Tabs defaultValue="drafts" className="w-full">
+        <Tabs defaultValue={tab || "drafts"} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="drafts">Drafts</TabsTrigger>
             <TabsTrigger value="hubs">Hubs</TabsTrigger>

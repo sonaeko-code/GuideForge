@@ -180,8 +180,23 @@ export default function GeneratorPage({
           <span className="text-foreground font-semibold">Generate Guide</span>
         </nav>
 
+        {/* Pre-check: Require hubs and collections */}
+        {hubs.length === 0 && (
+          <Card className="mb-6 border-amber-500/30 bg-amber-500/5 p-5">
+            <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+              <strong>No hubs yet.</strong> You need at least one hub with collections before creating guides.
+            </p>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
+                Create Hub
+              </Link>
+            </Button>
+          </Card>
+        )}
+
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Left: Input Form */}
+          {hubs.length > 0 ? (
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold">Generate a Guide</h1>
@@ -329,8 +344,10 @@ export default function GeneratorPage({
               </Button>
             </Card>
           </div>
+          ) : null}
 
           {/* Right: Preview Panel */}
+          {hubs.length > 0 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-bold">Generated JSON Preview</h2>
@@ -441,6 +458,7 @@ export default function GeneratorPage({
               </Card>
             )}
           </div>
+          )}
         </div>
 
         {/* Footer note */}

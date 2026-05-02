@@ -95,7 +95,7 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
       }
 
       console.log("[v0] Collection saved:", collection.id)
-      router.push(`/builder/network/${networkId}/dashboard`)
+      router.push(`/builder/network/${networkId}/dashboard?tab=collections`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
       console.error("[v0] Collection save error:", message)
