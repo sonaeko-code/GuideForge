@@ -30,6 +30,7 @@ import { Switch } from "@/components/ui/switch"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
 import { createNetwork } from "@/lib/guideforge/supabase-networks"
+import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
 import type {
   NetworkType,
   ThemeDirection,
@@ -231,13 +232,11 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(NETWORK_TYPE_LABEL) as NetworkType[]).map(
-                  (key) => (
-                    <SelectItem key={key} value={key}>
-                      {NETWORK_TYPE_LABEL[key]}
-                    </SelectItem>
-                  ),
-                )}
+                {getEnabledNetworkTypes().map((networkType) => (
+                  <SelectItem key={networkType.id} value={networkType.id as NetworkType}>
+                    {networkType.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <FieldDescription>

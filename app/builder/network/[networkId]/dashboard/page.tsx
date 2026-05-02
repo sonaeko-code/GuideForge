@@ -36,6 +36,9 @@ import {
   getHubsByNetworkId,
   getCollectionsByHubId,
   resolveNetworkParam,
+  getGuidesByNetworkId,
+  getDraftGuidesByNetworkId,
+  getPublishedGuidesByNetworkId,
 } from "@/lib/guideforge/supabase-networks"
 import { cn } from "@/lib/utils"
 
@@ -88,6 +91,9 @@ export default async function NetworkDashboardPage({
     hubs = getHubsByNetwork(network.id)
   }
 
+  console.log("[v0] Current network:", network.name)
+  console.log("[v0] Network hubs:", hubs.length)
+
   // Load collections for each hub, preferring Supabase
   let collections: Collection[] = []
   for (const hub of hubs) {
@@ -100,13 +106,30 @@ export default async function NetworkDashboardPage({
     }
   }
 
-  const guides = collections.flatMap((c: Collection) =>
-    getGuidesByCollection(c.id)
-  )
-  const published = guides.filter((g: Guide) => g.status === "published")
-  const drafts = guides.filter(
-    (g: Guide) => g.status === "draft" || g.status === "in-review"
-  )
+  console.log("[v0] Network collections:", collections.length)
+
+  // Load guides scoped to this network ONLY
+  let guides: any[] = []
+  let published: any[] = []
+  let drafts: any[] = []
+  
+  // For non-QuestLine networks, load from Supabase
+  // For QuestLine, optionally load from mock data to preserve demo content
+  const isQuestLineRoute = network.id === "network_questline" || network.slug === "questline"
+  
+  if (!isQuestLineRoute) {
+    // Real networks: load from Supabase only
+    guides = await getGuidesByNetworkId(network.id)
+    drafts = await getDraftGuidesByNetworkId(network.id)
+    published = await getPublishedGuidesByNetworkId(network.id)
+  } else {
+    // QuestLine demo route: use mock data for demo content
+    guides = collections.flatMap((c: Collection) => getGuidesByCollection(c.id))
+    published = guides.filter((g: any) => g.status === "published")
+    drafts = guides.filter((g: any) => g.status === "draft" || g.status === "in-review")
+  }
+
+  console.log("[v0] Network guides:", guides.length)
 
   return (
     <main className="min-h-screen bg-background">

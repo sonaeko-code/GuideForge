@@ -484,3 +484,92 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
     return null
   }
 }
+
+
+// ========== GUIDES (Network-Scoped) ==========
+
+/**
+ * Get all guides for a network (scoped: network → hubs → collections → guides)
+ * This ensures dashboards only show guides for the current network
+ */
+export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, returning empty guides for network")
+    return []
+  }
+
+  try {
+    console.log("[v0] Loading guides for network:", networkId)
+
+    // First get all hubs for this network
+    const { data: hubs, error: hubsError } = await supabase
+      .from("hubs")
+      .select("id")
+      .eq("network_id", networkId)
+
+    if (hubsError) {
+      console.warn("[v0] Error loading hubs:", hubsError.message)
+      return []
+    }
+
+    if (!hubs || hubs.length === 0) {
+      console.log("[v0] Network has no hubs")
+      return []
+    }
+
+    const hubIds = hubs.map(h => h.id)
+    console.log("[v0] Network hubs:", hubIds.length)
+
+    // Get all collections for those hubs
+    const { data: collections, error: collectionsError } = await supabase
+      .from("collections")
+      .select("id")
+      .in("hub_id", hubIds)
+
+    if (collectionsError) {
+      console.warn("[v0] Error loading collections:", collectionsError.message)
+      return []
+    }
+
+    if (!collections || collections.length === 0) {
+      console.log("[v0] Network has no collections")
+      return []
+    }
+
+    const collectionIds = collections.map(c => c.id)
+    console.log("[v0] Network collections:", collectionIds.length)
+
+    // Get all guides for those collections
+    const { data: guides, error: guidesError } = await supabase
+      .from("guides")
+      .select("*")
+      .in("collection_id", collectionIds)
+
+    if (guidesError) {
+      console.warn("[v0] Error loading guides:", guidesError.message)
+      return []
+    }
+
+    console.log("[v0] Network guides:", guides?.length || 0)
+    return guides || []
+  } catch (err) {
+    console.warn("[v0] Exception loading network guides:", err)
+    return []
+  }
+}
+
+/**
+ * Get draft guides (status=draft or status=in-review) for a network
+ */
+export async function getDraftGuidesByNetworkId(networkId: string): Promise<any[]> {
+  const guides = await getGuidesByNetworkId(networkId)
+  return guides.filter(g => g.status === "draft" || g.status === "in-review")
+}
+
+/**
+ * Get published guides (status=published) for a network
+ */
+export async function getPublishedGuidesByNetworkId(networkId: string): Promise<any[]> {
+  const guides = await getGuidesByNetworkId(networkId)
+  return guides.filter(g => g.status === "published")
+}
