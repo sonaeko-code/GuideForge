@@ -97,13 +97,13 @@ export async function createNetwork(
   try {
     const profileId = await getCurrentProfileId()
     
-    // Only include schema-supported fields. Do NOT include UI-only fields like branding, theme, etc.
+    // Only include schema-supported fields. Do NOT include UI-only fields.
+    // The networks table only has: id, slug, name, description, created_at, updated_at
+    // All other fields (theme, visibility, branding, etc) are UI-only and stored in app state
     const networkData = {
       slug: draft.slug,
       name: draft.name,
       description: draft.description,
-      type: draft.type,
-      visibility: draft.visibility,
     }
 
     console.log("[v0] Network save payload:", networkData)
