@@ -337,6 +337,20 @@ export default async function NetworkDashboardPage({
               </Button>
             </div>
 
+            {collections.length === 0 ? (
+              <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+                <FolderOpen className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
+                <p className="font-semibold text-foreground">No collections yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create collections to organize guides within hubs.
+                </p>
+                <Button size="sm" asChild className="mt-4">
+                  <Link href={`/builder/network/${networkId}/collection/new`}>
+                    Create First Collection
+                  </Link>
+                </Button>
+              </div>
+            ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {collections.map((col: Collection) => (
                 <Card key={col.id} className="border-border/50 px-4 py-4">
@@ -356,6 +370,7 @@ export default async function NetworkDashboardPage({
                 </Card>
               ))}
             </div>
+            )}
           </TabsContent>
 
           {/* Guides tab */}

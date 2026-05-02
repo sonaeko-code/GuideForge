@@ -267,6 +267,8 @@ export async function createHub(
   }
 
   try {
+    console.log("[v0] Create hub route networkId:", networkId)
+
     // Normalize networkId to real UUID
     const normalizedNetworkId = await normalizeNetworkIdForSupabase(networkId)
     if (!normalizedNetworkId) {
@@ -274,6 +276,8 @@ export async function createHub(
       console.error("[v0] Hub save error:", error)
       return { hub: {} as Hub, source: "supabase", error }
     }
+
+    console.log("[v0] Resolved hub network UUID:", normalizedNetworkId)
 
     const profileId = await getCurrentProfileId()
     
@@ -301,7 +305,7 @@ export async function createHub(
       return { hub: {} as Hub, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Hub saved:", data.id)
+    console.log("[v0] Hub save result:", data)
 
     // Update network's hubIds if supported
     const { data: network, error: networkError } = await supabase
@@ -335,17 +339,27 @@ export async function getHubsByNetworkId(networkId: string): Promise<Hub[]> {
   }
 
   try {
+    // Normalize networkId in case it's a slug or mock ID
+    const normalizedNetworkId = await normalizeNetworkIdForSupabase(networkId)
+    if (!normalizedNetworkId) {
+      console.warn("[v0] Could not normalize networkId for hub lookup:", networkId)
+      return []
+    }
+
+    console.log("[v0] Dashboard loaded hubs for network:", normalizedNetworkId)
+
+    // Query using network_id (snake_case) which is the actual column name
     const { data, error } = await supabase
       .from("hubs")
       .select("*")
-      .eq("networkId", networkId)
+      .eq("network_id", normalizedNetworkId)
 
     if (error) {
       console.warn("[v0] Error loading hubs:", error.message)
       return []
     }
 
-    console.log("[v0] Loaded hubs from Supabase:", data?.length || 0)
+    console.log("[v0] Hubs tab rendered hubs:", data?.length || 0)
     return data as Hub[]
   } catch (err) {
     console.warn("[v0] Exception loading hubs:", err)
@@ -440,17 +454,20 @@ export async function getCollectionsByHubId(hubId: string): Promise<Collection[]
   }
 
   try {
+    console.log("[v0] Dashboard loaded collections for network hub:", hubId)
+
+    // Query using hub_id (snake_case) which is the actual column name
     const { data, error } = await supabase
       .from("collections")
       .select("*")
-      .eq("hubId", hubId)
+      .eq("hub_id", hubId)
 
     if (error) {
       console.warn("[v0] Error loading collections:", error.message)
       return []
     }
 
-    console.log("[v0] Loaded collections from Supabase:", data?.length || 0)
+    console.log("[v0] Collections tab rendered collections:", data?.length || 0)
     return data as Collection[]
   } catch (err) {
     console.warn("[v0] Exception loading collections:", err)

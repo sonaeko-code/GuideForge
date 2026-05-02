@@ -73,6 +73,7 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
     try {
       const collSlug = slugify(name)
       
+      console.log("[v0] Selected hub for collection:", selectedHubId)
       console.log("[v0] Collection save payload:", { networkId, hubId: selectedHubId, slug: collSlug, name, description })
       
       const { collection, error: collError } = await createCollection(
@@ -94,7 +95,7 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
         return
       }
 
-      console.log("[v0] Collection saved:", collection.id)
+      console.log("[v0] Collection save result:", collection.id)
       router.push(`/builder/network/${networkId}/dashboard?tab=collections`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
@@ -116,6 +117,19 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
         </div>
       )}
 
+      {hubs.length === 0 ? (
+        <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+          <p className="font-semibold text-foreground">No hubs yet</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Create a hub first, then you can add collections to it.
+          </p>
+          <Button size="sm" asChild className="mt-4">
+            <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
+              Create Hub
+            </Link>
+          </Button>
+        </div>
+      ) : (
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="hub-select">Hub</FieldLabel>
@@ -191,6 +205,7 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
           {isSaving ? "Saving..." : "Create Collection"}
         </Button>
       </div>
+      )}
     </div>
   )
 }

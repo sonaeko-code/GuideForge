@@ -69,6 +69,8 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
     try {
       // Create the hub
       const hubSlug = slugify(name)
+      console.log("[v0] Create hub form saving to network:", networkId)
+
       const { hub, source, error: hubError } = await createHub(networkId, {
         id: "",
         networkId,
@@ -85,7 +87,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
         return
       }
 
-      console.log("[v0] Hub created, now creating collections")
+      console.log("[v0] Hub created successfully, id:", hub.id)
 
       // Create collections for this hub
       for (const collName of collectionNames) {
