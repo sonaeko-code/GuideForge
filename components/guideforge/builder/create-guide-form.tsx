@@ -44,11 +44,9 @@ const DIFFICULTY_LEVELS: DifficultyLevel[] = ["beginner", "intermediate", "advan
 
 const AUDIENCES = ["New Players", "Intermediate", "Advanced", "Hardcore", "PvP", "PvE"]
 
-// Phase 1: Seeded IDs for QuestLine network
-// These are the actual UUIDs used in Supabase seed data, not slugs
-const SEEDED_NETWORK_ID = "network_questline"
-const SEEDED_HUB_ID = "hub_emberfall"
-const SEEDED_COLLECTION_ID = "collection_character_builds"
+// Fallback IDs used when no hubs/collections are provided from Supabase
+const FALLBACK_HUB_ID = "hub_emberfall"
+const FALLBACK_COLLECTION_ID = "collection_character_builds"
 
 export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: CreateGuideFormProps) {
   const router = useRouter()
@@ -66,12 +64,12 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
 
   // Hub and collection selection
   const [selectedHubId, setSelectedHubId] = useState<string>(
-    hubs.length > 0 ? hubs[0].id : SEEDED_HUB_ID
+    hubs.length > 0 ? hubs[0].id : FALLBACK_HUB_ID
   )
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
     hubs.length > 0 && collectionsMap[hubs[0].id]?.length > 0
       ? collectionsMap[hubs[0].id][0].id
-      : SEEDED_COLLECTION_ID
+      : FALLBACK_COLLECTION_ID
   )
 
   // Update available collections when hub changes
@@ -92,8 +90,8 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
         prompt: title,
         guideType,
         preferredDifficulty: difficulty,
-        targetHubId: selectedHubId || SEEDED_HUB_ID,
-        targetCollectionId: selectedCollectionId || SEEDED_COLLECTION_ID,
+        targetHubId: selectedHubId || FALLBACK_HUB_ID,
+        targetCollectionId: selectedCollectionId || FALLBACK_COLLECTION_ID,
       })
 
       if (response.guide) {
@@ -109,8 +107,8 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
           guideType,
           difficulty,
           networkId,
-          hubId: selectedHubId || SEEDED_HUB_ID,
-          collectionId: selectedCollectionId || SEEDED_COLLECTION_ID,
+          hubId: selectedHubId || FALLBACK_HUB_ID,
+          collectionId: selectedCollectionId || FALLBACK_COLLECTION_ID,
           requirements: response.guide.requirements,
           warnings: response.guide.warnings,
           steps: response.guide.sections?.map((section) => ({
@@ -161,8 +159,8 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
         guideType,
         difficulty,
         networkId,
-        hubId: selectedHubId || SEEDED_HUB_ID,
-        collectionId: selectedCollectionId || SEEDED_COLLECTION_ID,
+        hubId: selectedHubId || FALLBACK_HUB_ID,
+        collectionId: selectedCollectionId || FALLBACK_COLLECTION_ID,
         requirements: requirements
           ? requirements.split(",").map((r) => r.trim()).filter(Boolean)
           : [],

@@ -10,6 +10,8 @@ import { DraftWorkspace } from "./draft-workspace"
 import { PublicQuestlineWorkspace } from "./public-questline-workspace"
 
 export function BuilderWorkspace() {
+  // On the /builder home page, we show QuestLine as an example network
+  // This is intentional - users can create their own networks via "Create Network"
   const networkId = "network_questline"
 
   return (

@@ -137,12 +137,10 @@ export async function getAllNetworks(): Promise<Network[]> {
   }
 
   try {
-    const profileId = await getCurrentProfileId()
-    
+    // Do not filter by profileId - column may not exist in schema
     const { data, error } = await supabase
       .from("networks")
       .select("*")
-      .eq("profileId", profileId)
 
     if (error) {
       console.warn("[v0] Error loading networks:", error.message)
@@ -173,15 +171,85 @@ export async function getNetworkBySlug(slug: string): Promise<Network | null> {
       .single()
 
     if (error) {
-      console.warn("[v0] Error loading network:", error.message)
+      console.warn("[v0] Error loading network by slug:", error.message)
       return null
     }
 
     return data as Network
   } catch (err) {
-    console.warn("[v0] Exception loading network:", err)
+    console.warn("[v0] Exception loading network by slug:", err)
     return null
   }
+}
+
+/**
+ * Get a single network by UUID
+ */
+export async function getNetworkById(id: string): Promise<Network | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  try {
+    console.log("[v0] Looking up network by ID:", id)
+    
+    const { data, error } = await supabase
+      .from("networks")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.warn("[v0] Error loading network by ID:", error.message)
+      return null
+    }
+
+    console.log("[v0] Found network:", data?.name)
+    return data as Network
+  } catch (err) {
+    console.warn("[v0] Exception loading network by ID:", err)
+    return null
+  }
+}
+
+/**
+ * Resolve a network param (UUID, slug, or mock ID) to a Network object
+ * This is the main entry point for loading networks in dashboard routes
+ */
+export async function resolveNetworkParam(networkId: string): Promise<Network | null> {
+  console.log("[v0] Dashboard route networkId:", networkId)
+
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured")
+    return null
+  }
+
+  // Check if it's a UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidRegex.test(networkId)) {
+    const network = await getNetworkById(networkId)
+    if (network) {
+      console.log("[v0] Resolved network by UUID:", network.name)
+      return network
+    }
+    console.log("[v0] Network load failed: No network found with UUID", networkId)
+    return null
+  }
+
+  // Try as slug
+  let slug = networkId
+  if (networkId.startsWith("network_")) {
+    slug = networkId.replace("network_", "")
+  }
+
+  const network = await getNetworkBySlug(slug)
+  if (network) {
+    console.log("[v0] Resolved network by slug:", network.name)
+    return network
+  }
+
+  console.log("[v0] Network load failed: No network found with slug", slug)
+  return null
 }
 
 // ========== HUBS ==========

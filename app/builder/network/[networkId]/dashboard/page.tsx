@@ -27,7 +27,7 @@ import { SiteHeader } from "@/components/guideforge/site-header"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import {
-  getNetworkById,
+  getNetworkById as getMockNetworkById,
   getHubsByNetwork,
   getCollectionsByHub,
   getGuidesByCollection,
@@ -35,8 +35,7 @@ import {
 import {
   getHubsByNetworkId,
   getCollectionsByHubId,
-  getNetworkBySlug,
-  getAllNetworks,
+  resolveNetworkParam,
 } from "@/lib/guideforge/supabase-networks"
 import { cn } from "@/lib/utils"
 
@@ -47,18 +46,15 @@ export default async function NetworkDashboardPage({
 }) {
   const { networkId } = await params
   
-  // Try to load from Supabase first
-  let network: Network | null = await getNetworkBySlug(networkId)
+  // Use the robust resolver to load network by UUID, slug, or mock ID
+  let network: Network | null = await resolveNetworkParam(networkId)
   
-  // If not found by slug, try by ID
+  // Only use mock QuestLine data for questline/network_questline routes
   if (!network) {
-    const allNetworks = await getAllNetworks()
-    network = allNetworks.find(n => n.id === networkId) || null
-  }
-  
-  // Fallback to mock data
-  if (!network) {
-    network = getNetworkById(networkId)
+    const isQuestLineRoute = networkId === "questline" || networkId === "network_questline"
+    if (isQuestLineRoute) {
+      network = getMockNetworkById("network_questline")
+    }
   }
 
   if (!network) {
@@ -66,11 +62,20 @@ export default async function NetworkDashboardPage({
       <main className="min-h-screen bg-background">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
-            <AlertCircle className="size-5" aria-hidden="true" />
-            <p className="text-center text-foreground">
-              Network not found.
-            </p>
+          <div className="flex flex-col items-center gap-4 text-center">
+            <AlertCircle className="size-8 text-red-600 dark:text-red-400" aria-hidden="true" />
+            <div>
+              <h1 className="text-xl font-semibold text-foreground mb-2">Network Not Found</h1>
+              <p className="text-muted-foreground">
+                Could not find network with ID: <code className="text-xs bg-muted px-1 py-0.5 rounded">{networkId}</code>
+              </p>
+            </div>
+            <Button asChild variant="outline" className="mt-4">
+              <Link href="/builder">
+                <ArrowLeft className="size-4 mr-2" aria-hidden="true" />
+                Back to Builder
+              </Link>
+            </Button>
           </div>
         </div>
       </main>
@@ -144,7 +149,7 @@ export default async function NetworkDashboardPage({
                   <Link href="#">Edit network</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={`/n/questline`}>View public page</Link>
+                  <Link href={`/n/${network.slug || "questline"}`}>View public page</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="#">Settings</Link>
