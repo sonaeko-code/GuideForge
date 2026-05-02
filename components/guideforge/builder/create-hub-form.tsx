@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { generateMockHubDraft } from "@/lib/guideforge/mock-generator"
 import { createHub, createCollection } from "@/lib/guideforge/supabase-networks"
+import { SaveStatus } from "@/components/guideforge/builder/save-status"
 import type { Hub, Collection } from "@/lib/guideforge/types"
 
 interface CreateHubFormProps {
@@ -52,6 +53,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
   ])
   const [generationAttempted, setGenerationAttempted] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
 
   const handleGenerateDraft = () => {
@@ -64,6 +66,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
 
   const handleSave = async () => {
     setError(null)
+    setSaveStatus("saving")
     setIsSaving(true)
 
     try {
@@ -82,12 +85,15 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
       })
 
       if (hubError || !hub.id) {
-        setError(hubError || "Failed to create hub")
+        const errorMsg = hubError || "Failed to create hub"
+        setError(errorMsg)
+        setSaveStatus("error")
         setIsSaving(false)
         return
       }
 
       console.log("[v0] Hub created successfully, id:", hub.id)
+      setSaveStatus("saved")
 
       // Create collections for this hub
       for (const collName of collectionNames) {
@@ -148,6 +154,8 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
           </div>
         </div>
       )}
+
+      <SaveStatus state={saveStatus} error={error} message="Hub created successfully" />
 
       <FieldGroup>
         <Field>
