@@ -109,7 +109,8 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
       }
 
       console.log("[v0] Hub and collections created successfully")
-      router.push(`/builder/network/${networkId}/dashboard`)
+      // Route back to dashboard and show the hubs tab where the new hub is now visible
+      router.push(`/builder/network/${networkId}/dashboard?tab=hubs`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
       setError(message)

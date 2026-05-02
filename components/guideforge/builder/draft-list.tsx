@@ -24,6 +24,8 @@ import { formatDistanceToNow } from "date-fns"
 
 interface DraftListProps {
   networkId: string
+  scopedDrafts?: any[]
+  scopedPublished?: any[]
 }
 
 const isSupabaseConfigured =
@@ -31,7 +33,7 @@ const isSupabaseConfigured =
   !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
   !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export function DraftList({ networkId }: DraftListProps) {
+export function DraftList({ networkId, scopedDrafts, scopedPublished }: DraftListProps) {
   const [drafts, setDrafts] = useState<Guide[]>([])
   const [draftSource, setDraftSource] = useState<"supabase" | "localStorage">(getPersistenceSource())
   const [isLoading, setIsLoading] = useState(true)
@@ -40,11 +42,21 @@ export function DraftList({ networkId }: DraftListProps) {
   useEffect(() => {
     const loadDrafts = async () => {
       try {
-        const networkDrafts = await getDraftsByNetwork(networkId)
-        setDrafts(networkDrafts)
+        // If scoped drafts are provided (from dashboard page), use them directly
+        if (scopedDrafts !== undefined && scopedPublished !== undefined) {
+          console.log("[v0] Draft guide list source: page props (network-scoped)")
+          const allScoped = [...scopedDrafts, ...scopedPublished]
+          setDrafts(allScoped)
+          setLoadError(null)
+        } else {
+          // Fallback: load from storage (for standalone use)
+          console.log("[v0] Draft guide list source: storage lookup")
+          const networkDrafts = await getDraftsByNetwork(networkId)
+          setDrafts(networkDrafts)
+        }
         // Use getPersistenceSource to get the actual source
         setDraftSource(getPersistenceSource())
-        console.log("[v0] DraftList loaded from", getPersistenceSource(), "| count:", networkDrafts.length)
+        console.log("[v0] DraftList loaded | count:", scopedDrafts?.length ?? 0, "published:", scopedPublished?.length ?? 0)
         setLoadError(null)
       } catch (error) {
         console.error("[v0] DraftList error loading drafts:", error)
@@ -54,7 +66,7 @@ export function DraftList({ networkId }: DraftListProps) {
       }
     }
     loadDrafts()
-  }, [networkId])
+  }, [networkId, scopedDrafts, scopedPublished])
 
   const handleDelete = async (guideId: string) => {
     if (confirm("Delete this draft? This cannot be undone.")) {

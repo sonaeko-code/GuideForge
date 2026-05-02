@@ -30,6 +30,60 @@ async function getCurrentProfileId(): Promise<string> {
 // ========== NETWORKS ==========
 
 /**
+ * Normalize a networkId (slug or mock ID) to a real Supabase UUID
+ * Examples:
+ *   "network_questline" -> lookup by slug "questline" -> returns UUID
+ *   "questline" -> lookup by slug -> returns UUID
+ *   "550e8400-e29b-41d4-a716-446655440000" -> already UUID, return as-is
+ */
+async function normalizeNetworkIdForSupabase(networkId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, cannot normalize networkId")
+    return null
+  }
+
+  console.log("[v0] Original networkId:", networkId)
+
+  // If it's already a UUID, return it
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidRegex.test(networkId)) {
+    console.log("[v0] networkId is already UUID:", networkId)
+    return networkId
+  }
+
+  // Try to normalize mock IDs like "network_questline" to "questline"
+  let slug = networkId
+  if (networkId.startsWith("network_")) {
+    slug = networkId.replace("network_", "")
+  }
+
+  console.log("[v0] Looking up network by slug:", slug)
+
+  try {
+    const { data, error } = await supabase
+      .from("networks")
+      .select("id")
+      .eq("slug", slug)
+      .single()
+
+    if (error) {
+      console.error("[v0] Network lookup error:", error.message)
+      return null
+    }
+
+    if (data?.id) {
+      console.log("[v0] Normalized network UUID:", data.id)
+      return data.id
+    }
+
+    return null
+  } catch (err) {
+    console.error("[v0] Network lookup exception:", err)
+    return null
+  }
+}
+
+/**
  * Create a new network
  */
 export async function createNetwork(
@@ -43,24 +97,16 @@ export async function createNetwork(
   try {
     const profileId = await getCurrentProfileId()
     
+    // Only include schema-supported fields. Do NOT include UI-only fields.
+    // The networks table only has: id, slug, name, description, created_at, updated_at
+    // All other fields (theme, visibility, branding, etc) are UI-only and stored in app state
     const networkData = {
       slug: draft.slug,
       name: draft.name,
       description: draft.description,
-      type: draft.type,
-      visibility: draft.visibility,
-      domain: draft.domain,
-      branding: {
-        primaryColor: draft.primaryColor,
-        accentColor: draft.primaryColor,
-        theme: draft.theme,
-      },
-      forgeRuleIds: [],
-      hubIds: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      profileId,
     }
+
+    console.log("[v0] Network save payload:", networkData)
 
     const { data, error } = await supabase
       .from("networks")
@@ -69,15 +115,15 @@ export async function createNetwork(
       .single()
 
     if (error) {
-      console.error("[v0] Supabase network creation error:", error.message)
+      console.error("[v0] Network save error:", error.message)
       return { network: {} as Network, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Network created in Supabase:", data.id)
+    console.log("[v0] Network saved:", data.id)
     return { network: data as Network, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
-    console.error("[v0] Network creation exception:", message)
+    console.error("[v0] Network save error:", message)
     return { network: {} as Network, source: "supabase", error: message }
   }
 }
@@ -91,12 +137,10 @@ export async function getAllNetworks(): Promise<Network[]> {
   }
 
   try {
-    const profileId = await getCurrentProfileId()
-    
+    // Do not filter by profileId - column may not exist in schema
     const { data, error } = await supabase
       .from("networks")
       .select("*")
-      .eq("profileId", profileId)
 
     if (error) {
       console.warn("[v0] Error loading networks:", error.message)
@@ -127,15 +171,85 @@ export async function getNetworkBySlug(slug: string): Promise<Network | null> {
       .single()
 
     if (error) {
-      console.warn("[v0] Error loading network:", error.message)
+      console.warn("[v0] Error loading network by slug:", error.message)
       return null
     }
 
     return data as Network
   } catch (err) {
-    console.warn("[v0] Exception loading network:", err)
+    console.warn("[v0] Exception loading network by slug:", err)
     return null
   }
+}
+
+/**
+ * Get a single network by UUID
+ */
+export async function getNetworkById(id: string): Promise<Network | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  try {
+    console.log("[v0] Looking up network by ID:", id)
+    
+    const { data, error } = await supabase
+      .from("networks")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.warn("[v0] Error loading network by ID:", error.message)
+      return null
+    }
+
+    console.log("[v0] Found network:", data?.name)
+    return data as Network
+  } catch (err) {
+    console.warn("[v0] Exception loading network by ID:", err)
+    return null
+  }
+}
+
+/**
+ * Resolve a network param (UUID, slug, or mock ID) to a Network object
+ * This is the main entry point for loading networks in dashboard routes
+ */
+export async function resolveNetworkParam(networkId: string): Promise<Network | null> {
+  console.log("[v0] Dashboard route networkId:", networkId)
+
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured")
+    return null
+  }
+
+  // Check if it's a UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidRegex.test(networkId)) {
+    const network = await getNetworkById(networkId)
+    if (network) {
+      console.log("[v0] Resolved network by UUID:", network.name)
+      return network
+    }
+    console.log("[v0] Network load failed: No network found with UUID", networkId)
+    return null
+  }
+
+  // Try as slug
+  let slug = networkId
+  if (networkId.startsWith("network_")) {
+    slug = networkId.replace("network_", "")
+  }
+
+  const network = await getNetworkBySlug(slug)
+  if (network) {
+    console.log("[v0] Resolved network by slug:", network.name)
+    return network
+  }
+
+  console.log("[v0] Network load failed: No network found with slug", slug)
+  return null
 }
 
 // ========== HUBS ==========
@@ -153,11 +267,19 @@ export async function createHub(
   }
 
   try {
+    // Normalize networkId to real UUID
+    const normalizedNetworkId = await normalizeNetworkIdForSupabase(networkId)
+    if (!normalizedNetworkId) {
+      const error = `Could not find network with ID or slug: ${networkId}`
+      console.error("[v0] Hub save error:", error)
+      return { hub: {} as Hub, source: "supabase", error }
+    }
+
     const profileId = await getCurrentProfileId()
     
     // Only include schema-supported fields
     const hubData = {
-      network_id: networkId,
+      network_id: normalizedNetworkId,
       slug: hub.slug,
       name: hub.name,
       description: hub.description,
@@ -185,7 +307,7 @@ export async function createHub(
     const { data: network, error: networkError } = await supabase
       .from("networks")
       .select("hub_ids")
-      .eq("id", networkId)
+      .eq("id", normalizedNetworkId)
       .single()
 
     if (network && !networkError) {
@@ -193,7 +315,7 @@ export async function createHub(
       await supabase
         .from("networks")
         .update({ hub_ids: [...hubIds, data.id] })
-        .eq("id", networkId)
+        .eq("id", normalizedNetworkId)
     }
 
     return { hub: data as Hub, source: "supabase" }
@@ -361,4 +483,93 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
     console.warn("[v0] Exception loading collection:", err)
     return null
   }
+}
+
+
+// ========== GUIDES (Network-Scoped) ==========
+
+/**
+ * Get all guides for a network (scoped: network → hubs → collections → guides)
+ * This ensures dashboards only show guides for the current network
+ */
+export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, returning empty guides for network")
+    return []
+  }
+
+  try {
+    console.log("[v0] Loading guides for network:", networkId)
+
+    // First get all hubs for this network
+    const { data: hubs, error: hubsError } = await supabase
+      .from("hubs")
+      .select("id")
+      .eq("network_id", networkId)
+
+    if (hubsError) {
+      console.warn("[v0] Error loading hubs:", hubsError.message)
+      return []
+    }
+
+    if (!hubs || hubs.length === 0) {
+      console.log("[v0] Network has no hubs")
+      return []
+    }
+
+    const hubIds = hubs.map(h => h.id)
+    console.log("[v0] Network hubs:", hubIds.length)
+
+    // Get all collections for those hubs
+    const { data: collections, error: collectionsError } = await supabase
+      .from("collections")
+      .select("id")
+      .in("hub_id", hubIds)
+
+    if (collectionsError) {
+      console.warn("[v0] Error loading collections:", collectionsError.message)
+      return []
+    }
+
+    if (!collections || collections.length === 0) {
+      console.log("[v0] Network has no collections")
+      return []
+    }
+
+    const collectionIds = collections.map(c => c.id)
+    console.log("[v0] Network collections:", collectionIds.length)
+
+    // Get all guides for those collections
+    const { data: guides, error: guidesError } = await supabase
+      .from("guides")
+      .select("*")
+      .in("collection_id", collectionIds)
+
+    if (guidesError) {
+      console.warn("[v0] Error loading guides:", guidesError.message)
+      return []
+    }
+
+    console.log("[v0] Network guides:", guides?.length || 0)
+    return guides || []
+  } catch (err) {
+    console.warn("[v0] Exception loading network guides:", err)
+    return []
+  }
+}
+
+/**
+ * Get draft guides (status=draft or status=in-review) for a network
+ */
+export async function getDraftGuidesByNetworkId(networkId: string): Promise<any[]> {
+  const guides = await getGuidesByNetworkId(networkId)
+  return guides.filter(g => g.status === "draft" || g.status === "in-review")
+}
+
+/**
+ * Get published guides (status=published) for a network
+ */
+export async function getPublishedGuidesByNetworkId(networkId: string): Promise<any[]> {
+  const guides = await getGuidesByNetworkId(networkId)
+  return guides.filter(g => g.status === "published")
 }

@@ -49,14 +49,14 @@ export function ExampleNetworks() {
       <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-20">
         <div className="mb-10 flex flex-col gap-3 md:max-w-2xl">
           <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Example networks
+            Example Networks
           </span>
           <h2 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            One engine. Many shapes of network.
+            One engine. Many network types.
           </h2>
           <p className="text-pretty text-muted-foreground">
-            The first demo is a gaming network. The same engine powers repair,
-            SOP, training, creator, and community networks.
+            The first live demo is a gaming network. The same engine powers repair,
+            SOP, training, creator, and community networks—coming next.
           </p>
         </div>
 
@@ -78,7 +78,11 @@ export function ExampleNetworks() {
                   <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                     Live demo
                   </span>
-                ) : null}
+                ) : (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    Coming next
+                  </span>
+                )}
               </div>
               <div>
                 <h3 className="text-base font-semibold tracking-tight text-foreground">

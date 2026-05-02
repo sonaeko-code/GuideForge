@@ -43,7 +43,7 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
             How it works
           </Link>
           <Link
-            href="/#examples"
+            href="/builder/networks"
             className="transition-colors hover:text-foreground"
           >
             Networks

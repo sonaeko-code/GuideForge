@@ -30,10 +30,9 @@ import {
   getCollectionsByHub,
 } from "@/lib/guideforge/mock-data"
 
-// Phase 1: Seeded IDs for QuestLine network (actual Supabase UUIDs)
-const SEEDED_NETWORK_ID = "network_questline"
-const SEEDED_HUB_ID = "hub_emberfall"
-const SEEDED_COLLECTION_ID = "collection_character_builds"
+// Fallback IDs for QuestLine network (used only when Supabase hubs/collections not available)
+const FALLBACK_HUB_ID = "hub_emberfall"
+const FALLBACK_COLLECTION_ID = "collection_character_builds"
 
 export default function GeneratorPage({
   params,
@@ -110,16 +109,16 @@ export default function GeneratorPage({
         difficulty: generatedGuide.difficulty,
       })
 
-      // Use seeded IDs from Supabase schema
-      // For Phase 1: Use emberfall hub and character-builds collection
+      // Use the current network from the route, not hardcoded QuestLine
+      // Fall back to mock hub/collection IDs when not using Supabase hubs
       const { id, source, verified, error } = await createAndSaveGuideDraft({
         title: generatedGuide.title,
         summary: generatedGuide.summary,
         guideType: formState.guideType,
         difficulty: generatedGuide.difficulty,
-        networkId: SEEDED_NETWORK_ID,
-        hubId: SEEDED_HUB_ID,
-        collectionId: SEEDED_COLLECTION_ID,
+        networkId: networkId,
+        hubId: hubs.length > 0 ? hubs[0].id : FALLBACK_HUB_ID,
+        collectionId: FALLBACK_COLLECTION_ID,
         requirements: generatedGuide.requirements,
         warnings: generatedGuide.warnings,
         steps: generatedGuide.sections?.map((section) => ({
@@ -137,8 +136,8 @@ export default function GeneratorPage({
 
       console.log("[v0] handleSendToEditor: Verification succeeded, redirecting to editor id:", id)
 
-      // Redirect to guide editor with guide ID
-      router.push(`/builder/network/${SEEDED_NETWORK_ID}/guide/${id}/edit`)
+      // Redirect to guide editor using the current network from the route
+      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
       console.error("[v0] Error in handleSendToEditor:", error)
@@ -181,8 +180,23 @@ export default function GeneratorPage({
           <span className="text-foreground font-semibold">Generate Guide</span>
         </nav>
 
+        {/* Pre-check: Require hubs and collections */}
+        {hubs.length === 0 && (
+          <Card className="mb-6 border-amber-500/30 bg-amber-500/5 p-5">
+            <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+              <strong>No hubs yet.</strong> You need at least one hub with collections before creating guides.
+            </p>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
+                Create Hub
+              </Link>
+            </Button>
+          </Card>
+        )}
+
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Left: Input Form */}
+          {hubs.length > 0 ? (
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold">Generate a Guide</h1>
@@ -330,8 +344,10 @@ export default function GeneratorPage({
               </Button>
             </Card>
           </div>
+          ) : null}
 
           {/* Right: Preview Panel */}
+          {hubs.length > 0 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-bold">Generated JSON Preview</h2>
@@ -442,6 +458,7 @@ export default function GeneratorPage({
               </Card>
             )}
           </div>
+          )}
         </div>
 
         {/* Footer note */}
