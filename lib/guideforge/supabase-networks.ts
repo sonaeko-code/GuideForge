@@ -307,31 +307,6 @@ export async function createCollection(
     console.error("[v0] Collection save error:", message)
     return { collection: {} as Collection, source: "supabase", error: message }
   }
-      return { collection: {} as Collection, source: "supabase", error: error.message }
-    }
-
-    // Update hub's collectionIds
-    const { data: hub } = await supabase
-      .from("hubs")
-      .select("collectionIds")
-      .eq("id", hubId)
-      .single()
-
-    if (hub) {
-      const collectionIds = Array.isArray(hub.collectionIds) ? hub.collectionIds : []
-      await supabase
-        .from("hubs")
-        .update({ collectionIds: [...collectionIds, data.id] })
-        .eq("id", hubId)
-    }
-
-    console.log("[v0] Collection created in Supabase:", data.id)
-    return { collection: data as Collection, source: "supabase" }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error"
-    console.error("[v0] Collection creation exception:", message)
-    return { collection: {} as Collection, source: "supabase", error: message }
-  }
 }
 
 /**
