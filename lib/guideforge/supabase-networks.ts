@@ -155,19 +155,18 @@ export async function createHub(
   try {
     const profileId = await getCurrentProfileId()
     
+    // Only include schema-supported fields
     const hubData = {
-      networkId,
+      network_id: networkId,
       slug: hub.slug,
       name: hub.name,
       description: hub.description,
-      tagline: hub.tagline,
-      bannerUrl: hub.bannerUrl,
-      hubKind: hub.hubKind,
-      collectionIds: [],
-      profileId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      hub_kind: hub.hubKind,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
+
+    console.log("[v0] Hub save payload:", hubData)
 
     const { data, error } = await supabase
       .from("hubs")
@@ -176,30 +175,31 @@ export async function createHub(
       .single()
 
     if (error) {
-      console.error("[v0] Supabase hub creation error:", error.message)
+      console.error("[v0] Hub save error:", error.message)
       return { hub: {} as Hub, source: "supabase", error: error.message }
     }
 
-    // Update network's hubIds
-    const { data: network } = await supabase
+    console.log("[v0] Hub saved:", data.id)
+
+    // Update network's hubIds if supported
+    const { data: network, error: networkError } = await supabase
       .from("networks")
-      .select("hubIds")
+      .select("hub_ids")
       .eq("id", networkId)
       .single()
 
-    if (network) {
-      const hubIds = Array.isArray(network.hubIds) ? network.hubIds : []
+    if (network && !networkError) {
+      const hubIds = Array.isArray(network.hub_ids) ? network.hub_ids : []
       await supabase
         .from("networks")
-        .update({ hubIds: [...hubIds, data.id] })
+        .update({ hub_ids: [...hubIds, data.id] })
         .eq("id", networkId)
     }
 
-    console.log("[v0] Hub created in Supabase:", data.id)
     return { hub: data as Hub, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
-    console.error("[v0] Hub creation exception:", message)
+    console.error("[v0] Hub save error:", message)
     return { hub: {} as Hub, source: "supabase", error: message }
   }
 }
@@ -276,18 +276,18 @@ export async function createCollection(
   try {
     const profileId = await getCurrentProfileId()
     
+    // Only include schema-supported fields
     const collectionData = {
-      networkId,
-      hubId,
+      network_id: networkId,
+      hub_id: hubId,
       slug: collection.slug,
       name: collection.name,
       description: collection.description,
-      defaultGuideType: collection.defaultGuideType,
-      guideIds: [],
-      profileId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
+
+    console.log("[v0] Collection save payload:", collectionData)
 
     const { data, error } = await supabase
       .from("collections")
@@ -296,30 +296,15 @@ export async function createCollection(
       .single()
 
     if (error) {
-      console.error("[v0] Supabase collection creation error:", error.message)
+      console.error("[v0] Collection save error:", error.message)
       return { collection: {} as Collection, source: "supabase", error: error.message }
     }
 
-    // Update hub's collectionIds
-    const { data: hub } = await supabase
-      .from("hubs")
-      .select("collectionIds")
-      .eq("id", hubId)
-      .single()
-
-    if (hub) {
-      const collectionIds = Array.isArray(hub.collectionIds) ? hub.collectionIds : []
-      await supabase
-        .from("hubs")
-        .update({ collectionIds: [...collectionIds, data.id] })
-        .eq("id", hubId)
-    }
-
-    console.log("[v0] Collection created in Supabase:", data.id)
+    console.log("[v0] Collection saved:", data.id)
     return { collection: data as Collection, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
-    console.error("[v0] Collection creation exception:", message)
+    console.error("[v0] Collection save error:", message)
     return { collection: {} as Collection, source: "supabase", error: message }
   }
 }

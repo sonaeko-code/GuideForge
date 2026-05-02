@@ -21,11 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { createCollection } from "@/lib/guideforge/supabase-networks"
-import type { GuideType } from "@/lib/guideforge/types"
+import type { GuideType, Hub } from "@/lib/guideforge/types"
 
 interface CreateCollectionFormProps {
   networkId: string
-  hubId: string
+  hubs?: Hub[]
 }
 
 function slugify(str: string): string {
@@ -50,8 +50,11 @@ const GUIDE_TYPES: { value: GuideType; label: string }[] = [
   { value: "news", label: "News" },
 ]
 
-export function CreateCollectionForm({ networkId, hubId }: CreateCollectionFormProps) {
+export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionFormProps) {
   const router = useRouter()
+  const [selectedHubId, setSelectedHubId] = useState<string>(
+    hubs.length > 0 ? hubs[0].id : ""
+  )
   const [name, setName] = useState("Character Builds")
   const [description, setDescription] = useState("Build guides for different character classes and playstyles")
   const [defaultGuideType, setDefaultGuideType] = useState<GuideType>("character-build")
@@ -59,14 +62,22 @@ export function CreateCollectionForm({ networkId, hubId }: CreateCollectionFormP
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
+    if (!selectedHubId) {
+      setError("Please select a hub")
+      return
+    }
+
     setError(null)
     setIsSaving(true)
 
     try {
       const collSlug = slugify(name)
+      
+      console.log("[v0] Collection save payload:", { networkId, hubId: selectedHubId, slug: collSlug, name, description })
+      
       const { collection, error: collError } = await createCollection(
         networkId,
-        hubId,
+        selectedHubId,
         {
           slug: collSlug,
           name,
@@ -77,17 +88,18 @@ export function CreateCollectionForm({ networkId, hubId }: CreateCollectionFormP
       )
 
       if (collError || !collection.id) {
+        console.error("[v0] Collection save error:", collError)
         setError(collError || "Failed to create collection")
         setIsSaving(false)
         return
       }
 
-      console.log("[v0] Collection created:", collection.id)
+      console.log("[v0] Collection saved:", collection.id)
       router.push(`/builder/network/${networkId}/dashboard`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
+      console.error("[v0] Collection save error:", message)
       setError(message)
-      console.error("[v0] Collection creation exception:", message)
     } finally {
       setIsSaving(false)
     }
@@ -105,6 +117,25 @@ export function CreateCollectionForm({ networkId, hubId }: CreateCollectionFormP
       )}
 
       <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="hub-select">Hub</FieldLabel>
+          <FieldDescription>
+            Select which hub this collection belongs to.
+          </FieldDescription>
+          <Select value={selectedHubId} onValueChange={setSelectedHubId} disabled={isSaving}>
+            <SelectTrigger id="hub-select" className="mt-2">
+              <SelectValue placeholder="Select hub" />
+            </SelectTrigger>
+            <SelectContent>
+              {hubs.map((hub) => (
+                <SelectItem key={hub.id} value={hub.id}>
+                  {hub.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
         <Field>
           <FieldLabel htmlFor="collection-name">Collection name</FieldLabel>
           <FieldDescription>Examples: "Character Builds", "Beginner Guides", "Boss Strategies"</FieldDescription>

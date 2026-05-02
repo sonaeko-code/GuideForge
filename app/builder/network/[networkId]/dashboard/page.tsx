@@ -10,6 +10,7 @@ import {
   BookMarked,
   Flame,
   ArrowLeft,
+  AlertCircle,
 } from "lucide-react"
 import type { Network, Hub, Collection, Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
@@ -30,11 +31,12 @@ import {
   getHubsByNetwork,
   getCollectionsByHub,
   getGuidesByCollection,
-  MOCK_HUBS,
 } from "@/lib/guideforge/mock-data"
 import {
   getHubsByNetworkId,
   getCollectionsByHubId,
+  getNetworkBySlug,
+  getAllNetworks,
 } from "@/lib/guideforge/supabase-networks"
 import { cn } from "@/lib/utils"
 
@@ -44,23 +46,39 @@ export default async function NetworkDashboardPage({
   params: Promise<{ networkId: string }>
 }) {
   const { networkId } = await params
-  const network = getNetworkById(networkId)
+  
+  // Try to load from Supabase first
+  let network: Network | null = await getNetworkBySlug(networkId)
+  
+  // If not found by slug, try by ID
+  if (!network) {
+    const allNetworks = await getAllNetworks()
+    network = allNetworks.find(n => n.id === networkId) || null
+  }
+  
+  // Fallback to mock data
+  if (!network) {
+    network = getNetworkById(networkId)
+  }
 
   if (!network) {
     return (
       <main className="min-h-screen bg-background">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-          <p className="text-center text-muted-foreground">
-            Network not found.
-          </p>
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <AlertCircle className="size-5" aria-hidden="true" />
+            <p className="text-center text-foreground">
+              Network not found.
+            </p>
+          </div>
         </div>
       </main>
     )
   }
 
   // Try to load hubs from Supabase first, fallback to mock data
-  let hubs = await getHubsByNetworkId(networkId)
+  let hubs = await getHubsByNetworkId(network.id)
   if (hubs.length === 0) {
     hubs = getHubsByNetwork(network.id)
   }
@@ -278,6 +296,12 @@ export default async function NetworkDashboardPage({
               <h2 className="text-lg font-semibold text-foreground">
                 Collections ({collections.length})
               </h2>
+              <Button size="sm" asChild>
+                <Link href={`/builder/network/${networkId}/collection/new`}>
+                  <Plus className="size-4 mr-1" aria-hidden="true" />
+                  Create Collection
+                </Link>
+              </Button>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

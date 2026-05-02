@@ -235,11 +235,3 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
     </div>
   )
 }
-
-          Generate Draft
-        </Button>
-        <Button onClick={handleSave}>Save Hub</Button>
-      </div>
-    </div>
-  )
-}

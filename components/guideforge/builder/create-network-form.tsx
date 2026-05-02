@@ -29,6 +29,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
+import { createNetwork } from "@/lib/guideforge/supabase-networks"
 import type {
   NetworkType,
   ThemeDirection,
@@ -129,6 +130,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [domainPrefix, setDomainPrefix] = useState(defaults.slug)
   const [submitting, setSubmitting] = useState(false)
   const [autofilled, setAutofilled] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const slug = useMemo(() => slugify(domainPrefix || name), [domainPrefix, name])
 
@@ -141,24 +143,52 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setAutofilled(true)
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitting(true)
-    // TODO: Persist NetworkDraft to Supabase. For now, hand off via query params
-    // so the next screen (Starter Pages) can render with this context.
-    const params = new URLSearchParams({
-      name,
-      type,
-      description,
-      theme,
-      visibility,
-      domain: slug,
-    })
-    router.push(`/builder/network/forge-rules?${params.toString()}`)
+    setError(null)
+
+    try {
+      console.log("[v0] Creating network:", { name, type, slug })
+
+      const { network, error: createError } = await createNetwork({
+        name,
+        type,
+        description,
+        theme,
+        visibility,
+        slug,
+        primaryColor: theme === "ember" ? "#f97316" : "#6366f1",
+      })
+
+      if (createError || !network.id) {
+        console.error("[v0] Network creation error:", createError)
+        setError(createError || "Failed to create network")
+        return
+      }
+
+      console.log("[v0] Network created:", network.id)
+      console.log("[v0] Routing to network dashboard:", network.id)
+
+      // Route to the new network's dashboard
+      router.push(`/builder/network/${network.id}/dashboard`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error"
+      console.error("[v0] Network creation exception:", message)
+      setError(message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
       <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
@@ -317,12 +347,12 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
           </Link>
         </Button>
         <div className="flex gap-2">
-          <Button type="button" size="lg" variant="secondary" className="gap-2" onClick={handleAutofill}>
+          <Button type="button" size="lg" variant="secondary" className="gap-2" onClick={handleAutofill} disabled={submitting}>
             <Sparkles className="size-4" aria-hidden="true" />
             Autofill Network
           </Button>
           <Button type="submit" size="lg" className="gap-2" disabled={submitting}>
-            Continue to Forge Rules
+            {submitting ? "Creating Network..." : "Create Network"}
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
         </div>
