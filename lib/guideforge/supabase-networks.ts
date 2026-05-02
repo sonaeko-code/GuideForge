@@ -30,6 +30,60 @@ async function getCurrentProfileId(): Promise<string> {
 // ========== NETWORKS ==========
 
 /**
+ * Normalize a networkId (slug or mock ID) to a real Supabase UUID
+ * Examples:
+ *   "network_questline" -> lookup by slug "questline" -> returns UUID
+ *   "questline" -> lookup by slug -> returns UUID
+ *   "550e8400-e29b-41d4-a716-446655440000" -> already UUID, return as-is
+ */
+async function normalizeNetworkIdForSupabase(networkId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, cannot normalize networkId")
+    return null
+  }
+
+  console.log("[v0] Original networkId:", networkId)
+
+  // If it's already a UUID, return it
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidRegex.test(networkId)) {
+    console.log("[v0] networkId is already UUID:", networkId)
+    return networkId
+  }
+
+  // Try to normalize mock IDs like "network_questline" to "questline"
+  let slug = networkId
+  if (networkId.startsWith("network_")) {
+    slug = networkId.replace("network_", "")
+  }
+
+  console.log("[v0] Looking up network by slug:", slug)
+
+  try {
+    const { data, error } = await supabase
+      .from("networks")
+      .select("id")
+      .eq("slug", slug)
+      .single()
+
+    if (error) {
+      console.error("[v0] Network lookup error:", error.message)
+      return null
+    }
+
+    if (data?.id) {
+      console.log("[v0] Normalized network UUID:", data.id)
+      return data.id
+    }
+
+    return null
+  } catch (err) {
+    console.error("[v0] Network lookup exception:", err)
+    return null
+  }
+}
+
+/**
  * Create a new network
  */
 export async function createNetwork(
@@ -43,24 +97,16 @@ export async function createNetwork(
   try {
     const profileId = await getCurrentProfileId()
     
+    // Only include schema-supported fields. Do NOT include UI-only fields like branding, theme, etc.
     const networkData = {
       slug: draft.slug,
       name: draft.name,
       description: draft.description,
       type: draft.type,
       visibility: draft.visibility,
-      domain: draft.domain,
-      branding: {
-        primaryColor: draft.primaryColor,
-        accentColor: draft.primaryColor,
-        theme: draft.theme,
-      },
-      forgeRuleIds: [],
-      hubIds: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      profileId,
     }
+
+    console.log("[v0] Network save payload:", networkData)
 
     const { data, error } = await supabase
       .from("networks")
@@ -69,15 +115,15 @@ export async function createNetwork(
       .single()
 
     if (error) {
-      console.error("[v0] Supabase network creation error:", error.message)
+      console.error("[v0] Network save error:", error.message)
       return { network: {} as Network, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Network created in Supabase:", data.id)
+    console.log("[v0] Network saved:", data.id)
     return { network: data as Network, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
-    console.error("[v0] Network creation exception:", message)
+    console.error("[v0] Network save error:", message)
     return { network: {} as Network, source: "supabase", error: message }
   }
 }
@@ -153,11 +199,19 @@ export async function createHub(
   }
 
   try {
+    // Normalize networkId to real UUID
+    const normalizedNetworkId = await normalizeNetworkIdForSupabase(networkId)
+    if (!normalizedNetworkId) {
+      const error = `Could not find network with ID or slug: ${networkId}`
+      console.error("[v0] Hub save error:", error)
+      return { hub: {} as Hub, source: "supabase", error }
+    }
+
     const profileId = await getCurrentProfileId()
     
     // Only include schema-supported fields
     const hubData = {
-      network_id: networkId,
+      network_id: normalizedNetworkId,
       slug: hub.slug,
       name: hub.name,
       description: hub.description,
@@ -185,7 +239,7 @@ export async function createHub(
     const { data: network, error: networkError } = await supabase
       .from("networks")
       .select("hub_ids")
-      .eq("id", networkId)
+      .eq("id", normalizedNetworkId)
       .single()
 
     if (network && !networkError) {
@@ -193,7 +247,7 @@ export async function createHub(
       await supabase
         .from("networks")
         .update({ hub_ids: [...hubIds, data.id] })
-        .eq("id", networkId)
+        .eq("id", normalizedNetworkId)
     }
 
     return { hub: data as Hub, source: "supabase" }
