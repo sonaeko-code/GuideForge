@@ -781,7 +781,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </ul>
           </Card>
         )}
-        </div>
 
         {/* Forge Rules Applied */}
         <Card className={`p-4 ${rulesStale ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"}`}>
