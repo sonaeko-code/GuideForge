@@ -28,6 +28,7 @@ import type { GuideType, Hub } from "@/lib/guideforge/types"
 interface CreateCollectionFormProps {
   networkId: string
   hubs?: Hub[]
+  preselectedHubId?: string
 }
 
 function slugify(str: string): string {
@@ -52,11 +53,15 @@ const GUIDE_TYPES: { value: GuideType; label: string }[] = [
   { value: "news", label: "News" },
 ]
 
-export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionFormProps) {
+export function CreateCollectionForm({ networkId, hubs = [], preselectedHubId }: CreateCollectionFormProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [selectedHubId, setSelectedHubId] = useState<string>(
-    hubs.length > 0 ? hubs[0].id : ""
+    preselectedHubId && hubs.some((h) => h.id === preselectedHubId)
+      ? preselectedHubId
+      : hubs.length > 0
+        ? hubs[0].id
+        : ""
   )
   const [name, setName] = useState("Character Builds")
   const [description, setDescription] = useState("Build guides for different character classes and playstyles")

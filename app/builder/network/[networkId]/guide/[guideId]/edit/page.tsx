@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ChevronRight } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { GuideEditorLoader } from "@/components/guideforge/builder/guide-editor-loader"
 import { FIRE_WARDEN_GUIDE } from "@/lib/guideforge/mock-data"
@@ -17,15 +17,24 @@ export default async function GuideEditorPage({
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6 md:py-14">
-        {/* Back to Builder Home link */}
-        <div className="mb-6">
+        {/* Breadcrumb / Back navigation */}
+        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
           <Button asChild variant="ghost" size="sm">
-            <Link href="/builder">
+            <Link href={`/builder/network/${networkId}/dashboard`}>
               <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Back to Builder Home
+              Back to Network Dashboard
             </Link>
           </Button>
-        </div>
+          <span className="text-muted-foreground">·</span>
+          <Link
+            href="/builder/networks"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            All Networks
+          </Link>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span className="text-foreground font-semibold">Edit Guide</span>
+        </nav>
 
         <GuideEditorLoader
           networkId={networkId}

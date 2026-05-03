@@ -412,9 +412,8 @@ export async function createCollection(
   try {
     const profileId = await getCurrentProfileId()
     
-    // Only include schema-supported fields
+    // Only include schema-supported fields (collections belong to hubs, not networks)
     const collectionData = {
-      network_id: networkId,
       hub_id: hubId,
       slug: collection.slug,
       name: collection.name,
@@ -423,6 +422,7 @@ export async function createCollection(
       updated_at: new Date().toISOString(),
     }
 
+    console.log("[v0] Collection selected hub:", hubId)
     console.log("[v0] Collection save payload:", collectionData)
 
     const { data, error } = await supabase
@@ -436,7 +436,7 @@ export async function createCollection(
       return { collection: {} as Collection, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Collection saved:", data.id)
+    console.log("[v0] Collection save result:", data.id)
     return { collection: data as Collection, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"

@@ -1,3 +1,6 @@
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft, ChevronRight } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { CreateCollectionForm } from "@/components/guideforge/builder/create-collection-form"
 import { getHubsByNetworkId } from "@/lib/guideforge/supabase-networks"
@@ -5,12 +8,16 @@ import { getHubsByNetwork } from "@/lib/guideforge/mock-data"
 
 export default async function CreateCollectionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ networkId: string }>
+  searchParams: Promise<{ hub?: string }>
 }) {
   const { networkId } = await params
+  const { hub: preselectedHubId } = await searchParams
 
   console.log("[v0] Collection page networkId:", networkId)
+  console.log("[v0] Collection page preselected hub:", preselectedHubId)
 
   // Load hubs from Supabase, fallback to mock data
   let hubs = await getHubsByNetworkId(networkId)
@@ -25,6 +32,25 @@ export default async function CreateCollectionPage({
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-2xl px-4 py-10 md:px-6 md:py-14">
+        {/* Breadcrumb / Back navigation */}
+        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
+          <Button asChild variant="ghost" size="sm">
+            <Link href={`/builder/network/${networkId}/dashboard`}>
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Back to Network Dashboard
+            </Link>
+          </Button>
+          <span className="text-muted-foreground">·</span>
+          <Link
+            href="/builder/networks"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            All Networks
+          </Link>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span className="text-foreground font-semibold">Create Collection</span>
+        </nav>
+
         <div className="mb-10 space-y-4">
           <h1 className="text-4xl font-semibold tracking-tight text-foreground">
             Create a Collection
@@ -34,7 +60,7 @@ export default async function CreateCollectionPage({
           </p>
         </div>
 
-        <CreateCollectionForm networkId={networkId} hubs={hubs} />
+        <CreateCollectionForm networkId={networkId} hubs={hubs} preselectedHubId={preselectedHubId} />
       </div>
     </main>
   )

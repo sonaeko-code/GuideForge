@@ -11,6 +11,7 @@ import {
   Flame,
   ArrowLeft,
   AlertCircle,
+  Sparkles,
 } from "lucide-react"
 import type { Network, Hub, Collection, Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
@@ -87,9 +88,9 @@ export default async function NetworkDashboardPage({
                 </p>
               </div>
               <Button asChild variant="outline" className="mt-4">
-                <Link href="/builder">
+                <Link href="/builder/networks">
                   <ArrowLeft className="size-4 mr-2" aria-hidden="true" />
-                  Back to Builder
+                  All Networks
                 </Link>
               </Button>
             </div>
@@ -122,7 +123,9 @@ export default async function NetworkDashboardPage({
     let collectionLoadError = ""
     try {
       console.log("[v0] dashboard loading collections")
-      for (const hub of hubs) {
+      const collectionSourceHubs = Array.isArray(hubs) ? hubs : []
+      console.log("[v0] Dashboard collection source hubs:", collectionSourceHubs.length)
+      for (const hub of collectionSourceHubs) {
         try {
           const hubCollections = await getCollectionsByHubId(hub.id)
           if (hubCollections && hubCollections.length > 0) {
@@ -141,7 +144,7 @@ export default async function NetworkDashboardPage({
           }
         }
       }
-      console.log("[v0] dashboard collections result:", collections?.length || 0)
+      console.log("[v0] Dashboard collections loaded through hubs:", collections?.length || 0)
       if (!collections) collections = []
     } catch (err) {
       console.error("[v0] dashboard loading collections error:", err)
@@ -243,15 +246,17 @@ export default async function NetworkDashboardPage({
             </div>
           )}
 
-          {/* Back to Builder Home link */}
-          <div className="mb-6">
+          {/* Breadcrumb / Back navigation */}
+          <nav className="mb-6 flex items-center gap-3 text-sm" aria-label="Breadcrumb">
             <Button asChild variant="ghost" size="sm">
-              <Link href="/builder">
+              <Link href="/builder/networks">
                 <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                Back to Builder Home
+                All Networks
               </Link>
             </Button>
-          </div>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-medium text-foreground">{network.name}</span>
+          </nav>
 
           {/* Network Header */}
           <div className="mb-10 flex flex-col gap-6">
@@ -319,6 +324,34 @@ export default async function NetworkDashboardPage({
               </div>
             </Card>
           </div>
+        </div>
+
+        {/* Guide Creation Actions */}
+        <div className="mb-6 flex gap-3">
+          {safeHubs.length > 0 && safeCollections.length > 0 ? (
+            <>
+              <Button asChild>
+                <Link href={`/builder/network/${networkId}/generate`}>
+                  <Sparkles className="size-4 mr-2" aria-hidden="true" />
+                  Generate Guide
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/builder/network/${networkId}/guide/new`}>
+                  <Plus className="size-4 mr-2" aria-hidden="true" />
+                  Create Manual Guide
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <div className="flex-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {safeHubs.length === 0
+                  ? "Create a hub and collection to start generating guides."
+                  : "Create a collection to start generating guides."}
+              </p>
+            </div>
+          )}
         </div>
 
           {/* Main tabs */}
@@ -401,23 +434,60 @@ export default async function NetworkDashboardPage({
               </div>
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {safeHubs.map((hub: Hub) => (
-                <Card key={hub.id} className="border-border/50 px-4 py-4">
-                  <div className="space-y-2">
-                    <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                      <BookMarked className="size-4 text-primary" aria-hidden="true" />
-                      {hub.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {hub.description}
-                    </p>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {hub.collectionIds?.length || 0} collection
-                      {hub.collectionIds?.length !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </Card>
-              ))}
+              {safeHubs.map((hub: Hub) => {
+                // Resolve collections that belong to this hub
+                const hubCollectionCount = safeCollections.filter(
+                  (c: Collection) => c.hubId === hub.id
+                ).length
+                const hasHubCollections = hubCollectionCount > 0
+
+                return (
+                  <Card key={hub.id} className="border-border/50 px-4 py-4 flex flex-col">
+                    <div className="space-y-2 flex-1">
+                      <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                        <BookMarked className="size-4 text-primary" aria-hidden="true" />
+                        {hub.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {hub.description}
+                      </p>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {hubCollectionCount} collection
+                        {hubCollectionCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" asChild variant="outline">
+                        <Link
+                          href={`/builder/network/${networkId}/collection/new?hub=${hub.id}`}
+                        >
+                          <Plus className="size-3 mr-1" aria-hidden="true" />
+                          Create Collection
+                        </Link>
+                      </Button>
+                      {hasHubCollections && (
+                        <>
+                          <Button size="sm" asChild variant="ghost">
+                            <Link
+                              href={`/builder/network/${networkId}/dashboard?tab=collections&hub=${hub.id}`}
+                            >
+                              View Collections
+                            </Link>
+                          </Button>
+                          <Button size="sm" asChild>
+                            <Link
+                              href={`/builder/network/${networkId}/generate?hub=${hub.id}`}
+                            >
+                              <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                              Generate Guide
+                            </Link>
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
             </div>
             )}
           </TabsContent>
@@ -468,8 +538,8 @@ export default async function NetworkDashboardPage({
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {safeCollections.map((col: Collection) => (
-                <Card key={col.id} className="border-border/50 px-4 py-4">
-                  <div className="space-y-2">
+                <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
+                  <div className="space-y-2 flex-1">
                     <h3 className="flex items-center gap-2 font-semibold text-foreground">
                       <FolderOpen className="size-4 text-primary" aria-hidden="true" />
                       {col.name}
@@ -481,6 +551,31 @@ export default async function NetworkDashboardPage({
                       {col.guideIds?.length || 0} guide
                       {col.guideIds?.length !== 1 ? "s" : ""}
                     </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" asChild>
+                      <Link
+                        href={`/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`}
+                      >
+                        <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                        Generate Guide
+                      </Link>
+                    </Button>
+                    <Button size="sm" asChild variant="outline">
+                      <Link
+                        href={`/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`}
+                      >
+                        <Plus className="size-3 mr-1" aria-hidden="true" />
+                        Create Manual Guide
+                      </Link>
+                    </Button>
+                    <Button size="sm" asChild variant="ghost">
+                      <Link
+                        href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}
+                      >
+                        View Guides
+                      </Link>
+                    </Button>
                   </div>
                 </Card>
               ))}
@@ -637,9 +732,9 @@ export default async function NetworkDashboardPage({
                   {fatalErr instanceof Error ? fatalErr.message : String(fatalErr)}
                 </p>
                 <Button asChild variant="outline" className="mt-4">
-                  <Link href="/builder">
+                  <Link href="/builder/networks">
                     <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                    Back to Builder
+                    All Networks
                   </Link>
                 </Button>
               </div>

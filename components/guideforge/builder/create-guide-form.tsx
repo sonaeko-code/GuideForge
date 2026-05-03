@@ -29,6 +29,8 @@ interface CreateGuideFormProps {
   networkId: string
   hubs?: any[]
   collectionsMap?: { [hubId: string]: any[] }
+  preselectedHubId?: string
+  preselectedCollectionId?: string
 }
 
 const GUIDE_TYPES: GuideType[] = [
@@ -44,11 +46,13 @@ const DIFFICULTY_LEVELS: DifficultyLevel[] = ["beginner", "intermediate", "advan
 
 const AUDIENCES = ["New Players", "Intermediate", "Advanced", "Hardcore", "PvP", "PvE"]
 
-// Fallback IDs used when no hubs/collections are provided from Supabase
-const FALLBACK_HUB_ID = "hub_emberfall"
-const FALLBACK_COLLECTION_ID = "collection_character_builds"
-
-export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: CreateGuideFormProps) {
+export function CreateGuideForm({
+  networkId,
+  hubs = [],
+  collectionsMap = {},
+  preselectedHubId,
+  preselectedCollectionId,
+}: CreateGuideFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -62,36 +66,68 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
     "A forgiving sustain-mage build for new Emberfall players. Learn the fights without getting punished."
   )
 
-  // Hub and collection selection
-  const [selectedHubId, setSelectedHubId] = useState<string>(
-    hubs.length > 0 ? hubs[0].id : FALLBACK_HUB_ID
-  )
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
-    hubs.length > 0 && collectionsMap[hubs[0].id]?.length > 0
-      ? collectionsMap[hubs[0].id][0].id
-      : FALLBACK_COLLECTION_ID
-  )
+  // Determine initial hub: preselected (if valid) > first hub > empty
+  const initialHubId = (() => {
+    if (preselectedHubId && hubs.some((h) => h.id === preselectedHubId)) {
+      return preselectedHubId
+    }
+    return hubs.length > 0 ? hubs[0].id : ""
+  })()
+
+  // Determine initial collection: preselected (if valid for hub) > single collection > first > empty
+  const initialCollectionId = (() => {
+    const hubCollections = collectionsMap[initialHubId] || []
+    if (
+      preselectedCollectionId &&
+      hubCollections.some((c) => c.id === preselectedCollectionId)
+    ) {
+      return preselectedCollectionId
+    }
+    return hubCollections.length > 0 ? hubCollections[0].id : ""
+  })()
+
+  const [selectedHubId, setSelectedHubId] = useState<string>(initialHubId)
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(initialCollectionId)
 
   // Update available collections when hub changes
   const availableCollections = collectionsMap[selectedHubId] || []
+  const hasPrereqs = hubs.length > 0 && availableCollections.length > 0
+  const canSubmit = hasPrereqs && !!selectedHubId && !!selectedCollectionId && !!title.trim()
+
+  const validateBeforeSave = (): string | null => {
+    if (!title.trim()) return "Please enter a guide title."
+    if (!selectedHubId) return "Please select a hub."
+    if (!selectedCollectionId) return "Please select a collection."
+    // Verify collection belongs to selected hub (and therefore to current network)
+    const hubCollections = collectionsMap[selectedHubId] || []
+    if (!hubCollections.some((c) => c.id === selectedCollectionId)) {
+      return "Selected collection does not belong to the chosen hub. Please reselect."
+    }
+    return null
+  }
 
   const handleGenerateMock = async () => {
-    if (!title.trim()) {
-      alert("Please enter a guide title")
+    const validationError = validateBeforeSave()
+    if (validationError) {
+      setSaveError(validationError)
       return
     }
 
     setIsLoading(true)
     setSaveError(null)
     try {
-      console.log("[v0] CreateGuideForm: Generating mock guide with title:", title)
+      console.log("[v0] CreateGuideForm generate target:", {
+        networkId,
+        hubId: selectedHubId,
+        collectionId: selectedCollectionId,
+      })
 
       const response = await generateMockResponse({
         prompt: title,
         guideType,
         preferredDifficulty: difficulty,
-        targetHubId: selectedHubId || FALLBACK_HUB_ID,
-        targetCollectionId: selectedCollectionId || FALLBACK_COLLECTION_ID,
+        targetHubId: selectedHubId,
+        targetCollectionId: selectedCollectionId,
       })
 
       if (response.guide) {
@@ -101,14 +137,14 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
           sectionsCount: response.guide.sections?.length,
         })
 
-        const { id, source, verified, error } = await createAndSaveGuideDraft({
+        const { id, verified, error } = await createAndSaveGuideDraft({
           title: response.guide.title || title,
           summary: response.guide.summary || description,
           guideType,
           difficulty,
           networkId,
-          hubId: selectedHubId || FALLBACK_HUB_ID,
-          collectionId: selectedCollectionId || FALLBACK_COLLECTION_ID,
+          hubId: selectedHubId,
+          collectionId: selectedCollectionId,
           requirements: response.guide.requirements,
           warnings: response.guide.warnings,
           steps: response.guide.sections?.map((section) => ({
@@ -137,30 +173,30 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
   }
 
   const handleContinueToEditor = async () => {
-    if (!title.trim()) {
-      alert("Please enter a guide title")
+    const validationError = validateBeforeSave()
+    if (validationError) {
+      setSaveError(validationError)
       return
     }
 
     setIsLoading(true)
     setSaveError(null)
     try {
-      console.log("[v0] CreateGuideForm: Creating manual draft...", {
+      console.log("[v0] CreateGuideForm manual create target:", {
+        networkId,
+        hubId: selectedHubId,
+        collectionId: selectedCollectionId,
         title,
-        summary: description?.substring(0, 60),
-        difficulty,
-        guideType,
-        requirements,
       })
 
-      const { id, source, verified, error } = await createAndSaveGuideDraft({
+      const { id, verified, error } = await createAndSaveGuideDraft({
         title,
         summary: description,
         guideType,
         difficulty,
         networkId,
-        hubId: selectedHubId || FALLBACK_HUB_ID,
-        collectionId: selectedCollectionId || FALLBACK_COLLECTION_ID,
+        hubId: selectedHubId,
+        collectionId: selectedCollectionId,
         requirements: requirements
           ? requirements.split(",").map((r) => r.trim()).filter(Boolean)
           : [],
@@ -362,14 +398,18 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
         </div>
       )}
 
-      <div className="flex gap-3 pt-4">
+      <div className="flex flex-wrap gap-3 pt-4">
         <Button asChild variant="outline" disabled={isLoading}>
           <Link href={`/builder/network/${networkId}/dashboard`}>
             <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
             Back
           </Link>
         </Button>
-        <Button onClick={handleGenerateMock} variant="secondary" disabled={isLoading}>
+        <Button
+          onClick={handleGenerateMock}
+          variant="secondary"
+          disabled={isLoading || !canSubmit}
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
@@ -382,7 +422,7 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
             </>
           )}
         </Button>
-        <Button onClick={handleContinueToEditor} disabled={isLoading}>
+        <Button onClick={handleContinueToEditor} disabled={isLoading || !canSubmit}>
           {isLoading ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
@@ -393,6 +433,11 @@ export function CreateGuideForm({ networkId, hubs = [], collectionsMap = {} }: C
           )}
         </Button>
       </div>
+      {!canSubmit && hasPrereqs && (
+        <p className="text-xs text-muted-foreground">
+          Enter a title and select a hub and collection to enable creation.
+        </p>
+      )}
     </div>
   )
 }

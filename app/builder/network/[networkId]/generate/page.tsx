@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Flame, ChevronRight, Copy, Check, ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -30,22 +30,26 @@ import {
   getCollectionsByHub,
 } from "@/lib/guideforge/mock-data"
 
-// Fallback IDs for QuestLine network (used only when Supabase hubs/collections not available)
-const FALLBACK_HUB_ID = "hub_emberfall"
-const FALLBACK_COLLECTION_ID = "collection_character_builds"
-
 export default function GeneratorPage({
   params,
 }: {
   params: Promise<{ networkId: string }>
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedHubFromQuery = searchParams?.get("hub") ?? ""
+  const preselectedCollectionFromQuery = searchParams?.get("collection") ?? ""
+
   const [networkId, setNetworkId] = useState<string>("")
   const [session, setSession] = useState<GenerationSession | null>(null)
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
+    preselectedCollectionFromQuery
+  )
   const [formState, setFormState] = useState<GenerationRequest>({
     prompt: "",
     guideType: "character-build",
     preferredDifficulty: "intermediate",
+    targetHubId: preselectedHubFromQuery || undefined,
   })
   const [isSending, setIsSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -64,6 +68,37 @@ export default function GeneratorPage({
   
   // Get all collections from all hubs for pre-check
   const allCollections = hubs.flatMap((hub) => getCollectionsByHub(hub.id))
+
+  // Get collections scoped to selected hub
+  const collectionsForHub = formState.targetHubId
+    ? getCollectionsByHub(formState.targetHubId)
+    : []
+
+  // Auto-preselect hub if there's only one
+  useEffect(() => {
+    if (hubs.length === 1 && !formState.targetHubId) {
+      console.log("[v0] Auto-preselecting single hub:", hubs[0].id)
+      setFormState((prev) => ({ ...prev, targetHubId: hubs[0].id }))
+    }
+  }, [hubs, formState.targetHubId])
+
+  // Auto-preselect collection if there's only one in the selected hub
+  useEffect(() => {
+    if (collectionsForHub.length === 1 && !selectedCollectionId) {
+      console.log("[v0] Auto-preselecting single collection:", collectionsForHub[0].id)
+      setSelectedCollectionId(collectionsForHub[0].id)
+    }
+  }, [collectionsForHub, selectedCollectionId])
+
+  // Reset collection selection when hub changes
+  useEffect(() => {
+    if (formState.targetHubId && collectionsForHub.length > 0) {
+      const stillValid = collectionsForHub.some((c) => c.id === selectedCollectionId)
+      if (!stillValid) {
+        setSelectedCollectionId(collectionsForHub.length === 1 ? collectionsForHub[0].id : "")
+      }
+    }
+  }, [formState.targetHubId, collectionsForHub, selectedCollectionId])
 
   const handleGenerateMock = async () => {
     if (!formState.prompt.trim()) {
@@ -98,30 +133,44 @@ export default function GeneratorPage({
       return
     }
 
+    if (!formState.targetHubId) {
+      setSendError("Please select a hub before saving the guide.")
+      return
+    }
+
+    if (!selectedCollectionId) {
+      setSendError("Please select a collection before saving the guide.")
+      return
+    }
+
+    // Validate collection belongs to selected hub (and therefore to the current network)
+    const validCollection = collectionsForHub.some((c) => c.id === selectedCollectionId)
+    if (!validCollection) {
+      console.error("[v0] Collection does not belong to selected hub:", selectedCollectionId)
+      setSendError("Selected collection does not belong to the chosen hub. Please reselect.")
+      return
+    }
+
     setIsSending(true)
     setSendError(null)
     try {
       console.log("[v0] handleSendToEditor started")
       const generatedGuide = session.response.guide
 
-      console.log("[v0] Generated guide:", {
-        title: generatedGuide.title,
-        summary: generatedGuide.summary,
-        sections: generatedGuide.sections?.length || 0,
-        requirements: generatedGuide.requirements,
-        difficulty: generatedGuide.difficulty,
+      console.log("[v0] Generated guide save target:", {
+        networkId,
+        hubId: formState.targetHubId,
+        collectionId: selectedCollectionId,
       })
 
-      // Use the current network from the route, not hardcoded QuestLine
-      // Fall back to mock hub/collection IDs when not using Supabase hubs
-      const { id, source, verified, error } = await createAndSaveGuideDraft({
+      const { id, verified, error } = await createAndSaveGuideDraft({
         title: generatedGuide.title,
         summary: generatedGuide.summary,
         guideType: formState.guideType,
         difficulty: generatedGuide.difficulty,
         networkId: networkId,
-        hubId: hubs.length > 0 ? hubs[0].id : FALLBACK_HUB_ID,
-        collectionId: FALLBACK_COLLECTION_ID,
+        hubId: formState.targetHubId,
+        collectionId: selectedCollectionId,
         requirements: generatedGuide.requirements,
         warnings: generatedGuide.warnings,
         steps: generatedGuide.sections?.map((section) => ({
@@ -164,22 +213,24 @@ export default function GeneratorPage({
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-        {/* Back to Builder Home link */}
-        <div className="mb-6">
+        {/* Breadcrumb / Back navigation */}
+        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
           <Button asChild variant="ghost" size="sm">
-            <Link href="/builder">
+            <Link href={`/builder/network/${networkId}/dashboard`}>
               <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Back to Builder Home
+              Back to Network Dashboard
             </Link>
           </Button>
-        </div>
-
-        {/* Breadcrumb */}
-        <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Builder</span>
-          <ChevronRight className="size-4" />
-          <span>{network?.name || "Network"}</span>
-          <ChevronRight className="size-4" />
+          <span className="text-muted-foreground">·</span>
+          <Link
+            href="/builder/networks"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            All Networks
+          </Link>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span className="text-muted-foreground">{network?.name || "Network"}</span>
+          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
           <span className="text-foreground font-semibold">Generate Guide</span>
         </nav>
 
@@ -315,7 +366,42 @@ export default function GeneratorPage({
                   <label className="text-sm font-semibold mb-2 block">
                     Collection
                   </label>
-                  <SelectCollectionForHub hubId={formState.targetHubId} />
+                  {collectionsForHub.length === 0 ? (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300">
+                      <p className="mb-2">
+                        <strong>No collections in this hub.</strong> Create a collection first.
+                      </p>
+                      <Button asChild size="sm" variant="outline">
+                        <Link
+                          href={`/builder/network/${networkId}/collection/new?hub=${formState.targetHubId}`}
+                        >
+                          Create Collection
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Select
+                      value={selectedCollectionId}
+                      onValueChange={(value) => setSelectedCollectionId(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            collectionsForHub.length === 1
+                              ? collectionsForHub[0].name
+                              : "Select a collection"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {collectionsForHub.map((col) => (
+                          <SelectItem key={col.id} value={col.id}>
+                            {col.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               )}
 
@@ -345,7 +431,11 @@ export default function GeneratorPage({
               {/* Generate Button */}
               <Button
                 onClick={handleGenerateMock}
-                disabled={session?.status === "generating"}
+                disabled={
+                  session?.status === "generating" ||
+                  !formState.targetHubId ||
+                  !selectedCollectionId
+                }
                 className="w-full"
               >
                 {session?.status === "generating" ? (
@@ -360,6 +450,11 @@ export default function GeneratorPage({
                   </>
                 )}
               </Button>
+              {(!formState.targetHubId || !selectedCollectionId) && (
+                <p className="text-xs text-muted-foreground">
+                  Select a hub and collection above to enable generation.
+                </p>
+              )}
             </Card>
           </div>
           ) : null}
@@ -493,24 +588,4 @@ export default function GeneratorPage({
   )
 }
 
-/**
- * Helper component to select a collection within a hub.
- */
-function SelectCollectionForHub({ hubId }: { hubId: string }) {
-  const collections = getCollectionsByHub(hubId)
 
-  return (
-    <Select>
-      <SelectTrigger>
-        <SelectValue placeholder="Select a collection" />
-      </SelectTrigger>
-      <SelectContent>
-        {collections.map((col) => (
-          <SelectItem key={col.id} value={col.id}>
-            {col.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
