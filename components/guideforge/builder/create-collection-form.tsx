@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 import { createCollection } from "@/lib/guideforge/supabase-networks"
 import { SaveStatus } from "@/components/guideforge/builder/save-status"
 import type { GuideType, Hub } from "@/lib/guideforge/types"
@@ -53,6 +54,7 @@ const GUIDE_TYPES: { value: GuideType; label: string }[] = [
 
 export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionFormProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [selectedHubId, setSelectedHubId] = useState<string>(
     hubs.length > 0 ? hubs[0].id : ""
   )
@@ -102,6 +104,14 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
 
       console.log("[v0] Collection save result:", collection.id)
       setSaveStatus("saved")
+      
+      // Show success toast
+      toast({
+        title: "Collection created",
+        description: `${name} has been created successfully.`,
+        duration: 3000,
+      })
+      
       router.push(`/builder/network/${networkId}/dashboard?tab=collections`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
