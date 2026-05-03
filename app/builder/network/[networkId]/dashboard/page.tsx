@@ -426,7 +426,7 @@ export default async function NetworkDashboardPage({
                 <Card key={hub.id} className="border-border/50 px-4 py-4">
                   <div className="space-y-2">
                     <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                      <Library className="size-4 text-primary" aria-hidden="true" />
+                      <BookMarked className="size-4 text-primary" aria-hidden="true" />
                       {hub.name}
                     </h3>
                     <p className="text-sm text-muted-foreground">
