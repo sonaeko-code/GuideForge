@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, ChevronRight } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { CreateCollectionForm } from "@/components/guideforge/builder/create-collection-form"
-import { getHubsByNetworkId } from "@/lib/guideforge/supabase-networks"
-import { getHubsByNetwork } from "@/lib/guideforge/mock-data"
+import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
 
 export default async function CreateCollectionPage({
   params,
@@ -16,16 +15,11 @@ export default async function CreateCollectionPage({
   const { networkId } = await params
   const { hub: preselectedHubId } = await searchParams
 
-  console.log("[v0] Collection page networkId:", networkId)
-  console.log("[v0] Collection page preselected hub:", preselectedHubId)
-
-  // Load hubs from Supabase, fallback to mock data
-  let hubs = await getHubsByNetworkId(networkId)
-  if (hubs.length === 0) {
-    hubs = getHubsByNetwork(networkId)
-  }
-
-  console.log("[v0] Collection page hubs loaded:", hubs.length)
+  // Use the shared loader — same as dashboard, generate, and guide/new pages.
+  // This correctly resolves UUIDs, slugs, and mock IDs and never falls back
+  // to mock hub data for real Supabase networks.
+  const ctx = await loadNetworkBuilderContext(networkId)
+  const hubs = ctx.hubs
 
   return (
     <main className="min-h-screen bg-background">
