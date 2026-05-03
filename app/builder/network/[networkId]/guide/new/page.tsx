@@ -4,8 +4,7 @@ import { Card } from "@/components/ui/card"
 import { ArrowLeft, ChevronRight, AlertCircle } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { CreateGuideForm } from "@/components/guideforge/builder/create-guide-form"
-import { getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
-import { getNetworkById, getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
+import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
 
 export default async function CreateGuidePage({
   params,
@@ -14,60 +13,49 @@ export default async function CreateGuidePage({
   params: Promise<{ networkId: string }>
   searchParams: Promise<{ hub?: string; collection?: string }>
 }) {
-  let { networkId } = await params
-  const { hub: preselectedHub, collection: preselectedCollection } = await searchParams
+  const { networkId } = await params
+  const { hub: hubParamRaw, collection: collectionParamRaw } = await searchParams
 
   console.log("[v0] Manual guide page route networkId:", networkId)
-
-  // Task 4: Resolve network ID to real network UUID
-  // Mock data uses "network_questline", route might pass slug or other variant
-  let resolvedNetwork = getNetworkById(networkId)
-  if (!resolvedNetwork) {
-    const withPrefix = getNetworkById(`network_${networkId}`)
-    if (withPrefix) {
-      resolvedNetwork = withPrefix
-      networkId = withPrefix.id
-    } else {
-      const firstNetwork = getNetworkById("network_questline")
-      if (firstNetwork) {
-        resolvedNetwork = firstNetwork
-        networkId = firstNetwork.id
-      }
-    }
-  }
-
-  console.log("[v0] Manual guide page resolved network:", networkId, resolvedNetwork?.name)
   console.log("[v0] Manual guide page query params:", {
-    preselectedHub,
-    preselectedCollection,
+    hub: hubParamRaw,
+    collection: collectionParamRaw,
   })
 
-  // Load hubs from Supabase, fallback to mock data
-  let hubs = await getHubsByNetworkId(networkId)
-  if (hubs.length === 0) {
-    hubs = getHubsByNetwork(networkId)
+  const ctx = await loadNetworkBuilderContext(networkId)
+  console.log("[v0] Manual guide page context summary:", {
+    networkId: ctx.networkId,
+    networkName: ctx.network?.name,
+    hubs: ctx.hubs.length,
+    collections: ctx.collections.length,
+    source: ctx.source,
+    errors: ctx.errors,
+  })
+
+  const sanitize = (v?: string) => {
+    if (!v) return undefined
+    const t = String(v).trim()
+    if (!t || t === "undefined" || t === "null") return undefined
+    return t
   }
+  const hubParam = sanitize(hubParamRaw)
+  const collectionParam = sanitize(collectionParamRaw)
 
-  console.log("[v0] Manual guide page raw hubs:", hubs.length, hubs.map((h) => ({ id: h.id, name: h.name })))
-
-  // Load collections for each hub, preferring Supabase
-  const collectionsMap: { [hubId: string]: any[] } = {}
-  let totalCollections = 0
-  for (const hub of hubs) {
-    const hubCollections = await getCollectionsByHubId(hub.id)
-    if (hubCollections.length === 0) {
-      collectionsMap[hub.id] = getCollectionsByHub(hub.id)
-    } else {
-      collectionsMap[hub.id] = hubCollections
+  // Validate hub/collection params against the loaded context
+  const validHub =
+    hubParam && ctx.hubs.some((h) => h.id === hubParam) ? hubParam : undefined
+  const validCollection = (() => {
+    if (!collectionParam) return undefined
+    if (validHub) {
+      const list = ctx.collectionsByHub[validHub] || []
+      return list.some((c) => c.id === collectionParam)
+        ? collectionParam
+        : undefined
     }
-    totalCollections += collectionsMap[hub.id].length
-  }
-
-  console.log("[v0] Manual guide page hubs/collections:", {
-    hubs: hubs.length,
-    totalCollections,
-    collectionsByHub: Object.entries(collectionsMap).map(([hubId, cols]) => ({ hubId, count: cols.length })),
-  })
+    return ctx.collections.some((c) => c.id === collectionParam)
+      ? collectionParam
+      : undefined
+  })()
 
   const breadcrumb = (
     <nav
@@ -75,7 +63,7 @@ export default async function CreateGuidePage({
       aria-label="Breadcrumb"
     >
       <Button asChild variant="ghost" size="sm">
-        <Link href={`/builder/network/${networkId}/dashboard`}>
+        <Link href={`/builder/network/${ctx.networkId}/dashboard`}>
           <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
           Back to Network Dashboard
         </Link>
@@ -92,8 +80,39 @@ export default async function CreateGuidePage({
     </nav>
   )
 
-  // Prerequisite: at least one hub
-  if (hubs.length === 0) {
+  if (!ctx.network) {
+    return (
+      <main className="min-h-screen bg-background">
+        <SiteHeader hideCta />
+        <div className="mx-auto w-full max-w-2xl px-4 py-10 md:px-6 md:py-14">
+          {breadcrumb}
+          <Card className="border-red-500/30 bg-red-500/5 p-6">
+            <div className="flex gap-3">
+              <AlertCircle
+                className="size-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <div className="flex-1">
+                <h2 className="font-semibold text-foreground">
+                  Network not found
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Could not resolve a network for{" "}
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                    {networkId}
+                  </code>
+                  .
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </main>
+    )
+  }
+
+  // Pre-check: at least one hub
+  if (ctx.hubs.length === 0) {
     return (
       <main className="min-h-screen bg-background">
         <SiteHeader hideCta />
@@ -107,14 +126,21 @@ export default async function CreateGuidePage({
               />
               <div className="flex-1 space-y-3">
                 <div>
-                  <h2 className="font-semibold text-foreground">Create a hub first.</h2>
+                  <h2 className="font-semibold text-foreground">
+                    Create a hub first.
+                  </h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Guides live inside collections, which live inside hubs. You need at least one hub before
-                    creating a guide in this network.
+                    Guides live inside collections, which live inside hubs. You
+                    need at least one hub before creating a guide in this
+                    network.
                   </p>
                 </div>
                 <Button asChild size="sm">
-                  <Link href={`/builder/network/${networkId}/hub/new`}>Create Hub</Link>
+                  <Link
+                    href={`/builder/network/${ctx.networkId}/hub/new`}
+                  >
+                    Create Hub
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -124,8 +150,8 @@ export default async function CreateGuidePage({
     )
   }
 
-  // Prerequisite: at least one collection across hubs
-  if (totalCollections === 0) {
+  // Pre-check: at least one collection across hubs
+  if (ctx.collections.length === 0) {
     return (
       <main className="min-h-screen bg-background">
         <SiteHeader hideCta />
@@ -139,15 +165,18 @@ export default async function CreateGuidePage({
               />
               <div className="flex-1 space-y-3">
                 <div>
-                  <h2 className="font-semibold text-foreground">Create a collection first.</h2>
+                  <h2 className="font-semibold text-foreground">
+                    Create a collection first.
+                  </h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    You have hubs in this network, but no collections yet. Guides need a collection to live in.
+                    You have hubs in this network, but no collections yet.
+                    Guides need a collection to live in.
                   </p>
                 </div>
                 <Button asChild size="sm">
                   <Link
-                    href={`/builder/network/${networkId}/collection/new${
-                      preselectedHub ? `?hub=${preselectedHub}` : ""
+                    href={`/builder/network/${ctx.networkId}/collection/new${
+                      validHub ? `?hub=${validHub}` : ""
                     }`}
                   >
                     Create Collection
@@ -173,16 +202,17 @@ export default async function CreateGuidePage({
             Create a Manual Guide
           </h1>
           <p className="text-lg text-muted-foreground">
-            Start with a guide template. Forge Rules are applied automatically based on type.
+            Start with a guide template. Forge Rules are applied automatically
+            based on type.
           </p>
         </div>
 
         <CreateGuideForm
-          networkId={networkId}
-          hubs={hubs}
-          collectionsMap={collectionsMap}
-          preselectedHubId={preselectedHub}
-          preselectedCollectionId={preselectedCollection}
+          networkId={ctx.networkId}
+          hubs={ctx.hubs}
+          collectionsMap={ctx.collectionsByHub}
+          preselectedHubId={validHub}
+          preselectedCollectionId={validCollection}
         />
       </div>
     </main>

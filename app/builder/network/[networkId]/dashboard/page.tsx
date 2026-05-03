@@ -13,7 +13,7 @@ import {
   AlertCircle,
   Sparkles,
 } from "lucide-react"
-import type { Network, Hub, Collection, Guide } from "@/lib/guideforge/types"
+import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -27,21 +27,15 @@ import {
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
+import { getGuidesByCollection } from "@/lib/guideforge/mock-data"
 import {
-  getNetworkById as getMockNetworkById,
-  getHubsByNetwork,
-  getCollectionsByHub,
-  getGuidesByCollection,
-} from "@/lib/guideforge/mock-data"
-import {
-  getHubsByNetworkId,
-  getCollectionsByHubId,
-  resolveNetworkParam,
+  loadNetworkBuilderContext,
   getGuidesByNetworkId,
   getDraftGuidesByNetworkId,
   getPublishedGuidesByNetworkId,
+  type NormalizedHub,
+  type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
-import { cn } from "@/lib/utils"
 
 export default async function NetworkDashboardPage({
   params,
@@ -60,20 +54,16 @@ export default async function NetworkDashboardPage({
 
   // Wrap entire component in try/catch to prevent crashes
   try {
-    // Step 1: Resolve network
-    let network: Network | null = null
-    try {
-      network = await resolveNetworkParam(networkId)
-      console.log("[v0] dashboard network result (Supabase):", network?.id, network?.name)
-    } catch (err) {
-      console.error("[v0] dashboard network load error:", err)
-      // Try mock fallback for QuestLine
-      const isQuestLineRoute = networkId === "questline" || networkId === "network_questline"
-      if (isQuestLineRoute) {
-        network = getMockNetworkById("network_questline")
-        console.log("[v0] dashboard network result (mock fallback):", network?.id, network?.name)
-      }
-    }
+    // Step 1+2+3: Load unified builder context (network + hubs + collections)
+    const ctx = await loadNetworkBuilderContext(networkId)
+    const network = ctx.network
+    const hubs: NormalizedHub[] = ctx.hubs
+    const collections: NormalizedCollection[] = ctx.collections
+    const hubLoadError = ctx.errors.find((e) => e.startsWith("hubs")) || ""
+    const collectionLoadError =
+      ctx.errors.find((e) => e.startsWith("collections")) ||
+      ctx.errors.find((e) => e.startsWith("mock collections")) ||
+      ""
 
     if (!network) {
       return (
@@ -98,59 +88,6 @@ export default async function NetworkDashboardPage({
           </div>
         </main>
       )
-    }
-
-    // Step 2: Load hubs
-    let hubs: Hub[] = []
-    let hubLoadError = ""
-    try {
-      console.log("[v0] dashboard loading hubs")
-      hubs = await getHubsByNetworkId(network.id)
-      console.log("[v0] dashboard hubs result (Supabase):", hubs?.length || 0)
-      
-      if (!hubs || hubs.length === 0) {
-        hubs = getHubsByNetwork(network.id)
-        console.log("[v0] dashboard hubs result (fallback mock):", hubs?.length || 0)
-      }
-      if (!hubs) hubs = []
-    } catch (err) {
-      console.error("[v0] dashboard loading hubs error:", err)
-      hubLoadError = err instanceof Error ? err.message : String(err)
-      hubs = getHubsByNetwork(network.id) || []
-    }
-
-    // Step 3: Load collections
-    let collections: Collection[] = []
-    let collectionLoadError = ""
-    try {
-      console.log("[v0] dashboard loading collections")
-      const collectionSourceHubs = Array.isArray(hubs) ? hubs : []
-      console.log("[v0] Dashboard collection source hubs:", collectionSourceHubs.length)
-      for (const hub of collectionSourceHubs) {
-        try {
-          const hubCollections = await getCollectionsByHubId(hub.id)
-          if (hubCollections && hubCollections.length > 0) {
-            collections = collections.concat(hubCollections)
-          } else {
-            const mockColls = getCollectionsByHub(hub.id)
-            if (mockColls && mockColls.length > 0) {
-              collections = collections.concat(mockColls)
-            }
-          }
-        } catch (hubErr) {
-          console.error("[v0] dashboard loading collections for hub error:", hubErr)
-          const mockColls = getCollectionsByHub(hub.id)
-          if (mockColls && mockColls.length > 0) {
-            collections = collections.concat(mockColls)
-          }
-        }
-      }
-      console.log("[v0] Dashboard collections loaded through hubs:", collections?.length || 0)
-      if (!collections) collections = []
-    } catch (err) {
-      console.error("[v0] dashboard loading collections error:", err)
-      collectionLoadError = err instanceof Error ? err.message : String(err)
-      collections = []
     }
 
     // Step 4: Load guides
@@ -187,7 +124,7 @@ export default async function NetworkDashboardPage({
         }
       } else {
         // QuestLine demo route: use mock data for demo content
-        guides = collections.flatMap((c: Collection) => getGuidesByCollection(c.id))
+        guides = collections.flatMap((c: NormalizedCollection) => getGuidesByCollection(c.id))
         if (!guides) guides = []
         published = guides.filter((g: any) => g.status === "published")
         if (!published) published = []
@@ -357,7 +294,7 @@ export default async function NetworkDashboardPage({
 
           {/* Main tabs */}
           <Tabs defaultValue={tab || "drafts"} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsList className="grid w-full grid-cols-5 mb-6">
               <TabsTrigger value="drafts">
                 Drafts
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold text-primary">
@@ -368,6 +305,12 @@ export default async function NetworkDashboardPage({
                 Published
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                   {safePublished.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="guides">
+                Guides
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {safeGuides.length}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="hubs">
@@ -435,10 +378,10 @@ export default async function NetworkDashboardPage({
               </div>
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {safeHubs.map((hub: Hub) => {
+              {safeHubs.map((hub: NormalizedHub) => {
                 // Resolve collections that belong to this hub
                 const hubCollectionCount = safeCollections.filter(
-                  (c: Collection) => c.hubId === hub.id
+                  (c: NormalizedCollection) => c.hubId === hub.id
                 ).length
                 const hasHubCollections = hubCollectionCount > 0
 
@@ -538,8 +481,8 @@ export default async function NetworkDashboardPage({
               </div>
             ) : (
               <div className="space-y-8">
-                {safeHubs.map((hub: Hub) => {
-                  const hubCollections = safeCollections.filter((c: Collection) => c.hubId === hub.id)
+                {safeHubs.map((hub: NormalizedHub) => {
+                  const hubCollections = safeCollections.filter((c: NormalizedCollection) => c.hubId === hub.id)
                   console.log(`[v0] Hub ${hub.name} has ${hubCollections.length} collections`)
                   
                   return (
@@ -571,7 +514,7 @@ export default async function NetworkDashboardPage({
                         </div>
                       ) : (
                         <div className="grid gap-3 md:grid-cols-2">
-                          {hubCollections.map((col: Collection) => {
+                          {hubCollections.map((col: NormalizedCollection) => {
                             const hubIdValid = col.hubId && col.hubId !== "undefined"
                             const colIdValid = col.id && col.id !== "undefined"
                             
@@ -588,10 +531,15 @@ export default async function NetworkDashboardPage({
                             return (
                               <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
                                 <div className="space-y-2 flex-1">
-                                  <h4 className="flex items-center gap-2 font-semibold text-foreground">
-                                    <FolderOpen className="size-4 text-primary" aria-hidden="true" />
-                                    {col.name}
-                                  </h4>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h4 className="flex items-center gap-2 font-semibold text-foreground">
+                                      <FolderOpen className="size-4 text-primary" aria-hidden="true" />
+                                      {col.name}
+                                    </h4>
+                                    <Badge variant="secondary" className="shrink-0 text-xs">
+                                      Hub: {col.hubName || hub.name}
+                                    </Badge>
+                                  </div>
                                   <p className="text-sm text-muted-foreground">{col.description}</p>
                                   <p className="text-xs font-medium text-muted-foreground">
                                     {col.guideIds?.length || 0} guide{col.guideIds?.length !== 1 ? "s" : ""}
@@ -646,7 +594,7 @@ export default async function NetworkDashboardPage({
           <TabsContent value="guides" className="space-y-4">
             {filterCollectionId ? (
               (() => {
-                const filteredCollection = safeCollections.find((c: Collection) => c.id === filterCollectionId)
+                const filteredCollection = safeCollections.find((c: NormalizedCollection) => c.id === filterCollectionId)
                 const filteredGuides = safeGuides.filter((g: Guide) => g.collectionId === filterCollectionId)
                 
                 console.log(`[v0] Guides tab filtered to collection ${filterCollectionId}: ${filteredGuides.length} guides`)

@@ -1,669 +1,78 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Flame, ChevronRight, Copy, Check, ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { ArrowLeft, AlertCircle } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
-import type {
-  GenerationRequest,
-  GenerationResponse,
-  GenerationSession,
-} from "@/lib/guideforge/generation-schemas"
-import { generateMockResponse } from "@/lib/guideforge/mock-generator"
-import { createAndSaveGuideDraft } from "@/lib/guideforge/create-and-save-guide-draft"
-import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
-import {
-  getNetworkById,
-  getHubsByNetwork,
-  getCollectionsByHub,
-} from "@/lib/guideforge/mock-data"
+import { GeneratorClient } from "@/components/guideforge/builder/generator-client"
+import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
 
-export default function GeneratorPage({
+export default async function GeneratorPage({
   params,
 }: {
   params: Promise<{ networkId: string }>
 }) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  // Read and validate query params - ignore undefined, empty strings
-  const hubParam = searchParams?.get("hub")
-  const collectionParam = searchParams?.get("collection")
-  const preselectedHubFromQuery = (hubParam && hubParam !== "undefined" && hubParam.trim()) ? hubParam : ""
-  const preselectedCollectionFromQuery = (collectionParam && collectionParam !== "undefined" && collectionParam.trim()) ? collectionParam : ""
+  const { networkId } = await params
+  console.log("[v0] Generate route networkId:", networkId)
 
-  console.log("[v0] Generate route query params:", { hubParam, collectionParam })
-  console.log("[v0] Generate route validated params:", { preselectedHubFromQuery, preselectedCollectionFromQuery })
-
-  const [networkId, setNetworkId] = useState<string>("")
-  const [session, setSession] = useState<GenerationSession | null>(null)
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
-    preselectedCollectionFromQuery
-  )
-  const [formState, setFormState] = useState<GenerationRequest>({
-    prompt: "",
-    guideType: "character-build",
-    preferredDifficulty: "intermediate",
-    targetHubId: preselectedHubFromQuery || undefined,
-  })
-  const [isSending, setIsSending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
-
-  // Load network on mount
-  useEffect(() => {
-    const loadNetwork = async () => {
-      const params_resolved = await params
-      const routeNetworkId = params_resolved.networkId
-      console.log("[v0] Generate route networkId:", routeNetworkId)
-      
-      // Try to find the network by ID - getNetworkById uses mock data
-      let resolvedNetworkId = routeNetworkId
-      const network = getNetworkById(routeNetworkId)
-      
-      if (!network) {
-        console.log("[v0] Generate networkId not found directly:", routeNetworkId)
-        // Mock data only has "network_questline", try looking it up
-        // For now, default to the only available network
-        const fallback = getNetworkById("network_questline")
-        if (fallback) {
-          resolvedNetworkId = fallback.id
-          console.log("[v0] Generate using fallback network:", fallback.id)
-        }
-      } else {
-        console.log("[v0] Generate found network directly:", network.id)
-      }
-      
-      setNetworkId(resolvedNetworkId)
-    }
-    loadNetwork()
-  }, [params])
-
-  const network = networkId ? getNetworkById(networkId) : null
-  const hubs = network ? getHubsByNetwork(network.id) : []
-  
-  console.log("[v0] Generate resolved network:", network?.id, network?.name)
-  console.log("[v0] Generate raw hubs:", hubs.length)
-  
-  // Get all collections from all hubs for pre-check
-  const allCollections = hubs.flatMap((hub) => getCollectionsByHub(hub.id))
-  
-  console.log("[v0] Generate raw collections:", allCollections.length)
-
-  // Get collections scoped to selected hub
-  const collectionsForHub = formState.targetHubId
-    ? getCollectionsByHub(formState.targetHubId)
-    : []
-
-  // Validate preselected hub and collection from query params
-  useEffect(() => {
-    if (preselectedHubFromQuery) {
-      const hubExists = hubs.some((h) => h.id === preselectedHubFromQuery)
-      console.log("[v0] Generate selected hub:", {
-        requested: preselectedHubFromQuery,
-        exists: hubExists,
-        availableHubs: hubs.length,
-        hubList: hubs.map((h) => h.id),
-      })
-      if (hubExists) {
-        setFormState((prev) => ({ ...prev, targetHubId: preselectedHubFromQuery }))
-      } else if (hubs.length > 0) {
-        // Hub param was invalid, don't crash - let user pick from available hubs
-        console.log("[v0] Generate hub param invalid, hubs available for selection")
-      }
-    }
-  }, [preselectedHubFromQuery, hubs])
-
-  // Validate preselected collection after hub is set
-  useEffect(() => {
-    if (preselectedCollectionFromQuery && formState.targetHubId) {
-      const collExists = collectionsForHub.some((c) => c.id === preselectedCollectionFromQuery)
-      console.log("[v0] Generate selected collection:", {
-        requested: preselectedCollectionFromQuery,
-        exists: collExists,
-        availableCollections: collectionsForHub.length,
-        collectionList: collectionsForHub.map((c) => c.id),
-      })
-      if (collExists) {
-        setSelectedCollectionId(preselectedCollectionFromQuery)
-      } else if (collectionsForHub.length > 0) {
-        console.log("[v0] Generate collection param invalid, collections available for selection")
-      }
-    }
-  }, [preselectedCollectionFromQuery, formState.targetHubId, collectionsForHub])
-
-  // Auto-preselect hub if there's only one
-  useEffect(() => {
-    if (hubs.length === 1 && !formState.targetHubId) {
-      console.log("[v0] Auto-preselecting single hub:", hubs[0].id)
-      setFormState((prev) => ({ ...prev, targetHubId: hubs[0].id }))
-    }
-  }, [hubs, formState.targetHubId])
-
-  // Auto-preselect collection if there's only one in the selected hub
-  useEffect(() => {
-    if (collectionsForHub.length === 1 && !selectedCollectionId) {
-      console.log("[v0] Auto-preselecting single collection:", collectionsForHub[0].id)
-      setSelectedCollectionId(collectionsForHub[0].id)
-    }
-  }, [collectionsForHub, selectedCollectionId])
-
-  // Reset collection selection when hub changes
-  useEffect(() => {
-    if (formState.targetHubId && collectionsForHub.length > 0) {
-      const stillValid = collectionsForHub.some((c) => c.id === selectedCollectionId)
-      if (!stillValid) {
-        setSelectedCollectionId(collectionsForHub.length === 1 ? collectionsForHub[0].id : "")
-      }
-    }
-  }, [formState.targetHubId, collectionsForHub, selectedCollectionId])
-
-  // Final prerequisite state log
-  console.log("[v0] Generate prerequisite state:", {
-    networkResolved: !!network,
-    hubsAvailable: hubs.length,
-    collectionsAvailable: allCollections.length,
-    hubSelected: formState.targetHubId,
-    collectionSelected: selectedCollectionId,
+  const ctx = await loadNetworkBuilderContext(networkId)
+  console.log("[v0] Generate context summary:", {
+    networkId: ctx.networkId,
+    networkName: ctx.network?.name,
+    hubs: ctx.hubs.length,
+    collections: ctx.collections.length,
+    source: ctx.source,
+    errors: ctx.errors,
   })
 
-  const handleGenerateMock = async () => {
-    if (!formState.prompt.trim()) {
-      alert("Please enter a prompt")
-      return
-    }
-
-    // Create session
-    const sessionId = `session_${Date.now()}`
-    setSession({
-      id: sessionId,
-      createdAt: new Date().toISOString(),
-      request: formState,
-      status: "generating",
-    })
-
-    // Simulate generation delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    // Generate mock response
-    const response = generateMockResponse(formState)
-
-    // Update session
-    setSession((prev) =>
-      prev ? { ...prev, response, status: "done" } : null
+  // Network not found at all
+  if (!ctx.network) {
+    return (
+      <main className="min-h-screen bg-background">
+        <SiteHeader hideCta />
+        <div className="mx-auto w-full max-w-2xl px-4 py-10 md:px-6 md:py-14">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-6">
+            <div className="flex gap-3">
+              <AlertCircle
+                className="size-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h2 className="font-semibold text-foreground">
+                    Network not found
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    No network was found for{" "}
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                      {networkId}
+                    </code>
+                    .
+                  </p>
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/builder/networks">
+                    <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                    All Networks
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
     )
-  }
-
-  const handleSendToEditor = async () => {
-    if (!session?.response?.guide) {
-      alert("No guide to send")
-      return
-    }
-
-    if (!formState.targetHubId) {
-      setSendError("Please select a hub before saving the guide.")
-      return
-    }
-
-    if (!selectedCollectionId) {
-      setSendError("Please select a collection before saving the guide.")
-      return
-    }
-
-    // Validate collection belongs to selected hub (and therefore to the current network)
-    const validCollection = collectionsForHub.some((c) => c.id === selectedCollectionId)
-    if (!validCollection) {
-      console.error("[v0] Collection does not belong to selected hub:", selectedCollectionId)
-      setSendError("Selected collection does not belong to the chosen hub. Please reselect.")
-      return
-    }
-
-    setIsSending(true)
-    setSendError(null)
-    try {
-      console.log("[v0] handleSendToEditor started")
-      const generatedGuide = session.response.guide
-
-      console.log("[v0] Generated guide save target:", {
-        networkId,
-        hubId: formState.targetHubId,
-        collectionId: selectedCollectionId,
-      })
-
-      const { id, verified, error } = await createAndSaveGuideDraft({
-        title: generatedGuide.title,
-        summary: generatedGuide.summary,
-        guideType: formState.guideType,
-        difficulty: generatedGuide.difficulty,
-        networkId: networkId,
-        hubId: formState.targetHubId,
-        collectionId: selectedCollectionId,
-        requirements: generatedGuide.requirements,
-        warnings: generatedGuide.warnings,
-        steps: generatedGuide.sections?.map((section) => ({
-          title: section.title,
-          body: section.body,
-          kind: section.kind,
-        })),
-      })
-
-      if (!verified) {
-        console.error("[v0] handleSendToEditor: Verification failed:", error)
-        setSendError(error || "Guide save verification failed. Please try again.")
-        return
-      }
-
-      console.log("[v0] handleSendToEditor: Verification succeeded, redirecting to editor id:", id)
-
-      // Redirect to guide editor using the current network from the route
-      router.push(`/builder/network/${networkId}/guide/${id}/edit`)
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Unknown error"
-      console.error("[v0] Error in handleSendToEditor:", error)
-      setSendError(`Could not save guide before opening editor: ${errorMsg}`)
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const handleCopyJson = () => {
-    if (!session?.response?.guide) return
-    const json = JSON.stringify(session.response.guide, null, 2)
-    navigator.clipboard.writeText(json)
-    setCopiedId("json")
-    setTimeout(() => setCopiedId(null), 2000)
   }
 
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader hideCta />
-
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-        {/* Breadcrumb / Back navigation */}
-        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/builder/network/${networkId}/dashboard`}>
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Back to Network Dashboard
-            </Link>
-          </Button>
-          <span className="text-muted-foreground">·</span>
-          <Link
-            href="/builder/networks"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            All Networks
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span className="text-muted-foreground">{network?.name || "Network"}</span>
-          <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span className="text-foreground font-semibold">Generate Guide</span>
-        </nav>
-
-        {/* Pre-check: Require hubs and collections */}
-        {(hubs.length === 0 || allCollections.length === 0) && (
-          <Card className="mb-6 border-amber-500/30 bg-amber-500/5 p-5">
-            {hubs.length === 0 ? (
-              <>
-                <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                  <strong>Create a hub first.</strong> Guides belong to collections, which belong to hubs.
-                </p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
-                    Create First Hub
-                  </Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                  <strong>Create a collection first.</strong> Collections organize guides within your hubs.
-                </p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
-                    Create First Collection
-                  </Link>
-                </Button>
-              </>
-            )}
-          </Card>
-        )}
-
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* Left: Input Form */}
-          {hubs.length > 0 && allCollections.length > 0 ? (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold">Generate a Guide</h1>
-              <p className="mt-2 text-muted-foreground">
-                Use AI to create structured guide data. Preview the JSON, then
-                send to the editor for customization.
-              </p>
-            </div>
-
-            {/* Form */}
-            <Card className="border-border/50 p-6 space-y-4">
-              {/* Guide Type */}
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Guide Type
-                </label>
-                <Select
-                  value={formState.guideType}
-                  onValueChange={(value) =>
-                    setFormState({ ...formState, guideType: value as GuideType })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="character-build">
-                      Character Build
-                    </SelectItem>
-                    <SelectItem value="boss-guide">Boss Guide</SelectItem>
-                    <SelectItem value="beginner-guide">
-                      Beginner Guide
-                    </SelectItem>
-                    <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                    <SelectItem value="patch-notes">Patch Notes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Difficulty */}
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Difficulty
-                </label>
-                <Select
-                  value={formState.preferredDifficulty || "intermediate"}
-                  onValueChange={(value) =>
-                    setFormState({
-                      ...formState,
-                      preferredDifficulty: value as DifficultyLevel,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
-                    <SelectItem value="expert">Expert</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Hub */}
-              {hubs.length > 0 && (
-                <div>
-                  <label className="text-sm font-semibold mb-2 block">
-                    Hub (Game)
-                  </label>
-                  <Select
-                    value={formState.targetHubId || ""}
-                    onValueChange={(value) =>
-                      setFormState({
-                        ...formState,
-                        targetHubId: value || undefined,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a hub" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hubs.map((hub) => (
-                        <SelectItem key={hub.id} value={hub.id}>
-                          {hub.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Collection */}
-              {formState.targetHubId && (
-                <div>
-                  <label className="text-sm font-semibold mb-2 block">
-                    Collection
-                  </label>
-                  {collectionsForHub.length === 0 ? (
-                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300">
-                      <p className="mb-2">
-                        <strong>No collections in this hub.</strong> Create a collection first.
-                      </p>
-                      <Button asChild size="sm" variant="outline">
-                        <Link
-                          href={`/builder/network/${networkId}/collection/new?hub=${formState.targetHubId}`}
-                        >
-                          Create Collection
-                        </Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <Select
-                      value={selectedCollectionId}
-                      onValueChange={(value) => setSelectedCollectionId(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            collectionsForHub.length === 1
-                              ? collectionsForHub[0].name
-                              : "Select a collection"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {collectionsForHub.map((col) => (
-                          <SelectItem key={col.id} value={col.id}>
-                            {col.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              )}
-
-              {/* Prompt */}
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Prompt
-                </label>
-                <Textarea
-                  placeholder="Describe the guide you want to generate. E.g., 'Create a beginner-friendly Fire Warden build guide that focuses on survivability and crowd control.'"
-                  value={formState.prompt}
-                  onChange={(e) =>
-                    setFormState({ ...formState, prompt: e.target.value })
-                  }
-                  className="min-h-32"
-                />
-              </div>
-
-              {/* Forge Rules Context */}
-              <div className="rounded-lg bg-muted/30 border border-border/50 p-3">
-                <p className="text-xs text-muted-foreground">
-                  <strong>Forge Rules:</strong> The network's forge rules will
-                  be applied as context to the generator.
-                </p>
-              </div>
-
-              {/* Generate Button */}
-              <Button
-                onClick={handleGenerateMock}
-                disabled={
-                  session?.status === "generating" ||
-                  !formState.targetHubId ||
-                  !selectedCollectionId
-                }
-                className="w-full"
-              >
-                {session?.status === "generating" ? (
-                  <>
-                    <Flame className="mr-2 size-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Flame className="mr-2 size-4" />
-                    Generate Mock Structured Guide
-                  </>
-                )}
-              </Button>
-              {(!formState.targetHubId || !selectedCollectionId) && (
-                <p className="text-xs text-muted-foreground">
-                  Select a hub and collection above to enable generation.
-                </p>
-              )}
-            </Card>
-          </div>
-          ) : null}
-
-          {/* Right: Preview Panel */}
-          {hubs.length > 0 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold">Generated JSON Preview</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Review the generated guide structure before sending to editor.
-              </p>
-            </div>
-
-            {session ? (
-              <>
-                {session.status === "generating" && (
-                  <Card className="border-border/50 p-8 text-center">
-                    <Flame className="mx-auto mb-3 size-8 text-primary animate-spin" />
-                    <p className="text-muted-foreground">Generating guide...</p>
-                  </Card>
-                )}
-
-                {session.status === "done" && session.response ? (
-                  <Card className="border-border/50 p-6 space-y-4">
-                    {session.response.success ? (
-                      <>
-                        {/* JSON Preview */}
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold uppercase text-muted-foreground">
-                              Generated Guide JSON
-                            </p>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleCopyJson}
-                            >
-                              {copiedId === "json" ? (
-                                <>
-                                  <Check className="size-4" />
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="size-4" />
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                          <div className="bg-muted/30 rounded border border-border/50 p-3 overflow-x-auto max-h-96 overflow-y-auto font-mono text-xs text-foreground">
-                            <pre>
-                              {JSON.stringify(
-                                session.response.guide,
-                                null,
-                                2
-                              )}
-                            </pre>
-                          </div>
-                        </div>
-
-                        {/* Summary */}
-                        <div className="bg-primary/5 border border-primary/20 rounded p-3">
-                          <p className="text-sm font-semibold mb-1">
-                            {session.response.guide.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {session.response.guide.sections.length} sections •{" "}
-                            {session.response.guide.estimatedMinutes} min read •{" "}
-                            {session.response.guide.difficulty}
-                          </p>
-                        </div>
-
-                        {/* Send to Editor */}
-            <Button
-              onClick={handleSendToEditor}
-              disabled={!session?.response?.guide || isSending}
-              size="lg"
-            >
-              {isSending ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                  Saving...
-                </>
-              ) : (
-                "Send to Editor"
-              )}
-            </Button>
-
-            {sendError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-4">
-                <p className="text-sm text-red-700 dark:text-red-400">{sendError}</p>
-              </div>
-            )}
-                      </>
-                    ) : (
-                      <div className="text-center py-6">
-                        <p className="text-red-600 text-sm mb-2">
-                          Generation failed
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          {session.response.error}
-                        </p>
-                      </div>
-                    )}
-                  </Card>
-                ) : null}
-              </>
-            ) : (
-              <Card className="border-border/50 p-8 text-center">
-                <p className="text-muted-foreground">
-                  Fill out the form and click "Generate Mock Structured Guide"
-                  to preview the output.
-                </p>
-              </Card>
-            )}
-          </div>
-          )}
-        </div>
-
-        {/* Footer note */}
-        <div className="mt-12 pt-6 border-t border-border/50">
-          <p className="text-xs text-muted-foreground">
-            <strong>TODO:</strong> This page uses mock generation. In production,
-            it will call the OpenAI API (with your custom system prompt and forge
-            rules), then persist the GeneratedGuide to Supabase before rendering
-            the editor.
-          </p>
-        </div>
+        <GeneratorClient
+          networkId={ctx.networkId}
+          networkName={ctx.network.name}
+          hubs={ctx.hubs}
+          collectionsByHub={ctx.collectionsByHub}
+        />
       </div>
     </main>
   )
 }
-
-

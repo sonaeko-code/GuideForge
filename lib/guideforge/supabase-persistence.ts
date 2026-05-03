@@ -324,6 +324,20 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // Normalize collection_id: convert frontend slug to real Supabase UUID
       const normalizedCollectionId = await normalizeCollectionIdForSupabase(guide.collectionId)
 
+      // HARD-STOP: refuse to write to Supabase without a collection_id.
+      // Guides are required to belong to a collection. If the caller did not
+      // resolve one, do not silently insert null — return an explicit error
+      // so the UI can show "Cannot save guide because no collection is selected."
+      if (!normalizedCollectionId) {
+        const reason =
+          "Cannot save guide because no collection is selected (collection_id is missing)."
+        console.error("[v0] Guide save fallback reason:", reason)
+        // Mirror to localStorage so the user does not lose their edits, but
+        // surface the error so the UI does not present this as a Supabase save.
+        this.localStorageAdapter.saveDraftSync(guide)
+        return { id: guide.id, source: "localStorage", error: reason }
+      }
+
       // Normalize type, status, and difficulty to Supabase-allowed values
       const normalizedType = normalizeGuideTypeForSupabase(guide.type)
       const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
