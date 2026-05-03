@@ -4,12 +4,9 @@ import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
-import { getGuidesByCollection } from "@/lib/guideforge/mock-data"
 import {
   loadNetworkBuilderContext,
-  getGuidesByNetworkId,
-  getDraftGuidesByNetworkId,
-  getPublishedGuidesByNetworkId,
+  getGuidesForNetworkCollections,
   checkGuidesTableReadability,
   getGuidesByCollectionIds,
   type NormalizedHub,
@@ -58,48 +55,27 @@ export default async function NetworkDashboardPage({
       )
     }
 
-    // Load guides
-    let guides: any[] = []
-    let published: any[] = []
-    let drafts: any[] = []
+    // Load guides using canonical helper that works with collection_id filtering
+    let guides: Guide[] = []
+    let published: Guide[] = []
+    let drafts: Guide[] = []
 
     try {
-      const isQuestLineRoute = network.id === "network_questline" || network.slug === "questline"
+      // Use canonical helper for ALL networks (not just non-QuestLine)
+      // This uses the proven working collection_id-based query
+      guides = await getGuidesForNetworkCollections(collections)
       
-      if (!isQuestLineRoute) {
-        // Real networks: load from Supabase
-        try {
-          guides = await getGuidesByNetworkId(network.id)
-          if (!guides) guides = []
-          console.log("[v0] Dashboard guide loading collection IDs:", {
-            totalGuides: guides.length,
-            collectionIdValues: guides.slice(0, 3).map(g => ({ id: g.id, collection_id: g.collection_id, collectionId: g.collectionId })),
-          })
-        } catch (e) {
-          guides = []
-        }
-        try {
-          drafts = await getDraftGuidesByNetworkId(network.id)
-          if (!drafts) drafts = []
-        } catch (e) {
-          drafts = []
-        }
-        try {
-          published = await getPublishedGuidesByNetworkId(network.id)
-          if (!published) published = []
-        } catch (e) {
-          published = []
-        }
-      } else {
-        // QuestLine demo route: use mock data
-        guides = collections.flatMap((c: NormalizedCollection) => getGuidesByCollection(c.id))
-        if (!guides) guides = []
-        published = guides.filter((g: any) => g.status === "published")
-        if (!published) published = []
-        drafts = guides.filter((g: any) => g.status === "draft" || g.status === "in-review")
-        if (!drafts) drafts = []
+      if (guides && guides.length > 0) {
+        published = guides.filter((g: Guide) => g.status === "published")
+        drafts = guides.filter((g: Guide) => g.status === "draft" || g.status === "in-review")
+        console.log("[v0] Dashboard loaded guides using canonical helper:", {
+          total: guides.length,
+          published: published.length,
+          drafts: drafts.length,
+        })
       }
     } catch (err) {
+      console.warn("[v0] Dashboard guide loading error:", err)
       guides = []
       published = []
       drafts = []
@@ -109,18 +85,8 @@ export default async function NetworkDashboardPage({
     const safeHubs = Array.isArray(hubs) ? hubs : []
     const safeCollections = Array.isArray(collections) ? collections : []
     
-    // Normalize guides from Supabase snake_case to camelCase
-    const safeGuides = Array.isArray(guides) ? guides.map((g: any) => ({
-      ...g,
-      collectionId: g.collection_id || g.collectionId,
-      createdAt: g.created_at || g.createdAt,
-      updatedAt: g.updated_at || g.updatedAt,
-      publishedAt: g.published_at || g.publishedAt,
-      authorId: g.author_id || g.authorId,
-      reviewerId: g.reviewer_id || g.reviewerId,
-      verificationStatus: g.verification_status || g.verificationStatus,
-    })) : []
-    
+    // Guides are already normalized by canonical helper
+    const safeGuides = Array.isArray(guides) ? guides : []
     const safeDrafts = Array.isArray(drafts) ? drafts : []
     const safePublished = Array.isArray(published) ? published : []
     
@@ -129,16 +95,11 @@ export default async function NetworkDashboardPage({
       networkId: network.id,
       networkName: network.name,
       hubCount: safeHubs.length,
-      hubIds: safeHubs.map(h => h.id),
       collectionCount: safeCollections.length,
-      collectionIds: safeCollections.map(c => c.id),
-      rawGuideCount: guides.length,
-      normalizedGuideCount: safeGuides.length,
-      guideIds: safeGuides.map((g: any) => g.id),
-      guideTitles: safeGuides.map((g: any) => ({ id: g.id, title: g.title, slug: g.slug, collection_id: g.collection_id, collectionId: g.collectionId, status: g.status })),
+      primaryLoadedGuidesCount: safeGuides.length,
       publishedCount: safePublished.length,
       draftCount: safeDrafts.length,
-      isQuestLineRoute: network.id === "network_questline" || network.slug === "questline",
+      guideSample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId, status: g.status })),
     }
     
     // RLS diagnostics
@@ -150,14 +111,15 @@ export default async function NetworkDashboardPage({
     const rlsDiagnostics = {
       guidesTableReadable: tableReadability.canRead,
       guidesTableRowCount: tableReadability.rowCount,
-      guidesTableError: tableReadability.error || null,
-      collectionGuidesCount: collectionGuides.guides?.length || 0,
-      collectionGuidesError: collectionGuides.error || null,
-      suspectedRLS: !tableReadability.canRead || (safeCollections.length > 0 && guides.length === 0 && collectionGuides.guides && collectionGuides.guides.length > 0),
+      directCollectionQueryCount: collectionGuides.guides?.length || 0,
+      primaryLoadedCount: safeGuides.length,
+      countsMatch: safeGuides.length === (collectionGuides.guides?.length || 0),
+      suspectedRLS: !tableReadability.canRead || (tableReadability.canRead === false && collectionGuides.error !== null),
     }
     
+    console.log("[v0] Dashboard primary guide count:", safeGuides.length)
+    console.log("[v0] Dashboard direct collection query count:", collectionGuides.guides?.length || 0)
     console.log("[v0] Dashboard RLS diagnostics:", rlsDiagnostics)
-    console.log("[v0] Dashboard diagnostics:", diagnostics)
 
     return (
       <main className="min-h-screen bg-background">
@@ -224,34 +186,31 @@ export default async function NetworkDashboardPage({
             <div className="rounded-lg border border-orange-400/50 bg-orange-500/5 p-4 mb-6">
               <h3 className="font-semibold text-orange-700 dark:text-orange-300 mb-3">DEBUG: Guide Diagnostics</h3>
               <div className="space-y-2 text-sm font-mono text-orange-600 dark:text-orange-400 overflow-auto max-h-64 bg-black/20 p-2 rounded">
-                <div>Network ID: {network.id}</div>
-                <div>Network Name: {network.name}</div>
-                <div>Is QuestLine: {diagnostics.isQuestLineRoute ? "YES" : "NO"}</div>
-                <div>Hubs: {diagnostics.hubCount} [{diagnostics.hubIds.join(", ")}]</div>
-                <div>Collections: {diagnostics.collectionCount} [{diagnostics.collectionIds.join(", ")}]</div>
-                <div className="border-t border-orange-400/30 pt-2 mt-2">Raw guides from Supabase: {diagnostics.rawGuideCount}</div>
-                <div>Normalized guides: {diagnostics.normalizedGuideCount}</div>
-                <div>Guide IDs: {diagnostics.guideIds.length === 0 ? "(empty)" : diagnostics.guideIds.join(", ")}</div>
-                {diagnostics.guideTitles.length > 0 && (
+                <div>Network: {diagnostics.networkName} ({diagnostics.networkId})</div>
+                <div>Hubs: {diagnostics.hubCount} | Collections: {diagnostics.collectionCount}</div>
+                <div className="border-t border-orange-400/30 pt-2 mt-2 text-orange-700 dark:text-orange-300 font-semibold">Guide Counts:</div>
+                <div>Primary loader: {diagnostics.primaryLoadedGuidesCount} guides</div>
+                <div>Direct collection query: {rlsDiagnostics.directCollectionQueryCount} guides</div>
+                <div className={rlsDiagnostics.countsMatch ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}>
+                  {rlsDiagnostics.countsMatch ? "✓ Counts match" : "⚠ Counts differ"}
+                </div>
+                <div>Published: {diagnostics.publishedCount} | Drafts: {diagnostics.draftCount}</div>
+                {diagnostics.guideSample.length > 0 && (
                   <div className="border-t border-orange-400/30 pt-2 mt-2">
-                    {diagnostics.guideTitles.map((g: any, i: number) => (
-                      <div key={i} className="mb-1">
-                        [{i+1}] {g.title} (slug: {g.slug}, coll_id: {g.collection_id}, collId: {g.collectionId}, status: {g.status})
-                      </div>
-                    ))}
+                    Sample guides: {diagnostics.guideSample.map((g: any) => `${g.title} (${g.status})`).join(", ")}
                   </div>
                 )}
-                <div className="border-t border-orange-400/30 pt-2 mt-2">Published: {diagnostics.publishedCount} | Drafts: {diagnostics.draftCount}</div>
-                
-                <div className="border-t border-orange-400/30 pt-2 mt-2 text-orange-700 dark:text-orange-300 font-semibold">RLS Diagnostics:</div>
+                <div className="border-t border-orange-400/30 pt-2 mt-2 text-orange-700 dark:text-orange-300 font-semibold">RLS Status:</div>
                 <div>Guides table readable: {rlsDiagnostics.guidesTableReadable ? "YES" : "NO"}</div>
-                {rlsDiagnostics.guidesTableError && <div className="text-red-600 dark:text-red-400">Table error: {rlsDiagnostics.guidesTableError}</div>}
-                <div>Guides table total rows (any user): {rlsDiagnostics.guidesTableRowCount}</div>
-                <div>Guides in selected collections: {rlsDiagnostics.collectionGuidesCount}</div>
-                {rlsDiagnostics.collectionGuidesError && <div className="text-red-600 dark:text-red-400">Collection error: {rlsDiagnostics.collectionGuidesError}</div>}
+                <div>Table total rows: {rlsDiagnostics.guidesTableRowCount}</div>
+                {!rlsDiagnostics.suspectedRLS && rlsDiagnostics.directCollectionQueryCount > 0 && (
+                  <div className="border-t border-green-400/30 pt-2 mt-2 text-green-600 dark:text-green-400">
+                    ✓ Guide rows are readable. Primary loader working correctly.
+                  </div>
+                )}
                 {rlsDiagnostics.suspectedRLS && (
                   <div className="border-t border-red-400/30 pt-2 mt-2 text-red-600 dark:text-red-400">
-                    ⚠ SUSPECTED RLS ISSUE: Supabase is likely blocking SELECT on draft guides.
+                    ⚠ RLS issue detected - guides table not readable
                   </div>
                 )}
               </div>
