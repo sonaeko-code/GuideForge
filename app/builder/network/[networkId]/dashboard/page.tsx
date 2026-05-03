@@ -51,6 +51,7 @@ export default async function NetworkDashboardPage({
   
   console.log("[v0] dashboard resolving network", { networkId })
   console.log("[v0] dashboard filter params", { tab, filterCollectionId })
+  console.log("[v0] dashboard will render Tabs with defaultValue:", tab || "collections")
 
   // Wrap entire component in try/catch to prevent crashes
   try {
@@ -293,7 +294,7 @@ export default async function NetworkDashboardPage({
         </div>
 
           {/* Main tabs */}
-          <Tabs defaultValue={tab || "drafts"} className="w-full">
+          <Tabs defaultValue={tab || "drafts"} className="w-full" key={`tabs-${tab}`}>
             <TabsList className="grid w-full grid-cols-5 mb-6">
               <TabsTrigger value="drafts">
                 Drafts
@@ -564,13 +565,20 @@ export default async function NetworkDashboardPage({
                                           Create Manual Guide
                                         </Link>
                                       </Button>
-                                      <Button size="sm" asChild variant="ghost">
-                                        <Link
-                                          href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}
-                                        >
-                                          View Guides
-                                        </Link>
-                                      </Button>
+                                      {(() => {
+                                        const viewGuidesHref = `/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`
+                                        console.log("[v0] View Guides route:", {
+                                          collection: col.name,
+                                          href: viewGuidesHref,
+                                        })
+                                        return (
+                                          <Button size="sm" asChild variant="ghost">
+                                            <Link href={viewGuidesHref}>
+                                              View Guides
+                                            </Link>
+                                          </Button>
+                                        )
+                                      })()}
                                     </>
                                   ) : (
                                     <span className="text-xs text-red-600 dark:text-red-400">
@@ -607,7 +615,7 @@ export default async function NetworkDashboardPage({
                           Guides in {filteredCollection?.name || 'Collection'}
                         </h2>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {filteredGuides.length} guide{filteredGuides.length !== 1 ? "s" : ""} in this collection
+                          Hub: {filteredCollection?.hubName || 'Unknown'}
                         </p>
                       </div>
                       <Button
