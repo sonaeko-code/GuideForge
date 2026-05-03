@@ -122,7 +122,8 @@ export default async function NetworkDashboardPage({
     let collectionLoadError = ""
     try {
       console.log("[v0] dashboard loading collections")
-      for (const hub of hubs) {
+      console.log("[v0] Dashboard collection source hubs:", safeHubs.length)
+      for (const hub of safeHubs) {
         try {
           const hubCollections = await getCollectionsByHubId(hub.id)
           if (hubCollections && hubCollections.length > 0) {
@@ -141,7 +142,7 @@ export default async function NetworkDashboardPage({
           }
         }
       }
-      console.log("[v0] dashboard collections result:", collections?.length || 0)
+      console.log("[v0] Dashboard collections loaded through hubs:", collections?.length || 0)
       if (!collections) collections = []
     } catch (err) {
       console.error("[v0] dashboard loading collections error:", err)
