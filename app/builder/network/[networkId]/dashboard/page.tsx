@@ -11,6 +11,7 @@ import {
   Flame,
   ArrowLeft,
   AlertCircle,
+  Sparkles,
 } from "lucide-react"
 import type { Network, Hub, Collection, Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
@@ -122,8 +123,9 @@ export default async function NetworkDashboardPage({
     let collectionLoadError = ""
     try {
       console.log("[v0] dashboard loading collections")
-      console.log("[v0] Dashboard collection source hubs:", safeHubs.length)
-      for (const hub of safeHubs) {
+      const collectionSourceHubs = Array.isArray(hubs) ? hubs : []
+      console.log("[v0] Dashboard collection source hubs:", collectionSourceHubs.length)
+      for (const hub of collectionSourceHubs) {
         try {
           const hubCollections = await getCollectionsByHubId(hub.id)
           if (hubCollections && hubCollections.length > 0) {
