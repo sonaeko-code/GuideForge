@@ -32,7 +32,15 @@ export function GuideEditorLoader({
   useEffect(() => {
     const loadGuide = async () => {
       try {
-        console.log("[v0] Editor loader requested id:", guideId)
+        console.log("[v0] Guide editor loaded guide identity:", {
+          guideId,
+          collectionId: fallback?.collectionId,
+          slug: fallback?.slug,
+          title: fallback?.title,
+          status: fallback?.status,
+          source: "loader-start",
+          isUuid: guideId?.includes("-") && guideId?.length === 36,
+        })
 
         // Try to load from Supabase/localStorage (async)
         const draft = await loadGuideDraft(guideId)
