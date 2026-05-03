@@ -200,7 +200,22 @@ export default async function NetworkDashboardPage({
       drafts = []
     }
 
-    // Step 5: Render dashboard
+    // Step 5: Create safe defaults for rendering
+    const safeHubs = Array.isArray(hubs) ? hubs : []
+    const safeCollections = Array.isArray(collections) ? collections : []
+    const safeGuides = Array.isArray(guides) ? guides : []
+    const safeDrafts = Array.isArray(drafts) ? drafts : []
+    const safePublished = Array.isArray(published) ? published : []
+
+    console.log("[v0] dashboard safe render data", {
+      hubs: safeHubs.length,
+      collections: safeCollections.length,
+      guides: safeGuides.length,
+      drafts: safeDrafts.length,
+      published: safePublished.length,
+    })
+
+    // Step 6: Render dashboard
     console.log("[v0] dashboard render start")
 
     return (
@@ -278,8 +293,29 @@ export default async function NetworkDashboardPage({
             <Card className="border-primary/30 bg-primary/5 px-4 py-4">
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hubs</p>
-                <p className="text-3xl font-bold text-foreground">{hubs.length}</p>
+                <p className="text-3xl font-bold text-foreground">{safeHubs.length}</p>
                 <p className="text-xs text-muted-foreground">Categories</p>
+              </div>
+            </Card>
+            <Card className="border-border/50 px-4 py-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Collections</p>
+                <p className="text-3xl font-bold text-foreground">{safeCollections.length}</p>
+                <p className="text-xs text-muted-foreground">Groups</p>
+              </div>
+            </Card>
+            <Card className="border-emerald-500/30 bg-emerald-500/5 px-4 py-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Published</p>
+                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{safePublished.length}</p>
+                <p className="text-xs text-muted-foreground">Guides</p>
+              </div>
+            </Card>
+            <Card className="border-amber-500/30 bg-amber-500/5 px-4 py-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Drafts</p>
+                <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{safeDrafts.length}</p>
+                <p className="text-xs text-muted-foreground">In progress</p>
               </div>
             </Card>
             <Card className="border-border/50 px-4 py-4">
@@ -306,15 +342,34 @@ export default async function NetworkDashboardPage({
           </div>
         </div>
 
-        {/* Main tabs */}
-        <Tabs defaultValue={tab || "drafts"} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="drafts">Drafts</TabsTrigger>
-            <TabsTrigger value="hubs">Hubs</TabsTrigger>
-            <TabsTrigger value="collections">Collections</TabsTrigger>
-            <TabsTrigger value="guides">Guides</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
+          {/* Main tabs */}
+          <Tabs defaultValue={tab || "drafts"} className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-6">
+              <TabsTrigger value="drafts">
+                Drafts
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold text-primary">
+                  {safeDrafts.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="published">
+                Published
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  {safePublished.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="hubs">
+                Hubs
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {safeHubs.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="collections">
+                Collections
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {safeCollections.length}
+                </span>
+              </TabsTrigger>
+            </TabsList>
 
           {/* Drafts tab */}
           <TabsContent value="drafts" className="space-y-4">
@@ -341,23 +396,18 @@ export default async function NetworkDashboardPage({
           {/* Hubs tab */}
           <TabsContent value="hubs" className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Hubs ({hubs.length})
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Games, products, departments — the main categories in your network.
-                </p>
-              </div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Hubs ({safeHubs.length})
+              </h2>
               <Button size="sm" asChild>
                 <Link href={`/builder/network/${networkId}/hub/new`}>
-                  <Plus className="size-4" aria-hidden="true" />
+                  <Plus className="size-4 mr-1" aria-hidden="true" />
                   Create Hub
                 </Link>
               </Button>
             </div>
 
-            {hubs.length === 0 ? (
+            {safeHubs.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <Gamepad2 className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
                 <p className="font-semibold text-foreground">No hubs yet</p>
@@ -371,42 +421,25 @@ export default async function NetworkDashboardPage({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
-                {hubs.map((hub: Hub) => (
-                  <Card key={hub.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                          <Gamepad2 className="size-4 text-primary" aria-hidden="true" />
-                          {hub.name}
-                        </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {hub.description}
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {hub.collectionIds.length} collection
-                          {hub.collectionIds.length !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="icon" variant="ghost">
-                            <MoreVertical
-                              className="size-4"
-                              aria-hidden="true"
-                            />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>View</DropdownMenuItem>
-                          <DropdownMenuItem>Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {safeHubs.map((hub: Hub) => (
+                <Card key={hub.id} className="border-border/50 px-4 py-4">
+                  <div className="space-y-2">
+                    <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                      <Library className="size-4 text-primary" aria-hidden="true" />
+                      {hub.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {hub.description}
+                    </p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {hub.collectionIds?.length || 0} collection
+                      {hub.collectionIds?.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </Card>
+              ))}
+            </div>
             )}
           </TabsContent>
 
@@ -414,7 +447,7 @@ export default async function NetworkDashboardPage({
           <TabsContent value="collections" className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">
-                Collections ({collections.length})
+                Collections ({safeCollections.length})
               </h2>
               <Button size="sm" asChild>
                 <Link href={`/builder/network/${networkId}/collection/new`}>
@@ -424,7 +457,7 @@ export default async function NetworkDashboardPage({
               </Button>
             </div>
 
-            {collections.length === 0 ? (
+            {safeCollections.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <FolderOpen className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
                 <p className="font-semibold text-foreground">No collections yet</p>
@@ -439,7 +472,7 @@ export default async function NetworkDashboardPage({
               </div>
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {collections.map((col: Collection) => (
+              {safeCollections.map((col: Collection) => (
                 <Card key={col.id} className="border-border/50 px-4 py-4">
                   <div className="space-y-2">
                     <h3 className="flex items-center gap-2 font-semibold text-foreground">
@@ -450,8 +483,8 @@ export default async function NetworkDashboardPage({
                       {col.description}
                     </p>
                     <p className="text-xs font-medium text-muted-foreground">
-                      {col.guideIds.length} guide
-                      {col.guideIds.length !== 1 ? "s" : ""}
+                      {col.guideIds?.length || 0} guide
+                      {col.guideIds?.length !== 1 ? "s" : ""}
                     </p>
                   </div>
                 </Card>
@@ -463,31 +496,15 @@ export default async function NetworkDashboardPage({
           {/* Guides tab */}
           <TabsContent value="guides" className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Guides ({guides.length})
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {published.length} published, {drafts.length} draft
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" asChild>
-                  <Link href={`/builder/network/${networkId}/generate`}>
-                    <Flame className="size-4 mr-1" aria-hidden="true" />
-                    Generate Guide
-                  </Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link href={`/builder/network/${networkId}/generate`}>
-                    <Plus className="size-4" aria-hidden="true" />
-                    Create Guide
-                  </Link>
-                </Button>
+              <h2 className="text-lg font-semibold text-foreground">
+                Guides ({safeGuides.length})
+              </h2>
+              <div className="text-sm text-muted-foreground">
+                {safePublished.length} published, {safeDrafts.length} draft
               </div>
             </div>
 
-            {guides.length === 0 ? (
+            {safeGuides.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
                 <p className="font-semibold text-foreground">No guides yet</p>
