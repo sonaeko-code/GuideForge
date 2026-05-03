@@ -8,12 +8,16 @@ import { getHubsByNetwork } from "@/lib/guideforge/mock-data"
 
 export default async function CreateCollectionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ networkId: string }>
+  searchParams: Promise<{ hub?: string }>
 }) {
   const { networkId } = await params
+  const { hub: preselectedHubId } = await searchParams
 
   console.log("[v0] Collection page networkId:", networkId)
+  console.log("[v0] Collection page preselected hub:", preselectedHubId)
 
   // Load hubs from Supabase, fallback to mock data
   let hubs = await getHubsByNetworkId(networkId)
@@ -56,7 +60,7 @@ export default async function CreateCollectionPage({
           </p>
         </div>
 
-        <CreateCollectionForm networkId={networkId} hubs={hubs} />
+        <CreateCollectionForm networkId={networkId} hubs={hubs} preselectedHubId={preselectedHubId} />
       </div>
     </main>
   )
