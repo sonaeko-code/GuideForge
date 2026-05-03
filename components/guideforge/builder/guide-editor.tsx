@@ -128,7 +128,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
 
-      setIsSaving(true)
+      console.log("[v0] Guide save mode:", {
+        guideId: updatedGuide.id,
+        isUuid: updatedGuide.id?.includes("-") && updatedGuide.id?.length === 36,
+        collectionId: updatedGuide.collectionId,
+        slug: updatedGuide.slug,
+        saveMode: updatedGuide.id && updatedGuide.id !== "new" ? "update" : "insert",
+      })
+      console.log("[v0] Guide save payload:", {
+        id: updatedGuide.id,
+        title: updatedGuide.title,
+        collectionId: updatedGuide.collectionId,
+        slug: updatedGuide.slug,
+        requirements: updatedGuide.requirements?.length || 0,
+        stepsCount: updatedGuide.steps?.length || 0,
+      })
       setSaveError(null)
       ;(async () => {
         try {
@@ -176,7 +190,16 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               }, 2000)
             }
           } else if (error) {
-            setSaveError(`Supabase save failed: ${error}`)
+            // Display specific error message based on error type
+            let errorMessage = error
+            if (error.includes("23505")) {
+              errorMessage = "Save failed: another guide in this collection already uses this slug."
+            } else if (error.includes("collection_id is missing")) {
+              errorMessage = "Cannot save guide because no collection is selected."
+            } else if (error.includes("Supabase")) {
+              errorMessage = `Supabase save failed: ${error}`
+            }
+            setSaveError(errorMessage)
             
             // Ensure minimum saving visibility even on error
             if (remainingMinDuration > 0) {
@@ -189,7 +212,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               console.log("[v0] Autosave toast state changed: failed")
             }
           } else {
-            setSaveError("Supabase save failed — saved locally instead")
+            setSaveError("Saved locally — Supabase save failed")
             
             // Ensure minimum saving visibility
             if (remainingMinDuration > 0) {
@@ -250,6 +273,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   const handleApplyForgeRules = async () => {
+    console.log("[v0] Forge Rules Re-check: validation only, no save")
+    
     // Normalize requirements from textarea
     const requirementsArray = requirementsText
       .split("\n")
@@ -270,7 +295,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     // Get available rules
     const forgeRules = suggestMockForgeRules("gaming")
     
-    // Perform deterministic validation
+    // Perform deterministic validation only — do NOT save
     const results = validateForgeRules(currentGuide, forgeRules.rules)
     const checkTimestamp = Date.now()
 
@@ -279,19 +304,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setRulesApplied(true)
     setRulesStale(false)
     
-    const updatedGuide: Guide = {
-      ...currentGuide,
-      forgeRulesCheckResult: results as any,
-      forgeRulesCheckTimestamp: checkTimestamp,
-    }
-    const { source } = await saveGuideDraft(updatedGuide)
-    setSaveSource(source)
-    setLastSaved(new Date())
-    if (source !== "supabase") {
-      setSaveError("Supabase save failed — saved locally instead")
-    } else {
-      setSaveError(null)
-    }
+    console.log("[v0] Forge Rules validation complete:", {
+      passed: results.filter((r: any) => r.passed).length,
+      failed: results.filter((r: any) => !r.passed).length,
+      total: results.length,
+    })
   }
 
   // Check if validation needs refreshing when content changes
