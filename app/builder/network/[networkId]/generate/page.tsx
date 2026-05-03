@@ -61,6 +61,9 @@ export default function GeneratorPage({
 
   const network = networkId ? getNetworkById(networkId) : null
   const hubs = network ? getHubsByNetwork(network.id) : []
+  
+  // Get all collections from all hubs for pre-check
+  const allCollections = hubs.flatMap((hub) => getCollectionsByHub(hub.id))
 
   const handleGenerateMock = async () => {
     if (!formState.prompt.trim()) {
@@ -181,22 +184,37 @@ export default function GeneratorPage({
         </nav>
 
         {/* Pre-check: Require hubs and collections */}
-        {hubs.length === 0 && (
+        {(hubs.length === 0 || allCollections.length === 0) && (
           <Card className="mb-6 border-amber-500/30 bg-amber-500/5 p-5">
-            <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-              <strong>No hubs yet.</strong> You need at least one hub with collections before creating guides.
-            </p>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
-                Create Hub
-              </Link>
-            </Button>
+            {hubs.length === 0 ? (
+              <>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                  <strong>No hubs yet.</strong> You need at least one hub with collections before creating guides.
+                </p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
+                    Create Hub
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                  <strong>No collections yet.</strong> Create at least one collection before generating guides.
+                </p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
+                    Create Collection
+                  </Link>
+                </Button>
+              </>
+            )}
           </Card>
         )}
 
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Left: Input Form */}
-          {hubs.length > 0 ? (
+          {hubs.length > 0 && allCollections.length > 0 ? (
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold">Generate a Guide</h1>

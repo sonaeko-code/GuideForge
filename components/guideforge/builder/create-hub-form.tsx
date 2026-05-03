@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 import { generateMockHubDraft } from "@/lib/guideforge/mock-generator"
 import { createHub, createCollection } from "@/lib/guideforge/supabase-networks"
 import { SaveStatus } from "@/components/guideforge/builder/save-status"
@@ -40,6 +41,7 @@ function slugify(str: string): string {
 
 export function CreateHubForm({ networkId }: CreateHubFormProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [name, setName] = useState("Emberfall")
   const [hubKind, setHubKind] = useState<Hub["hubKind"]>("game")
   const [description, setDescription] = useState(
@@ -117,6 +119,14 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
       }
 
       console.log("[v0] Hub and collections created successfully")
+      
+      // Show success toast
+      toast({
+        title: "Hub created",
+        description: `${name} has been created with ${collectionNames.length} collection${collectionNames.length !== 1 ? 's' : ''}.`,
+        duration: 3000,
+      })
+      
       // Route back to dashboard and show the hubs tab where the new hub is now visible
       router.push(`/builder/network/${networkId}/dashboard?tab=hubs`)
     } catch (err) {
