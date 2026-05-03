@@ -10,6 +10,8 @@ import {
   getGuidesByNetworkId,
   getDraftGuidesByNetworkId,
   getPublishedGuidesByNetworkId,
+  checkGuidesTableReadability,
+  getGuidesByCollectionIds,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -122,10 +124,40 @@ export default async function NetworkDashboardPage({
     const safeDrafts = Array.isArray(drafts) ? drafts : []
     const safePublished = Array.isArray(published) ? published : []
     
-    console.log("[v0] Dashboard normalized guides:", {
-      total: safeGuides.length,
-      sample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
-    })
+    // DIAGNOSTICS: Capture what's actually loaded
+    const diagnostics = {
+      networkId: network.id,
+      networkName: network.name,
+      hubCount: safeHubs.length,
+      hubIds: safeHubs.map(h => h.id),
+      collectionCount: safeCollections.length,
+      collectionIds: safeCollections.map(c => c.id),
+      rawGuideCount: guides.length,
+      normalizedGuideCount: safeGuides.length,
+      guideIds: safeGuides.map((g: any) => g.id),
+      guideTitles: safeGuides.map((g: any) => ({ id: g.id, title: g.title, slug: g.slug, collection_id: g.collection_id, collectionId: g.collectionId, status: g.status })),
+      publishedCount: safePublished.length,
+      draftCount: safeDrafts.length,
+      isQuestLineRoute: network.id === "network_questline" || network.slug === "questline",
+    }
+    
+    // RLS diagnostics
+    const tableReadability = await checkGuidesTableReadability()
+    const collectionGuides = safeCollections.length > 0 
+      ? await getGuidesByCollectionIds(safeCollections.map(c => c.id))
+      : { guides: [] }
+    
+    const rlsDiagnostics = {
+      guidesTableReadable: tableReadability.canRead,
+      guidesTableRowCount: tableReadability.rowCount,
+      guidesTableError: tableReadability.error || null,
+      collectionGuidesCount: collectionGuides.guides?.length || 0,
+      collectionGuidesError: collectionGuides.error || null,
+      suspectedRLS: !tableReadability.canRead || (safeCollections.length > 0 && guides.length === 0 && collectionGuides.guides && collectionGuides.guides.length > 0),
+    }
+    
+    console.log("[v0] Dashboard RLS diagnostics:", rlsDiagnostics)
+    console.log("[v0] Dashboard diagnostics:", diagnostics)
 
     return (
       <main className="min-h-screen bg-background">
@@ -186,6 +218,43 @@ export default async function NetworkDashboardPage({
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Tabs Section - Handled by Client Component */}
+            <div className="rounded-lg border border-orange-400/50 bg-orange-500/5 p-4 mb-6">
+              <h3 className="font-semibold text-orange-700 dark:text-orange-300 mb-3">DEBUG: Guide Diagnostics</h3>
+              <div className="space-y-2 text-sm font-mono text-orange-600 dark:text-orange-400 overflow-auto max-h-64 bg-black/20 p-2 rounded">
+                <div>Network ID: {network.id}</div>
+                <div>Network Name: {network.name}</div>
+                <div>Is QuestLine: {diagnostics.isQuestLineRoute ? "YES" : "NO"}</div>
+                <div>Hubs: {diagnostics.hubCount} [{diagnostics.hubIds.join(", ")}]</div>
+                <div>Collections: {diagnostics.collectionCount} [{diagnostics.collectionIds.join(", ")}]</div>
+                <div className="border-t border-orange-400/30 pt-2 mt-2">Raw guides from Supabase: {diagnostics.rawGuideCount}</div>
+                <div>Normalized guides: {diagnostics.normalizedGuideCount}</div>
+                <div>Guide IDs: {diagnostics.guideIds.length === 0 ? "(empty)" : diagnostics.guideIds.join(", ")}</div>
+                {diagnostics.guideTitles.length > 0 && (
+                  <div className="border-t border-orange-400/30 pt-2 mt-2">
+                    {diagnostics.guideTitles.map((g: any, i: number) => (
+                      <div key={i} className="mb-1">
+                        [{i+1}] {g.title} (slug: {g.slug}, coll_id: {g.collection_id}, collId: {g.collectionId}, status: {g.status})
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="border-t border-orange-400/30 pt-2 mt-2">Published: {diagnostics.publishedCount} | Drafts: {diagnostics.draftCount}</div>
+                
+                <div className="border-t border-orange-400/30 pt-2 mt-2 text-orange-700 dark:text-orange-300 font-semibold">RLS Diagnostics:</div>
+                <div>Guides table readable: {rlsDiagnostics.guidesTableReadable ? "YES" : "NO"}</div>
+                {rlsDiagnostics.guidesTableError && <div className="text-red-600 dark:text-red-400">Table error: {rlsDiagnostics.guidesTableError}</div>}
+                <div>Guides table total rows (any user): {rlsDiagnostics.guidesTableRowCount}</div>
+                <div>Guides in selected collections: {rlsDiagnostics.collectionGuidesCount}</div>
+                {rlsDiagnostics.collectionGuidesError && <div className="text-red-600 dark:text-red-400">Collection error: {rlsDiagnostics.collectionGuidesError}</div>}
+                {rlsDiagnostics.suspectedRLS && (
+                  <div className="border-t border-red-400/30 pt-2 mt-2 text-red-600 dark:text-red-400">
+                    ⚠ SUSPECTED RLS ISSUE: Supabase is likely blocking SELECT on draft guides.
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Tabs Section - Handled by Client Component */}
