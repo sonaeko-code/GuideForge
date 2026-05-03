@@ -10,11 +10,15 @@ export default async function CreateCollectionPage({
 }) {
   const { networkId } = await params
 
+  console.log("[v0] Collection page networkId:", networkId)
+
   // Load hubs from Supabase, fallback to mock data
   let hubs = await getHubsByNetworkId(networkId)
   if (hubs.length === 0) {
     hubs = getHubsByNetwork(networkId)
   }
+
+  console.log("[v0] Collection page hubs loaded:", hubs.length)
 
   return (
     <main className="min-h-screen bg-background">

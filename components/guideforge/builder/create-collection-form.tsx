@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { createCollection } from "@/lib/guideforge/supabase-networks"
+import { SaveStatus } from "@/components/guideforge/builder/save-status"
 import type { GuideType, Hub } from "@/lib/guideforge/types"
 
 interface CreateCollectionFormProps {
@@ -59,20 +60,24 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
   const [description, setDescription] = useState("Build guides for different character classes and playstyles")
   const [defaultGuideType, setDefaultGuideType] = useState<GuideType>("character-build")
   const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
     if (!selectedHubId) {
       setError("Please select a hub")
+      setSaveStatus("error")
       return
     }
 
     setError(null)
+    setSaveStatus("saving")
     setIsSaving(true)
 
     try {
       const collSlug = slugify(name)
       
+      console.log("[v0] Selected hub for collection:", selectedHubId)
       console.log("[v0] Collection save payload:", { networkId, hubId: selectedHubId, slug: collSlug, name, description })
       
       const { collection, error: collError } = await createCollection(
@@ -90,11 +95,13 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
       if (collError || !collection.id) {
         console.error("[v0] Collection save error:", collError)
         setError(collError || "Failed to create collection")
+        setSaveStatus("error")
         setIsSaving(false)
         return
       }
 
-      console.log("[v0] Collection saved:", collection.id)
+      console.log("[v0] Collection save result:", collection.id)
+      setSaveStatus("saved")
       router.push(`/builder/network/${networkId}/dashboard?tab=collections`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
@@ -107,90 +114,99 @@ export function CreateCollectionForm({ networkId, hubs = [] }: CreateCollectionF
 
   return (
     <div className="space-y-8">
-      {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 flex items-start gap-3">
-          <AlertCircle className="size-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="flex-1">
-            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-          </div>
+      <SaveStatus state={saveStatus} error={error} message="Collection created successfully" />
+
+      {hubs.length === 0 ? (
+        <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+          <p className="font-semibold text-foreground">No hubs yet</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Create a hub first, then you can add collections to it.
+          </p>
+          <Button size="sm" asChild className="mt-4">
+            <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
+              Create Hub
+            </Link>
+          </Button>
         </div>
-      )}
+      ) : (
+      <div className="space-y-6">
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="hub-select">Hub</FieldLabel>
+            <FieldDescription>
+              Select which hub this collection belongs to.
+            </FieldDescription>
+            <Select value={selectedHubId} onValueChange={setSelectedHubId} disabled={isSaving}>
+              <SelectTrigger id="hub-select" className="mt-2">
+                <SelectValue placeholder="Select hub" />
+              </SelectTrigger>
+              <SelectContent>
+                {hubs.map((hub) => (
+                  <SelectItem key={hub.id} value={hub.id}>
+                    {hub.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="hub-select">Hub</FieldLabel>
-          <FieldDescription>
-            Select which hub this collection belongs to.
-          </FieldDescription>
-          <Select value={selectedHubId} onValueChange={setSelectedHubId} disabled={isSaving}>
-            <SelectTrigger id="hub-select" className="mt-2">
-              <SelectValue placeholder="Select hub" />
-            </SelectTrigger>
-            <SelectContent>
-              {hubs.map((hub) => (
-                <SelectItem key={hub.id} value={hub.id}>
-                  {hub.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+          <Field>
+            <FieldLabel htmlFor="collection-name">Collection name</FieldLabel>
+            <FieldDescription>Examples: "Character Builds", "Beginner Guides", "Boss Strategies"</FieldDescription>
+            <Input
+              id="collection-name"
+              placeholder="e.g. Character Builds"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-2"
+              disabled={isSaving}
+            />
+          </Field>
 
-        <Field>
-          <FieldLabel htmlFor="collection-name">Collection name</FieldLabel>
-          <FieldDescription>Examples: "Character Builds", "Beginner Guides", "Boss Strategies"</FieldDescription>
-          <Input
-            id="collection-name"
-            placeholder="e.g. Character Builds"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-2"
-            disabled={isSaving}
-          />
-        </Field>
+          <Field>
+            <FieldLabel htmlFor="collection-desc">Description</FieldLabel>
+            <FieldDescription>Describes what this collection contains and helps users understand its purpose.</FieldDescription>
+            <Textarea
+              id="collection-desc"
+              placeholder="Describe this collection..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="mt-2"
+              disabled={isSaving}
+            />
+          </Field>
 
-        <Field>
-          <FieldLabel htmlFor="collection-desc">Description</FieldLabel>
-          <FieldDescription>Describes what this collection contains and helps users understand its purpose.</FieldDescription>
-          <Textarea
-            id="collection-desc"
-            placeholder="Describe this collection..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="mt-2"
-            disabled={isSaving}
-          />
-        </Field>
+          <Field>
+            <FieldLabel htmlFor="default-type">Default guide type</FieldLabel>
+            <FieldDescription>When creating guides in this collection, this type will be pre-selected.</FieldDescription>
+            <Select value={defaultGuideType} onValueChange={(v) => setDefaultGuideType(v as GuideType)} disabled={isSaving}>
+              <SelectTrigger id="default-type" className="mt-2">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {GUIDE_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
 
-        <Field>
-          <FieldLabel htmlFor="default-type">Default guide type</FieldLabel>
-          <FieldDescription>When creating guides in this collection, this type will be pre-selected.</FieldDescription>
-          <Select value={defaultGuideType} onValueChange={(v) => setDefaultGuideType(v as GuideType)} disabled={isSaving}>
-            <SelectTrigger id="default-type" className="mt-2">
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              {GUIDE_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </FieldGroup>
-
-      <div className="flex gap-3 pt-4">
-        <Button asChild variant="outline" disabled={isSaving}>
-          <Link href={`/builder/network/${networkId}/dashboard`}>
-            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Cancel
-          </Link>
-        </Button>
-        <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "Saving..." : "Create Collection"}
-        </Button>
+        <div className="flex gap-3">
+          <Button asChild variant="outline" disabled={isSaving}>
+            <Link href={`/builder/network/${networkId}/dashboard`}>
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Cancel
+            </Link>
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Create Collection"}
+          </Button>
+        </div>
       </div>
+      )}
     </div>
   )
 }
