@@ -454,7 +454,7 @@ export async function getCollectionsByHubId(hubId: string): Promise<Collection[]
   }
 
   try {
-    console.log("[v0] Dashboard loaded collections for network hub:", hubId)
+    console.log("[v0] Loading collections for hub:", hubId)
 
     // Query using hub_id (snake_case) which is the actual column name
     const { data, error } = await supabase
@@ -467,8 +467,21 @@ export async function getCollectionsByHubId(hubId: string): Promise<Collection[]
       return []
     }
 
-    console.log("[v0] Collections tab rendered collections:", data?.length || 0)
-    return data as Collection[]
+    console.log("[v0] Collections loaded from Supabase:", data?.length || 0)
+    
+    // Normalize snake_case from Supabase to camelCase for the app
+    const normalized = (data || []).map((col: any) => ({
+      id: col.id,
+      hubId: col.hub_id,
+      networkId: col.network_id,
+      slug: col.slug,
+      name: col.name,
+      description: col.description,
+      defaultGuideType: col.default_guide_type,
+      guideIds: col.guide_ids || [],
+    })) as Collection[]
+    
+    return normalized
   } catch (err) {
     console.warn("[v0] Exception loading collections:", err)
     return []
