@@ -603,3 +603,205 @@ export async function getPublishedGuidesByNetworkId(networkId: string): Promise<
   const guides = await getGuidesByNetworkId(networkId)
   return guides.filter(g => g.status === "published")
 }
+
+// ========== UNIFIED BUILDER CONTEXT LOADER ==========
+
+/**
+ * Normalized, denormalized collection used in builder pages.
+ * Always carries its parent hub identity so cards/forms can render
+ * unambiguous "Hub: X" badges even when collection names collide.
+ */
+export interface NormalizedHub {
+  id: string
+  name: string
+  slug: string
+  description: string
+  hubKind?: string
+}
+
+export interface NormalizedCollection {
+  id: string
+  name: string
+  slug: string
+  description: string
+  hubId: string
+  hubName: string
+  hubSlug: string
+  guideIds: string[]
+}
+
+export interface NetworkBuilderContext {
+  network: Network | null
+  networkId: string
+  hubs: NormalizedHub[]
+  collections: NormalizedCollection[]
+  collectionsByHub: Record<string, NormalizedCollection[]>
+  errors: string[]
+  source: "supabase" | "mock" | "none"
+}
+
+/**
+ * loadNetworkBuilderContext
+ *
+ * Single source of truth for network → hub → collection data used by
+ * dashboard, generate, and guide/new pages.
+ *
+ * Resolution rules:
+ * - If networkParam is a UUID, load network by id.
+ * - If networkParam is a slug (or `network_<slug>`), load network by slug.
+ * - If networkParam refers to the legacy QuestLine mock and the Supabase
+ *   row exists, prefer the real Supabase data.
+ * - Only fall back to mock-data when the route truly is the QuestLine
+ *   mock/demo path AND no Supabase network exists for it.
+ * - Never throw. Always returns arrays (possibly empty) and an `errors[]`.
+ */
+export async function loadNetworkBuilderContext(
+  networkParam: string
+): Promise<NetworkBuilderContext> {
+  const errors: string[] = []
+  console.log("[v0] Builder context input networkParam:", networkParam)
+
+  // Step 1: Resolve the network
+  let network: Network | null = null
+  let source: "supabase" | "mock" | "none" = "none"
+
+  try {
+    network = await resolveNetworkParam(networkParam)
+    if (network) {
+      source = "supabase"
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("[v0] Builder context network resolve error:", msg)
+    errors.push(`network resolve: ${msg}`)
+  }
+
+  // Step 2: QuestLine demo fallback ONLY if Supabase has nothing AND route is QuestLine
+  const isQuestLineRoute =
+    networkParam === "questline" ||
+    networkParam === "network_questline"
+
+  if (!network && isQuestLineRoute) {
+    try {
+      const { getNetworkById: mockGetNetworkById } = await import("./mock-data")
+      const mockNet = mockGetNetworkById("network_questline")
+      if (mockNet) {
+        network = mockNet
+        source = "mock"
+        console.log("[v0] Builder context using QuestLine mock fallback")
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push(`mock fallback: ${msg}`)
+    }
+  }
+
+  if (!network) {
+    console.log("[v0] Builder context resolved network: null")
+    return {
+      network: null,
+      networkId: networkParam,
+      hubs: [],
+      collections: [],
+      collectionsByHub: {},
+      errors,
+      source: "none",
+    }
+  }
+
+  console.log(
+    "[v0] Builder context resolved network:",
+    network.id,
+    network.name,
+    "source:",
+    source
+  )
+
+  const resolvedNetworkId = network.id
+
+  // Step 3: Load hubs
+  let rawHubs: any[] = []
+  if (source === "supabase") {
+    try {
+      rawHubs = await getHubsByNetworkId(resolvedNetworkId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push(`hubs: ${msg}`)
+      rawHubs = []
+    }
+  } else if (source === "mock") {
+    try {
+      const { getHubsByNetwork } = await import("./mock-data")
+      rawHubs = getHubsByNetwork(resolvedNetworkId) || []
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push(`mock hubs: ${msg}`)
+      rawHubs = []
+    }
+  }
+
+  const hubs: NormalizedHub[] = rawHubs.map((h: any) => ({
+    id: h.id,
+    name: h.name,
+    slug: h.slug ?? h.id,
+    description: h.description ?? "",
+    hubKind: h.hub_kind ?? h.hubKind,
+  }))
+
+  console.log("[v0] Builder context hubs:", hubs.length)
+
+  // Step 4: Load collections per hub
+  const collections: NormalizedCollection[] = []
+  const collectionsByHub: Record<string, NormalizedCollection[]> = {}
+
+  for (const hub of hubs) {
+    let rawCols: any[] = []
+    if (source === "supabase") {
+      try {
+        rawCols = await getCollectionsByHubId(hub.id)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        errors.push(`collections for hub ${hub.id}: ${msg}`)
+        rawCols = []
+      }
+    } else if (source === "mock") {
+      try {
+        const { getCollectionsByHub } = await import("./mock-data")
+        rawCols = getCollectionsByHub(hub.id) || []
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        errors.push(`mock collections for hub ${hub.id}: ${msg}`)
+        rawCols = []
+      }
+    }
+
+    const normalized: NormalizedCollection[] = rawCols.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug ?? c.id,
+      description: c.description ?? "",
+      hubId: c.hubId ?? c.hub_id ?? hub.id,
+      hubName: hub.name,
+      hubSlug: hub.slug,
+      guideIds: c.guideIds ?? c.guide_ids ?? [],
+    }))
+
+    collectionsByHub[hub.id] = normalized
+    collections.push(...normalized)
+  }
+
+  console.log("[v0] Builder context collections:", collections.length)
+  if (errors.length > 0) {
+    console.log("[v0] Builder context errors:", errors)
+  }
+
+  return {
+    network,
+    networkId: resolvedNetworkId,
+    hubs,
+    collections,
+    collectionsByHub,
+    errors,
+    source,
+  }
+}
