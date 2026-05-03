@@ -592,6 +592,9 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
  * Get draft guides (status=draft or status=in-review) for a network
  */
 export async function getDraftGuidesByNetworkId(networkId: string): Promise<any[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
   const guides = await getGuidesByNetworkId(networkId)
   return guides.filter(g => g.status === "draft" || g.status === "in-review")
 }
@@ -600,6 +603,9 @@ export async function getDraftGuidesByNetworkId(networkId: string): Promise<any[
  * Get published guides (status=published) for a network
  */
 export async function getPublishedGuidesByNetworkId(networkId: string): Promise<any[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
   const guides = await getGuidesByNetworkId(networkId)
   return guides.filter(g => g.status === "published")
 }
@@ -721,7 +727,7 @@ export async function loadNetworkBuilderContext(
 
   // Step 3: Load hubs
   let rawHubs: any[] = []
-  if (source === "supabase") {
+  if (source === "supabase" && isSupabaseConfigured()) {
     try {
       rawHubs = await getHubsByNetworkId(resolvedNetworkId)
     } catch (err) {
@@ -756,7 +762,7 @@ export async function loadNetworkBuilderContext(
 
   for (const hub of hubs) {
     let rawCols: any[] = []
-    if (source === "supabase") {
+    if (source === "supabase" && isSupabaseConfigured()) {
       try {
         rawCols = await getCollectionsByHubId(hub.id)
       } catch (err) {
