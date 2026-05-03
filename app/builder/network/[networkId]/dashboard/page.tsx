@@ -575,7 +575,15 @@ export default async function NetworkDashboardPage({
                             const hubIdValid = col.hubId && col.hubId !== "undefined"
                             const colIdValid = col.id && col.id !== "undefined"
                             
-                            console.log(`[v0] Collection card route params: hub=${col.hubId}, collection=${col.id}`)
+                            if (hubIdValid && colIdValid) {
+                              console.log("[v0] Collection action route:", {
+                                generateGuide: `/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`,
+                                createManualGuide: `/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`,
+                                viewGuides: `/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`,
+                              })
+                            } else {
+                              console.log("[v0] Collection action route INVALID:", { hubIdValid, colIdValid, hubId: col.hubId, id: col.id })
+                            }
                             
                             return (
                               <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
@@ -674,13 +682,13 @@ export default async function NetworkDashboardPage({
                         </p>
                         <div className="flex gap-2 justify-center mt-4">
                           <Button size="sm" asChild>
-                            <Link href={`/builder/network/${networkId}/generate?collection=${filterCollectionId}`}>
+                            <Link href={`/builder/network/${networkId}/generate?hub=${filteredCollection?.hubId}&collection=${filterCollectionId}`}>
                               <Sparkles className="size-4 mr-1" aria-hidden="true" />
                               Generate Guide
                             </Link>
                           </Button>
                           <Button size="sm" asChild variant="outline">
-                            <Link href={`/builder/network/${networkId}/guide/new?collection=${filterCollectionId}`}>
+                            <Link href={`/builder/network/${networkId}/guide/new?hub=${filteredCollection?.hubId}&collection=${filterCollectionId}`}>
                               <Plus className="size-4 mr-1" aria-hidden="true" />
                               Create Manual Guide
                             </Link>

@@ -65,7 +65,27 @@ export default function GeneratorPage({
   useEffect(() => {
     const loadNetwork = async () => {
       const params_resolved = await params
-      setNetworkId(params_resolved.networkId)
+      const routeNetworkId = params_resolved.networkId
+      console.log("[v0] Generate route networkId:", routeNetworkId)
+      
+      // Try to find the network by ID - getNetworkById uses mock data
+      let resolvedNetworkId = routeNetworkId
+      const network = getNetworkById(routeNetworkId)
+      
+      if (!network) {
+        console.log("[v0] Generate networkId not found directly:", routeNetworkId)
+        // Mock data only has "network_questline", try looking it up
+        // For now, default to the only available network
+        const fallback = getNetworkById("network_questline")
+        if (fallback) {
+          resolvedNetworkId = fallback.id
+          console.log("[v0] Generate using fallback network:", fallback.id)
+        }
+      } else {
+        console.log("[v0] Generate found network directly:", network.id)
+      }
+      
+      setNetworkId(resolvedNetworkId)
     }
     loadNetwork()
   }, [params])
@@ -73,13 +93,13 @@ export default function GeneratorPage({
   const network = networkId ? getNetworkById(networkId) : null
   const hubs = network ? getHubsByNetwork(network.id) : []
   
-  console.log("[v0] Generate loaded network:", network?.name)
-  console.log("[v0] Generate loaded hubs:", hubs.length)
+  console.log("[v0] Generate resolved network:", network?.id, network?.name)
+  console.log("[v0] Generate raw hubs:", hubs.length)
   
   // Get all collections from all hubs for pre-check
   const allCollections = hubs.flatMap((hub) => getCollectionsByHub(hub.id))
   
-  console.log("[v0] Generate loaded collections:", allCollections.length)
+  console.log("[v0] Generate raw collections:", allCollections.length)
 
   // Get collections scoped to selected hub
   const collectionsForHub = formState.targetHubId
@@ -94,9 +114,13 @@ export default function GeneratorPage({
         requested: preselectedHubFromQuery,
         exists: hubExists,
         availableHubs: hubs.length,
+        hubList: hubs.map((h) => h.id),
       })
       if (hubExists) {
         setFormState((prev) => ({ ...prev, targetHubId: preselectedHubFromQuery }))
+      } else if (hubs.length > 0) {
+        // Hub param was invalid, don't crash - let user pick from available hubs
+        console.log("[v0] Generate hub param invalid, hubs available for selection")
       }
     }
   }, [preselectedHubFromQuery, hubs])
@@ -109,9 +133,12 @@ export default function GeneratorPage({
         requested: preselectedCollectionFromQuery,
         exists: collExists,
         availableCollections: collectionsForHub.length,
+        collectionList: collectionsForHub.map((c) => c.id),
       })
       if (collExists) {
         setSelectedCollectionId(preselectedCollectionFromQuery)
+      } else if (collectionsForHub.length > 0) {
+        console.log("[v0] Generate collection param invalid, collections available for selection")
       }
     }
   }, [preselectedCollectionFromQuery, formState.targetHubId, collectionsForHub])
@@ -141,6 +168,15 @@ export default function GeneratorPage({
       }
     }
   }, [formState.targetHubId, collectionsForHub, selectedCollectionId])
+
+  // Final prerequisite state log
+  console.log("[v0] Generate prerequisite state:", {
+    networkResolved: !!network,
+    hubsAvailable: hubs.length,
+    collectionsAvailable: allCollections.length,
+    hubSelected: formState.targetHubId,
+    collectionSelected: selectedCollectionId,
+  })
 
   const handleGenerateMock = async () => {
     if (!formState.prompt.trim()) {
