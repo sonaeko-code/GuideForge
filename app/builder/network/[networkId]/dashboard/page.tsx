@@ -48,15 +48,6 @@ export default async function NetworkDashboardPage({
   
   const { networkId } = await params
   const { tab, collection: filterCollectionId } = await searchParams
-  
-  console.log("[v0] dashboard page render:", {
-    networkId,
-    tab,
-    filterCollectionId,
-    tabResolved: tab || "drafts",
-    willShowGuideTab: tab === "guides",
-    willFilterByCollection: !!filterCollectionId,
-  })
 
   // Wrap entire component in try/catch to prevent crashes
   try {
@@ -525,16 +516,7 @@ export default async function NetworkDashboardPage({
                             const colIdValid = col.id && col.id !== "undefined"
                             
                             if (hubIdValid && colIdValid) {
-                              console.log("[v0] Collection action route:", {
-                                generateGuide: `/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`,
-                                createManualGuide: `/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`,
-                                viewGuides: `/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`,
-                              })
-                            } else {
-                              console.log("[v0] Collection action route INVALID:", { hubIdValid, colIdValid, hubId: col.hubId, id: col.id })
-                            }
-                            
-                            return (
+                              return (
                               <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
                                 <div className="space-y-2 flex-1">
                                   <div className="flex items-start justify-between gap-2">
@@ -572,14 +554,6 @@ export default async function NetworkDashboardPage({
                                       </Button>
                                       {(() => {
                                         const viewGuidesHref = `/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`
-                                        console.log("[v0] View Guides route:", {
-                                          collectionId: col.id,
-                                          collectionName: col.name,
-                                          hubId: col.hubId,
-                                          hubName: col.hubName,
-                                          href: viewGuidesHref,
-                                          guideCount: col.guideIds?.length || 0,
-                                        })
                                         return (
                                           <Button size="sm" asChild variant="ghost">
                                             <Link href={viewGuidesHref}>
@@ -613,17 +587,6 @@ export default async function NetworkDashboardPage({
               (() => {
                 const filteredCollection = safeCollections.find((c: NormalizedCollection) => c.id === filterCollectionId)
                 const filteredGuides = safeGuides.filter((g: Guide) => g.collectionId === filterCollectionId)
-                
-                console.log(`[v0] Guides tab filtered:`, {
-                  filterCollectionId,
-                  collectionFound: !!filteredCollection,
-                  collectionName: filteredCollection?.name,
-                  collectionHubName: filteredCollection?.hubName,
-                  totalGuides: safeGuides.length,
-                  filteredGuidesCount: filteredGuides.length,
-                  guidesWithCollectionId: safeGuides.filter(g => g.collectionId === filterCollectionId).length,
-                  guideSampleCollectionIds: safeGuides.slice(0, 3).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
-                })
                 
                 return (
                   <div className="space-y-4">
