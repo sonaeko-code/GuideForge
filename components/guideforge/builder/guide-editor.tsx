@@ -749,7 +749,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Summary
+                Requirements
               </label>
               <Textarea
                 value={requirementsText}
@@ -757,29 +757,30 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   markDirty()
                   setRequirementsText(e.target.value)
                 }}
-              placeholder="Add requirements here, one per line:&#10;• Level 30+&#10;• Completion of main questline"
-              className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              One requirement per line. Leave empty if not applicable.
-            </p>
-          </Card>
-
-          {normalizedGuide.warnings.length > 0 && (
-            <Card className="border-amber-500/20 bg-amber-500/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                Warnings
+                placeholder="Add requirements here, one per line:&#10;• Level 30+&#10;• Completion of main questline"
+                className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                One requirement per line. Leave empty if not applicable.
               </p>
-              <ul className="mt-3 space-y-1">
-                {normalizedGuide.warnings.map((warn, idx) => (
-                  <li key={idx} className="text-sm text-amber-700 dark:text-amber-400">
-                    ⚠ {warn}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
+            </div>
+          </div>
         </div>
+
+        {(normalizedGuide.warnings ?? []).length > 0 && (
+          <Card className="border-amber-500/20 bg-amber-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+              Warnings
+            </p>
+            <ul className="mt-3 space-y-1">
+              {(normalizedGuide.warnings ?? []).map((warn, idx) => (
+                <li key={idx} className="text-sm text-amber-700 dark:text-amber-400">
+                  ⚠ {warn}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         {/* Forge Rules Applied */}
         <Card className={`p-4 ${rulesStale ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"}`}>

@@ -5,7 +5,7 @@ import { ArrowLeft, ChevronRight, AlertCircle } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { CreateGuideForm } from "@/components/guideforge/builder/create-guide-form"
 import { getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
-import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
+import { getNetworkById, getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 
 export default async function CreateGuidePage({
   params,
@@ -14,11 +14,30 @@ export default async function CreateGuidePage({
   params: Promise<{ networkId: string }>
   searchParams: Promise<{ hub?: string; collection?: string }>
 }) {
-  const { networkId } = await params
+  let { networkId } = await params
   const { hub: preselectedHub, collection: preselectedCollection } = await searchParams
 
-  console.log("[v0] Manual guide new page:", {
-    networkId,
+  console.log("[v0] Manual guide page route networkId:", networkId)
+
+  // Task 4: Resolve network ID to real network UUID
+  // Mock data uses "network_questline", route might pass slug or other variant
+  let resolvedNetwork = getNetworkById(networkId)
+  if (!resolvedNetwork) {
+    const withPrefix = getNetworkById(`network_${networkId}`)
+    if (withPrefix) {
+      resolvedNetwork = withPrefix
+      networkId = withPrefix.id
+    } else {
+      const firstNetwork = getNetworkById("network_questline")
+      if (firstNetwork) {
+        resolvedNetwork = firstNetwork
+        networkId = firstNetwork.id
+      }
+    }
+  }
+
+  console.log("[v0] Manual guide page resolved network:", networkId, resolvedNetwork?.name)
+  console.log("[v0] Manual guide page query params:", {
     preselectedHub,
     preselectedCollection,
   })
@@ -28,6 +47,8 @@ export default async function CreateGuidePage({
   if (hubs.length === 0) {
     hubs = getHubsByNetwork(networkId)
   }
+
+  console.log("[v0] Manual guide page raw hubs:", hubs.length, hubs.map((h) => ({ id: h.id, name: h.name })))
 
   // Load collections for each hub, preferring Supabase
   const collectionsMap: { [hubId: string]: any[] } = {}
@@ -45,6 +66,7 @@ export default async function CreateGuidePage({
   console.log("[v0] Manual guide page hubs/collections:", {
     hubs: hubs.length,
     totalCollections,
+    collectionsByHub: Object.entries(collectionsMap).map(([hubId, cols]) => ({ hubId, count: cols.length })),
   })
 
   const breadcrumb = (

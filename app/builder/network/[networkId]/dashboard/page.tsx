@@ -48,14 +48,15 @@ export default async function NetworkDashboardPage({
   searchParams,
 }: {
   params: Promise<{ networkId: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; collection?: string }>
 }) {
   console.log("[v0] DASHBOARD PAGE START")
   
   const { networkId } = await params
-  const { tab } = await searchParams
+  const { tab, collection: filterCollectionId } = await searchParams
   
   console.log("[v0] dashboard resolving network", { networkId })
+  console.log("[v0] dashboard filter params", { tab, filterCollectionId })
 
   // Wrap entire component in try/catch to prevent crashes
   try {
@@ -493,7 +494,7 @@ export default async function NetworkDashboardPage({
           </TabsContent>
 
           {/* Collections tab */}
-          <TabsContent value="collections" className="space-y-4">
+          <TabsContent value="collections" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">
                 Collections ({safeCollections.length})
@@ -536,142 +537,301 @@ export default async function NetworkDashboardPage({
                 )}
               </div>
             ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {safeCollections.map((col: Collection) => (
-                <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
-                  <div className="space-y-2 flex-1">
-                    <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                      <FolderOpen className="size-4 text-primary" aria-hidden="true" />
-                      {col.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {col.description}
-                    </p>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {col.guideIds?.length || 0} guide
-                      {col.guideIds?.length !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" asChild>
-                      <Link
-                        href={`/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`}
-                      >
-                        <Sparkles className="size-3 mr-1" aria-hidden="true" />
-                        Generate Guide
-                      </Link>
-                    </Button>
-                    <Button size="sm" asChild variant="outline">
-                      <Link
-                        href={`/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`}
-                      >
-                        <Plus className="size-3 mr-1" aria-hidden="true" />
-                        Create Manual Guide
-                      </Link>
-                    </Button>
-                    <Button size="sm" asChild variant="ghost">
-                      <Link
-                        href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}
-                      >
-                        View Guides
-                      </Link>
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+              <div className="space-y-8">
+                {safeHubs.map((hub: Hub) => {
+                  const hubCollections = safeCollections.filter((c: Collection) => c.hubId === hub.id)
+                  console.log(`[v0] Hub ${hub.name} has ${hubCollections.length} collections`)
+                  
+                  return (
+                    <div key={hub.id} className="space-y-3">
+                      <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/50">
+                        <div>
+                          <h3 className="flex items-center gap-2 font-semibold text-foreground text-base">
+                            <BookMarked className="size-4 text-primary" aria-hidden="true" />
+                            {hub.name}
+                          </h3>
+                          {hub.description && (
+                            <p className="mt-1 text-sm text-muted-foreground">{hub.description}</p>
+                          )}
+                          <p className="mt-1 text-xs font-medium text-muted-foreground">
+                            {hubCollections.length} collection{hubCollections.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <Button size="sm" asChild variant="outline">
+                          <Link href={`/builder/network/${networkId}/collection/new?hub=${hub.id}`}>
+                            <Plus className="size-3 mr-1" aria-hidden="true" />
+                            Create Collection
+                          </Link>
+                        </Button>
+                      </div>
+                      
+                      {hubCollections.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border/50 bg-muted/20 p-4 text-center">
+                          <p className="text-sm text-muted-foreground">No collections in this hub yet.</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {hubCollections.map((col: Collection) => {
+                            const hubIdValid = col.hubId && col.hubId !== "undefined"
+                            const colIdValid = col.id && col.id !== "undefined"
+                            
+                            if (hubIdValid && colIdValid) {
+                              console.log("[v0] Collection action route:", {
+                                generateGuide: `/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`,
+                                createManualGuide: `/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`,
+                                viewGuides: `/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`,
+                              })
+                            } else {
+                              console.log("[v0] Collection action route INVALID:", { hubIdValid, colIdValid, hubId: col.hubId, id: col.id })
+                            }
+                            
+                            return (
+                              <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
+                                <div className="space-y-2 flex-1">
+                                  <h4 className="flex items-center gap-2 font-semibold text-foreground">
+                                    <FolderOpen className="size-4 text-primary" aria-hidden="true" />
+                                    {col.name}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground">{col.description}</p>
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {col.guideIds?.length || 0} guide{col.guideIds?.length !== 1 ? "s" : ""}
+                                  </p>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {hubIdValid && colIdValid ? (
+                                    <>
+                                      <Button size="sm" asChild>
+                                        <Link
+                                          href={`/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`}
+                                        >
+                                          <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                                          Generate Guide
+                                        </Link>
+                                      </Button>
+                                      <Button size="sm" asChild variant="outline">
+                                        <Link
+                                          href={`/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`}
+                                        >
+                                          <Plus className="size-3 mr-1" aria-hidden="true" />
+                                          Create Manual Guide
+                                        </Link>
+                                      </Button>
+                                      <Button size="sm" asChild variant="ghost">
+                                        <Link
+                                          href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}
+                                        >
+                                          View Guides
+                                        </Link>
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-red-600 dark:text-red-400">
+                                      Missing hub/collection link
+                                    </span>
+                                  )}
+                                </div>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </TabsContent>
 
           {/* Guides tab */}
           <TabsContent value="guides" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">
-                Guides ({safeGuides.length})
-              </h2>
-              <div className="text-sm text-muted-foreground">
-                {safePublished.length} published, {safeDrafts.length} draft
-              </div>
-            </div>
+            {filterCollectionId ? (
+              (() => {
+                const filteredCollection = safeCollections.find((c: Collection) => c.id === filterCollectionId)
+                const filteredGuides = safeGuides.filter((g: Guide) => g.collectionId === filterCollectionId)
+                
+                console.log(`[v0] Guides tab filtered to collection ${filterCollectionId}: ${filteredGuides.length} guides`)
+                
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold text-foreground">
+                          Guides in {filteredCollection?.name || 'Collection'}
+                        </h2>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {filteredGuides.length} guide{filteredGuides.length !== 1 ? "s" : ""} in this collection
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        asChild
+                        variant="outline"
+                      >
+                        <Link href={`/builder/network/${networkId}/dashboard?tab=guides`}>
+                          Show All Guides
+                        </Link>
+                      </Button>
+                    </div>
 
-            {safeGuides.length === 0 ? (
-              <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
-                <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
-                {safeCollections.length === 0 ? (
-                  <>
-                    <p className="font-semibold text-foreground">Create a collection first</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Guides live inside collections. Start by creating your first collection.
-                    </p>
-                    <Button size="sm" asChild className="mt-4">
-                      <Link href={`/builder/network/${networkId}/collection/new`}>
-                        Create First Collection
-                      </Link>
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-semibold text-foreground">No guides yet</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Generate your first guide to populate your network.
-                    </p>
-                    <Button size="sm" asChild className="mt-4">
-                      <Link href={`/builder/network/${networkId}/generate`}>
-                        Generate First Guide
-                      </Link>
-                    </Button>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {guides.map((guide: Guide) => (
-                  <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex-1">
-                        <h3 className="flex items-center gap-2 font-semibold text-foreground">
-                          <BookMarked className="size-4 text-primary" aria-hidden="true" />
-                          {guide.title}
-                        </h3>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <StatusBadge status={guide.status} />
-                          <DifficultyBadge difficulty={guide.difficulty} />
-                          {guide.verification && (
-                            <Badge variant="secondary" className="text-xs">
-                              {guide.verification === "forge-verified"
-                                ? "Forge Verified"
-                                : guide.verification}
-                            </Badge>
-                          )}
+                    {filteredGuides.length === 0 ? (
+                      <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+                        <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
+                        <p className="font-semibold text-foreground">No guides in this collection yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Create your first guide in this collection.
+                        </p>
+                        <div className="flex gap-2 justify-center mt-4">
+                          <Button size="sm" asChild>
+                            <Link href={`/builder/network/${networkId}/generate?hub=${filteredCollection?.hubId}&collection=${filterCollectionId}`}>
+                              <Sparkles className="size-4 mr-1" aria-hidden="true" />
+                              Generate Guide
+                            </Link>
+                          </Button>
+                          <Button size="sm" asChild variant="outline">
+                            <Link href={`/builder/network/${networkId}/guide/new?hub=${filteredCollection?.hubId}&collection=${filterCollectionId}`}>
+                              <Plus className="size-4 mr-1" aria-hidden="true" />
+                              Create Manual Guide
+                            </Link>
+                          </Button>
                         </div>
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="icon" variant="ghost">
-                            <MoreVertical
-                              className="size-4"
-                              aria-hidden="true"
-                            />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            {/* Guide preview link - use guide's hub slug if available */}
-                            <Link href={`/n/${network.slug || "questline"}/${guide.hubId || "emberfall"}/${guide.slug}`}>
-                              Preview
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Publish</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </Card>
-                ))}
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredGuides.map((guide: Guide) => (
+                          <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex-1">
+                                <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                                  <BookMarked className="size-4 text-primary" aria-hidden="true" />
+                                  {guide.title}
+                                </h3>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  <StatusBadge status={guide.status} />
+                                  <DifficultyBadge difficulty={guide.difficulty} />
+                                  {guide.verification && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {guide.verification === "forge-verified"
+                                        ? "Forge Verified"
+                                        : guide.verification}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="icon" variant="ghost">
+                                    <MoreVertical className="size-4" aria-hidden="true" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
+                                      Edit
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/n/${network.slug || "questline"}/${guide.hubId || "emberfall"}/${guide.slug}`}>
+                                      Preview
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem>Publish</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Guides ({safeGuides.length})
+                  </h2>
+                  <div className="text-sm text-muted-foreground">
+                    {safePublished.length} published, {safeDrafts.length} draft
+                  </div>
+                </div>
+
+                {safeGuides.length === 0 ? (
+                  <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+                    <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
+                    {safeCollections.length === 0 ? (
+                      <>
+                        <p className="font-semibold text-foreground">Create a collection first</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Guides live inside collections. Start by creating your first collection.
+                        </p>
+                        <Button size="sm" asChild className="mt-4">
+                          <Link href={`/builder/network/${networkId}/collection/new`}>
+                            Create First Collection
+                          </Link>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-foreground">No guides yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Generate your first guide to populate your network.
+                        </p>
+                        <Button size="sm" asChild className="mt-4">
+                          <Link href={`/builder/network/${networkId}/generate`}>
+                            Generate First Guide
+                          </Link>
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {safeGuides.map((guide: Guide) => (
+                      <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex-1">
+                            <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                              <BookMarked className="size-4 text-primary" aria-hidden="true" />
+                              {guide.title}
+                            </h3>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <StatusBadge status={guide.status} />
+                              <DifficultyBadge difficulty={guide.difficulty} />
+                              {guide.verification && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {guide.verification === "forge-verified"
+                                    ? "Forge Verified"
+                                    : guide.verification}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost">
+                                <MoreVertical className="size-4" aria-hidden="true" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
+                                  Edit
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/n/${network.slug || "questline"}/${guide.hubId || "emberfall"}/${guide.slug}`}>
+                                  Preview
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>Publish</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>

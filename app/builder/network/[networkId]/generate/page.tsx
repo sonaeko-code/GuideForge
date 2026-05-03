@@ -37,8 +37,15 @@ export default function GeneratorPage({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const preselectedHubFromQuery = searchParams?.get("hub") ?? ""
-  const preselectedCollectionFromQuery = searchParams?.get("collection") ?? ""
+  
+  // Read and validate query params - ignore undefined, empty strings
+  const hubParam = searchParams?.get("hub")
+  const collectionParam = searchParams?.get("collection")
+  const preselectedHubFromQuery = (hubParam && hubParam !== "undefined" && hubParam.trim()) ? hubParam : ""
+  const preselectedCollectionFromQuery = (collectionParam && collectionParam !== "undefined" && collectionParam.trim()) ? collectionParam : ""
+
+  console.log("[v0] Generate route query params:", { hubParam, collectionParam })
+  console.log("[v0] Generate route validated params:", { preselectedHubFromQuery, preselectedCollectionFromQuery })
 
   const [networkId, setNetworkId] = useState<string>("")
   const [session, setSession] = useState<GenerationSession | null>(null)
@@ -58,7 +65,27 @@ export default function GeneratorPage({
   useEffect(() => {
     const loadNetwork = async () => {
       const params_resolved = await params
-      setNetworkId(params_resolved.networkId)
+      const routeNetworkId = params_resolved.networkId
+      console.log("[v0] Generate route networkId:", routeNetworkId)
+      
+      // Try to find the network by ID - getNetworkById uses mock data
+      let resolvedNetworkId = routeNetworkId
+      const network = getNetworkById(routeNetworkId)
+      
+      if (!network) {
+        console.log("[v0] Generate networkId not found directly:", routeNetworkId)
+        // Mock data only has "network_questline", try looking it up
+        // For now, default to the only available network
+        const fallback = getNetworkById("network_questline")
+        if (fallback) {
+          resolvedNetworkId = fallback.id
+          console.log("[v0] Generate using fallback network:", fallback.id)
+        }
+      } else {
+        console.log("[v0] Generate found network directly:", network.id)
+      }
+      
+      setNetworkId(resolvedNetworkId)
     }
     loadNetwork()
   }, [params])
@@ -66,13 +93,55 @@ export default function GeneratorPage({
   const network = networkId ? getNetworkById(networkId) : null
   const hubs = network ? getHubsByNetwork(network.id) : []
   
+  console.log("[v0] Generate resolved network:", network?.id, network?.name)
+  console.log("[v0] Generate raw hubs:", hubs.length)
+  
   // Get all collections from all hubs for pre-check
   const allCollections = hubs.flatMap((hub) => getCollectionsByHub(hub.id))
+  
+  console.log("[v0] Generate raw collections:", allCollections.length)
 
   // Get collections scoped to selected hub
   const collectionsForHub = formState.targetHubId
     ? getCollectionsByHub(formState.targetHubId)
     : []
+
+  // Validate preselected hub and collection from query params
+  useEffect(() => {
+    if (preselectedHubFromQuery) {
+      const hubExists = hubs.some((h) => h.id === preselectedHubFromQuery)
+      console.log("[v0] Generate selected hub:", {
+        requested: preselectedHubFromQuery,
+        exists: hubExists,
+        availableHubs: hubs.length,
+        hubList: hubs.map((h) => h.id),
+      })
+      if (hubExists) {
+        setFormState((prev) => ({ ...prev, targetHubId: preselectedHubFromQuery }))
+      } else if (hubs.length > 0) {
+        // Hub param was invalid, don't crash - let user pick from available hubs
+        console.log("[v0] Generate hub param invalid, hubs available for selection")
+      }
+    }
+  }, [preselectedHubFromQuery, hubs])
+
+  // Validate preselected collection after hub is set
+  useEffect(() => {
+    if (preselectedCollectionFromQuery && formState.targetHubId) {
+      const collExists = collectionsForHub.some((c) => c.id === preselectedCollectionFromQuery)
+      console.log("[v0] Generate selected collection:", {
+        requested: preselectedCollectionFromQuery,
+        exists: collExists,
+        availableCollections: collectionsForHub.length,
+        collectionList: collectionsForHub.map((c) => c.id),
+      })
+      if (collExists) {
+        setSelectedCollectionId(preselectedCollectionFromQuery)
+      } else if (collectionsForHub.length > 0) {
+        console.log("[v0] Generate collection param invalid, collections available for selection")
+      }
+    }
+  }, [preselectedCollectionFromQuery, formState.targetHubId, collectionsForHub])
 
   // Auto-preselect hub if there's only one
   useEffect(() => {
@@ -99,6 +168,15 @@ export default function GeneratorPage({
       }
     }
   }, [formState.targetHubId, collectionsForHub, selectedCollectionId])
+
+  // Final prerequisite state log
+  console.log("[v0] Generate prerequisite state:", {
+    networkResolved: !!network,
+    hubsAvailable: hubs.length,
+    collectionsAvailable: allCollections.length,
+    hubSelected: formState.targetHubId,
+    collectionSelected: selectedCollectionId,
+  })
 
   const handleGenerateMock = async () => {
     if (!formState.prompt.trim()) {
@@ -240,22 +318,22 @@ export default function GeneratorPage({
             {hubs.length === 0 ? (
               <>
                 <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                  <strong>No hubs yet.</strong> You need at least one hub with collections before creating guides.
+                  <strong>Create a hub first.</strong> Guides belong to collections, which belong to hubs.
                 </p>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/builder/network/${networkId}/dashboard?tab=hubs`}>
-                    Create Hub
+                    Create First Hub
                   </Link>
                 </Button>
               </>
             ) : (
               <>
                 <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                  <strong>No collections yet.</strong> Create at least one collection before generating guides.
+                  <strong>Create a collection first.</strong> Collections organize guides within your hubs.
                 </p>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
-                    Create Collection
+                    Create First Collection
                   </Link>
                 </Button>
               </>
