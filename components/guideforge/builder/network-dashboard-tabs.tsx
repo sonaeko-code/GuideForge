@@ -82,6 +82,14 @@ export function NetworkDashboardTabs({
   const filteredGuides = initialCollectionId
     ? safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId)
     : safeGuides
+  
+  console.log("[v0] Guides tab rendering:", {
+    totalGuides: safeGuides.length,
+    filteredByCollection: initialCollectionId ? true : false,
+    filteredGuideCount: filteredGuides.length,
+    collectionMatch: filteredCollection ? filteredCollection.name : "none",
+    guideSample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
+  })
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -415,6 +423,9 @@ export function NetworkDashboardTabs({
                       const hubIdValid = col.hubId && col.hubId !== "undefined"
                       const colIdValid = col.id && col.id !== "undefined"
                       
+                      // Calculate guide count for this collection from loaded guides
+                      const collectionGuideCount = safeGuides.filter((g: Guide) => g.collectionId === col.id).length
+                      
                       if (hubIdValid && colIdValid) {
                         return (
                           <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
@@ -430,7 +441,7 @@ export function NetworkDashboardTabs({
                               </div>
                               <p className="text-sm text-muted-foreground">{col.description}</p>
                               <p className="text-xs font-medium text-muted-foreground">
-                                {col.guideIds?.length || 0} guide{col.guideIds?.length !== 1 ? "s" : ""}
+                                {collectionGuideCount} guide{collectionGuideCount !== 1 ? "s" : ""}
                               </p>
                             </div>
                             <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">

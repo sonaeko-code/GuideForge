@@ -69,6 +69,10 @@ export default async function NetworkDashboardPage({
         try {
           guides = await getGuidesByNetworkId(network.id)
           if (!guides) guides = []
+          console.log("[v0] Dashboard guide loading collection IDs:", {
+            totalGuides: guides.length,
+            collectionIdValues: guides.slice(0, 3).map(g => ({ id: g.id, collection_id: g.collection_id, collectionId: g.collectionId })),
+          })
         } catch (e) {
           guides = []
         }
@@ -102,9 +106,26 @@ export default async function NetworkDashboardPage({
     // Safe defaults
     const safeHubs = Array.isArray(hubs) ? hubs : []
     const safeCollections = Array.isArray(collections) ? collections : []
-    const safeGuides = Array.isArray(guides) ? guides : []
+    
+    // Normalize guides from Supabase snake_case to camelCase
+    const safeGuides = Array.isArray(guides) ? guides.map((g: any) => ({
+      ...g,
+      collectionId: g.collection_id || g.collectionId,
+      createdAt: g.created_at || g.createdAt,
+      updatedAt: g.updated_at || g.updatedAt,
+      publishedAt: g.published_at || g.publishedAt,
+      authorId: g.author_id || g.authorId,
+      reviewerId: g.reviewer_id || g.reviewerId,
+      verificationStatus: g.verification_status || g.verificationStatus,
+    })) : []
+    
     const safeDrafts = Array.isArray(drafts) ? drafts : []
     const safePublished = Array.isArray(published) ? published : []
+    
+    console.log("[v0] Dashboard normalized guides:", {
+      total: safeGuides.length,
+      sample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
+    })
 
     return (
       <main className="min-h-screen bg-background">
