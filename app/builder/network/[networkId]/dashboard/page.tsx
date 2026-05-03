@@ -88,57 +88,105 @@ export default async function NetworkDashboardPage({
     )
   }
 
-  // Try to load hubs from Supabase first, fallback to mock data
-  let hubs = await getHubsByNetworkId(network.id)
-  if (hubs.length === 0) {
-    hubs = getHubsByNetwork(network.id)
-  }
+  // Safe data loading with error handling
+  console.log("[v0] Dashboard load start: networkId:", networkId)
+  console.log("[v0] Dashboard resolved network:", network.id, network.name)
 
-  console.log("[v0] Current network:", network.name)
-  console.log("[v0] Network hubs:", hubs.length)
-
-  // Load collections for each hub, preferring Supabase
+  let hubs: Hub[] = []
   let collections: Collection[] = []
-  for (const hub of hubs) {
-    const hubCollections = await getCollectionsByHubId(hub.id)
-    if (hubCollections.length === 0) {
-      // Fallback to mock data
-      collections = collections.concat(getCollectionsByHub(hub.id))
-    } else {
-      collections = collections.concat(hubCollections)
-    }
-  }
-
-  console.log("[v0] Network collections:", collections.length)
-
-  // Load guides scoped to this network ONLY
   let guides: any[] = []
   let published: any[] = []
   let drafts: any[] = []
-  
-  // For non-QuestLine networks, load from Supabase
-  // For QuestLine, optionally load from mock data to preserve demo content
-  const isQuestLineRoute = network.id === "network_questline" || network.slug === "questline"
-  
-  if (!isQuestLineRoute) {
-    // Real networks: load from Supabase only
-    guides = await getGuidesByNetworkId(network.id)
-    drafts = await getDraftGuidesByNetworkId(network.id)
-    published = await getPublishedGuidesByNetworkId(network.id)
-  } else {
-    // QuestLine demo route: use mock data for demo content
-    guides = collections.flatMap((c: Collection) => getGuidesByCollection(c.id))
-    published = guides.filter((g: any) => g.status === "published")
-    drafts = guides.filter((g: any) => g.status === "draft" || g.status === "in-review")
+  let loadErrors: string[] = []
+
+  try {
+    // Try to load hubs from Supabase first, fallback to mock data
+    hubs = await getHubsByNetworkId(network.id)
+    console.log("[v0] Dashboard hubs result (Supabase):", hubs.length)
+    
+    if (hubs.length === 0) {
+      hubs = getHubsByNetwork(network.id)
+      console.log("[v0] Dashboard hubs result (fallback mock):", hubs.length)
+    }
+  } catch (err) {
+    console.error("[v0] Dashboard load error (hubs):", err)
+    loadErrors.push(`Failed to load hubs: ${err instanceof Error ? err.message : String(err)}`)
+    hubs = []
   }
 
-  console.log("[v0] Dashboard scoped guides passed to list:", drafts.length)
-  console.log("[v0] - Draft guides:", drafts.length)
-  console.log("[v0] - Published guides:", published.length)
+  // Load collections for each hub, preferring Supabase
+  try {
+    for (const hub of hubs) {
+      try {
+        const hubCollections = await getCollectionsByHubId(hub.id)
+        if (hubCollections.length === 0) {
+          // Fallback to mock data
+          collections = collections.concat(getCollectionsByHub(hub.id))
+        } else {
+          collections = collections.concat(hubCollections)
+        }
+      } catch (hubErr) {
+        console.error("[v0] Dashboard load error (collections for hub", hub.id, "):", hubErr)
+        // Continue with other hubs instead of crashing
+        collections = collections.concat(getCollectionsByHub(hub.id))
+      }
+    }
+    console.log("[v0] Dashboard collections result:", collections.length)
+  } catch (err) {
+    console.error("[v0] Dashboard load error (collections):", err)
+    loadErrors.push(`Failed to load collections: ${err instanceof Error ? err.message : String(err)}`)
+    collections = []
+  }
+
+  // Load guides scoped to this network ONLY
+  try {
+    const isQuestLineRoute = network.id === "network_questline" || network.slug === "questline"
+    
+    if (!isQuestLineRoute) {
+      // Real networks: load from Supabase only
+      guides = await getGuidesByNetworkId(network.id)
+      drafts = await getDraftGuidesByNetworkId(network.id)
+      published = await getPublishedGuidesByNetworkId(network.id)
+    } else {
+      // QuestLine demo route: use mock data for demo content
+      guides = collections.flatMap((c: Collection) => getGuidesByCollection(c.id))
+      published = guides.filter((g: any) => g.status === "published")
+      drafts = guides.filter((g: any) => g.status === "draft" || g.status === "in-review")
+    }
+    
+    console.log("[v0] Dashboard guides result:", guides.length, "| published:", published.length, "| drafts:", drafts.length)
+  } catch (err) {
+    console.error("[v0] Dashboard load error (guides):", err)
+    loadErrors.push(`Failed to load guides: ${err instanceof Error ? err.message : String(err)}`)
+    guides = []
+    published = []
+    drafts = []
+  }
 
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader hideCta />
+
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
+        {/* Error display if data loading failed */}
+        {loadErrors.length > 0 && (
+          <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-900 dark:text-amber-100">Some data failed to load</p>
+                <ul className="mt-2 space-y-1 text-sm text-amber-800 dark:text-amber-200">
+                  {loadErrors.map((error, i) => (
+                    <li key={i}>• {error}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  Empty states will be shown below. Some features may be limited.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
         {/* Back to Builder Home link */}

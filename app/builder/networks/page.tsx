@@ -10,7 +10,7 @@ export default async function NetworksDirectoryPage() {
   // Load all networks from Supabase
   let networks = await getAllNetworks()
   
-  console.log("[v0] Networks directory: found", networks.length, "networks")
+  console.log("[v0] Networks directory loaded networks:", networks.length)
 
   // If no real networks exist, show empty state
   if (networks.length === 0) {
@@ -45,32 +45,41 @@ export default async function NetworksDirectoryPage() {
     )
   }
 
-  // Load hub and collection counts for each network
+  // Load hub and collection counts for each network safely
   const networksWithCounts = await Promise.all(
     networks.map(async (network) => {
+      let hubCount = 0
+      let collectionCount = 0
+      
       try {
         const hubs = await getHubsByNetworkId(network.id)
+        hubCount = hubs?.length || 0
+        console.log("[v0] Network card counts:", network.id, "hubs:", hubCount)
         
-        let collections = 0
         if (hubs && hubs.length > 0) {
-          const collectionArrays = await Promise.all(
-            hubs.map(hub => getCollectionsByHubId(hub.id))
-          )
-          collections = collectionArrays.reduce((sum, arr) => sum + (arr?.length || 0), 0)
-        }
-
-        return {
-          ...network,
-          hubCount: hubs?.length || 0,
-          collectionCount: collections,
+          try {
+            const collectionArrays = await Promise.all(
+              hubs.map(hub => getCollectionsByHubId(hub.id).catch(() => []))
+            )
+            collectionCount = collectionArrays.reduce((sum, arr) => sum + (arr?.length || 0), 0)
+            console.log("[v0] Network card counts:", network.id, "collections:", collectionCount)
+          } catch (collErr) {
+            console.warn("[v0] Network count error (collections for", network.id, "):", collErr)
+            // Return zero collections if query fails, don't let it break the whole card
+            collectionCount = 0
+          }
         }
       } catch (err) {
-        console.warn("[v0] Error loading counts for network", network.id, err)
-        return {
-          ...network,
-          hubCount: 0,
-          collectionCount: 0,
-        }
+        console.warn("[v0] Network count error (hubs for", network.id, "):", err)
+        // Return zeroes if counts fail to load, but still render the card
+        hubCount = 0
+        collectionCount = 0
+      }
+
+      return {
+        ...network,
+        hubCount,
+        collectionCount,
       }
     })
   )
