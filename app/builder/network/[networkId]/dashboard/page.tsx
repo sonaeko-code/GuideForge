@@ -49,9 +49,14 @@ export default async function NetworkDashboardPage({
   const { networkId } = await params
   const { tab, collection: filterCollectionId } = await searchParams
   
-  console.log("[v0] dashboard resolving network", { networkId })
-  console.log("[v0] dashboard filter params", { tab, filterCollectionId })
-  console.log("[v0] dashboard will render Tabs with defaultValue:", tab || "collections")
+  console.log("[v0] dashboard page render:", {
+    networkId,
+    tab,
+    filterCollectionId,
+    tabResolved: tab || "drafts",
+    willShowGuideTab: tab === "guides",
+    willFilterByCollection: !!filterCollectionId,
+  })
 
   // Wrap entire component in try/catch to prevent crashes
   try {
@@ -568,8 +573,12 @@ export default async function NetworkDashboardPage({
                                       {(() => {
                                         const viewGuidesHref = `/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`
                                         console.log("[v0] View Guides route:", {
-                                          collection: col.name,
+                                          collectionId: col.id,
+                                          collectionName: col.name,
+                                          hubId: col.hubId,
+                                          hubName: col.hubName,
                                           href: viewGuidesHref,
+                                          guideCount: col.guideIds?.length || 0,
                                         })
                                         return (
                                           <Button size="sm" asChild variant="ghost">
@@ -605,7 +614,16 @@ export default async function NetworkDashboardPage({
                 const filteredCollection = safeCollections.find((c: NormalizedCollection) => c.id === filterCollectionId)
                 const filteredGuides = safeGuides.filter((g: Guide) => g.collectionId === filterCollectionId)
                 
-                console.log(`[v0] Guides tab filtered to collection ${filterCollectionId}: ${filteredGuides.length} guides`)
+                console.log(`[v0] Guides tab filtered:`, {
+                  filterCollectionId,
+                  collectionFound: !!filteredCollection,
+                  collectionName: filteredCollection?.name,
+                  collectionHubName: filteredCollection?.hubName,
+                  totalGuides: safeGuides.length,
+                  filteredGuidesCount: filteredGuides.length,
+                  guidesWithCollectionId: safeGuides.filter(g => g.collectionId === filterCollectionId).length,
+                  guideSampleCollectionIds: safeGuides.slice(0, 3).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
+                })
                 
                 return (
                   <div className="space-y-4">
