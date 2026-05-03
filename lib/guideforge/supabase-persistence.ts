@@ -332,16 +332,19 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // Determine save mode: update existing by id, or insert new
       // For new guides, ensure slug is unique within the collection
       let finalSlug = guide.slug || guide.id
-      const saveMode = guide.id && guide.id.length > 0 ? "update" : "insert"
+      const isExistingGuide = guide.id && guide.id.length > 0 && guide.id !== "new"
+      const saveMode = isExistingGuide ? "update" : "insert"
 
       if (saveMode === "insert") {
         // For new guides, generate unique slug if needed
         finalSlug = await generateUniqueSlugForCollection(finalSlug, normalizedCollectionId)
       }
 
-      console.log("[v0] Saving guide id:", guide.id)
-      console.log("[v0] Saving guide slug:", finalSlug)
-      console.log("[v0] Save mode:", saveMode)
+      console.log("[v0] Guide save mode:", saveMode)
+      console.log("[v0] Existing guide id:", isExistingGuide ? guide.id : "new guide")
+      console.log("[v0] Guide collection_id:", normalizedCollectionId)
+      console.log("[v0] Original slug:", guide.slug || guide.id)
+      console.log("[v0] Final slug:", finalSlug)
 
       console.log("[v0] saveDraft: Guide object before save:", {
         id: guide.id,
@@ -393,7 +396,24 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         .from("guides")
         .upsert(guideData, { onConflict: "id" })
 
-      if (guideError) {
+      // Handle duplicate slug error for inserts
+      if (guideError && guideError.code === "23505" && saveMode === "insert") {
+        console.warn("[v0] Duplicate slug handled:", guideError.message)
+        // Generate another unique slug and retry once
+        finalSlug = await generateUniqueSlugForCollection(`${finalSlug}-2`, normalizedCollectionId)
+        guideData.slug = finalSlug
+        console.log("[v0] Retrying with new slug:", finalSlug)
+        
+        const { error: retryError } = await supabase
+          .from("guides")
+          .upsert(guideData, { onConflict: "id" })
+        
+        if (retryError) {
+          console.error("[v0] Supabase guide save FAILED after retry:", retryError)
+          this.localStorageAdapter.saveDraftSync(guide)
+          return { id: guide.id, source: "localStorage", error: retryError.message }
+        }
+      } else if (guideError) {
         const errorMsg = `${guideError.code}: ${guideError.message}${guideError.hint ? ` (${guideError.hint})` : ""}`
         console.error("[v0] Supabase guide save FAILED:", errorMsg)
         console.error("[v0] Full error:", JSON.stringify(guideError, null, 2))
@@ -401,7 +421,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         return { id: guide.id, source: "localStorage", error: errorMsg }
       }
 
-      console.log("[v0] saveDraft: Supabase guides upsert SUCCESS")
+      console.log("[v0] Guide save result: success")
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0

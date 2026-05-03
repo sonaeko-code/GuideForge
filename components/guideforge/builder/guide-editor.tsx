@@ -40,6 +40,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     warnings: guide.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
   }
   
+  // Track hydration to prevent autosave on initial load
+  const hasHydratedRef = useRef(false)
+  const userEditedRef = useRef(false)
+  
   const [title, setTitle] = useState(normalizedGuide.title || "")
   const [summary, setSummary] = useState(normalizedGuide.summary || "")
   const [requirementsText, setRequirementsText] = useState(normalizedGuide.requirements.join("\n") || "")
@@ -69,12 +73,25 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Autosave effect - debounced by 300ms
+  
+  // Mark hydration complete on mount
   useEffect(() => {
-    // Skip autosave if guide is published or if this is the initial load
+    console.log("[v0] Guide editor hydrated: initial state loaded, autosave disabled until user edit")
+    hasHydratedRef.current = true
+    userEditedRef.current = false
+  }, [])
+
+  // Autosave effect - debounced by 300ms, only saves after user edits
+  useEffect(() => {
+    // Skip autosave if guide is published
     if (guideStatus === "published") {
       console.log("[v0] Autosave skipped: guide is published")
+      return
+    }
+    
+    // Skip autosave on initial load before user has edited anything
+    if (!hasHydratedRef.current || !userEditedRef.current) {
+      console.log("[v0] Autosave skipped initial load: hydrated=", hasHydratedRef.current, "userEdited=", userEditedRef.current)
       return
     }
 
@@ -83,8 +100,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       clearTimeout(autosaveTimerRef.current)
     }
 
-    // Show "Saving..." immediately when changes are detected
-    console.log("[v0] Autosave triggered by: user edit")
+    // Show "Saving..." when changes are detected after hydration
+    console.log("[v0] Autosave triggered by user edit")
     console.log("[v0] Autosave toast state changed: saving")
     setAutosaveStatus("saving")
 
@@ -215,6 +232,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
   }, [title, summary, requirementsText, steps, version, guideStatus])
 
+  // Mark guide as edited when user changes content
+  const markDirty = () => {
+    if (!userEditedRef.current) {
+      console.log("[v0] User marked guide dirty: first edit detected")
+      userEditedRef.current = true
+    }
+  }
+  
   // Mock state tracking for draft/ready/published flow
   const isDraft = guideStatus === "draft"
   const isReady = guideStatus === "ready"
@@ -283,11 +308,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         ? { ...s, body: generateAlternateSectionContent(s.kind) }
         : s
     )
+    markDirty()
     setSteps(updatedSteps)
     setRegeneratedSections(new Set([...regeneratedSections, stepId]))
     
     // Trigger autosave status on regenerate
-    console.log("[v0] Autosave triggered by: Regenerate section")
+    console.log("[v0] Autosave triggered by regenerate: user regenerated section")
     setAutosaveStatus("saving")
     console.log("[v0] Autosave indicator state: saving")
     
@@ -712,7 +738,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               </label>
               <Input
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  markDirty()
+                  setTitle(e.target.value)
+                }}
                 className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 placeholder="Guide title"
               />
@@ -723,88 +752,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Summary
               </label>
               <Textarea
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                className="mt-2 border border-border/50 bg-muted/40 text-sm rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                placeholder="Brief description of what readers will learn..."
-                rows={2}
-              />
-            </div>
-          </div>
-
-          {/* Metadata grid */}
-          <div className="grid gap-3 pt-2 md:grid-cols-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Difficulty
-              </p>
-              <p className="mt-1 text-sm font-medium text-foreground">
-                {guide.difficulty.charAt(0).toUpperCase() + guide.difficulty.slice(1)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Patch / Version
-              </p>
-              <Input
-                value={version}
-                onChange={(e) => setVersion(e.target.value)}
-                placeholder="e.g. Patch 4.2"
-                className="mt-1 h-8 border border-border/50 bg-muted/40 text-sm rounded focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-              />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Type
-              </p>
-              <p className="mt-1 text-sm font-medium capitalize text-foreground">
-                {guide.type.replace("-", " ")}
-              </p>
-            </div>
-          </div>
-
-          {/* Status badges */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            <DifficultyBadge difficulty={guide.difficulty} />
-            <Badge variant="secondary" className="text-xs">
-              {guide.type.replace("-", " ")}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Debug Config Panel */}
-        {showDebugInfo && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20 p-3 space-y-2 text-xs font-mono">
-            <div className="font-semibold text-amber-900 dark:text-amber-300">Supabase Configuration Debug</div>
-            <div className="space-y-1 text-amber-800 dark:text-amber-200">
-              <div>URL present: {process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ yes" : "✗ no"}</div>
-              <div>Anon key present: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "✓ yes" : "✗ no"}</div>
-              <div>Last save target: {saveSource || "not yet"}</div>
-              <div>Adapter: {saveSource === "supabase" ? "Supabase" : "localStorage"}</div>
-              <div className="text-xs text-amber-700 dark:text-amber-300 pt-1">
-                Check browser console for detailed [v0] logs about configuration detection and adapter selection.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Requirements and warnings */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Editable Requirements */}
-          <Card className="border-border/50 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Requirements
-              </p>
-              {requirementsText.trim().length > 0 && (
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  {requirementsText.split("\n").filter(l => l.trim().length > 0).length} item{requirementsText.split("\n").filter(l => l.trim().length > 0).length !== 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-            <textarea
-              value={requirementsText}
-              onChange={(e) => setRequirementsText(e.target.value)}
+                value={requirementsText}
+                onChange={(e) => {
+                  markDirty()
+                  setRequirementsText(e.target.value)
+                }}
               placeholder="Add requirements here, one per line:&#10;• Level 30+&#10;• Completion of main questline"
               className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
@@ -1033,6 +985,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                       <Input
                         value={currentStep.title}
                         onChange={(e) => {
+                          markDirty()
                           const updated = { ...currentStep, title: e.target.value }
                           setSteps(steps.map((s) => (s.id === currentStep.id ? updated : s)))
                         }}
@@ -1048,6 +1001,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                       <Textarea
                         value={currentStep.body}
                         onChange={(e) => {
+                          markDirty()
                           const updated = { ...currentStep, body: e.target.value }
                           setSteps(steps.map((s) => (s.id === currentStep.id ? updated : s)))
                         }}
