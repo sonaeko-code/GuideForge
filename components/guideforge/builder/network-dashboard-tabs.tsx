@@ -253,9 +253,25 @@ export function NetworkDashboardTabs({
           </div>
         ) : (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Guides ({safeGuides.length})
-            </h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground">
+                Guides ({safeGuides.length})
+              </h2>
+              <div className="flex gap-2">
+                <Button size="sm" asChild>
+                  <Link href={`/builder/network/${networkId}/generate`}>
+                    <Sparkles className="size-4 mr-1" aria-hidden="true" />
+                    Generate Guide
+                  </Link>
+                </Button>
+                <Button size="sm" asChild variant="outline">
+                  <Link href={`/builder/network/${networkId}/guide/new`}>
+                    <Plus className="size-4 mr-1" aria-hidden="true" />
+                    Create Manual Guide
+                  </Link>
+                </Button>
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground">
               {safePublished.length} published, {safeDrafts.length} draft
             </p>
@@ -269,6 +285,20 @@ export function NetworkDashboardTabs({
                     ? "Create a collection to start building guides."
                     : "Generate or create your first guide."}
                 </p>
+                <div className="flex gap-2 justify-center mt-4">
+                  <Button size="sm" asChild>
+                    <Link href={`/builder/network/${networkId}/generate`}>
+                      <Sparkles className="size-4 mr-1" aria-hidden="true" />
+                      Generate Guide
+                    </Link>
+                  </Button>
+                  <Button size="sm" asChild variant="outline">
+                    <Link href={`/builder/network/${networkId}/guide/new`}>
+                      <Plus className="size-4 mr-1" aria-hidden="true" />
+                      Create Manual Guide
+                    </Link>
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -403,28 +433,12 @@ export function NetworkDashboardTabs({
                                 {col.guideIds?.length || 0} guide{col.guideIds?.length !== 1 ? "s" : ""}
                               </p>
                             </div>
-                            <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/50">
-                              <Button size="sm" asChild>
-                                <Link
-                                  href={`/builder/network/${networkId}/generate?hub=${col.hubId}&collection=${col.id}`}
-                                >
-                                  <Sparkles className="size-3 mr-1" aria-hidden="true" />
-                                  Generate Guide
-                                </Link>
-                              </Button>
-                              <Button size="sm" asChild variant="outline">
-                                <Link
-                                  href={`/builder/network/${networkId}/guide/new?hub=${col.hubId}&collection=${col.id}`}
-                                >
-                                  <Plus className="size-3 mr-1" aria-hidden="true" />
-                                  Create Manual Guide
-                                </Link>
-                              </Button>
-                              <Button size="sm" asChild={false} variant="ghost" onClick={() => {
+                            <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">
+                              <Button size="sm" asChild variant="ghost" onClick={() => {
                                 setActiveTab("guides")
                                 router.push(`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`)
                               }}>
-                                View Guides
+                                Manage Guides
                               </Button>
                             </div>
                           </Card>
