@@ -318,27 +318,6 @@ export default async function NetworkDashboardPage({
                 <p className="text-xs text-muted-foreground">In progress</p>
               </div>
             </Card>
-            <Card className="border-border/50 px-4 py-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Collections</p>
-                <p className="text-3xl font-bold text-foreground">{collections.length}</p>
-                <p className="text-xs text-muted-foreground">Groups</p>
-              </div>
-            </Card>
-            <Card className="border-emerald-500/30 bg-emerald-500/5 px-4 py-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Published</p>
-                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{published.length}</p>
-                <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">Live</p>
-              </div>
-            </Card>
-            <Card className="border-amber-500/30 bg-amber-500/5 px-4 py-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Drafts</p>
-                <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{drafts.length}</p>
-                <p className="text-xs text-amber-700/70 dark:text-amber-400/70">In progress</p>
-              </div>
-            </Card>
           </div>
         </div>
 
@@ -460,15 +439,31 @@ export default async function NetworkDashboardPage({
             {safeCollections.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <FolderOpen className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
-                <p className="font-semibold text-foreground">No collections yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Create collections to organize guides within hubs.
-                </p>
-                <Button size="sm" asChild className="mt-4">
-                  <Link href={`/builder/network/${networkId}/collection/new`}>
-                    Create First Collection
-                  </Link>
-                </Button>
+                {safeHubs.length === 0 ? (
+                  <>
+                    <p className="font-semibold text-foreground">Create a hub first</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Collections live inside hubs. Start by creating your first hub.
+                    </p>
+                    <Button size="sm" asChild className="mt-4">
+                      <Link href={`/builder/network/${networkId}/hub/new`}>
+                        Create First Hub
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-foreground">No collections yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Create your first collection to organize guides within {safeHubs.length > 1 ? 'your hubs' : 'your hub'}.
+                    </p>
+                    <Button size="sm" asChild className="mt-4">
+                      <Link href={`/builder/network/${networkId}/collection/new`}>
+                        Create First Collection
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
@@ -507,15 +502,31 @@ export default async function NetworkDashboardPage({
             {safeGuides.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
-                <p className="font-semibold text-foreground">No guides yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Create your first guide to populate your network.
-                </p>
-                <Button size="sm" asChild className="mt-4">
-                  <Link href={`/builder/network/${networkId}/generate`}>
-                    Create First Guide
-                  </Link>
-                </Button>
+                {safeCollections.length === 0 ? (
+                  <>
+                    <p className="font-semibold text-foreground">Create a collection first</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Guides live inside collections. Start by creating your first collection.
+                    </p>
+                    <Button size="sm" asChild className="mt-4">
+                      <Link href={`/builder/network/${networkId}/collection/new`}>
+                        Create First Collection
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-foreground">No guides yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Generate your first guide to populate your network.
+                    </p>
+                    <Button size="sm" asChild className="mt-4">
+                      <Link href={`/builder/network/${networkId}/generate`}>
+                        Generate First Guide
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
