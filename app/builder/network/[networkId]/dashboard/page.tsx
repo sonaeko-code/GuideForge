@@ -322,6 +322,34 @@ export default async function NetworkDashboardPage({
           </div>
         </div>
 
+        {/* Guide Creation Actions */}
+        <div className="mb-6 flex gap-3">
+          {safeHubs.length > 0 && safeCollections.length > 0 ? (
+            <>
+              <Button asChild>
+                <Link href={`/builder/network/${networkId}/generate`}>
+                  <Sparkles className="size-4 mr-2" aria-hidden="true" />
+                  Generate Guide
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/builder/network/${networkId}/guide/new`}>
+                  <Plus className="size-4 mr-2" aria-hidden="true" />
+                  Create Manual Guide
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <div className="flex-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {safeHubs.length === 0
+                  ? "Create a hub and collection to start generating guides."
+                  : "Create a collection to start generating guides."}
+              </p>
+            </div>
+          )}
+        </div>
+
           {/* Main tabs */}
           <Tabs defaultValue={tab || "drafts"} className="w-full">
             <TabsList className="grid w-full grid-cols-4 mb-6">
@@ -403,8 +431,8 @@ export default async function NetworkDashboardPage({
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {safeHubs.map((hub: Hub) => (
-                <Card key={hub.id} className="border-border/50 px-4 py-4">
-                  <div className="space-y-2">
+                <Card key={hub.id} className="border-border/50 px-4 py-4 flex flex-col">
+                  <div className="space-y-2 flex-1">
                     <h3 className="flex items-center gap-2 font-semibold text-foreground">
                       <BookMarked className="size-4 text-primary" aria-hidden="true" />
                       {hub.name}
@@ -417,6 +445,14 @@ export default async function NetworkDashboardPage({
                       {hub.collectionIds?.length !== 1 ? "s" : ""}
                     </p>
                   </div>
+                  {safeCollections.length === 0 && (
+                    <Button size="sm" asChild variant="outline" className="mt-3">
+                      <Link href={`/builder/network/${networkId}/collection/new?hub=${hub.id}`}>
+                        <Plus className="size-3 mr-1" aria-hidden="true" />
+                        Create Collection
+                      </Link>
+                    </Button>
+                  )}
                 </Card>
               ))}
             </div>
@@ -469,8 +505,8 @@ export default async function NetworkDashboardPage({
             ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {safeCollections.map((col: Collection) => (
-                <Card key={col.id} className="border-border/50 px-4 py-4">
-                  <div className="space-y-2">
+                <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
+                  <div className="space-y-2 flex-1">
                     <h3 className="flex items-center gap-2 font-semibold text-foreground">
                       <FolderOpen className="size-4 text-primary" aria-hidden="true" />
                       {col.name}
@@ -482,6 +518,20 @@ export default async function NetworkDashboardPage({
                       {col.guideIds?.length || 0} guide
                       {col.guideIds?.length !== 1 ? "s" : ""}
                     </p>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <Button size="sm" asChild className="flex-1">
+                      <Link href={`/builder/network/${networkId}/generate?collection=${col.id}`}>
+                        <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                        Generate
+                      </Link>
+                    </Button>
+                    <Button size="sm" asChild variant="outline">
+                      <Link href={`/builder/network/${networkId}/guide/new?collection=${col.id}`}>
+                        <Plus className="size-3 mr-1" aria-hidden="true" />
+                        Manual
+                      </Link>
+                    </Button>
                   </div>
                 </Card>
               ))}
