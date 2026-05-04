@@ -220,6 +220,13 @@ export function GeneratorClient({
         return
       }
 
+      // Additional safety check: ensure guide ID exists and is valid
+      if (!id || id === "error" || id.startsWith("error")) {
+        console.error("[v0] handleSendToEditor: Invalid guide ID returned:", id)
+        setSendError("Guide ID is invalid. Please try generating again.")
+        return
+      }
+
       console.log("[v0] handleSendToEditor: redirecting to editor id:", id)
       router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (err) {

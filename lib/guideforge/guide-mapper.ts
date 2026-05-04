@@ -11,7 +11,7 @@
  * - Preserves generated content through the mapping
  */
 
-import { v4 as uuidv4 } from "uuid"
+import { makeTempId } from "./utils"
 import type { GeneratedGuide, GeneratedGuideSection } from "./generation-schemas"
 import type { Guide, GuideAuthor, GuideStep } from "./types"
 
@@ -32,7 +32,7 @@ export function generatedGuideToGuide(
   }
 ): Guide {
   const now = new Date().toISOString()
-  const guideId = `guide_${uuidv4()}`
+  const guideId = `guide_${makeTempId()}`
 
   console.log("[v0] Mapping GeneratedGuide to Guide")
   console.log("[v0] Generated title:", generated.title)
@@ -44,7 +44,7 @@ export function generatedGuideToGuide(
 
   // Map author
   const author: GuideAuthor = {
-    id: `author_${uuidv4()}`,
+    id: `author_${makeTempId()}`,
     displayName: generated.author?.displayName || "AI Generated",
     handle: generated.author?.handle || "ai.generated",
     avatarUrl: undefined,
@@ -53,7 +53,7 @@ export function generatedGuideToGuide(
   // Map reviewer if present
   const reviewer = generated.reviewer
     ? {
-        id: `reviewer_${uuidv4()}`,
+        id: `reviewer_${makeTempId()}`,
         displayName: generated.reviewer.displayName,
         handle: generated.reviewer.handle,
         avatarUrl: undefined,
@@ -63,7 +63,7 @@ export function generatedGuideToGuide(
   // Map sections to steps with proper ordering
   const steps: GuideStep[] = (generated.sections || []).map(
     (section: GeneratedGuideSection, index: number) => ({
-      id: `step_${uuidv4()}`,
+      id: `step_${makeTempId()}`,
       guideId: guideId,
       order: index,
       kind: section.kind,
