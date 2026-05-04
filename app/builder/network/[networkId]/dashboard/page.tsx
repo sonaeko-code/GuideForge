@@ -7,8 +7,6 @@ import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-da
 import {
   loadNetworkBuilderContext,
   getGuidesForNetworkCollections,
-  checkGuidesTableReadability,
-  getGuidesByCollectionIds,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -89,37 +87,6 @@ export default async function NetworkDashboardPage({
     const safeGuides = Array.isArray(guides) ? guides : []
     const safeDrafts = Array.isArray(drafts) ? drafts : []
     const safePublished = Array.isArray(published) ? published : []
-    
-    // DIAGNOSTICS: Capture what's actually loaded
-    const diagnostics = {
-      networkId: network.id,
-      networkName: network.name,
-      hubCount: safeHubs.length,
-      collectionCount: safeCollections.length,
-      primaryLoadedGuidesCount: safeGuides.length,
-      publishedCount: safePublished.length,
-      draftCount: safeDrafts.length,
-      guideSample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId, status: g.status })),
-    }
-    
-    // RLS diagnostics
-    const tableReadability = await checkGuidesTableReadability()
-    const collectionGuides = safeCollections.length > 0 
-      ? await getGuidesByCollectionIds(safeCollections.map(c => c.id))
-      : { guides: [] }
-    
-    const rlsDiagnostics = {
-      guidesTableReadable: tableReadability.canRead,
-      guidesTableRowCount: tableReadability.rowCount,
-      directCollectionQueryCount: collectionGuides.guides?.length || 0,
-      primaryLoadedCount: safeGuides.length,
-      countsMatch: safeGuides.length === (collectionGuides.guides?.length || 0),
-      suspectedRLS: !tableReadability.canRead || (tableReadability.canRead === false && collectionGuides.error !== null),
-    }
-    
-    console.log("[v0] Dashboard primary guide count:", safeGuides.length)
-    console.log("[v0] Dashboard direct collection query count:", collectionGuides.guides?.length || 0)
-    console.log("[v0] Dashboard RLS diagnostics:", rlsDiagnostics)
 
     return (
       <main className="min-h-screen bg-background">
@@ -180,40 +147,6 @@ export default async function NetworkDashboardPage({
                   </p>
                 </div>
               )}
-            </div>
-
-            {/* Tabs Section - Handled by Client Component */}
-            <div className="rounded-lg border border-orange-400/50 bg-orange-500/5 p-4 mb-6">
-              <h3 className="font-semibold text-orange-700 dark:text-orange-300 mb-3">DEBUG: Guide Diagnostics</h3>
-              <div className="space-y-2 text-sm font-mono text-orange-600 dark:text-orange-400 overflow-auto max-h-64 bg-black/20 p-2 rounded">
-                <div>Network: {diagnostics.networkName} ({diagnostics.networkId})</div>
-                <div>Hubs: {diagnostics.hubCount} | Collections: {diagnostics.collectionCount}</div>
-                <div className="border-t border-orange-400/30 pt-2 mt-2 text-orange-700 dark:text-orange-300 font-semibold">Guide Counts:</div>
-                <div>Primary loader: {diagnostics.primaryLoadedGuidesCount} guides</div>
-                <div>Direct collection query: {rlsDiagnostics.directCollectionQueryCount} guides</div>
-                <div className={rlsDiagnostics.countsMatch ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}>
-                  {rlsDiagnostics.countsMatch ? "✓ Counts match" : "⚠ Counts differ"}
-                </div>
-                <div>Published: {diagnostics.publishedCount} | Drafts: {diagnostics.draftCount}</div>
-                {diagnostics.guideSample.length > 0 && (
-                  <div className="border-t border-orange-400/30 pt-2 mt-2">
-                    Sample guides: {diagnostics.guideSample.map((g: any) => `${g.title} (${g.status})`).join(", ")}
-                  </div>
-                )}
-                <div className="border-t border-orange-400/30 pt-2 mt-2 text-orange-700 dark:text-orange-300 font-semibold">RLS Status:</div>
-                <div>Guides table readable: {rlsDiagnostics.guidesTableReadable ? "YES" : "NO"}</div>
-                <div>Table total rows: {rlsDiagnostics.guidesTableRowCount}</div>
-                {!rlsDiagnostics.suspectedRLS && rlsDiagnostics.directCollectionQueryCount > 0 && (
-                  <div className="border-t border-green-400/30 pt-2 mt-2 text-green-600 dark:text-green-400">
-                    ✓ Guide rows are readable. Primary loader working correctly.
-                  </div>
-                )}
-                {rlsDiagnostics.suspectedRLS && (
-                  <div className="border-t border-red-400/30 pt-2 mt-2 text-red-600 dark:text-red-400">
-                    ⚠ RLS issue detected - guides table not readable
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Tabs Section - Handled by Client Component */}
