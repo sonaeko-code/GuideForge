@@ -66,12 +66,17 @@ export async function createAndSaveGuideDraft(
     }
   }
   
-  if (!input.collectionId) {
+  // Validate collection ID is a real UUID (from selectedCollectionId dropdown)
+  if (!input.collectionId || !input.collectionId.includes("-") || input.collectionId.length !== 36) {
+    const msg = input.collectionId 
+      ? `Collection ID is not a valid UUID: "${input.collectionId}". Did you forget to select a collection?`
+      : "Collection ID is required. Please select a collection."
+    console.error("[v0] createAndSaveGuideDraft: Invalid collection ID format:", msg)
     return {
       id: "error",
       source: "localStorage",
       verified: false,
-      error: "Collection ID is required",
+      error: msg,
     }
   }
   
@@ -206,39 +211,56 @@ export async function createAndSaveGuideDraft(
     }
   }
 
-  // HARD-STOP VERIFICATION: Immediately reload the saved guide
-  console.log("[v0] createAndSaveGuideDraft: Attempting immediate reload of saved guide:", saveResult.id)
+  // HARD-STOP: If save fell back to localStorage (because Supabase save failed),
+  // treat this as a failure for dashboard persistence. We only want Supabase saves
+  // to count as success for the dashboard.
+  if (saveResult.source === "localStorage" && saveResult.error) {
+    console.error("[v0] createAndSaveGuideDraft: Supabase save failed with fallback to localStorage:", saveResult.error)
+    return {
+      id: saveResult.id,
+      source: saveResult.source,
+      verified: false,
+      error: `Save to Supabase failed: ${saveResult.error}. The guide was saved locally only.`,
+    }
+  }
+
+  console.log("[v0] createAndSaveGuideDraft: Save source confirmed:", saveResult.source)
+
+  // HARD-STOP VERIFICATION: Immediately reload the saved guide from Supabase (or localStorage for fallback)
+  // This ensures the guide was actually created and is accessible.
+  console.log("[v0] createAndSaveGuideDraft: Attempting immediate reload of saved guide from", saveResult.source, ":", saveResult.id)
   try {
     const reloadedGuide = await loadGuideDraft(saveResult.id)
     
     if (!reloadedGuide) {
       console.error("[v0] createAndSaveGuideDraft: Immediate reload result: null (FAILED)")
-      
-      // Log debug info
-      if (typeof window !== "undefined") {
-        const keys = Object.keys(localStorage)
-        const guideforgeKeys = keys.filter((k) => k.includes("guideforge"))
-        console.log("[v0] localStorage keys:", guideforgeKeys)
-      }
+      console.error("[v0] Failed to reload guide from", saveResult.source, "after save")
       
       return {
         id: saveResult.id,
         source: saveResult.source,
         verified: false,
-        error: "Guide save failed verification. Could not reload saved guide.",
+        error: `Guide save verification failed. Could not reload ${saveResult.source} guide after save.`,
       }
     }
     
-    console.log("[v0] createAndSaveGuideDraft: Immediate reload result: SUCCESS")
+    console.log("[v0] createAndSaveGuideDraft: Immediate reload result: SUCCESS from", saveResult.source)
     console.log("[v0] createAndSaveGuideDraft: Reloaded guide title:", reloadedGuide.title)
     console.log("[v0] createAndSaveGuideDraft: Reloaded guide steps:", reloadedGuide.steps.length)
     
-    // Pass through any Supabase error even if localStorage fallback succeeded
+    // SUCCESS: If we got here, the guide was saved and reloaded successfully.
+    // Only return verified: true if it was actually saved to Supabase (not localStorage fallback)
+    const isVerified = saveResult.source === "supabase"
+    
+    if (!isVerified) {
+      console.warn("[v0] createAndSaveGuideDraft: Reloaded guide from localStorage, not Supabase. Not counting as dashboard-persistent save.")
+    }
+    
     return {
       id: saveResult.id,
       source: saveResult.source,
-      verified: true,
-      error: saveResult.error, // Will be undefined if Supabase succeeded
+      verified: isVerified,
+      error: saveResult.error,
     }
   } catch (reloadError) {
     console.error("[v0] createAndSaveGuideDraft: Immediate reload error:", reloadError)
