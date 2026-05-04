@@ -319,14 +319,6 @@ export function NetworkDashboardTabs({
                     </div>
                   </Card>
                 ))}
-                      <Button size="sm" asChild variant="ghost" className="ml-auto">
-                        <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
-                          Edit
-                        </Link>
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
               </div>
             )}
           </div>

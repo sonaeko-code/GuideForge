@@ -55,8 +55,6 @@ export interface CreateGuideDraftResult {
  */
 export async function createAndSaveGuideDraft(
   input: CreateGuideDraftInput
-export async function createAndSaveGuideDraft(
-  input: CreateGuideDraftInput
 ): Promise<CreateGuideDraftResult> {
   console.log("[v0] Manual guide create payload:", {
     title: input.title,
