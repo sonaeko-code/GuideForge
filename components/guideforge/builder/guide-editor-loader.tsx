@@ -131,8 +131,26 @@ export function GuideEditorLoader({
 
   if (!guide) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Failed to load guide.</p>
+      <div className="space-y-8 py-12">
+        <Card className="border-red-500/30 bg-red-500/5 p-8">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Editor Failed to Load</h2>
+          <p className="text-sm text-red-700 mb-4">
+            The guide editor encountered an error while initializing.
+          </p>
+          <div className="mb-4 p-3 bg-red-50 rounded text-xs font-mono text-red-900 max-h-20 overflow-auto">
+            <p>guideId: {guideId}</p>
+            <p>networkId: {networkId}</p>
+            <p>fallback available: {fallback ? "yes" : "no"}</p>
+          </div>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Button asChild variant="outline">
+              <Link href={`/builder/network/${networkId}/dashboard`}>
+                <ArrowLeft className="size-4 mr-2" aria-hidden="true" />
+                Back to Dashboard
+              </Link>
+            </Button>
+          </div>
+        </Card>
       </div>
     )
   }

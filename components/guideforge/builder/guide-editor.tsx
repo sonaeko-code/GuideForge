@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,11 +35,24 @@ interface GuideEditorProps {
 
 export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const router = useRouter()
-  // Ensure requirements is always an array
+  
+  // Defensively normalize the guide with safe defaults for all required fields
+  // Prevents crashes if guide is missing sections, metadata, or other fields
   const normalizedGuide = {
     ...guide,
-    requirements: guide.requirements && Array.isArray(guide.requirements) ? guide.requirements : [],
-    warnings: guide.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
+    id: guide?.id || "unknown-id",
+    title: guide?.title || "Untitled Guide",
+    summary: guide?.summary || "",
+    requirements: guide?.requirements && Array.isArray(guide.requirements) ? guide.requirements : [],
+    warnings: guide?.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
+    steps: guide?.steps && Array.isArray(guide.steps) ? guide.steps : [],
+    status: guide?.status || "draft",
+    type: guide?.type || "reference",
+    difficulty: guide?.difficulty || "Beginner",
+    networkId: guide?.networkId || networkId || "unknown-network",
+    hubId: guide?.hubId || "unknown-hub",
+    collectionId: guide?.collectionId || "unknown-collection",
+    audience: guide?.audience && Array.isArray(guide.audience) ? guide.audience : [],
   }
   
   // Track hydration to prevent autosave on initial load

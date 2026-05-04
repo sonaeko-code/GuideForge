@@ -29,7 +29,7 @@ export interface CreateGuideDraftInput {
   collectionId: string
   
   // Optional fields
-  requirements?: string[]
+  requirements?: string[] | string
   warnings?: string[]
   steps?: Partial<GuideStep>[]
   audience?: string[]
@@ -56,13 +56,60 @@ export interface CreateGuideDraftResult {
 export async function createAndSaveGuideDraft(
   input: CreateGuideDraftInput
 ): Promise<CreateGuideDraftResult> {
+  // Validate required fields before processing
+  if (!input.title || !input.title.trim()) {
+    return {
+      id: "error",
+      source: "localStorage",
+      verified: false,
+      error: "Guide title is required",
+    }
+  }
+  
+  if (!input.collectionId) {
+    return {
+      id: "error",
+      source: "localStorage",
+      verified: false,
+      error: "Collection ID is required",
+    }
+  }
+  
+  if (!input.guideType) {
+    return {
+      id: "error",
+      source: "localStorage",
+      verified: false,
+      error: "Guide type is required",
+    }
+  }
+  
+  if (!input.difficulty) {
+    return {
+      id: "error",
+      source: "localStorage",
+      verified: false,
+      error: "Difficulty is required",
+    }
+  }
+  
+  // Normalize requirements: handle string (newline-separated) or array
+  const normalizedRequirements = Array.isArray(input.requirements)
+    ? input.requirements
+    : typeof input.requirements === "string"
+      ? input.requirements
+          .split("\n")
+          .map(line => line.trim())
+          .filter(line => line.length > 0)
+      : []
+  
   console.log("[v0] Manual guide create payload:", {
     title: input.title,
     summary: input.summary?.substring(0, 60),
     guideType: input.guideType,
     audience: input.audience,
     difficulty: input.difficulty,
-    requirements: input.requirements?.length || 0,
+    requirements: normalizedRequirements.length,
     collectionId: input.collectionId,
     hubId: input.hubId,
     sectionCount: input.steps?.length || 1,
@@ -110,7 +157,7 @@ export async function createAndSaveGuideDraft(
     status: "draft",
     verification: "unverified",
     
-    requirements: input.requirements || [],
+    requirements: normalizedRequirements,
     warnings: input.warnings || [],
     audience: input.audience || [],
     
