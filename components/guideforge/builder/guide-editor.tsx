@@ -93,6 +93,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   
+  // Derive current step from editingStepId and steps array
+  const currentStep = editingStepId
+    ? steps.find((s) => s.id === editingStepId)
+    : undefined
+  
   // Mark hydration complete on mount
   useEffect(() => {
     console.log("[v0] Guide editor hydrated: initial state loaded, autosave disabled until user edit")
