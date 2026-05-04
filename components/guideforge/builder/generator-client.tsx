@@ -181,26 +181,34 @@ export function GeneratorClient({
     setSendError(null)
     try {
       const generatedGuide = session.response.guide
+      
+      // Defensive: ensure required fields have defaults
+      const guideTypeToUse = formState.guideType || "reference"
+      const difficultyToUse = generatedGuide.difficulty || "Beginner"
+      const summaryToUse = generatedGuide.summary || generatedGuide.title?.substring(0, 100) || "AI-generated guide"
+      
       console.log("[v0] Generated guide save target:", {
         networkId,
         hubId: selectedHubId,
         collectionId: selectedCollectionId,
+        guideType: guideTypeToUse,
+        difficulty: difficultyToUse,
       })
 
       const { id, verified, error } = await createAndSaveGuideDraft({
-        title: generatedGuide.title,
-        summary: generatedGuide.summary,
-        guideType: formState.guideType,
-        difficulty: generatedGuide.difficulty,
+        title: generatedGuide.title || "Untitled Guide",
+        summary: summaryToUse,
+        guideType: guideTypeToUse,
+        difficulty: difficultyToUse,
         networkId,
         hubId: selectedHubId,
         collectionId: selectedCollectionId,
         requirements: generatedGuide.requirements,
         warnings: generatedGuide.warnings,
         steps: generatedGuide.sections?.map((section) => ({
-          title: section.title,
-          body: section.body,
-          kind: section.kind,
+          title: section.title || "Untitled Section",
+          body: section.body || "",
+          kind: section.kind || "custom",
         })),
       })
 

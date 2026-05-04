@@ -907,3 +907,76 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
     }
   }
 }
+
+/**
+ * Update a guide's status in Supabase by ID.
+ * Performs atomic update of the guides table row and returns the updated guide data.
+ * 
+ * @param guideId - The guide ID to update
+ * @param newStatus - The new status value (draft, ready, or published)
+ * @returns { success: boolean, error?: string, guide?: Guide }
+ */
+export async function updateGuideStatus(
+  guideId: string,
+  newStatus: "draft" | "ready" | "published"
+): Promise<{ success: boolean; error?: string; guide?: Guide }> {
+  if (!supabase || !isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    console.log("[v0] updateGuideStatus: Updating guide", guideId, "to status:", newStatus)
+    
+    const updateData: any = {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    }
+    
+    // Add publishedAt timestamp if transitioning to published
+    if (newStatus === "published") {
+      updateData.published_at = new Date().toISOString()
+    }
+    
+    const { data, error } = await supabase
+      .from("guides")
+      .update(updateData)
+      .eq("id", guideId)
+      .select("*")
+      .single()
+    
+    if (error) {
+      console.error("[v0] updateGuideStatus: Supabase error", {
+        code: error.code,
+        message: error.message,
+        guideId,
+        newStatus,
+      })
+      return {
+        success: false,
+        error: `Failed to update status: ${error.message}`,
+      }
+    }
+    
+    if (!data) {
+      console.error("[v0] updateGuideStatus: No data returned from Supabase")
+      return {
+        success: false,
+        error: "Update succeeded but no data returned",
+      }
+    }
+    
+    console.log("[v0] updateGuideStatus: Success", {
+      guideId,
+      newStatus,
+      returnedStatus: data.status,
+    })
+    
+    return { success: true, guide: data as Guide }
+  } catch (error) {
+    console.error("[v0] updateGuideStatus: Unexpected error", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}

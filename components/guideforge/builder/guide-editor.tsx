@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,10 +20,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { Guide, GuideStep } from "@/lib/guideforge/types"
+import { v4 as uuidv4 } from "uuid"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
 import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
+import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -33,16 +35,33 @@ interface GuideEditorProps {
 
 export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const router = useRouter()
-  // Ensure requirements is always an array
+  
+  // Defensively normalize the guide with safe defaults for all required fields
+  // Prevents crashes if guide is missing sections, metadata, or other fields
   const normalizedGuide = {
     ...guide,
-    requirements: guide.requirements && Array.isArray(guide.requirements) ? guide.requirements : [],
-    warnings: guide.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
+    id: guide?.id || "unknown-id",
+    title: guide?.title || "Untitled Guide",
+    summary: guide?.summary || "",
+    requirements: guide?.requirements && Array.isArray(guide.requirements) ? guide.requirements : [],
+    warnings: guide?.warnings && Array.isArray(guide.warnings) ? guide.warnings : [],
+    steps: guide?.steps && Array.isArray(guide.steps) ? guide.steps : [],
+    status: guide?.status || "draft",
+    type: guide?.type || "reference",
+    difficulty: guide?.difficulty || "Beginner",
+    networkId: guide?.networkId || networkId || "unknown-network",
+    hubId: guide?.hubId || "unknown-hub",
+    collectionId: guide?.collectionId || "unknown-collection",
+    audience: guide?.audience && Array.isArray(guide.audience) ? guide.audience : [],
   }
   
   // Track hydration to prevent autosave on initial load
   const hasHydratedRef = useRef(false)
   const userEditedRef = useRef(false)
+  
+  // Snapshot-based change detection to prevent flickering saves
+  const lastSavedSnapshotRef = useRef<string | null>(null)
+  const currentSnapshotRef = useRef<string | null>(null)
   
   const [title, setTitle] = useState(normalizedGuide.title || "")
   const [summary, setSummary] = useState(normalizedGuide.summary || "")
@@ -81,12 +100,22 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     userEditedRef.current = false
   }, [])
 
-  // Autosave effect - debounced by 300ms, only saves after user edits
-  // Runs for all statuses: draft, ready, and published all save directly to Supabase.
+  // Autosave effect - debounced by 1500ms, only saves if snapshot changed
+  // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
   useEffect(() => {
     // Skip autosave on initial load before user has edited anything
     if (!hasHydratedRef.current || !userEditedRef.current) {
       console.log("[v0] Autosave skipped initial load: hydrated=", hasHydratedRef.current, "userEdited=", userEditedRef.current)
+      return
+    }
+
+    // Create a snapshot of current state
+    const snapshot = JSON.stringify({ title, summary, requirementsText, steps, guideStatus })
+    currentSnapshotRef.current = snapshot
+    
+    // Skip save if nothing changed since last save
+    if (lastSavedSnapshotRef.current === snapshot) {
+      console.log("[v0] Autosave skipped: no changes since last save")
       return
     }
 
@@ -95,17 +124,20 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       clearTimeout(autosaveTimerRef.current)
     }
 
-    // Show "Saving..." when changes are detected after hydration
-    console.log("[v0] Autosave triggered by user edit")
-    console.log("[v0] Autosave toast state changed: saving")
-    setAutosaveStatus("saving")
-
-    // Set a minimum visibility timer for "Saving" state (700ms)
-    const savingStartTime = Date.now()
-    const minSavingDuration = 700
-
-    // Set new timer
+    // Only show "Saving..." if we're actually going to save (debounce before displaying)
+    // Set new timer with 1500ms debounce
     autosaveTimerRef.current = setTimeout(() => {
+      // Re-check snapshot hasn't changed again while waiting
+      const finalSnapshot = JSON.stringify({ title, summary, requirementsText, steps, guideStatus })
+      if (lastSavedSnapshotRef.current === finalSnapshot) {
+        console.log("[v0] Autosave cancelled: changes reverted")
+        return
+      }
+      
+      // NOW show "Saving..." since we're truly going to save
+      console.log("[v0] Autosave triggered by user edit")
+      setAutosaveStatus("saving")
+
       // Normalize requirements from textarea (one per line)
       const requirementsArray = requirementsText
         .split("\n")
@@ -143,8 +175,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             errorCode: error ? (error.match(/^(\w+):/) || [])[1] || "unknown" : null,
             errorMessage: error || null,
           })
-          const elapsed = Date.now() - savingStartTime
-          const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
           
           setSaveSource(source)
           setLastSaved(new Date())
@@ -152,104 +182,46 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           // Show actual error if Supabase save failed
           if (source === "supabase") {
             setSaveError(null)
+            setAutosaveStatus("saved")
             
-            // Wait for minimum saving duration, then show "Saved"
-            if (remainingMinDuration > 0) {
-              setTimeout(() => {
-                setAutosaveStatus("saved")
-                console.log("[v0] Autosave completed: saved to Supabase")
-                console.log("[v0] Autosave toast state changed: saved")
-                
-                // Keep "Saved" for at least 2000ms
-                if (autosaveStatusTimeoutRef.current) {
-                  clearTimeout(autosaveStatusTimeoutRef.current)
-                }
-                autosaveStatusTimeoutRef.current = setTimeout(() => {
-                  setAutosaveStatus("idle")
-                  console.log("[v0] Autosave idle: returning to idle state")
-                  console.log("[v0] Autosave toast state changed: idle")
-                }, 2000)
-              }, remainingMinDuration)
-            } else {
-              setAutosaveStatus("saved")
-              console.log("[v0] Autosave completed: saved to Supabase")
-              console.log("[v0] Autosave toast state changed: saved")
-              
-              // Keep "Saved" for at least 2000ms
-              if (autosaveStatusTimeoutRef.current) {
-                clearTimeout(autosaveStatusTimeoutRef.current)
-              }
-              autosaveStatusTimeoutRef.current = setTimeout(() => {
-                setAutosaveStatus("idle")
-                console.log("[v0] Autosave idle: returning to idle state")
-                console.log("[v0] Autosave toast state changed: idle")
-              }, 2000)
-            }
-          } else if (error) {
-            // Display specific error message based on error type
-            let errorMessage = error
-            if (error.includes("23505")) {
-              errorMessage = "Save failed: another guide in this collection already uses this slug."
-            } else if (error.includes("collection_id is missing")) {
-              errorMessage = "Cannot save guide because no collection is selected."
-            } else if (error.includes("Supabase")) {
-              errorMessage = `Supabase save failed: ${error}`
-            }
-            setSaveError(errorMessage)
+            // Update snapshot to reflect saved state
+            lastSavedSnapshotRef.current = finalSnapshot
+            console.log("[v0] Autosave completed: saved to Supabase")
             
-            // Ensure minimum saving visibility even on error
-            if (remainingMinDuration > 0) {
-              setTimeout(() => {
-                setAutosaveStatus("failed")
-                console.log("[v0] Autosave toast state changed: failed")
-              }, remainingMinDuration)
-            } else {
-              setAutosaveStatus("failed")
-              console.log("[v0] Autosave toast state changed: failed")
+            // Keep "Saved" for at least 2000ms
+            if (autosaveStatusTimeoutRef.current) {
+              clearTimeout(autosaveStatusTimeoutRef.current)
             }
+            autosaveStatusTimeoutRef.current = setTimeout(() => {
+              setAutosaveStatus("idle")
+              console.log("[v0] Autosave idle: returning to idle state")
+            }, 2000)
           } else {
-            setSaveError("Saved locally — Supabase save failed")
-            
-            // Ensure minimum saving visibility
-            if (remainingMinDuration > 0) {
-              setTimeout(() => {
-                setAutosaveStatus("failed")
-                console.log("[v0] Autosave toast state changed: failed")
-              }, remainingMinDuration)
-            } else {
-              setAutosaveStatus("failed")
-              console.log("[v0] Autosave toast state changed: failed")
-            }
+            setSaveError(error ? `Autosave failed: ${error}` : "Autosave failed — localStorage only")
+            setAutosaveStatus("failed")
           }
         } catch (error) {
           console.error("[v0] Autosave error:", error)
-          const elapsed = Date.now() - savingStartTime
-          const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
-          
-          setSaveError(`Save error: ${error instanceof Error ? error.message : "Unknown error"}`)
-          
-          // Ensure minimum saving visibility
-          if (remainingMinDuration > 0) {
-            setTimeout(() => {
-              setAutosaveStatus("failed")
-              console.log("[v0] Autosave toast state changed: failed")
-            }, remainingMinDuration)
-          } else {
-            setAutosaveStatus("failed")
-            console.log("[v0] Autosave toast state changed: failed")
-          }
-        } finally {
-          setIsSaving(false)
+          setSaveError(error instanceof Error ? error.message : "Autosave failed")
+          setAutosaveStatus("failed")
         }
       })()
-    }, 300)
-
+    }, 1500)  // 1500ms debounce
+    
     return () => {
       if (autosaveTimerRef.current) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, requirementsText, steps, version, guideStatus])
+  }, [title, summary, requirementsText, steps, guideStatus])
+
+  // Initialize snapshot on mount
+  useEffect(() => {
+    const initialSnapshot = JSON.stringify({ title, summary, requirementsText, steps, guideStatus })
+    lastSavedSnapshotRef.current = initialSnapshot
+    currentSnapshotRef.current = initialSnapshot
+    hasHydratedRef.current = true
+  }, [])
 
   // Mark guide as edited when user changes content
   const markDirty = () => {
@@ -265,7 +237,27 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const isPublished = guideStatus === "published"
 
   // Safe .find() with defensive chaining
-  const currentStep = steps && steps.length > 0 ? steps.find((s) => s.id === editingStepId) : undefined
+  const handleAddSection = async () => {
+    console.log("[v0] Adding new section to guide:", normalizedGuide.id)
+    const newStep: GuideStep = {
+      id: uuidv4(),
+      guideId: normalizedGuide.id,
+      order: steps.length,
+      kind: "custom",
+      title: "New Section",
+      body: "",
+      isSpoiler: false,
+    }
+    
+    const updatedSteps = [...steps, newStep]
+    setSteps(updatedSteps)
+    setEditingStepId(newStep.id)
+    markDirty()
+    
+    // Persist to Supabase by triggering autosave
+    // The autosave handler will save the guide with the new steps
+    console.log("[v0] Section added, marking dirty for autosave persistence")
+  }
   const allStepsHaveContent = steps && steps.length > 0 ? steps.every((s) => s.title.trim() && s.body.trim()) : false
 
   const handleApplyForgeRules = async () => {
@@ -364,118 +356,83 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     
     console.log("[v0] Status transition requested: draft → ready")
     setMarkReadyError(false)
-    setGuideStatus("ready")
-    
-    // Build guide object — use normalizedGuide as base so collectionId is preserved
-    const updatedGuide: Guide = {
-      ...normalizedGuide,
-      title,
-      summary,
-      requirements: requirementsArray,
-      steps,
-      version,
-      status: "ready",
-      updatedAt: new Date().toISOString(),
-      forgeRulesCheckResult: rulesCheckResult as any,
-      forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
-    }
-    
-    console.log("[v0] Mark Ready guide id:", normalizedGuide.id, "| collectionId:", normalizedGuide.collectionId)
     setAutosaveStatus("saving")
     
-    const { source, error } = await saveGuideDraft(updatedGuide)
-    console.log("[v0] Guide save Supabase result:", {
-      success: source === "supabase",
-      source,
-      errorMessage: error || null,
-    })
-    
-    setSaveSource(source)
-    setLastSaved(new Date())
-    if (source !== "supabase") {
-      setSaveError(error ? `Mark Ready save failed: ${error}` : "Mark Ready: Supabase save failed")
-      setAutosaveStatus("failed")
-    } else {
-      setSaveError(null)
-      setAutosaveStatus("saved")
+    try {
+      // Call updateGuideStatus to atomically update the guide status in Supabase
+      const result = await updateGuideStatus(normalizedGuide.id, "ready")
       
-      if (autosaveStatusTimeoutRef.current) {
-        clearTimeout(autosaveStatusTimeoutRef.current)
+      if (!result.success) {
+        console.error("[v0] Mark Ready failed:", result.error)
+        setSaveError(`Mark Ready failed: ${result.error}`)
+        setAutosaveStatus("failed")
+        return
       }
-      autosaveStatusTimeoutRef.current = setTimeout(() => {
-        setAutosaveStatus("idle")
-      }, 2000)
+      
+      // Success! Update local state from the returned guide data
+      if (result.guide) {
+        console.log("[v0] Mark Ready succeeded, updating local state from Supabase response")
+        setGuideStatus("ready")
+        setSaveError(null)
+        setAutosaveStatus("saved")
+        setMarkedReady(true)
+        
+        // Clear the indicator after a delay
+        setTimeout(() => {
+          setAutosaveStatus("idle")
+        }, 2000)
+        
+        setTimeout(() => {
+          setMarkedReady(false)
+        }, 5000)
+      }
+    } catch (error) {
+      console.error("[v0] Mark Ready error:", error)
+      setSaveError(error instanceof Error ? error.message : "Mark Ready failed")
+      setAutosaveStatus("failed")
     }
-    
-    setMarkedReady(source === "supabase")
-    
-    setTimeout(() => {
-      setMarkedReady(false)
-    }, 5000)
   }
 
   const handlePublish = async () => {
     setShowPublishDialog(false)
     setIsPublishing(true)
     
-    console.log("[v0] Status transition requested: ready → published | guideId:", guide.id)
+    console.log("[v0] Status transition requested: ready → published | guideId:", normalizedGuide.id)
     setAutosaveStatus("saving")
     
     try {
-      // Normalize requirements from textarea
-      const requirementsArray = requirementsText
-        .split("\n")
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-
-      // Build guide object — use normalizedGuide as base so collectionId is preserved
-      const publishedGuide: Guide = {
-        ...normalizedGuide,
-        title,
-        summary,
-        requirements: requirementsArray,
-        steps,
-        version,
-        status: "published",
-        publishedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        forgeRulesCheckResult: rulesCheckResult as any,
-        forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
+      // Call updateGuideStatus to atomically update the guide status to published
+      const result = await updateGuideStatus(normalizedGuide.id, "published")
+      
+      if (!result.success) {
+        console.error("[v0] Publish failed:", result.error)
+        setSaveError(`Publish failed: ${result.error}`)
+        setAutosaveStatus("failed")
+        setIsPublishing(false)
+        return
       }
-
-      console.log("[v0] Publish guide id:", normalizedGuide.id, "| collectionId:", normalizedGuide.collectionId)
-      const { source, error: publishError } = await saveGuideDraft(publishedGuide)
-      console.log("[v0] Guide save Supabase result:", {
-        success: source === "supabase",
-        source,
-        errorMessage: publishError || null,
-      })
       
-      setSaveSource(source)
-      setLastSaved(new Date())
-      
-      if (source === "supabase") {
-        setSaveError(null)
+      // Success! Update local state from the returned guide data
+      if (result.guide) {
+        console.log("[v0] Publish succeeded, updating local state from Supabase response")
         setGuideStatus("published")
+        setSaveError(null)
         setAutosaveStatus("saved")
-        setPublishedMessage(true)
         
+        // Clear the indicator after a delay
         setTimeout(() => {
           setAutosaveStatus("idle")
         }, 2000)
         
+        // Redirect after a brief delay
         setTimeout(() => {
-          setPublishedMessage(false)
-        }, 5000)
-      } else {
-        setSaveError(publishError ? `Publish failed: ${publishError}` : "Publish failed — Supabase could not save")
-        setAutosaveStatus("failed")
+          router.push(`/builder/network/${networkId}/dashboard?tab=published`)
+        }, 1000)
       }
     } catch (error) {
       console.error("[v0] Publish error:", error)
-      setSaveError(`Publish error: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setSaveError(error instanceof Error ? error.message : "Publish failed")
       setAutosaveStatus("failed")
-      console.log("[v0] Autosave indicator state: failed")
     } finally {
       setIsPublishing(false)
     }
@@ -987,11 +944,19 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   </Card>
                 )
               })}
+              
+              {/* Add Section Button */}
+              <Card className="border-dashed border-border/50 px-4 py-6 flex items-center justify-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={handleAddSection}>
+                <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                  <Plus className="size-5" aria-hidden="true" />
+                  <span className="text-sm font-medium">Add Section</span>
+                </div>
+              </Card>
             </TabsContent>
 
             {/* Section editor */}
             <TabsContent value="editor" className="space-y-4">
-              {currentStep && (
+              {currentStep ? (
                 <Card className="border-border/50 p-6">
                   <div className="space-y-4">
                     <div>
@@ -1044,6 +1009,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                         Back to List
                       </Button>
                     </div>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="border-border/50 p-8 text-center">
+                  <div className="space-y-2">
+                    <p className="font-semibold text-foreground">No section selected</p>
+                    <p className="text-sm text-muted-foreground">Click a section from the list to edit it, or add a new one.</p>
                   </div>
                 </Card>
               )}
