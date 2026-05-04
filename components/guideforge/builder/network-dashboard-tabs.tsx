@@ -164,7 +164,7 @@ export function NetworkDashboardTabs({
           </Button>
         </div>
 
-        <DraftList networkId={networkId} scopedDrafts={drafts} scopedPublished={published} />
+        <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
       </TabsContent>
 
       {/* Ready tab */}
