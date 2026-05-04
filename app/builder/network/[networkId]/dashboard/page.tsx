@@ -4,12 +4,9 @@ import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
-import { getGuidesByCollection } from "@/lib/guideforge/mock-data"
 import {
   loadNetworkBuilderContext,
-  getGuidesByNetworkId,
-  getDraftGuidesByNetworkId,
-  getPublishedGuidesByNetworkId,
+  getGuidesForNetworkCollections,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -56,48 +53,27 @@ export default async function NetworkDashboardPage({
       )
     }
 
-    // Load guides
-    let guides: any[] = []
-    let published: any[] = []
-    let drafts: any[] = []
+    // Load guides using canonical helper that works with collection_id filtering
+    let guides: Guide[] = []
+    let published: Guide[] = []
+    let drafts: Guide[] = []
 
     try {
-      const isQuestLineRoute = network.id === "network_questline" || network.slug === "questline"
+      // Use canonical helper for ALL networks (not just non-QuestLine)
+      // This uses the proven working collection_id-based query
+      guides = await getGuidesForNetworkCollections(collections)
       
-      if (!isQuestLineRoute) {
-        // Real networks: load from Supabase
-        try {
-          guides = await getGuidesByNetworkId(network.id)
-          if (!guides) guides = []
-          console.log("[v0] Dashboard guide loading collection IDs:", {
-            totalGuides: guides.length,
-            collectionIdValues: guides.slice(0, 3).map(g => ({ id: g.id, collection_id: g.collection_id, collectionId: g.collectionId })),
-          })
-        } catch (e) {
-          guides = []
-        }
-        try {
-          drafts = await getDraftGuidesByNetworkId(network.id)
-          if (!drafts) drafts = []
-        } catch (e) {
-          drafts = []
-        }
-        try {
-          published = await getPublishedGuidesByNetworkId(network.id)
-          if (!published) published = []
-        } catch (e) {
-          published = []
-        }
-      } else {
-        // QuestLine demo route: use mock data
-        guides = collections.flatMap((c: NormalizedCollection) => getGuidesByCollection(c.id))
-        if (!guides) guides = []
-        published = guides.filter((g: any) => g.status === "published")
-        if (!published) published = []
-        drafts = guides.filter((g: any) => g.status === "draft" || g.status === "in-review")
-        if (!drafts) drafts = []
+      if (guides && guides.length > 0) {
+        published = guides.filter((g: Guide) => g.status === "published")
+        drafts = guides.filter((g: Guide) => g.status === "draft" || g.status === "in-review")
+        console.log("[v0] Dashboard loaded guides using canonical helper:", {
+          total: guides.length,
+          published: published.length,
+          drafts: drafts.length,
+        })
       }
     } catch (err) {
+      console.warn("[v0] Dashboard guide loading error:", err)
       guides = []
       published = []
       drafts = []
@@ -107,25 +83,10 @@ export default async function NetworkDashboardPage({
     const safeHubs = Array.isArray(hubs) ? hubs : []
     const safeCollections = Array.isArray(collections) ? collections : []
     
-    // Normalize guides from Supabase snake_case to camelCase
-    const safeGuides = Array.isArray(guides) ? guides.map((g: any) => ({
-      ...g,
-      collectionId: g.collection_id || g.collectionId,
-      createdAt: g.created_at || g.createdAt,
-      updatedAt: g.updated_at || g.updatedAt,
-      publishedAt: g.published_at || g.publishedAt,
-      authorId: g.author_id || g.authorId,
-      reviewerId: g.reviewer_id || g.reviewerId,
-      verificationStatus: g.verification_status || g.verificationStatus,
-    })) : []
-    
+    // Guides are already normalized by canonical helper
+    const safeGuides = Array.isArray(guides) ? guides : []
     const safeDrafts = Array.isArray(drafts) ? drafts : []
     const safePublished = Array.isArray(published) ? published : []
-    
-    console.log("[v0] Dashboard normalized guides:", {
-      total: safeGuides.length,
-      sample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
-    })
 
     return (
       <main className="min-h-screen bg-background">

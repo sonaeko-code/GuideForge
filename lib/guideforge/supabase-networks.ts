@@ -519,8 +519,87 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
 // ========== GUIDES (Network-Scoped) ==========
 
 /**
+ * CANONICAL: Get guides for a network's collections with full normalization
+ * This is the proven working guide loader - used by dashboard diagnostics
+ * 
+ * Accepts normalized collections and returns fully normalized guides with
+ * snake_case mapped to camelCase, plus attached collection/hub context
+ */
+export async function getGuidesForNetworkCollections(
+  collections: NormalizedCollection[]
+): Promise<Guide[]> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] getGuidesForNetworkCollections: Supabase not configured")
+    return []
+  }
+
+  if (!collections || collections.length === 0) {
+    console.log("[v0] getGuidesForNetworkCollections: No collections provided")
+    return []
+  }
+
+  try {
+    const collectionIds = collections.map(c => c.id)
+    console.log("[v0] getGuidesForNetworkCollections: Querying guides for collections:", collectionIds)
+
+    // Query guides by collection IDs (this is the proven working query)
+    const { data: guides, error: guidesError } = await supabase
+      .from("guides")
+      .select("*")
+      .in("collection_id", collectionIds)
+
+    if (guidesError) {
+      console.warn("[v0] getGuidesForNetworkCollections: Query error:", guidesError.message)
+      return []
+    }
+
+    if (!guides || guides.length === 0) {
+      console.log("[v0] getGuidesForNetworkCollections: No guides found")
+      return []
+    }
+
+    // Normalize guides: convert snake_case to camelCase and attach collection/hub context
+    const normalizedGuides = guides.map((g: any) => {
+      const collection = collections.find(c => c.id === g.collection_id)
+      return {
+        id: g.id,
+        title: g.title,
+        slug: g.slug,
+        description: g.description,
+        summary: g.summary,
+        status: g.status,
+        difficulty: g.difficulty,
+        requirements: g.requirements,
+        steps: g.steps,
+        version: g.version,
+        forgeRulesCheckResult: g.forge_rules_check_result,
+        forgeRulesCheckTimestamp: g.forge_rules_check_timestamp,
+        collectionId: g.collection_id,
+        collectionName: collection?.name || "Unknown",
+        hubId: collection?.hubId,
+        hubName: collection?.hubName,
+        createdAt: g.created_at,
+        updatedAt: g.updated_at,
+        publishedAt: g.published_at,
+        authorId: g.author_id,
+        reviewerId: g.reviewer_id,
+        verificationStatus: g.verification_status,
+      }
+    })
+
+    console.log("[v0] getGuidesForNetworkCollections: Normalized", normalizedGuides.length, "guides")
+    return normalizedGuides
+  } catch (err) {
+    console.warn("[v0] getGuidesForNetworkCollections: Exception:", err)
+    return []
+  }
+}
+
+/**
  * Get all guides for a network (scoped: network → hubs → collections → guides)
  * This ensures dashboards only show guides for the current network
+ * 
+ * Detailed diagnostics for debugging RLS and selection issues.
  */
 export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
   if (!isSupabaseConfigured()) {
@@ -548,7 +627,7 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
     }
 
     const hubIds = hubs.map(h => h.id)
-    console.log("[v0] Network hubs:", hubIds.length)
+    console.log("[v0] Guide load hub IDs:", hubIds)
 
     // Get all collections for those hubs
     const { data: collections, error: collectionsError } = await supabase
@@ -567,7 +646,7 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
     }
 
     const collectionIds = collections.map(c => c.id)
-    console.log("[v0] Network collections:", collectionIds.length)
+    console.log("[v0] Guide load collection IDs:", collectionIds)
 
     // Get all guides for those collections
     const { data: guides, error: guidesError } = await supabase
@@ -575,12 +654,35 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
       .select("*")
       .in("collection_id", collectionIds)
 
+    console.log("[v0] Guide load raw Supabase result:", {
+      rows: guides?.length || 0,
+      error: guidesError?.message || null,
+      errorCode: guidesError?.code || null,
+    })
+
     if (guidesError) {
-      console.warn("[v0] Error loading guides:", guidesError.message)
+      console.warn("[v0] Guide load Supabase error:", guidesError.message, {
+        code: guidesError.code,
+        details: guidesError.details,
+      })
+      // Even on error, check if we got partial results
+      if (guides && guides.length > 0) {
+        console.log("[v0] Despite error, got partial guides:", guides.length)
+        return guides
+      }
       return []
     }
 
-    console.log("[v0] Network guides:", guides?.length || 0)
+    if (guides && guides.length > 0) {
+      console.log("[v0] Guide load sample rows:", guides.slice(0, 2).map(g => ({
+        id: g.id,
+        title: g.title,
+        slug: g.slug,
+        collection_id: g.collection_id,
+        status: g.status,
+      })))
+    }
+
     return guides || []
   } catch (err) {
     console.warn("[v0] Exception loading network guides:", err)
@@ -589,8 +691,73 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
 }
 
 /**
- * Get draft guides (status=draft or status=in-review) for a network
+ * Diagnostic helper: Check if guides table is readable at all
+ * Useful for detecting RLS issues where guides exist but cannot be selected
  */
+export async function checkGuidesTableReadability(): Promise<{ canRead: boolean; rowCount: number; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { canRead: false, rowCount: 0, error: "Supabase not configured" }
+  }
+
+  try {
+    const { data, error, count } = await supabase
+      .from("guides")
+      .select("id, title, collection_id", { count: "exact" })
+      .limit(10)
+
+    if (error) {
+      console.log("[v0] Guide table RLS check - SELECT blocked:", error.message)
+      return { canRead: false, rowCount: 0, error: error.message }
+    }
+
+    console.log("[v0] Guide table RLS check - SELECT allowed:", { rowCount: count || 0 })
+    return { canRead: true, rowCount: count || 0 }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.log("[v0] Guide table RLS check - exception:", msg)
+    return { canRead: false, rowCount: 0, error: msg }
+  }
+}
+
+/**
+ * Diagnostic helper: Get guides by specific collection IDs without network scoping
+ * Useful for testing if a known collection has guides but network query returned none
+ */
+export async function getGuidesByCollectionIds(collectionIds: string[]): Promise<{ guides: any[]; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { guides: [] }
+  }
+
+  if (!collectionIds || collectionIds.length === 0) {
+    return { guides: [] }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("guides")
+      .select("*")
+      .in("collection_id", collectionIds)
+
+    if (error) {
+      console.log("[v0] Guide collection query error:", error.message)
+      return { guides: [], error: error.message }
+    }
+
+    console.log("[v0] Guide collection query result:", {
+      collectionIds,
+      rowCount: data?.length || 0,
+      sample: data?.slice(0, 1).map(g => ({ id: g.id, title: g.title, collection_id: g.collection_id })) || [],
+    })
+
+    return { guides: data || [] }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.log("[v0] Guide collection query exception:", msg)
+    return { guides: [], error: msg }
+  }
+}
+
+
 export async function getDraftGuidesByNetworkId(networkId: string): Promise<any[]> {
   if (!isSupabaseConfigured()) {
     return []

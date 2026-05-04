@@ -527,6 +527,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
   /**
    * Load a guide draft from Supabase or localStorage.
    * Tries Supabase first, falls back to localStorage if not found or error.
+   * Also hydrates hubId and networkId from collection context.
    */
   async loadDraft(draftId: string): Promise<Guide | null> {
     if (!isSupabaseConfigured() || !supabase) {
@@ -553,7 +554,14 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         return this.localStorageAdapter.loadDraftSync(draftId)
       }
 
-      console.log("[v0] Loaded guide from Supabase:", guideData)
+      console.log("[v0] Loaded guide from Supabase:", {
+        id: guideData.id,
+        title: guideData.title,
+        hasRequirements: !!guideData.requirements,
+        requirementsCount: Array.isArray(guideData.requirements) ? guideData.requirements.length : 0,
+        hasWarnings: !!guideData.warnings,
+        warningsCount: Array.isArray(guideData.warnings) ? guideData.warnings.length : 0,
+      })
 
       // Fetch steps
       const { data: stepsData, error: stepsError } = await supabase
@@ -574,14 +582,40 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // Log loaded requirements
       console.log("[v0] Loaded requirements:", guideData.requirements)
 
+      // Fetch collection to get hubId and networkId
+      let hubId = ""
+      let networkId = ""
+      if (guideData.collection_id && supabase) {
+        const { data: collectionData } = await supabase
+          .from("collections")
+          .select("hub_id")
+          .eq("id", guideData.collection_id)
+          .single()
+        
+        if (collectionData?.hub_id) {
+          hubId = collectionData.hub_id
+          
+          // Fetch hub to get networkId
+          const { data: hubData } = await supabase
+            .from("hubs")
+            .select("network_id")
+            .eq("id", hubId)
+            .single()
+          
+          if (hubData?.network_id) {
+            networkId = hubData.network_id
+          }
+        }
+      }
+
       // Reconstruct guide from Supabase data
       // Note: guides table does NOT have hub_id or network_id columns
       // Those are derived from the collection -> hub -> network hierarchy
       const guide: Guide = {
         id: guideData.id,
         collectionId: guideData.collection_id || "",
-        hubId: "", // Not stored in guides table - derive from collection if needed
-        networkId: "", // Not stored in guides table - derive from collection->hub if needed
+        hubId: hubId,
+        networkId: networkId,
         slug: guideData.slug,
         title: guideData.title,
         summary: guideData.summary,
@@ -590,7 +624,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         status: guideData.status,
         verification: guideData.verification_status,
         requirements: Array.isArray(guideData.requirements) ? guideData.requirements : [],
-        warnings: [],
+        warnings: Array.isArray(guideData.warnings) ? guideData.warnings : [],
         version: guideData.version,
         steps: (stepsData || []).map((step: any) => ({
           id: step.id,
@@ -612,7 +646,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         publishedAt: guideData.published_at,
       }
 
-      console.log("[v0] Editor loaded source:supabase | id:", guide.id, "| title:", guide.title, "| steps:", guide.steps.length)
+      console.log("[v0] Editor loaded source:supabase | id:", guide.id, "| title:", guide.title, "| steps:", guide.steps.length, "| hubId:", hubId, "| networkId:", networkId)
 
       return guide
     } catch (error) {
