@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkSettingsForm } from "@/components/guideforge/builder/network-settings-form"
+import { NetworkStructureManager } from "@/components/guideforge/builder/network-structure-manager"
 import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
 
 export default async function NetworkSettingsPage({
@@ -29,10 +30,13 @@ export default async function NetworkSettingsPage({
 
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">{network.name} Settings</h1>
-            <p className="text-muted-foreground mt-2">Edit network information</p>
+            <p className="text-muted-foreground mt-2">Edit network information and structure</p>
           </div>
 
-          <NetworkSettingsForm network={network} networkId={networkId} />
+          <div className="space-y-8">
+            <NetworkSettingsForm network={network} networkId={networkId} />
+            <NetworkStructureManager network={network} networkId={networkId} />
+          </div>
         </div>
       </main>
     )

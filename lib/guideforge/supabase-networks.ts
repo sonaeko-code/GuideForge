@@ -406,6 +406,61 @@ export async function createHub(
 }
 
 /**
+ * Update an existing hub
+ */
+export async function updateHub(
+  hubId: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+  }
+): Promise<{ hub: Hub | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { hub: null, error: "Supabase not configured" }
+  }
+
+  if (!hubId) {
+    return { hub: null, error: "No hub ID provided" }
+  }
+
+  try {
+    const updateData: Record<string, any> = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.slug !== undefined) updateData.slug = updates.slug
+    if (updates.description !== undefined) updateData.description = updates.description
+    updateData.updated_at = new Date().toISOString()
+
+    console.log("[v0] Hub update payload:", updateData)
+
+    const { data, error } = await supabase
+      .from("hubs")
+      .update(updateData)
+      .eq("id", hubId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Hub update error:", error.message)
+      return { hub: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No hub found for id: ${hubId}`
+      console.error("[v0] Hub update error:", notFoundError)
+      return { hub: null, error: notFoundError }
+    }
+
+    console.log("[v0] Hub updated:", data.id, data.name)
+    return { hub: data as Hub }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Hub update error:", message)
+    return { hub: null, error: message }
+  }
+}
+
+/**
  * Get all hubs in a network
  */
 export async function getHubsByNetworkId(networkId: string): Promise<Hub[]> {
@@ -560,6 +615,74 @@ export async function getCollectionsByHubId(hubId: string): Promise<Collection[]
   } catch (err) {
     console.warn("[v0] Exception loading collections:", err)
     return []
+  }
+}
+
+/**
+ * Update an existing collection
+ */
+export async function updateCollection(
+  collectionId: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+  }
+): Promise<{ collection: Collection | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { collection: null, error: "Supabase not configured" }
+  }
+
+  if (!collectionId) {
+    return { collection: null, error: "No collection ID provided" }
+  }
+
+  try {
+    const updateData: Record<string, any> = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.slug !== undefined) updateData.slug = updates.slug
+    if (updates.description !== undefined) updateData.description = updates.description
+    updateData.updated_at = new Date().toISOString()
+
+    console.log("[v0] Collection update payload:", updateData)
+
+    const { data, error } = await supabase
+      .from("collections")
+      .update(updateData)
+      .eq("id", collectionId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Collection update error:", error.message)
+      return { collection: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No collection found for id: ${collectionId}`
+      console.error("[v0] Collection update error:", notFoundError)
+      return { collection: null, error: notFoundError }
+    }
+
+    console.log("[v0] Collection updated:", data.id, data.name)
+    
+    // Normalize the returned data
+    const normalized = {
+      id: data.id,
+      hubId: data.hub_id,
+      networkId: data.network_id,
+      slug: data.slug,
+      name: data.name,
+      description: data.description,
+      defaultGuideType: data.default_guide_type,
+      guideIds: data.guide_ids || [],
+    }
+    
+    return { collection: normalized as Collection }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Collection update error:", message)
+    return { collection: null, error: message }
   }
 }
 
