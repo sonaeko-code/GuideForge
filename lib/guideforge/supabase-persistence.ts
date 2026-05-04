@@ -10,6 +10,14 @@
  * - guides: Main guide data
  * - guide_steps: Individual guide steps
  * - generation_events: Track AI generation events (optional)
+ * 
+ * GuideForge Data Spine Contract:
+ * - saveDraft MUST check if guide.id exists in Supabase before choosing UPDATE vs INSERT
+ * - saveDraft MUST use canonical Supabase-returned id for guide_steps and verification
+ * - Generated guides (with local UUIDs) will INSERT, not UPDATE
+ * - Verification must use Supabase-only check, never fall back to localStorage
+ * - Returns source:"supabase" ONLY if Supabase save AND verification both pass
+ * - localStorage fallback signals failure for dashboard persistence
  */
 
 import type { Guide, GuideStep } from "./types"
@@ -344,14 +352,39 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
 
       // Determine save mode: UPDATE existing by id, or INSERT new
-      // A guide is "existing" when it has a real UUID (not "new" placeholder).
-      // UUIDs are 36 chars with dashes.
-      const isExistingGuide =
+      // A guide is "existing" if it has a valid UUID format
+      const hasValidUuidFormat =
         !!guide.id &&
         guide.id !== "new" &&
         guide.id.includes("-") &&
         guide.id.length === 36
-      const saveMode = isExistingGuide ? "update" : "insert"
+
+      // However, UUID format alone is not proof the row exists.
+      // Generated guides get a local UUID id but don't exist in Supabase yet.
+      // Check if the guide actually exists in Supabase before committing to UPDATE.
+      let saveMode: "insert" | "update" = "insert"
+      let guideExistsInSupabase = false
+
+      if (hasValidUuidFormat) {
+        console.log("[v0] Guide has valid UUID format, checking if it exists in Supabase:", guide.id)
+        const { data: existingGuide, error: checkError } = await supabase
+          .from("guides")
+          .select("id")
+          .eq("id", guide.id)
+          .maybeSingle()
+
+        if (!checkError && existingGuide) {
+          console.log("[v0] Guide exists in Supabase, will use UPDATE mode")
+          saveMode = "update"
+          guideExistsInSupabase = true
+        } else if (checkError) {
+          console.warn("[v0] Error checking if guide exists, will try INSERT:", checkError.message)
+          saveMode = "insert"
+        } else {
+          console.log("[v0] Guide does not exist in Supabase yet, will use INSERT mode")
+          saveMode = "insert"
+        }
+      }
 
       // For new guides, generate unique slug; for existing, preserve current slug
       let finalSlug = guide.slug || guide.id
@@ -396,35 +429,95 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       }, null, 2))
 
       let guideError: { code: string; message: string; hint?: string } | null = null
+      let canonicalGuideId = guide.id // May be updated if Supabase returned a different id
 
       if (saveMode === "update") {
         // Explicit UPDATE — never risks duplicate slug conflicts for existing guides
-        const { error } = await supabase
+        const { data: updateData, error } = await supabase
           .from("guides")
           .update(guideUpdatePayload)
           .eq("id", guide.id)
+          .select("id, collection_id, status, title")
+          .maybeSingle()
+        
+        if (!updateData) {
+          const errorMsg = error ? `${error.code}: ${error.message}` : "Update failed: no row returned"
+          console.error("[v0] Supabase guide update FAILED:", errorMsg)
+          this.localStorageAdapter.saveDraftSync(guide)
+          return { id: guide.id, source: "localStorage", error: errorMsg }
+        }
+        
+        canonicalGuideId = updateData.id
         guideError = error as typeof guideError
       } else {
-        // INSERT new guide with id
-        const insertPayload = {
+        // INSERT new guide
+        // Try with client-provided id first. If schema disallows client-generated ids,
+        // retry without id and use the Supabase-generated id.
+        let insertPayload: any = {
           id: guide.id,
           created_at: guide.createdAt || new Date().toISOString(),
           ...guideUpdatePayload,
         }
-        const { error } = await supabase
+
+        console.log("[v0] Attempting INSERT with client-provided id:", guide.id)
+        let { data: insertData, error } = await supabase
           .from("guides")
           .insert(insertPayload)
+          .select("id, collection_id, status, title")
+          .maybeSingle()
 
-        // Handle duplicate slug on first insert attempt
-        if (error && error.code === "23505") {
-          console.warn("[v0] Duplicate slug on insert, retrying with unique slug:", error.message)
-          const retrySlug = await generateUniqueSlugForCollection(`${finalSlug}-2`, normalizedCollectionId)
-          insertPayload.slug = retrySlug
-          const { error: retryError } = await supabase.from("guides").insert(insertPayload)
-          guideError = retryError as typeof guideError
-        } else {
-          guideError = error as typeof guideError
+        // If insert fails because schema doesn't allow client-provided id,
+        // retry without the id field and use Supabase-generated id
+        if (error && (error.code === "42P10" || error.message?.includes("violates unique constraint"))) {
+          console.warn("[v0] Insert with client-provided id failed, retrying without id:", error.message)
+          delete insertPayload.id
+          
+          const { data: retryData, error: retryError } = await supabase
+            .from("guides")
+            .insert(insertPayload)
+            .select("id, collection_id, status, title")
+            .maybeSingle()
+
+          if (!retryData) {
+            const errorMsg = retryError ? `${retryError.code}: ${retryError.message}` : "Retry insert (without id) failed: no row returned"
+            console.error("[v0] Supabase guide retry insert FAILED:", errorMsg)
+            this.localStorageAdapter.saveDraftSync(guide)
+            return { id: guide.id, source: "localStorage", error: errorMsg }
+          }
+          
+          insertData = retryData
+          error = retryError
+          console.log("[v0] Retry insert succeeded, using Supabase-generated id:", retryData.id)
+        } else if (!insertData) {
+          // Handle duplicate slug on first insert attempt
+          if (error && error.code === "23505") {
+            console.warn("[v0] Duplicate slug on insert, retrying with unique slug:", error.message)
+            const retrySlug = await generateUniqueSlugForCollection(`${finalSlug}-2`, normalizedCollectionId)
+            insertPayload.slug = retrySlug
+            const { data: retryData, error: retryError } = await supabase
+              .from("guides")
+              .insert(insertPayload)
+              .select("id, collection_id, status, title")
+              .maybeSingle()
+            
+            if (!retryData) {
+              const errorMsg = retryError ? `${retryError.code}: ${retryError.message}` : "Retry insert failed: no row returned"
+              console.error("[v0] Supabase guide retry insert FAILED:", errorMsg)
+              this.localStorageAdapter.saveDraftSync(guide)
+              return { id: guide.id, source: "localStorage", error: errorMsg }
+            }
+            insertData = retryData
+            error = retryError
+          } else {
+            const errorMsg = error ? `${error.code}: ${error.message}` : "Insert failed: no row returned"
+            console.error("[v0] Supabase guide insert FAILED:", errorMsg)
+            this.localStorageAdapter.saveDraftSync(guide)
+            return { id: guide.id, source: "localStorage", error: errorMsg }
+          }
         }
+
+        guideError = error as typeof guideError
+        canonicalGuideId = insertData?.id || guide.id
       }
 
       if (guideError) {
@@ -436,7 +529,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       console.log("[v0] Guide save result: success | mode:", saveMode, "| status:", normalizedStatus)
 
-      // Save guide steps
+      // Save guide steps — use guide.id which has been verified to exist in Supabase
       const stepCount = guide.steps?.length ?? 0
       console.log("[v0] Guide steps before Supabase save:", guide.steps)
       console.log("[v0] Step count:", stepCount)
@@ -466,7 +559,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
           const stepData = {
             id: step.id,
-            guide_id: guide.id,
+            guide_id: canonicalGuideId,
             title: step.title,
             body: step.body,
             kind: normalizedKind,
@@ -483,8 +576,8 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           return stepData
         })
 
-        console.log("[v0] guide_steps delete starting for guide", guide.id)
-        const { error: deleteError } = await supabase.from("guide_steps").delete().eq("guide_id", guide.id)
+        console.log("[v0] guide_steps delete starting for guide", canonicalGuideId)
+        const { error: deleteError } = await supabase.from("guide_steps").delete().eq("guide_id", canonicalGuideId)
         if (deleteError) {
           console.log("[v0] guide_steps delete error:", deleteError.message)
         } else {
@@ -514,8 +607,18 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       // Mirror to localStorage
       this.localStorageAdapter.saveDraftSync(guide)
-      console.log("[v0] saveDraft: Supabase save complete, returning source:supabase")
-      return { id: guide.id, source: "supabase" }
+      console.log("[v0] saveDraft: Supabase save complete, verifying guide exists in Supabase...")
+      console.log("[v0] saveDraft: Using canonical guide id for verification:", canonicalGuideId, "(input was:", guide.id + ")")
+      
+      // CRITICAL: Verify guide actually exists in Supabase before returning success
+      const verification = await verifyGuideInSupabase(canonicalGuideId)
+      if (!verification.found) {
+        console.error("[v0] saveDraft: Supabase save reported success but verification FAILED:", verification.error)
+        return { id: canonicalGuideId, source: "localStorage", error: verification.error }
+      }
+      
+      console.log("[v0] saveDraft: Supabase save verified successfully")
+      return { id: canonicalGuideId, source: "supabase" }
     } catch (error) {
       console.error("[v0] saveDraft: Unexpected error", error)
       this.localStorageAdapter.saveDraftSync(guide)
@@ -916,6 +1019,100 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
  * @param newStatus - The new status value (draft, ready, or published)
  * @returns { success: boolean, error?: string, guide?: Guide }
  */
+/**
+ * Verify that a guide was successfully saved to Supabase by querying directly.
+ * This does NOT fall back to localStorage like loadGuideDraft does.
+ * Used only for verification after save operations.
+ */
+export async function verifyGuideInSupabase(guideId: string): Promise<{ found: boolean; guide?: any; error?: string }> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      found: false,
+      error: "Supabase not configured — cannot verify guide persistence",
+    }
+  }
+
+  try {
+    console.log("[v0] verifyGuideInSupabase: Querying Supabase for guide:", guideId)
+    
+    const { data, error } = await supabase
+      .from("guides")
+      .select("*")
+      .eq("id", guideId)
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] verifyGuideInSupabase: Query error:", error.message)
+      return {
+        found: false,
+        error: `Supabase query failed: ${error.message}`,
+      }
+    }
+
+    if (!data) {
+      console.error("[v0] verifyGuideInSupabase: No guide found with id:", guideId)
+      return {
+        found: false,
+        error: `No guide found in Supabase with id: ${guideId}`,
+      }
+    }
+
+    console.log("[v0] verifyGuideInSupabase: Found guide in Supabase:", {
+      id: data.id,
+      title: data.title?.substring(0, 50),
+      status: data.status,
+      collection_id: data.collection_id,
+    })
+
+    return {
+      found: true,
+      guide: data,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] verifyGuideInSupabase: Exception:", msg)
+    return {
+      found: false,
+      error: `Verification exception: ${msg}`,
+    }
+  }
+}
+
+/**
+ * Check if a Supabase save operation actually succeeded.
+ * Returns the saved guide data if successful, null/error otherwise.
+ */
+export async function checkSupabaseSaveResult(
+  saveMode: "insert" | "update",
+  guideId: string,
+  error: any
+): Promise<{ success: boolean; message: string }> {
+  if (error) {
+    console.error("[v0] checkSupabaseSaveResult: Save returned error:", error.code, error.message)
+    return {
+      success: false,
+      message: `Supabase ${saveMode} failed: ${error.message}`,
+    }
+  }
+
+  // Save operation succeeded (no error), but verify guide is actually in Supabase
+  const verification = await verifyGuideInSupabase(guideId)
+  
+  if (!verification.found) {
+    console.error("[v0] checkSupabaseSaveResult: Save succeeded but verification failed:", verification.error)
+    return {
+      success: false,
+      message: `Save reported success but guide not found in verification: ${verification.error}`,
+    }
+  }
+
+  console.log("[v0] checkSupabaseSaveResult: Save and verification both succeeded")
+  return {
+    success: true,
+    message: "Guide successfully saved to Supabase and verified",
+  }
+}
+
 export async function updateGuideStatus(
   guideId: string,
   newStatus: "draft" | "ready" | "published"
@@ -942,7 +1139,7 @@ export async function updateGuideStatus(
       .update(updateData)
       .eq("id", guideId)
       .select("*")
-      .single()
+      .maybeSingle()
     
     if (error) {
       console.error("[v0] updateGuideStatus: Supabase error", {
@@ -958,10 +1155,10 @@ export async function updateGuideStatus(
     }
     
     if (!data) {
-      console.error("[v0] updateGuideStatus: No data returned from Supabase")
+      console.error("[v0] updateGuideStatus: No guide found with ID", guideId)
       return {
         success: false,
-        error: "Update succeeded but no data returned",
+        error: `No guide found for id: ${guideId}`,
       }
     }
     

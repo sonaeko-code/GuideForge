@@ -1,5 +1,11 @@
 /**
  * GuideForge utilities
+ * 
+ * GuideForge Data Spine Contract:
+ * - Status normalization centralizes all guide status values to three canonical buckets: draft | ready | published
+ * - Mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
+ * - All guide filtering (dashboard tabs) must use normalizeGuideStatus for consistent bucketing
+ * - Do not change status mappings or bypass normalization
  */
 
 import type { Guide } from "./types"

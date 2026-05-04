@@ -11,10 +11,18 @@
  * - Saves to Supabase first (when configured), falls back to localStorage
  * - Returns { id, source } to indicate save success
  * - Includes comprehensive debug logging
+ * 
+ * GuideForge Data Spine Contract:
+ * - Generated guides MUST insert into Supabase as draft before routing to editor
+ * - localStorage fallback must never count as dashboard persistence
+ * - Verification uses Supabase-only check (verifyGuideInSupabase), never localStorage fallback
+ * - Returns verified:true ONLY if source==="supabase" AND Supabase verification passes
+ * - Send to Editor must not route unless both Supabase save and verification pass
  */
 
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"
 import { saveGuideDraft, loadGuideDraft } from "./guide-drafts-storage"
+import { verifyGuideInSupabase } from "./supabase-persistence"
 import { getStarterSectionsForGuideType } from "./starter-scaffolds"
 import { makeTempId } from "./utils"
 
@@ -66,12 +74,15 @@ export async function createAndSaveGuideDraft(
     }
   }
   
+  // Validate collection ID is not empty
   if (!input.collectionId) {
+    const msg = "Collection ID is required. Please select a collection before saving."
+    console.error("[v0] createAndSaveGuideDraft: Missing collection ID:", msg)
     return {
       id: "error",
       source: "localStorage",
       verified: false,
-      error: "Collection ID is required",
+      error: msg,
     }
   }
   
@@ -206,47 +217,58 @@ export async function createAndSaveGuideDraft(
     }
   }
 
-  // HARD-STOP VERIFICATION: Immediately reload the saved guide
-  console.log("[v0] createAndSaveGuideDraft: Attempting immediate reload of saved guide:", saveResult.id)
+  // HARD-STOP: If save fell back to localStorage (because Supabase save failed),
+  // treat this as a failure for dashboard persistence. We only want Supabase saves
+  // to count as success for the dashboard.
+  if (saveResult.source === "localStorage") {
+    console.error("[v0] createAndSaveGuideDraft: Save did not use Supabase (fell back to localStorage):", saveResult.error)
+    return {
+      id: saveResult.id,
+      source: saveResult.source,
+      verified: false,
+      error: saveResult.error || "Save did not persist to Supabase",
+    }
+  }
+
+  console.log("[v0] createAndSaveGuideDraft: Save source confirmed as Supabase:", saveResult.source)
+
+  // CRITICAL VERIFICATION: Use Supabase-only verification (NOT loadGuideDraft which can fall back to localStorage)
+  console.log("[v0] createAndSaveGuideDraft: Attempting Supabase-only verification of saved guide:", saveResult.id)
   try {
-    const reloadedGuide = await loadGuideDraft(saveResult.id)
+    const verification = await verifyGuideInSupabase(saveResult.id)
     
-    if (!reloadedGuide) {
-      console.error("[v0] createAndSaveGuideDraft: Immediate reload result: null (FAILED)")
-      
-      // Log debug info
-      if (typeof window !== "undefined") {
-        const keys = Object.keys(localStorage)
-        const guideforgeKeys = keys.filter((k) => k.includes("guideforge"))
-        console.log("[v0] localStorage keys:", guideforgeKeys)
-      }
+    if (!verification.found) {
+      console.error("[v0] createAndSaveGuideDraft: Supabase-only verification FAILED:", verification.error)
       
       return {
         id: saveResult.id,
         source: saveResult.source,
         verified: false,
-        error: "Guide save failed verification. Could not reload saved guide.",
+        error: `Supabase verification failed: ${verification.error}`,
       }
     }
     
-    console.log("[v0] createAndSaveGuideDraft: Immediate reload result: SUCCESS")
-    console.log("[v0] createAndSaveGuideDraft: Reloaded guide title:", reloadedGuide.title)
-    console.log("[v0] createAndSaveGuideDraft: Reloaded guide steps:", reloadedGuide.steps.length)
+    console.log("[v0] createAndSaveGuideDraft: Supabase-only verification PASSED")
+    console.log("[v0] createAndSaveGuideDraft: Guide verified in Supabase:", {
+      id: verification.guide?.id,
+      title: verification.guide?.title?.substring(0, 50),
+      status: verification.guide?.status,
+    })
     
-    // Pass through any Supabase error even if localStorage fallback succeeded
+    // SUCCESS: Guide was saved to Supabase AND verified to exist in Supabase
     return {
       id: saveResult.id,
       source: saveResult.source,
       verified: true,
-      error: saveResult.error, // Will be undefined if Supabase succeeded
+      error: undefined,
     }
-  } catch (reloadError) {
-    console.error("[v0] createAndSaveGuideDraft: Immediate reload error:", reloadError)
+  } catch (verifyError) {
+    console.error("[v0] createAndSaveGuideDraft: Supabase verification error:", verifyError)
     return {
       id: saveResult.id,
       source: saveResult.source,
       verified: false,
-      error: `Verification failed: ${reloadError instanceof Error ? reloadError.message : "Unknown error"}`,
+      error: `Supabase verification error: ${verifyError instanceof Error ? verifyError.message : "Unknown error"}`,
     }
   }
 }

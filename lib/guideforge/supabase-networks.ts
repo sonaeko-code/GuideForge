@@ -7,6 +7,12 @@
  * - collections
  * 
  * Falls back to localStorage if Supabase is unavailable.
+ * 
+ * GuideForge Data Spine Contract:
+ * - Dashboard guide loading uses: networkId → hubs → collections → collection IDs → guides WHERE collection_id IN (ids)
+ * - getGuidesForNetworkCollections must receive array of NormalizedCollection objects with valid id fields
+ * - Guide query filters by collection_id matching collection.id (Supabase UUID)
+ * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
 import type { Network, Hub, Collection, NetworkDraft } from "./types"
@@ -519,11 +525,8 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
 // ========== GUIDES (Network-Scoped) ==========
 
 /**
- * CANONICAL: Get guides for a network's collections with full normalization
- * This is the proven working guide loader - used by dashboard diagnostics
- * 
- * Accepts normalized collections and returns fully normalized guides with
- * snake_case mapped to camelCase, plus attached collection/hub context
+ * Get all guides for a network's collections with full normalization
+ * Converts snake_case to camelCase and attaches collection/hub context
  */
 export async function getGuidesForNetworkCollections(
   collections: NormalizedCollection[]

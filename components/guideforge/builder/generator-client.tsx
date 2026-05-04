@@ -177,9 +177,28 @@ export function GeneratorClient({
       return
     }
 
+    // Validate selectedCollectionId is a UUID before attempting save
+    const isValidCollectionUuid = selectedCollectionId && selectedCollectionId.includes("-") && selectedCollectionId.length === 36
+    if (!isValidCollectionUuid) {
+      console.error(
+        "[v0] handleSendToEditor: selectedCollectionId is not a valid UUID:",
+        selectedCollectionId,
+        "length:",
+        selectedCollectionId?.length
+      )
+      setSendError(
+        `Invalid collection ID format: "${selectedCollectionId}". Expected a UUID. This may indicate a data loading issue.`
+      )
+      return
+    }
+
     setIsSending(true)
     setSendError(null)
     try {
+      if (!session?.response?.guide) {
+        throw new Error("No generated guide available")
+      }
+
       const generatedGuide = session.response.guide
       
       // Defensive: ensure required fields have defaults
@@ -191,11 +210,13 @@ export function GeneratorClient({
         networkId,
         hubId: selectedHubId,
         collectionId: selectedCollectionId,
+        collectionIdLength: selectedCollectionId.length,
         guideType: guideTypeToUse,
         difficulty: difficultyToUse,
+        sectionsCount: generatedGuide.sections?.length,
       })
 
-      const { id, verified, error } = await createAndSaveGuideDraft({
+      const result = await createAndSaveGuideDraft({
         title: generatedGuide.title || "Untitled Guide",
         summary: summaryToUse,
         guideType: guideTypeToUse,
@@ -210,6 +231,14 @@ export function GeneratorClient({
           body: section.body || "",
           kind: section.kind || "custom",
         })),
+      })
+
+      const { id, verified, error } = result
+
+      console.log("[v0] handleSendToEditor: createAndSaveGuideDraft returned:", {
+        id,
+        verified,
+        error,
       })
 
       if (!verified) {
@@ -227,7 +256,16 @@ export function GeneratorClient({
         return
       }
 
+      // Triple-check: ID must be a valid UUID (non-empty, has dashes, proper length)
+      const isValidUuid = id && id.includes("-") && id.length === 36
+      if (!isValidUuid) {
+        console.error("[v0] handleSendToEditor: Guide ID is not a valid UUID:", id, "length:", id?.length)
+        setSendError("Generated guide ID is malformed. Please try generating again.")
+        return
+      }
+
       console.log("[v0] handleSendToEditor: redirecting to editor id:", id)
+      console.log("[v0] handleSendToEditor: target route: /builder/network/%s/guide/%s/edit", networkId, id)
       router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"

@@ -34,9 +34,9 @@ export default async function NetworksDirectoryPage() {
               Create your first network to get started.
             </p>
             <Button asChild>
-              <Link href="/builder/network/new">
+              <Link href="/builder/network/scaffold">
                 <Plus className="mr-2 size-4" aria-hidden="true" />
-                Create Network
+                From Template
               </Link>
             </Button>
           </div>
@@ -97,22 +97,30 @@ export default async function NetworksDirectoryPage() {
           </Button>
         </div>
 
-        <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex-1">
-            <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-              All Networks
-            </h1>
-            <p className="mt-2 text-pretty text-lg text-muted-foreground">
-              {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
-            </p>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex-1">
+              <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+                All Networks
+              </h1>
+              <p className="mt-2 text-pretty text-lg text-muted-foreground">
+                {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 md:flex-row md:gap-3">
+              <Button asChild variant="outline">
+                <Link href="/builder/network/scaffold">
+                  <Plus className="mr-2 size-4" aria-hidden="true" />
+                  From Template
+                </Link>
+              </Button>
+              <Button asChild size="lg">
+                <Link href="/builder/network/new">
+                  <Plus className="mr-2 size-4" aria-hidden="true" />
+                  Create Network
+                </Link>
+              </Button>
+            </div>
           </div>
-          <Button asChild size="lg">
-            <Link href="/builder/network/new">
-              <Plus className="mr-2 size-4" aria-hidden="true" />
-              Create Network
-            </Link>
-          </Button>
-        </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {networksWithCounts.map((network) => (
