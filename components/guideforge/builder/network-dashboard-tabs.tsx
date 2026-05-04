@@ -195,6 +195,7 @@ export function NetworkDashboardTabs({
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                   <StatusBadge status={guide.status} />
+                  {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
                   {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
                   <Button size="sm" asChild variant="ghost" className="ml-auto">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
@@ -236,6 +237,7 @@ export function NetworkDashboardTabs({
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                   <StatusBadge status={guide.status} />
+                  {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
                   {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
                   <Button size="sm" asChild variant="ghost" className="ml-auto">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
@@ -307,7 +309,16 @@ export function NetworkDashboardTabs({
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                       <StatusBadge status={guide.status} />
+                      {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
                       {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                      <Button size="sm" asChild variant="ghost" className="ml-auto">
+                        <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
+                          Edit
+                        </Link>
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
                       <Button size="sm" asChild variant="ghost" className="ml-auto">
                         <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                           Edit

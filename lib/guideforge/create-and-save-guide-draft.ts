@@ -15,6 +15,7 @@
 
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"
 import { saveGuideDraft, loadGuideDraft } from "./guide-drafts-storage"
+import { getStarterSectionsForGuideType } from "./starter-scaffolds"
 import { v4 as uuidv4 } from "uuid"
 
 export interface CreateGuideDraftInput {
@@ -54,16 +55,20 @@ export interface CreateGuideDraftResult {
  */
 export async function createAndSaveGuideDraft(
   input: CreateGuideDraftInput
+export async function createAndSaveGuideDraft(
+  input: CreateGuideDraftInput
 ): Promise<CreateGuideDraftResult> {
-  console.log("[v0] Create flow guide id before save:", {
+  console.log("[v0] Manual guide create payload:", {
     title: input.title,
     summary: input.summary?.substring(0, 60),
     guideType: input.guideType,
+    audience: input.audience,
     difficulty: input.difficulty,
-    networkId: input.networkId,
-    hubId: input.hubId,
+    requirements: input.requirements?.length || 0,
     collectionId: input.collectionId,
-    inputStepsCount: input.steps?.length ?? 0,
+    hubId: input.hubId,
+    sectionCount: input.steps?.length || 1,
+    sections: input.steps?.map(s => s.title) || ["Overview"],
   })
 
   // Generate guide ID
@@ -75,7 +80,7 @@ export async function createAndSaveGuideDraft(
 
   // Build steps array.
   // If steps were provided (generate path), use them directly — do NOT prepend a starter.
-  // If no steps were provided (manual create path), add a single starter Overview section.
+  // If no steps were provided (manual create path), use type-specific starter sections.
   const hasProvidedSteps = input.steps && input.steps.length > 0
 
   const steps: GuideStep[] = hasProvidedSteps
@@ -89,17 +94,7 @@ export async function createAndSaveGuideDraft(
         isSpoiler: step.isSpoiler || false,
         callout: step.callout,
       }))
-    : [
-        {
-          id: uuidv4(),
-          guideId,
-          order: 0,
-          kind: "overview" as const,
-          title: "Overview",
-          body: input.summary || "Start writing this guide section.",
-          isSpoiler: false,
-        },
-      ]
+    : getStarterSectionsForGuideType(input.guideType, guideId)
 
   // Build complete Guide object
   const guide: Guide = {
@@ -119,6 +114,7 @@ export async function createAndSaveGuideDraft(
     
     requirements: input.requirements || [],
     warnings: input.warnings || [],
+    audience: input.audience || [],
     
     version: input.version || "1.0",
     estimatedMinutes: input.estimatedMinutes,

@@ -702,6 +702,39 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       </div>
 
       <div className="mx-auto max-w-4xl space-y-6 px-6 py-8">
+        {/* Metadata Context Header */}
+        <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border/50">
+          {/* Guide type */}
+          {normalizedGuide.type && (
+            <Badge variant="outline" className="capitalize">
+              {normalizedGuide.type.replace("-", " ")}
+            </Badge>
+          )}
+          
+          {/* Difficulty */}
+          {normalizedGuide.difficulty && (
+            <DifficultyBadge difficulty={normalizedGuide.difficulty} />
+          )}
+          
+          {/* Audience tags */}
+          {normalizedGuide.audience && normalizedGuide.audience.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {normalizedGuide.audience.map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+          
+          {/* Hub/Collection context */}
+          {normalizedGuide.hubId && (
+            <div className="ml-auto text-xs text-muted-foreground">
+              Editing in: {normalizedGuide.hubId} / {normalizedGuide.collectionId}
+            </div>
+          )}
+        </div>
+
         {/* Summary Card */}
         <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-6">
           <div className="space-y-3">
@@ -718,6 +751,24 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 placeholder="Guide title"
               />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Summary (Short Description)
+              </label>
+              <Textarea
+                value={summary}
+                onChange={(e) => {
+                  markDirty()
+                  setSummary(e.target.value)
+                }}
+                placeholder="Brief summary of this guide. Shown on guide cards and list pages."
+                className="w-full h-20 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none mt-2"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                This summary appears on guide cards and in search results. Keep it concise.
+              </p>
             </div>
 
             <div>
