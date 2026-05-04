@@ -514,7 +514,16 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       // Mirror to localStorage
       this.localStorageAdapter.saveDraftSync(guide)
-      console.log("[v0] saveDraft: Supabase save complete, returning source:supabase")
+      console.log("[v0] saveDraft: Supabase save complete, verifying guide exists in Supabase...")
+      
+      // CRITICAL: Verify guide actually exists in Supabase before returning success
+      const verification = await verifyGuideInSupabase(guide.id)
+      if (!verification.found) {
+        console.error("[v0] saveDraft: Supabase save reported success but verification FAILED:", verification.error)
+        return { id: guide.id, source: "localStorage", error: verification.error }
+      }
+      
+      console.log("[v0] saveDraft: Supabase save verified successfully")
       return { id: guide.id, source: "supabase" }
     } catch (error) {
       console.error("[v0] saveDraft: Unexpected error", error)
@@ -916,6 +925,100 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
  * @param newStatus - The new status value (draft, ready, or published)
  * @returns { success: boolean, error?: string, guide?: Guide }
  */
+/**
+ * Verify that a guide was successfully saved to Supabase by querying directly.
+ * This does NOT fall back to localStorage like loadGuideDraft does.
+ * Used only for verification after save operations.
+ */
+export async function verifyGuideInSupabase(guideId: string): Promise<{ found: boolean; guide?: any; error?: string }> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      found: false,
+      error: "Supabase not configured — cannot verify guide persistence",
+    }
+  }
+
+  try {
+    console.log("[v0] verifyGuideInSupabase: Querying Supabase for guide:", guideId)
+    
+    const { data, error } = await supabase
+      .from("guides")
+      .select("*")
+      .eq("id", guideId)
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] verifyGuideInSupabase: Query error:", error.message)
+      return {
+        found: false,
+        error: `Supabase query failed: ${error.message}`,
+      }
+    }
+
+    if (!data) {
+      console.error("[v0] verifyGuideInSupabase: No guide found with id:", guideId)
+      return {
+        found: false,
+        error: `No guide found in Supabase with id: ${guideId}`,
+      }
+    }
+
+    console.log("[v0] verifyGuideInSupabase: Found guide in Supabase:", {
+      id: data.id,
+      title: data.title?.substring(0, 50),
+      status: data.status,
+      collection_id: data.collection_id,
+    })
+
+    return {
+      found: true,
+      guide: data,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] verifyGuideInSupabase: Exception:", msg)
+    return {
+      found: false,
+      error: `Verification exception: ${msg}`,
+    }
+  }
+}
+
+/**
+ * Check if a Supabase save operation actually succeeded.
+ * Returns the saved guide data if successful, null/error otherwise.
+ */
+export async function checkSupabaseSaveResult(
+  saveMode: "insert" | "update",
+  guideId: string,
+  error: any
+): Promise<{ success: boolean; message: string }> {
+  if (error) {
+    console.error("[v0] checkSupabaseSaveResult: Save returned error:", error.code, error.message)
+    return {
+      success: false,
+      message: `Supabase ${saveMode} failed: ${error.message}`,
+    }
+  }
+
+  // Save operation succeeded (no error), but verify guide is actually in Supabase
+  const verification = await verifyGuideInSupabase(guideId)
+  
+  if (!verification.found) {
+    console.error("[v0] checkSupabaseSaveResult: Save succeeded but verification failed:", verification.error)
+    return {
+      success: false,
+      message: `Save reported success but guide not found in verification: ${verification.error}`,
+    }
+  }
+
+  console.log("[v0] checkSupabaseSaveResult: Save and verification both succeeded")
+  return {
+    success: true,
+    message: "Guide successfully saved to Supabase and verified",
+  }
+}
+
 export async function updateGuideStatus(
   guideId: string,
   newStatus: "draft" | "ready" | "published"
