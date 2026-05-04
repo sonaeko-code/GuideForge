@@ -180,6 +180,10 @@ export function GeneratorClient({
     setIsSending(true)
     setSendError(null)
     try {
+      if (!session?.response?.guide) {
+        throw new Error("No generated guide available")
+      }
+
       const generatedGuide = session.response.guide
       
       // Defensive: ensure required fields have defaults
@@ -193,9 +197,10 @@ export function GeneratorClient({
         collectionId: selectedCollectionId,
         guideType: guideTypeToUse,
         difficulty: difficultyToUse,
+        sectionsCount: generatedGuide.sections?.length,
       })
 
-      const { id, verified, error } = await createAndSaveGuideDraft({
+      const result = await createAndSaveGuideDraft({
         title: generatedGuide.title || "Untitled Guide",
         summary: summaryToUse,
         guideType: guideTypeToUse,
@@ -212,6 +217,9 @@ export function GeneratorClient({
         })),
       })
 
+
+      const { id, verified, error } = result
+
       if (!verified) {
         console.error("[v0] handleSendToEditor: Verification failed:", error)
         setSendError(
@@ -227,7 +235,16 @@ export function GeneratorClient({
         return
       }
 
+      // Triple-check: ID must be a valid UUID (non-empty, has dashes, proper length)
+      const isValidUuid = id && id.includes("-") && id.length === 36
+      if (!isValidUuid) {
+        console.error("[v0] handleSendToEditor: Guide ID is not a valid UUID:", id, "length:", id?.length)
+        setSendError("Generated guide ID is malformed. Please try generating again.")
+        return
+      }
+
       console.log("[v0] handleSendToEditor: redirecting to editor id:", id)
+      console.log("[v0] handleSendToEditor: target route: /builder/network/%s/guide/%s/edit", networkId, id)
       router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"

@@ -93,6 +93,9 @@ export function GuideEditorLoader({
   }
 
   if (notFound) {
+    // Determine if this is a UUID format issue
+    const isValidUuidFormat = guideId && guideId.includes("-") && guideId.length === 36
+    
     return (
       <div className="space-y-8 py-12">
         <Card className="p-8 text-center">
@@ -103,6 +106,18 @@ export function GuideEditorLoader({
             We couldn&apos;t find this guide draft. It may have been deleted or
             the link is incorrect.
           </p>
+
+          <div className="mb-6 p-3 bg-amber-50 dark:bg-amber-950/20 rounded text-xs text-amber-700 dark:text-amber-300 font-mono max-h-24 overflow-auto">
+            <p className="mb-1">
+              <strong>Guide ID:</strong> {guideId}
+            </p>
+            <p className="mb-1">
+              <strong>Network ID:</strong> {networkId}
+            </p>
+            <p>
+              <strong>ID format valid:</strong> {isValidUuidFormat ? "yes" : "NO - not a proper UUID"}
+            </p>
+          </div>
 
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Button asChild variant="outline">
