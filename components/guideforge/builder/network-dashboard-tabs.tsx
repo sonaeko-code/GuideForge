@@ -88,7 +88,14 @@ export function NetworkDashboardTabs({
     filteredByCollection: initialCollectionId ? true : false,
     filteredGuideCount: filteredGuides.length,
     collectionMatch: filteredCollection ? filteredCollection.name : "none",
-    guideSample: safeGuides.slice(0, 2).map(g => ({ id: g.id, title: g.title, collectionId: g.collectionId })),
+    guideSample: safeGuides.slice(0, 3).map(g => ({ 
+      id: g.id, 
+      title: g.title, 
+      summary: g.summary ? g.summary.substring(0, 50) + "..." : "(no summary)",
+      collectionId: g.collectionId,
+      collectionName: g.collectionName,
+      hubName: g.hubName,
+    })),
   })
 
   return (
@@ -171,7 +178,7 @@ export function NetworkDashboardTabs({
                 <div className="space-y-2 flex-1">
                   <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                   <p className="text-xs text-muted-foreground">
-                    {guide.description ? guide.description.slice(0, 60) + "..." : "No description"}
+                    {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
@@ -242,7 +249,7 @@ export function NetworkDashboardTabs({
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                       <p className="text-xs text-muted-foreground">
-                        {guide.description ? guide.description.slice(0, 60) + "..." : "No description"}
+                        {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
@@ -315,7 +322,7 @@ export function NetworkDashboardTabs({
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                       <p className="text-xs text-muted-foreground">
-                        {guide.description ? guide.description.slice(0, 60) + "..." : "No description"}
+                        {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
