@@ -343,33 +343,25 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
       const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
 
-      // Determine save mode: update existing by id, or insert new
-      // For new guides, ensure slug is unique within the collection
-      let finalSlug = guide.slug || guide.id
-      const isExistingGuide = guide.id && guide.id.length > 0 && guide.id !== "new"
+      // Determine save mode: UPDATE existing by id, or INSERT new
+      // A guide is "existing" when it has a real UUID (not "new" placeholder).
+      // UUIDs are 36 chars with dashes.
+      const isExistingGuide =
+        !!guide.id &&
+        guide.id !== "new" &&
+        guide.id.includes("-") &&
+        guide.id.length === 36
       const saveMode = isExistingGuide ? "update" : "insert"
 
+      // For new guides, generate unique slug; for existing, preserve current slug
+      let finalSlug = guide.slug || guide.id
       if (saveMode === "insert") {
-        // For new guides, generate unique slug if needed
         finalSlug = await generateUniqueSlugForCollection(finalSlug, normalizedCollectionId)
       }
 
-      console.log("[v0] Guide save mode:", saveMode)
-      console.log("[v0] Existing guide id:", isExistingGuide ? guide.id : "new guide")
+      console.log("[v0] Guide save mode:", saveMode, "| id:", guide.id, "| status:", normalizedStatus)
       console.log("[v0] Guide collection_id:", normalizedCollectionId)
-      console.log("[v0] Original slug:", guide.slug || guide.id)
       console.log("[v0] Final slug:", finalSlug)
-
-      console.log("[v0] saveDraft: Guide object before save:", {
-        id: guide.id,
-        title: guide.title,
-        collectionId: normalizedCollectionId,
-        type: normalizedType,
-        status: normalizedStatus,
-        difficulty: normalizedDifficulty,
-        authorId,
-        stepsCount: guide.steps?.length ?? 0,
-      })
 
       // Normalize requirements to Supabase format
       const normalizedRequirements = normalizeRequirementsForSupabase(guide.requirements)
@@ -378,8 +370,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // id, collection_id, title, slug, summary, type, difficulty, version,
       // author_id, reviewer_id, status, verification_status, latest_check_run_id,
       // published_at, created_at, updated_at, requirements
-      const guideData = {
-        id: guide.id,
+      const guideUpdatePayload = {
         collection_id: normalizedCollectionId,
         title: guide.title,
         slug: finalSlug,
@@ -390,52 +381,60 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         author_id: authorId,
         status: normalizedStatus,
         verification_status: guide.verification || "unverified",
-        created_at: guide.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
         published_at: guide.publishedAt || null,
         requirements: normalizedRequirements,
       }
 
-      console.log("[v0] Supabase guide upsert payload:", JSON.stringify({
-        id: guideData.id,
-        title: guideData.title.substring(0, 50),
-        collection_id: guideData.collection_id,
-        author_id: guideData.author_id,
-        type: guideData.type,
-        difficulty: guideData.difficulty,
-        status: guideData.status,
+      console.log("[v0] Supabase guide save payload:", JSON.stringify({
+        saveMode,
+        id: guide.id,
+        title: guideUpdatePayload.title.substring(0, 50),
+        collection_id: guideUpdatePayload.collection_id,
+        status: guideUpdatePayload.status,
+        requirements: normalizedRequirements.length,
       }, null, 2))
 
-      const { error: guideError } = await supabase
-        .from("guides")
-        .upsert(guideData, { onConflict: "id" })
+      let guideError: { code: string; message: string; hint?: string } | null = null
 
-      // Handle duplicate slug error for inserts
-      if (guideError && guideError.code === "23505" && saveMode === "insert") {
-        console.warn("[v0] Duplicate slug handled:", guideError.message)
-        // Generate another unique slug and retry once
-        finalSlug = await generateUniqueSlugForCollection(`${finalSlug}-2`, normalizedCollectionId)
-        guideData.slug = finalSlug
-        console.log("[v0] Retrying with new slug:", finalSlug)
-        
-        const { error: retryError } = await supabase
+      if (saveMode === "update") {
+        // Explicit UPDATE — never risks duplicate slug conflicts for existing guides
+        const { error } = await supabase
           .from("guides")
-          .upsert(guideData, { onConflict: "id" })
-        
-        if (retryError) {
-          console.error("[v0] Supabase guide save FAILED after retry:", retryError)
-          this.localStorageAdapter.saveDraftSync(guide)
-          return { id: guide.id, source: "localStorage", error: retryError.message }
+          .update(guideUpdatePayload)
+          .eq("id", guide.id)
+        guideError = error as typeof guideError
+      } else {
+        // INSERT new guide with id
+        const insertPayload = {
+          id: guide.id,
+          created_at: guide.createdAt || new Date().toISOString(),
+          ...guideUpdatePayload,
         }
-      } else if (guideError) {
+        const { error } = await supabase
+          .from("guides")
+          .insert(insertPayload)
+
+        // Handle duplicate slug on first insert attempt
+        if (error && error.code === "23505") {
+          console.warn("[v0] Duplicate slug on insert, retrying with unique slug:", error.message)
+          const retrySlug = await generateUniqueSlugForCollection(`${finalSlug}-2`, normalizedCollectionId)
+          insertPayload.slug = retrySlug
+          const { error: retryError } = await supabase.from("guides").insert(insertPayload)
+          guideError = retryError as typeof guideError
+        } else {
+          guideError = error as typeof guideError
+        }
+      }
+
+      if (guideError) {
         const errorMsg = `${guideError.code}: ${guideError.message}${guideError.hint ? ` (${guideError.hint})` : ""}`
         console.error("[v0] Supabase guide save FAILED:", errorMsg)
-        console.error("[v0] Full error:", JSON.stringify(guideError, null, 2))
         this.localStorageAdapter.saveDraftSync(guide)
         return { id: guide.id, source: "localStorage", error: errorMsg }
       }
 
-      console.log("[v0] Guide save result: success")
+      console.log("[v0] Guide save result: success | mode:", saveMode, "| status:", normalizedStatus)
 
       // Save guide steps
       const stepCount = guide.steps?.length ?? 0
