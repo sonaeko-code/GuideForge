@@ -29,8 +29,8 @@ export default async function NetworkDashboardPage({
     const hubs: NormalizedHub[] = ctx.hubs
     const collections: NormalizedCollection[] = ctx.collections
 
-    // Load guides for the network
-    const guides = await getGuidesForNetworkCollections(networkId, collections)
+    // Load guides for the network's collections
+    const guides = await getGuidesForNetworkCollections(collections)
 
     // Ensure arrays are safe
     const safeHubs = Array.isArray(hubs) ? hubs : []

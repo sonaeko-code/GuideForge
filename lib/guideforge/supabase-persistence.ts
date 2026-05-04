@@ -942,7 +942,7 @@ export async function updateGuideStatus(
       .update(updateData)
       .eq("id", guideId)
       .select("*")
-      .single()
+      .maybeSingle()
     
     if (error) {
       console.error("[v0] updateGuideStatus: Supabase error", {
@@ -958,10 +958,10 @@ export async function updateGuideStatus(
     }
     
     if (!data) {
-      console.error("[v0] updateGuideStatus: No data returned from Supabase")
+      console.error("[v0] updateGuideStatus: No guide found with ID", guideId)
       return {
         success: false,
-        error: "Update succeeded but no data returned",
+        error: `No guide found for id: ${guideId}`,
       }
     }
     
