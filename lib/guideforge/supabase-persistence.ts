@@ -399,10 +399,20 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       if (saveMode === "update") {
         // Explicit UPDATE — never risks duplicate slug conflicts for existing guides
-        const { error } = await supabase
+        const { data: updateData, error } = await supabase
           .from("guides")
           .update(guideUpdatePayload)
           .eq("id", guide.id)
+          .select("id, collection_id, status, title")
+          .maybeSingle()
+        
+        if (!updateData) {
+          const errorMsg = error ? `${error.code}: ${error.message}` : "Update failed: no row returned"
+          console.error("[v0] Supabase guide update FAILED:", errorMsg)
+          this.localStorageAdapter.saveDraftSync(guide)
+          return { id: guide.id, source: "localStorage", error: errorMsg }
+        }
+        
         guideError = error as typeof guideError
       } else {
         // INSERT new guide with id
@@ -411,17 +421,35 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           created_at: guide.createdAt || new Date().toISOString(),
           ...guideUpdatePayload,
         }
-        const { error } = await supabase
+        const { data: insertData, error } = await supabase
           .from("guides")
           .insert(insertPayload)
+          .select("id, collection_id, status, title")
+          .maybeSingle()
 
         // Handle duplicate slug on first insert attempt
         if (error && error.code === "23505") {
           console.warn("[v0] Duplicate slug on insert, retrying with unique slug:", error.message)
           const retrySlug = await generateUniqueSlugForCollection(`${finalSlug}-2`, normalizedCollectionId)
           insertPayload.slug = retrySlug
-          const { error: retryError } = await supabase.from("guides").insert(insertPayload)
+          const { data: retryData, error: retryError } = await supabase
+            .from("guides")
+            .insert(insertPayload)
+            .select("id, collection_id, status, title")
+            .maybeSingle()
+          
+          if (!retryData) {
+            const errorMsg = retryError ? `${retryError.code}: ${retryError.message}` : "Retry insert failed: no row returned"
+            console.error("[v0] Supabase guide retry insert FAILED:", errorMsg)
+            this.localStorageAdapter.saveDraftSync(guide)
+            return { id: guide.id, source: "localStorage", error: errorMsg }
+          }
           guideError = retryError as typeof guideError
+        } else if (!insertData) {
+          const errorMsg = error ? `${error.code}: ${error.message}` : "Insert failed: no row returned"
+          console.error("[v0] Supabase guide insert FAILED:", errorMsg)
+          this.localStorageAdapter.saveDraftSync(guide)
+          return { id: guide.id, source: "localStorage", error: errorMsg }
         } else {
           guideError = error as typeof guideError
         }
@@ -436,7 +464,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
       console.log("[v0] Guide save result: success | mode:", saveMode, "| status:", normalizedStatus)
 
-      // Save guide steps
+      // Save guide steps — use guide.id which has been verified to exist in Supabase
       const stepCount = guide.steps?.length ?? 0
       console.log("[v0] Guide steps before Supabase save:", guide.steps)
       console.log("[v0] Step count:", stepCount)
