@@ -22,7 +22,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
-import { getGuidesByCollection } from "@/lib/guideforge/mock-data"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
 interface NetworkDashboardTabsProps {
