@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
 import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
+import { DashboardDiagnostics } from "@/components/guideforge/builder/dashboard-diagnostics"
 import {
   loadNetworkBuilderContext,
-  getGuidesForNetworkCollections,
+  getGuidesForNetworkCollectionsWithDiagnostics,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -29,8 +30,8 @@ export default async function NetworkDashboardPage({
     const hubs: NormalizedHub[] = ctx.hubs
     const collections: NormalizedCollection[] = ctx.collections
 
-    // Load guides for the network's collections
-    const guides = await getGuidesForNetworkCollections(collections)
+    // Load guides for the network's collections with diagnostics
+    const { guides, error: guidesError } = await getGuidesForNetworkCollectionsWithDiagnostics(collections)
 
     // Ensure arrays are safe
     const safeHubs = Array.isArray(hubs) ? hubs : []
@@ -50,6 +51,16 @@ export default async function NetworkDashboardPage({
               </Link>
             </Button>
           </div>
+
+          {/* Diagnostics Panel - Temporary Debug UI */}
+          <DashboardDiagnostics
+            networkId={network.id}
+            networkLoaded={!!network}
+            hubs={safeHubs}
+            collections={safeCollections}
+            guides={safeGuides}
+            supabaseError={guidesError}
+          />
 
           {/* Tabs Section - Wrapped in Error Boundary */}
           <DashboardErrorBoundary networkId={network.id}>

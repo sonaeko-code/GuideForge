@@ -525,6 +525,82 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
  * Accepts normalized collections and returns fully normalized guides with
  * snake_case mapped to camelCase, plus attached collection/hub context
  */
+/**
+ * Get all guides for network collections with diagnostics
+ * Returns both guides and error information for debugging
+ */
+export async function getGuidesForNetworkCollectionsWithDiagnostics(
+  collections: NormalizedCollection[]
+): Promise<{ guides: Guide[]; error: string | null }> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] getGuidesForNetworkCollections: Supabase not configured")
+    return { guides: [], error: "Supabase not configured" }
+  }
+
+  if (!collections || collections.length === 0) {
+    console.log("[v0] getGuidesForNetworkCollections: No collections provided")
+    return { guides: [], error: "No collections provided" }
+  }
+
+  try {
+    const collectionIds = collections.map(c => c.id)
+    console.log("[v0] getGuidesForNetworkCollections: Querying guides for collections:", collectionIds)
+
+    // Query guides by collection IDs (this is the proven working query)
+    const { data: guides, error: guidesError } = await supabase
+      .from("guides")
+      .select("*")
+      .in("collection_id", collectionIds)
+
+    if (guidesError) {
+      const errorMsg = `Query error: ${guidesError.message}`
+      console.warn("[v0] getGuidesForNetworkCollections:", errorMsg)
+      return { guides: [], error: errorMsg }
+    }
+
+    if (!guides || guides.length === 0) {
+      console.log("[v0] getGuidesForNetworkCollections: No guides found")
+      return { guides: [], error: null }
+    }
+
+    // Normalize guides: convert snake_case to camelCase and attach collection/hub context
+    const normalizedGuides = guides.map((g: any) => {
+      const collection = collections.find(c => c.id === g.collection_id)
+      return {
+        id: g.id,
+        title: g.title,
+        slug: g.slug,
+        description: g.description,
+        summary: g.summary,
+        status: g.status,
+        difficulty: g.difficulty,
+        requirements: g.requirements,
+        steps: g.steps,
+        version: g.version,
+        forgeRulesCheckResult: g.forge_rules_check_result,
+        forgeRulesCheckTimestamp: g.forge_rules_check_timestamp,
+        collectionId: g.collection_id,
+        collectionName: collection?.name || "Unknown",
+        hubId: collection?.hubId,
+        hubName: collection?.hubName,
+        createdAt: g.created_at,
+        updatedAt: g.updated_at,
+        publishedAt: g.published_at,
+        authorId: g.author_id,
+        reviewerId: g.reviewer_id,
+        verificationStatus: g.verification_status,
+      }
+    })
+
+    console.log("[v0] getGuidesForNetworkCollections: Normalized", normalizedGuides.length, "guides")
+    return { guides: normalizedGuides, error: null }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "Unknown error"
+    console.warn("[v0] getGuidesForNetworkCollections: Exception:", errorMsg)
+    return { guides: [], error: errorMsg }
+  }
+}
+
 export async function getGuidesForNetworkCollections(
   collections: NormalizedCollection[]
 ): Promise<Guide[]> {
