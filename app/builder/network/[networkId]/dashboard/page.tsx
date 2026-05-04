@@ -3,14 +3,6 @@ import { Plus, ArrowLeft, AlertCircle } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
-import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
-import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
-import {
-  loadNetworkBuilderContext,
-  getGuidesForNetworkCollections,
-  type NormalizedHub,
-  type NormalizedCollection,
-} from "@/lib/guideforge/supabase-networks"
 
 export default async function NetworkDashboardPage({
   params,
@@ -22,37 +14,24 @@ export default async function NetworkDashboardPage({
   const { networkId } = await params
   const { tab, collection: filterCollectionId } = await searchParams
 
-  try {
-    // Load unified builder context (network + hubs + collections)
-    const ctx = await loadNetworkBuilderContext(networkId)
-    const network = ctx.network
-    const hubs: NormalizedHub[] = ctx.hubs
-    const collections: NormalizedCollection[] = ctx.collections
-
-    if (!network) {
-      return (
-        <main className="min-h-screen bg-background">
-          <SiteHeader hideCta />
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <AlertCircle className="size-8 text-red-600 dark:text-red-400" aria-hidden="true" />
-              <div>
-                <h1 className="text-xl font-semibold text-foreground mb-2">Network Not Found</h1>
-                <p className="text-muted-foreground">
-                  Could not find network with ID: <code className="text-xs bg-muted px-1 py-0.5 rounded">{networkId}</code>
-                </p>
-              </div>
-              <Button asChild variant="outline" className="mt-4">
-                <Link href="/builder/networks">
-                  <ArrowLeft className="size-4 mr-2" aria-hidden="true" />
-                  All Networks
-                </Link>
-              </Button>
-            </div>
+  return (
+    <main className="min-h-screen bg-background">
+      <SiteHeader hideCta />
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold">Dashboard Route Alive</h1>
+          <div className="space-y-2 text-muted-foreground">
+            <p>networkId: <code className="bg-muted px-2 py-1 rounded">{networkId}</code></p>
+            <p>tab: <code className="bg-muted px-2 py-1 rounded">{tab || "drafts"}</code></p>
+            <p>collection: <code className="bg-muted px-2 py-1 rounded">{filterCollectionId || "none"}</code></p>
           </div>
-        </main>
-      )
-    }
+          <p className="text-green-600 font-semibold">✓ Minimal route is working</p>
+          <p className="text-sm text-muted-foreground">Adding full dashboard imports next...</p>
+        </div>
+      </div>
+    </main>
+  )
+}
 
     // Load guides using canonical helper that works with collection_id filtering
     let guides: Guide[] = []
