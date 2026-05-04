@@ -82,13 +82,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   }, [])
 
   // Autosave effect - debounced by 300ms, only saves after user edits
+  // Runs for all statuses: draft, ready, and published all save directly to Supabase.
   useEffect(() => {
-    // Skip autosave if guide is published
-    if (guideStatus === "published") {
-      console.log("[v0] Autosave skipped: guide is published")
-      return
-    }
-    
     // Skip autosave on initial load before user has edited anything
     if (!hasHydratedRef.current || !userEditedRef.current) {
       console.log("[v0] Autosave skipped initial load: hydrated=", hasHydratedRef.current, "userEdited=", userEditedRef.current)
@@ -128,25 +123,26 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         updatedAt: new Date().toISOString(),
       }
 
-      console.log("[v0] Guide save mode:", {
+      console.log("[v0] Guide save requested:", {
         guideId: updatedGuide.id,
-        isUuid: updatedGuide.id?.includes("-") && updatedGuide.id?.length === 36,
-        collectionId: updatedGuide.collectionId,
-        slug: updatedGuide.slug,
+        status: updatedGuide.status,
         saveMode: updatedGuide.id && updatedGuide.id !== "new" ? "update" : "insert",
-      })
-      console.log("[v0] Guide save payload:", {
-        id: updatedGuide.id,
-        title: updatedGuide.title,
-        collectionId: updatedGuide.collectionId,
-        slug: updatedGuide.slug,
-        requirements: updatedGuide.requirements?.length || 0,
-        stepsCount: updatedGuide.steps?.length || 0,
+        hasCollectionId: !!updatedGuide.collectionId,
+        hasSections: (updatedGuide.steps?.length ?? 0) > 0,
+        sectionCount: updatedGuide.steps?.length ?? 0,
+        isPublished: updatedGuide.status === "published",
+        isReady: updatedGuide.status === "ready",
       })
       setSaveError(null)
       ;(async () => {
         try {
           const { source, error } = await saveGuideDraft(updatedGuide)
+          console.log("[v0] Guide save Supabase result:", {
+            success: source === "supabase",
+            source,
+            errorCode: error ? (error.match(/^(\w+):/) || [])[1] || "unknown" : null,
+            errorMessage: error || null,
+          })
           const elapsed = Date.now() - savingStartTime
           const remainingMinDuration = Math.max(0, minSavingDuration - elapsed)
           
@@ -394,9 +390,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setGuideStatus("ready")
     console.log("[v0] Mark Ready status after: ready")
     
-    // Update status to "ready" in Supabase
+    // Build guide object — use normalizedGuide as base so collectionId is preserved
     const updatedGuide: Guide = {
-      ...guide,
+      ...normalizedGuide,
       title,
       summary,
       requirements: requirementsArray,
@@ -408,39 +404,35 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
     }
     
-    console.log("[v0] Mark Ready guide id:", guide.id)
-    console.log("[v0] Autosave triggered by: Mark Ready button")
+    console.log("[v0] Mark Ready guide id:", normalizedGuide.id, "| collectionId:", normalizedGuide.collectionId)
     setAutosaveStatus("saving")
-    console.log("[v0] Autosave indicator state: saving")
     
-    const { source } = await saveGuideDraft(updatedGuide)
-    console.log("[v0] Mark Ready save source:", source)
-    console.log("[v0] Mark Ready save result:", { source, guideId: guide.id, status: "ready" })
+    const { source, error } = await saveGuideDraft(updatedGuide)
+    console.log("[v0] Guide save Supabase result:", {
+      success: source === "supabase",
+      source,
+      errorMessage: error || null,
+    })
     
     setSaveSource(source)
     setLastSaved(new Date())
     if (source !== "supabase") {
-      setSaveError("Supabase save failed — saved locally instead")
+      setSaveError(error ? `Mark Ready save failed: ${error}` : "Mark Ready: Supabase save failed")
       setAutosaveStatus("failed")
-      console.log("[v0] Autosave indicator state: failed")
     } else {
       setSaveError(null)
       setAutosaveStatus("saved")
-      console.log("[v0] Autosave indicator state: saved")
       
-      // Keep "Saved" status for at least 2 seconds
       if (autosaveStatusTimeoutRef.current) {
         clearTimeout(autosaveStatusTimeoutRef.current)
       }
       autosaveStatusTimeoutRef.current = setTimeout(() => {
         setAutosaveStatus("idle")
-        console.log("[v0] Autosave indicator state: idle")
       }, 2000)
     }
     
-    setMarkedReady(true)
+    setMarkedReady(source === "supabase")
     
-    // Clear confirmation message after 5 seconds
     setTimeout(() => {
       setMarkedReady(false)
     }, 5000)
@@ -461,9 +453,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         .map(line => line.trim())
         .filter(line => line.length > 0)
 
-      // Update guide to published status
+      // Build guide object — use normalizedGuide as base so collectionId is preserved
       const publishedGuide: Guide = {
-        ...guide,
+        ...normalizedGuide,
         title,
         summary,
         requirements: requirementsArray,
@@ -476,8 +468,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         forgeRulesCheckTimestamp: rulesCheckTimestamp || undefined,
       }
 
-      const { source } = await saveGuideDraft(publishedGuide)
-      console.log("[v0] Publish save result:", { source, guideId: guide.id, status: "published" })
+      console.log("[v0] Publish guide id:", normalizedGuide.id, "| collectionId:", normalizedGuide.collectionId)
+      const { source, error: publishError } = await saveGuideDraft(publishedGuide)
+      console.log("[v0] Guide save Supabase result:", {
+        success: source === "supabase",
+        source,
+        errorMessage: publishError || null,
+      })
       
       setSaveSource(source)
       setLastSaved(new Date())
@@ -486,23 +483,18 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         setSaveError(null)
         setGuideStatus("published")
         setAutosaveStatus("saved")
-        console.log("[v0] Autosave indicator state: saved")
         setPublishedMessage(true)
         
-        // Keep "Saved" visible for 2 seconds
         setTimeout(() => {
           setAutosaveStatus("idle")
-          console.log("[v0] Autosave indicator state: idle")
         }, 2000)
         
-        // Clear published message after 5 seconds
         setTimeout(() => {
           setPublishedMessage(false)
         }, 5000)
       } else {
-        setSaveError("Supabase publish failed — saved locally instead")
+        setSaveError(publishError ? `Publish failed: ${publishError}` : "Publish failed — Supabase could not save")
         setAutosaveStatus("failed")
-        console.log("[v0] Autosave indicator state: failed")
       }
     } catch (error) {
       console.error("[v0] Publish error:", error)
@@ -553,22 +545,19 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <div className="inline-flex">
                 <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
               </div>
-              <span>Saving changes...</span>
-              <span className="text-xs opacity-75 ml-2">[saving]</span>
+              <span>Saving...</span>
             </>
           )}
           {autosaveStatus === "saved" && (
             <>
               <CheckCircle2 className="size-4" />
               <span>Saved to Supabase</span>
-              <span className="text-xs opacity-75 ml-2">[saved]</span>
             </>
           )}
           {autosaveStatus === "failed" && (
             <>
               <AlertCircle className="size-4" />
               <span>Save failed</span>
-              <span className="text-xs opacity-75 ml-2">[failed]</span>
             </>
           )}
         </div>
@@ -626,70 +615,63 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             )}
 
             {/* Draft action buttons */}
+            {/* Shared inline save status indicator — shown for all statuses */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              autosaveStatus === "saving"
+                ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
+                : autosaveStatus === "saved"
+                ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                : autosaveStatus === "failed"
+                ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+                : "bg-muted text-muted-foreground"
+            }`}>
+              {autosaveStatus === "saving" && (
+                <>
+                  <div className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                  <span>Saving...</span>
+                </>
+              )}
+              {autosaveStatus === "saved" && (
+                <>
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  <span>Saved to Supabase</span>
+                </>
+              )}
+              {autosaveStatus === "failed" && (
+                <>
+                  <AlertCircle className="size-3.5" aria-hidden="true" />
+                  <span>Save failed</span>
+                </>
+              )}
+              {autosaveStatus === "idle" && (
+                <>
+                  <div className="h-1.5 w-1.5 rounded-full bg-current opacity-50" />
+                  <span>{userEditedRef.current ? "Unsaved changes" : "Idle"}</span>
+                </>
+              )}
+            </div>
+
+            {/* Error detail when save fails */}
+            {autosaveStatus === "failed" && saveError && (
+              <div className="text-xs text-red-600 dark:text-red-400 max-w-[200px] truncate" title={saveError}>
+                {saveError}
+              </div>
+            )}
+
             {isDraft && (
-              <div className="flex gap-2 ml-auto items-center">
-                {/* Persistent autosave status indicator */}
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  autosaveStatus === "saving"
-                    ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
-                    : autosaveStatus === "saved"
-                    ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-                    : autosaveStatus === "failed"
-                    ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {autosaveStatus === "saving" && (
-                    <>
-                      <div className="inline-flex">
-                        <div className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-                      </div>
-                      <span>Saving...</span>
-                    </>
-                  )}
-                  {autosaveStatus === "saved" && (
-                    <>
-                      <CheckCircle2 className="size-4" aria-hidden="true" />
-                      <span>Saved to Supabase</span>
-                    </>
-                  )}
-                  {autosaveStatus === "failed" && (
-                    <>
-                      <AlertCircle className="size-4" aria-hidden="true" />
-                      <span>Save failed</span>
-                    </>
-                  )}
-                  {autosaveStatus === "idle" && (
-                    <>
-                      <div className="h-1.5 w-1.5 rounded-full bg-current" />
-                      <span>Idle</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Error details when save fails */}
-                {autosaveStatus === "failed" && saveError && (
-                  <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
-                    {saveError}
-                  </div>
-                )}
-
-                {/* Dev debug info */}
-                <button
-                  onClick={() => setShowDebugInfo(!showDebugInfo)}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                  title="Toggle Supabase configuration debug info"
-                >
-                  {showDebugInfo ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                  Config
-                </button>
-
+              <div className="flex gap-2 items-center">
                 <Button size="sm" variant="outline" onClick={handlePreview}>
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
-                <Button size="sm" onClick={handlePublishDraft} disabled={isReady}>
+                <Button
+                  size="sm"
+                  onClick={handlePublishDraft}
+                  className={markReadyError ? "border-red-500 text-red-600" : ""}
+                  variant={markReadyError ? "outline" : "default"}
+                >
                   <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
-                  {isReady ? "Ready" : "Mark Ready"}
+                  {markReadyError ? "Fix required rules first" : "Mark Ready"}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -699,17 +681,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
             {/* Ready state actions */}
             {isReady && (
-              <div className="flex gap-2 ml-auto items-center">
-                <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  Ready to publish
-                </div>
+              <div className="flex gap-2 items-center">
                 <Button size="sm" variant="outline" onClick={handlePreview}>
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
                 <Button size="sm" onClick={() => setShowPublishDialog(true)} disabled={isPublishing}>
-                  <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
+                  <Send className="size-4 mr-1" aria-hidden="true" />
                   {isPublishing ? "Publishing..." : "Publish"}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
@@ -720,11 +698,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
             {/* Published state actions */}
             {isPublished && (
-              <div className="flex gap-2 ml-auto items-center">
-                <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="size-4" aria-hidden="true" />
-                  Published to QuestLine
-                </div>
+              <div className="flex gap-2 items-center">
                 <Button size="sm" variant="outline" onClick={handlePreview}>
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
@@ -734,11 +708,18 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 </Button>
               </div>
             )}
-            
+
             {publishedMessage && (
-              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 ml-auto">
+              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="size-4" aria-hidden="true" />
-                Guide published to QuestLine.
+                Guide published.
+              </div>
+            )}
+
+            {markedReady && (
+              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                <CheckCircle2 className="size-4" aria-hidden="true" />
+                Guide marked ready.
               </div>
             )}
           </div>
