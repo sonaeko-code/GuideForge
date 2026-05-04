@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -54,17 +54,20 @@ export function CreateGuideForm({
   preselectedCollectionId,
 }: CreateGuideFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [title, setTitle] = useState("Best Fire Warden Beginner Build")
+  // Check if this is a fresh form load (should start blank)
+  const isFresh = searchParams.get("fresh") === "true"
+
+  // Initialize with blank defaults if fresh, otherwise with template
+  const [title, setTitle] = useState("")
   const [guideType, setGuideType] = useState<GuideType>("character-build")
   const [audience, setAudience] = useState<string[]>(["New Players"])
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("beginner")
-  const [requirements, setRequirements] = useState("Character level 10 or higher")
-  const [description, setDescription] = useState(
-    "A forgiving sustain-mage build for new Emberfall players. Learn the fights without getting punished."
-  )
+  const [requirements, setRequirements] = useState("")
+  const [description, setDescription] = useState("")
 
   // Determine initial hub: preselected (if valid) > first hub > empty
   const initialHubId = (() => {

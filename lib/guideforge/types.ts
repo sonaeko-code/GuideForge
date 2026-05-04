@@ -173,6 +173,8 @@ export interface Guide {
   requirements: string[]
   /** Optional warnings (spoilers, dangerous repair steps, etc.). */
   warnings: string[]
+  /** Target audience tags (e.g., "Beginner", "PvP", "Hardcore"). */
+  audience?: string[]
 
   /** Game patch / SOP version / doc revision. */
   version?: string

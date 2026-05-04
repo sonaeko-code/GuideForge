@@ -352,43 +352,19 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   }
 
   const handlePublishDraft = async () => {
-    console.log("[v0] Mark Ready status before:", guideStatus)
-    
-    // Check if validation is stale
-    if (rulesStale) {
+    // Forge rules validation before status transition
+    const rulesErrors = rulesCheckResult?.filter((r) => r.severity === "error") ?? []
+    if (rulesErrors.length > 0) {
+      console.log("[v0] Status transition blocked: draft → ready (forge rules errors)")
       setMarkReadyError(true)
       setTimeout(() => setMarkReadyError(false), 3000)
+      setSaveError("Cannot mark ready: Forge Rules have errors. Please fix them first.")
       return
     }
-
-    // Check if REQUIRED Forge Rules pass
-    if (rulesCheckResult && rulesCheckResult.length > 0) {
-      const requiredFailures = rulesCheckResult.filter(
-        (r: any) => !r.passed && (r.required !== false)
-      )
-      if (requiredFailures.length > 0) {
-        console.log("[v0] Mark Ready blocked by required failures:", requiredFailures)
-        setMarkReadyError(true)
-        setTimeout(() => setMarkReadyError(false), 3000)
-        return
-      }
-    }
     
-    // Cancel any pending autosave before changing status
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current)
-      autosaveTimerRef.current = null
-    }
-    
-    // Normalize requirements from textarea for save
-    const requirementsArray = requirementsText
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-
-    // Update status to "ready"
+    console.log("[v0] Status transition requested: draft → ready")
+    setMarkReadyError(false)
     setGuideStatus("ready")
-    console.log("[v0] Mark Ready status after: ready")
     
     // Build guide object — use normalizedGuide as base so collectionId is preserved
     const updatedGuide: Guide = {
@@ -442,8 +418,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setShowPublishDialog(false)
     setIsPublishing(true)
     
-    console.log("[v0] Publishing guide id:", guide.id)
-    console.log("[v0] Autosave triggered by: Publish button")
+    console.log("[v0] Status transition requested: ready → published | guideId:", guide.id)
     setAutosaveStatus("saving")
     
     try {
@@ -727,6 +702,39 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       </div>
 
       <div className="mx-auto max-w-4xl space-y-6 px-6 py-8">
+        {/* Metadata Context Header */}
+        <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border/50">
+          {/* Guide type */}
+          {normalizedGuide.type && (
+            <Badge variant="outline" className="capitalize">
+              {normalizedGuide.type.replace("-", " ")}
+            </Badge>
+          )}
+          
+          {/* Difficulty */}
+          {normalizedGuide.difficulty && (
+            <DifficultyBadge difficulty={normalizedGuide.difficulty} />
+          )}
+          
+          {/* Audience tags */}
+          {normalizedGuide.audience && normalizedGuide.audience.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {normalizedGuide.audience.map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+          
+          {/* Hub/Collection context */}
+          {normalizedGuide.hubId && (
+            <div className="ml-auto text-xs text-muted-foreground">
+              Editing in: {normalizedGuide.hubId} / {normalizedGuide.collectionId}
+            </div>
+          )}
+        </div>
+
         {/* Summary Card */}
         <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-6">
           <div className="space-y-3">
@@ -743,6 +751,24 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 placeholder="Guide title"
               />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Summary (Short Description)
+              </label>
+              <Textarea
+                value={summary}
+                onChange={(e) => {
+                  markDirty()
+                  setSummary(e.target.value)
+                }}
+                placeholder="Brief summary of this guide. Shown on guide cards and list pages."
+                className="w-full h-20 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none mt-2"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                This summary appears on guide cards and in search results. Keep it concise.
+              </p>
             </div>
 
             <div>

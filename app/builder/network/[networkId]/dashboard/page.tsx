@@ -57,6 +57,7 @@ export default async function NetworkDashboardPage({
     let guides: Guide[] = []
     let published: Guide[] = []
     let drafts: Guide[] = []
+    let ready: Guide[] = []
 
     try {
       // Use canonical helper for ALL networks (not just non-QuestLine)
@@ -65,11 +66,13 @@ export default async function NetworkDashboardPage({
       
       if (guides && guides.length > 0) {
         published = guides.filter((g: Guide) => g.status === "published")
-        drafts = guides.filter((g: Guide) => g.status === "draft" || g.status === "in-review")
+        drafts = guides.filter((g: Guide) => g.status === "draft")
+        ready = guides.filter((g: Guide) => g.status === "ready")
         console.log("[v0] Dashboard loaded guides using canonical helper:", {
           total: guides.length,
           published: published.length,
           drafts: drafts.length,
+          ready: ready.length,
         })
       }
     } catch (err) {
@@ -77,6 +80,7 @@ export default async function NetworkDashboardPage({
       guides = []
       published = []
       drafts = []
+      ready = []
     }
 
     // Safe defaults
@@ -86,6 +90,7 @@ export default async function NetworkDashboardPage({
     // Guides are already normalized by canonical helper
     const safeGuides = Array.isArray(guides) ? guides : []
     const safeDrafts = Array.isArray(drafts) ? drafts : []
+    const safeReady = Array.isArray(ready) ? ready : []
     const safePublished = Array.isArray(published) ? published : []
 
     return (
@@ -103,7 +108,7 @@ export default async function NetworkDashboardPage({
               </div>
 
               {/* Stats */}
-              <div className="grid gap-4 md:grid-cols-4 mt-6">
+              <div className="grid gap-4 md:grid-cols-5 mt-6">
                 <div className="rounded-lg border border-border/50 px-4 py-3">
                   <p className="text-sm font-medium text-muted-foreground">Hubs</p>
                   <p className="text-3xl font-bold text-foreground">{safeHubs.length}</p>
@@ -113,32 +118,21 @@ export default async function NetworkDashboardPage({
                   <p className="text-3xl font-bold text-foreground">{safeCollections.length}</p>
                 </div>
                 <div className="rounded-lg border border-border/50 px-4 py-3">
-                  <p className="text-sm font-medium text-muted-foreground">Published Guides</p>
-                  <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{safePublished.length}</p>
-                </div>
-                <div className="rounded-lg border border-border/50 px-4 py-3">
                   <p className="text-sm font-medium text-muted-foreground">Drafts</p>
                   <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{safeDrafts.length}</p>
                 </div>
+                <div className="rounded-lg border border-border/50 px-4 py-3">
+                  <p className="text-sm font-medium text-muted-foreground">Ready</p>
+                  <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">{safeReady.length}</p>
+                </div>
+                <div className="rounded-lg border border-border/50 px-4 py-3">
+                  <p className="text-sm font-medium text-muted-foreground">Published</p>
+                  <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{safePublished.length}</p>
+                </div>
               </div>
 
-              {/* CTA */}
-              {safeHubs.length > 0 && safeCollections.length > 0 ? (
-                <div className="flex gap-3 mt-6">
-                  <Button asChild>
-                    <Link href={`/builder/network/${networkId}/generate`}>
-                      <Plus className="size-4 mr-2" aria-hidden="true" />
-                      Generate Guide
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <Link href={`/builder/network/${networkId}/guide/new`}>
-                      <Plus className="size-4 mr-2" aria-hidden="true" />
-                      Create Manual Guide
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
+              {/* No top-level CTA — CTA buttons are in the tabs empty states */}
+              {safeHubs.length === 0 || safeCollections.length === 0 ? (
                 <div className="flex-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 mt-6">
                   <p className="text-sm text-amber-700 dark:text-amber-300">
                     {safeHubs.length === 0
@@ -146,7 +140,7 @@ export default async function NetworkDashboardPage({
                       : "Create a collection to start generating guides."}
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Tabs Section - Handled by Client Component */}
@@ -158,6 +152,7 @@ export default async function NetworkDashboardPage({
               collections={safeCollections}
               guides={safeGuides}
               drafts={safeDrafts}
+              ready={safeReady}
               published={safePublished}
             />
           </div>

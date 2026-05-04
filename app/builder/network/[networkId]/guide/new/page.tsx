@@ -11,10 +11,10 @@ export default async function CreateGuidePage({
   searchParams,
 }: {
   params: Promise<{ networkId: string }>
-  searchParams: Promise<{ hub?: string; collection?: string }>
+  searchParams: Promise<{ hub?: string; collection?: string; fresh?: string }>
 }) {
   const { networkId } = await params
-  const { hub: hubParamRaw, collection: collectionParamRaw } = await searchParams
+  const { hub: hubParamRaw, collection: collectionParamRaw, fresh } = await searchParams
 
   console.log("[v0] Manual guide page route networkId:", networkId)
   console.log("[v0] Manual guide page query params:", {
