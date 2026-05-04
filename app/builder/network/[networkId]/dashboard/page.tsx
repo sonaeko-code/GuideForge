@@ -7,7 +7,7 @@ import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-da
 import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
 import {
   loadNetworkBuilderContext,
-  getGuidesForNetworkCollectionsWithDiagnostics,
+  getGuidesForNetworkCollections,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -42,7 +42,7 @@ export default async function NetworkDashboardPage({
     const collections: NormalizedCollection[] = ctx.collections
 
     // Load guides for the network's collections
-    const { guides, error: guidesError } = await getGuidesForNetworkCollectionsWithDiagnostics(collections)
+    const guides = await getGuidesForNetworkCollections(collections)
 
     // Ensure arrays are safe
     const safeHubs = Array.isArray(hubs) ? hubs : []
