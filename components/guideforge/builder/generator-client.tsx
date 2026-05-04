@@ -177,6 +177,21 @@ export function GeneratorClient({
       return
     }
 
+    // Validate selectedCollectionId is a UUID before attempting save
+    const isValidCollectionUuid = selectedCollectionId && selectedCollectionId.includes("-") && selectedCollectionId.length === 36
+    if (!isValidCollectionUuid) {
+      console.error(
+        "[v0] handleSendToEditor: selectedCollectionId is not a valid UUID:",
+        selectedCollectionId,
+        "length:",
+        selectedCollectionId?.length
+      )
+      setSendError(
+        `Invalid collection ID format: "${selectedCollectionId}". Expected a UUID. This may indicate a data loading issue.`
+      )
+      return
+    }
+
     setIsSending(true)
     setSendError(null)
     try {
@@ -195,6 +210,7 @@ export function GeneratorClient({
         networkId,
         hubId: selectedHubId,
         collectionId: selectedCollectionId,
+        collectionIdLength: selectedCollectionId.length,
         guideType: guideTypeToUse,
         difficulty: difficultyToUse,
         sectionsCount: generatedGuide.sections?.length,
@@ -217,8 +233,13 @@ export function GeneratorClient({
         })),
       })
 
-
       const { id, verified, error } = result
+
+      console.log("[v0] handleSendToEditor: createAndSaveGuideDraft returned:", {
+        id,
+        verified,
+        error,
+      })
 
       if (!verified) {
         console.error("[v0] handleSendToEditor: Verification failed:", error)

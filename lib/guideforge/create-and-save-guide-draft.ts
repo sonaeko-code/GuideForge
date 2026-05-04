@@ -66,12 +66,10 @@ export async function createAndSaveGuideDraft(
     }
   }
   
-  // Validate collection ID is a real UUID (from selectedCollectionId dropdown)
-  if (!input.collectionId || !input.collectionId.includes("-") || input.collectionId.length !== 36) {
-    const msg = input.collectionId 
-      ? `Collection ID is not a valid UUID: "${input.collectionId}". Did you forget to select a collection?`
-      : "Collection ID is required. Please select a collection."
-    console.error("[v0] createAndSaveGuideDraft: Invalid collection ID format:", msg)
+  // Validate collection ID is not empty
+  if (!input.collectionId) {
+    const msg = "Collection ID is required. Please select a collection before saving."
+    console.error("[v0] createAndSaveGuideDraft: Missing collection ID:", msg)
     return {
       id: "error",
       source: "localStorage",
