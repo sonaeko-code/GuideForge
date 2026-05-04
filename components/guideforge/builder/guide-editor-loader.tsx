@@ -155,5 +155,51 @@ export function GuideEditorLoader({
     )
   }
 
-  return <GuideEditor guide={guide} networkId={networkId} />
+  // Task 3: Sanitize guide object to ensure all arrays are safe before rendering
+  let safeGuide: Guide | null = null
+  if (guide) {
+    try {
+      safeGuide = JSON.parse(JSON.stringify({
+        ...guide,
+        steps: Array.isArray(guide.steps) ? guide.steps : [],
+        warnings: Array.isArray(guide.warnings) ? guide.warnings : [],
+        requirements: Array.isArray(guide.requirements) ? guide.requirements : [],
+        audience: Array.isArray(guide.audience) ? guide.audience : [],
+        summary: guide.summary ?? "",
+        status: guide.status ?? "draft",
+        difficulty: guide.difficulty ?? "Beginner",
+      })) as Guide
+    } catch (sanitizeError) {
+      console.error("[v0] Guide sanitization failed:", sanitizeError)
+      safeGuide = null
+    }
+  }
+
+  if (!safeGuide && guide) {
+    return (
+      <div className="space-y-8 py-12">
+        <Card className="border-red-500/30 bg-red-500/5 p-8">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Guide Data Error</h2>
+          <p className="text-sm text-red-700 mb-4">
+            The guide data could not be prepared for editing.
+          </p>
+          <div className="mb-4 p-3 bg-red-50 rounded text-xs font-mono text-red-900 max-h-20 overflow-auto">
+            <p>guideId: {guideId}</p>
+            <p>networkId: {networkId}</p>
+            <p>status: data-sanitization-failed</p>
+          </div>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Button asChild variant="outline">
+              <Link href={`/builder/network/${networkId}/dashboard`}>
+                <ArrowLeft className="size-4 mr-2" aria-hidden="true" />
+                Back to Dashboard
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  return <GuideEditor guide={safeGuide} networkId={networkId} />
 }

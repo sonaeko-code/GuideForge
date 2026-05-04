@@ -5,6 +5,18 @@
 import type { Guide } from "./types"
 
 /**
+ * Generate a temporary or permanent ID for guides, steps, and other entities.
+ * Uses crypto.randomUUID() if available (modern browsers/Node), falls back to Date + Math.random()
+ */
+export function makeTempId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID()
+  }
+  // Fallback: timestamp + random string
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+/**
  * Normalizes a guide's status to one of three canonical values: draft | ready | published
  * Handles edge cases where status might be ready_to_publish, active, or other variants.
  * 

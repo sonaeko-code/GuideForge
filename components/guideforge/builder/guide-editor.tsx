@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { Guide, GuideStep } from "@/lib/guideforge/types"
-import { v4 as uuidv4 } from "uuid"
+import { makeTempId } from "@/lib/guideforge/utils"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
@@ -240,7 +240,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const handleAddSection = async () => {
     console.log("[v0] Adding new section to guide:", normalizedGuide.id)
     const newStep: GuideStep = {
-      id: uuidv4(),
+      id: makeTempId(),
       guideId: normalizedGuide.id,
       order: steps.length,
       kind: "custom",

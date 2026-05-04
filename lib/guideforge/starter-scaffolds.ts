@@ -8,7 +8,7 @@
  */
 
 import type { GuideStep, GuideType } from "./types"
-import { v4 as uuidv4 } from "uuid"
+import { makeTempId } from "./utils"
 
 export interface StarterSection {
   kind: string
@@ -86,7 +86,7 @@ export function getStarterSectionsForGuideType(
   const template = STARTER_SECTIONS_BY_TYPE[guideType] || STARTER_SECTIONS_BY_TYPE["reference"]
   
   return template.map((section, index) => ({
-    id: uuidv4(),
+    id: makeTempId(),
     guideId,
     order: index,
     kind: section.kind as any,

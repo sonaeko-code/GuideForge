@@ -16,7 +16,7 @@
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"
 import { saveGuideDraft, loadGuideDraft } from "./guide-drafts-storage"
 import { getStarterSectionsForGuideType } from "./starter-scaffolds"
-import { v4 as uuidv4 } from "uuid"
+import { makeTempId } from "./utils"
 
 export interface CreateGuideDraftInput {
   // Required fields
@@ -117,7 +117,7 @@ export async function createAndSaveGuideDraft(
   })
 
   // Generate guide ID
-  const guideId = uuidv4()
+  const guideId = makeTempId()
   console.log("[v0] Generated guide id for new draft:", guideId)
   
   // Seeded dev profile ID for Phase 1 (no auth yet)
@@ -130,7 +130,7 @@ export async function createAndSaveGuideDraft(
 
   const steps: GuideStep[] = hasProvidedSteps
     ? input.steps!.map((step, index) => ({
-        id: step.id || uuidv4(),
+        id: step.id || makeTempId(),
         guideId,
         order: index,
         kind: step.kind || "custom",

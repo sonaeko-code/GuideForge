@@ -12,7 +12,7 @@
  *   4. Return the persisted Guide (not GeneratedGuide)
  */
 
-import { v4 as uuidv4 } from "uuid"
+import { makeTempId } from "./utils"
 import type {
   GeneratedGuide,
   GeneratedGuideSection,
