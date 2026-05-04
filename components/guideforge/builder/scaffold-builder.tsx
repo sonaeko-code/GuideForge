@@ -34,6 +34,7 @@ export function ScaffoldBuilder() {
       setSelectedTemplate(template)
       setNetworkName(template.networkTemplate.name)
       setNetworkSlug(template.networkTemplate.slug)
+      setNetworkSlugManuallyEdited(false)
       setNetworkDescription(template.networkTemplate.description)
       setError(null)
       setStep("configure")
@@ -46,7 +47,7 @@ export function ScaffoldBuilder() {
       setError("Network name is required")
       return
     }
-    if (!networkSlug.trim()) {
+    if (!computedSlug.trim()) {
       setError("Network slug is required")
       return
     }
@@ -68,13 +69,13 @@ export function ScaffoldBuilder() {
       console.log("[v0] ScaffoldBuilder: Creating scaffold with:", {
         template: selectedTemplate.id,
         networkName,
-        networkSlug,
+        networkSlug: computedSlug,
         networkDescription,
       })
 
       const result = await createNetworkScaffold(selectedTemplate, {
         networkName,
-        networkSlug,
+        networkSlug: computedSlug,
         networkDescription,
       })
 
@@ -174,8 +175,11 @@ export function ScaffoldBuilder() {
           <div>
             <label className="text-sm font-medium text-foreground block mb-2">Network Slug</label>
             <Input
-              value={networkSlug}
-              onChange={(e) => setNetworkSlug(e.target.value)}
+              value={computedSlug}
+              onChange={(e) => {
+                setNetworkSlug(e.target.value)
+                setNetworkSlugManuallyEdited(true)
+              }}
               placeholder="e.g., gaming-guides"
               className="w-full"
             />
