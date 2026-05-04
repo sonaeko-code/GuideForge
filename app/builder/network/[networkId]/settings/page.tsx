@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
+import { NetworkSettingsForm } from "@/components/guideforge/builder/network-settings-form"
 import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
 
 export default async function NetworkSettingsPage({
@@ -26,47 +27,12 @@ export default async function NetworkSettingsPage({
             </Link>
           </Button>
 
-          <div className="rounded-lg border border-border bg-secondary/20 p-8">
-            <h1 className="text-2xl font-bold tracking-tight mb-4">Network Settings</h1>
-            
-            <div className="space-y-6">
-              <div>
-                <h2 className="font-semibold text-foreground mb-2">Current Network</h2>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-sm text-muted-foreground">Name: </span>
-                    <span className="font-mono text-sm">{network.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">Slug: </span>
-                    <span className="font-mono text-sm">{network.slug}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">Description: </span>
-                    <span className="font-mono text-sm">{network.description || "—"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-6">
-                <h2 className="font-semibold text-foreground mb-3">Phase 2 & Beyond</h2>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• Edit network name and slug</li>
-                  <li>• Update network description</li>
-                  <li>• Change theme and colors</li>
-                  <li>• Manage hubs and collections</li>
-                  <li>• Configure permissions and access</li>
-                  <li>• Delete network</li>
-                </ul>
-              </div>
-
-              <div className="border-t border-border pt-6">
-                <p className="text-xs text-muted-foreground">
-                  Phase 1 Foundation: Settings page placeholder. Full editing will be implemented in Phase 2.
-                </p>
-              </div>
-            </div>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">{network.name} Settings</h1>
+            <p className="text-muted-foreground mt-2">Edit network information</p>
           </div>
+
+          <NetworkSettingsForm network={network} networkId={networkId} />
         </div>
       </main>
     )
@@ -92,3 +58,4 @@ export default async function NetworkSettingsPage({
     )
   }
 }
+

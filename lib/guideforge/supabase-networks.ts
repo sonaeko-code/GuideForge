@@ -135,6 +135,75 @@ export async function createNetwork(
 }
 
 /**
+ * Update an existing network's editable fields
+ */
+export async function updateNetwork(
+  networkId: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+  }
+): Promise<{ network: Network | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, cannot update network")
+    return { network: null, error: "Supabase not configured" }
+  }
+
+  if (!networkId) {
+    return { network: null, error: "No network ID provided" }
+  }
+
+  try {
+    // Normalize networkId to UUID if needed
+    let normalizedId = networkId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(networkId)) {
+      // Try to look up by slug
+      const bySlug = await getNetworkBySlug(networkId)
+      if (bySlug) {
+        normalizedId = bySlug.id
+      } else {
+        return { network: null, error: `No network found for id: ${networkId}` }
+      }
+    }
+
+    const updateData: Record<string, any> = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.slug !== undefined) updateData.slug = updates.slug
+    if (updates.description !== undefined) updateData.description = updates.description
+    updateData.updated_at = new Date().toISOString()
+
+    console.log("[v0] Network update payload:", updateData)
+
+    const { data, error } = await supabase
+      .from("networks")
+      .update(updateData)
+      .eq("id", normalizedId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Network update error:", error.message)
+      return { network: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No network found for id: ${networkId}`
+      console.error("[v0] Network update error:", notFoundError)
+      return { network: null, error: notFoundError }
+    }
+
+    console.log("[v0] Network updated:", data.id, data.name)
+    return { network: data as Network }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Network update error:", message)
+    return { network: null, error: message }
+  }
+}
+
+/**
  * Get all networks (for dashboards)
  */
 export async function getAllNetworks(): Promise<Network[]> {
