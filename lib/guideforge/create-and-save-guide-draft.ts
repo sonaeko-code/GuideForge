@@ -11,6 +11,13 @@
  * - Saves to Supabase first (when configured), falls back to localStorage
  * - Returns { id, source } to indicate save success
  * - Includes comprehensive debug logging
+ * 
+ * GuideForge Data Spine Contract:
+ * - Generated guides MUST insert into Supabase as draft before routing to editor
+ * - localStorage fallback must never count as dashboard persistence
+ * - Verification uses Supabase-only check (verifyGuideInSupabase), never localStorage fallback
+ * - Returns verified:true ONLY if source==="supabase" AND Supabase verification passes
+ * - Send to Editor must not route unless both Supabase save and verification pass
  */
 
 import type { Guide, GuideStep, GuideType, DifficultyLevel } from "./types"

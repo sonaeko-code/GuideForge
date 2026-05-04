@@ -10,6 +10,14 @@
  * - guides: Main guide data
  * - guide_steps: Individual guide steps
  * - generation_events: Track AI generation events (optional)
+ * 
+ * GuideForge Data Spine Contract:
+ * - saveDraft MUST check if guide.id exists in Supabase before choosing UPDATE vs INSERT
+ * - saveDraft MUST use canonical Supabase-returned id for guide_steps and verification
+ * - Generated guides (with local UUIDs) will INSERT, not UPDATE
+ * - Verification must use Supabase-only check, never fall back to localStorage
+ * - Returns source:"supabase" ONLY if Supabase save AND verification both pass
+ * - localStorage fallback signals failure for dashboard persistence
  */
 
 import type { Guide, GuideStep } from "./types"

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
 import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
-import { DashboardDiagnostics } from "@/components/guideforge/builder/dashboard-diagnostics"
 import {
   loadNetworkBuilderContext,
   getGuidesForNetworkCollectionsWithDiagnostics,
@@ -30,7 +29,7 @@ export default async function NetworkDashboardPage({
     const hubs: NormalizedHub[] = ctx.hubs
     const collections: NormalizedCollection[] = ctx.collections
 
-    // Load guides for the network's collections with diagnostics
+    // Load guides for the network's collections
     const { guides, error: guidesError } = await getGuidesForNetworkCollectionsWithDiagnostics(collections)
 
     // Ensure arrays are safe
@@ -52,15 +51,10 @@ export default async function NetworkDashboardPage({
             </Button>
           </div>
 
-          {/* Diagnostics Panel - Temporary Debug UI */}
-          <DashboardDiagnostics
-            networkId={network.id}
-            networkLoaded={!!network}
-            hubs={safeHubs}
-            collections={safeCollections}
-            guides={safeGuides}
-            supabaseError={guidesError}
-          />
+          {/* GuideForge Data Spine Contract - Dashboard Guide Loading
+             The dashboard loads guides directly from Supabase filtered by collection IDs.
+             Guides flow: networkId → hubs → collections → collection IDs → Supabase WHERE collection_id IN (ids)
+             Do not change this data loading path. */}
 
           {/* Tabs Section - Wrapped in Error Boundary */}
           <DashboardErrorBoundary networkId={network.id}>

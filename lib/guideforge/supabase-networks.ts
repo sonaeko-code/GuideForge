@@ -7,6 +7,12 @@
  * - collections
  * 
  * Falls back to localStorage if Supabase is unavailable.
+ * 
+ * GuideForge Data Spine Contract:
+ * - Dashboard guide loading uses: networkId → hubs → collections → collection IDs → guides WHERE collection_id IN (ids)
+ * - getGuidesForNetworkCollections must receive array of NormalizedCollection objects with valid id fields
+ * - Guide query filters by collection_id matching collection.id (Supabase UUID)
+ * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
 import type { Network, Hub, Collection, NetworkDraft } from "./types"
