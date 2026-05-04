@@ -1,10 +1,12 @@
 /**
- * Starter Scaffolds for Guide Types
+ * Starter Scaffolds for Guide Types & Network Templates
  * 
- * Provides type-specific section templates for manual guide creation.
- * Each guide type gets seeded with an appropriate set of starter sections.
+ * Provides:
+ * 1. Type-specific section templates for manual guide creation
+ * 2. Deterministic network scaffold templates (hubs + collections)
  * 
  * Phase 2: Will be extended with AI-powered section generation.
+ * Phase 6: Network scaffolds for template-based network creation.
  */
 
 import type { GuideStep, GuideType } from "./types"
@@ -94,4 +96,367 @@ export function getStarterSectionsForGuideType(
     body: section.body,
     isSpoiler: false,
   }))
+}
+
+// ========== NETWORK SCAFFOLD TEMPLATES ==========
+
+export interface ScaffoldHub {
+  name: string
+  slug: string
+  description: string
+}
+
+export interface ScaffoldCollection {
+  name: string
+  slug: string
+  description: string
+}
+
+export interface ScaffoldTemplate {
+  id: string
+  name: string
+  description: string
+  icon: string
+  networkTemplate: {
+    name: string
+    slug: string
+    description: string
+  }
+  hubs: {
+    hub: ScaffoldHub
+    collections: ScaffoldCollection[]
+  }[]
+}
+
+/**
+ * Gaming Guide Network Template
+ * For game-related tutorials, walkthroughs, and builds
+ */
+export const GAMING_SCAFFOLD: ScaffoldTemplate = {
+  id: "gaming",
+  name: "Gaming Guide Network",
+  description: "Organize game tutorials, builds, and walkthroughs",
+  icon: "🎮",
+  networkTemplate: {
+    name: "Gaming Guides",
+    slug: "gaming-guides",
+    description: "A collection of guides for various games and genres",
+  },
+  hubs: [
+    {
+      hub: {
+        name: "Beginner Guides",
+        slug: "beginner-guides",
+        description: "Getting started with games",
+      },
+      collections: [
+        {
+          name: "Getting Started",
+          slug: "getting-started",
+          description: "First steps and basic mechanics",
+        },
+        {
+          name: "Controls & Settings",
+          slug: "controls-settings",
+          description: "Keyboard, controller, and configuration",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Character & Builds",
+        slug: "character-builds",
+        description: "Character creation and build guides",
+      },
+      collections: [
+        {
+          name: "Class Builds",
+          slug: "class-builds",
+          description: "Optimized builds for each class",
+        },
+        {
+          name: "Equipment Guides",
+          slug: "equipment-guides",
+          description: "Gear selection and optimization",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Content & Progression",
+        slug: "content-progression",
+        description: "Raids, bosses, and progression paths",
+      },
+      collections: [
+        {
+          name: "Boss Guides",
+          slug: "boss-guides",
+          description: "Strategies for boss encounters",
+        },
+        {
+          name: "Raid Guides",
+          slug: "raid-guides",
+          description: "Group content and raid mechanics",
+        },
+        {
+          name: "Progression Systems",
+          slug: "progression-systems",
+          description: "Leveling, quests, and endgame content",
+        },
+      ],
+    },
+  ],
+}
+
+/**
+ * Repair / Support Network Template
+ * For technical support and device troubleshooting
+ */
+export const REPAIR_SCAFFOLD: ScaffoldTemplate = {
+  id: "repair",
+  name: "Repair / Support Network",
+  description: "Device troubleshooting and support documentation",
+  icon: "🔧",
+  networkTemplate: {
+    name: "Support & Repairs",
+    slug: "support-repairs",
+    description: "Troubleshooting guides and technical support",
+  },
+  hubs: [
+    {
+      hub: {
+        name: "Common Issues",
+        slug: "common-issues",
+        description: "Frequent problems and quick fixes",
+      },
+      collections: [
+        {
+          name: "WiFi Issues",
+          slug: "wifi-issues",
+          description: "Network connectivity troubleshooting",
+        },
+        {
+          name: "Power Issues",
+          slug: "power-issues",
+          description: "Power on/off and charging problems",
+        },
+        {
+          name: "Performance Issues",
+          slug: "performance-issues",
+          description: "Speed and responsiveness problems",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Device Categories",
+        slug: "device-categories",
+        description: "Device-specific troubleshooting",
+      },
+      collections: [
+        {
+          name: "Laptop / PC Issues",
+          slug: "laptop-pc-issues",
+          description: "Computer troubleshooting guides",
+        },
+        {
+          name: "Printer Issues",
+          slug: "printer-issues",
+          description: "Printing problems and solutions",
+        },
+        {
+          name: "Mobile Device Issues",
+          slug: "mobile-device-issues",
+          description: "Phone and tablet troubleshooting",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Escalation",
+        slug: "escalation",
+        description: "Complex issues and escalation paths",
+      },
+      collections: [
+        {
+          name: "Hardware Replacement",
+          slug: "hardware-replacement",
+          description: "Component replacement procedures",
+        },
+        {
+          name: "Advanced Troubleshooting",
+          slug: "advanced-troubleshooting",
+          description: "Complex diagnostic procedures",
+        },
+      ],
+    },
+  ],
+}
+
+/**
+ * SOP / Training Network Template
+ * For standard operating procedures and employee training
+ */
+export const SOP_SCAFFOLD: ScaffoldTemplate = {
+  id: "sop",
+  name: "SOP / Training Network",
+  description: "Standard operating procedures and training materials",
+  icon: "📋",
+  networkTemplate: {
+    name: "SOPs & Training",
+    slug: "soaps-training",
+    description: "Standard operating procedures and employee training guides",
+  },
+  hubs: [
+    {
+      hub: {
+        name: "Onboarding",
+        slug: "onboarding",
+        description: "New employee training and orientation",
+      },
+      collections: [
+        {
+          name: "Employee Handbook",
+          slug: "employee-handbook",
+          description: "Policies and general information",
+        },
+        {
+          name: "Systems & Tools",
+          slug: "systems-tools",
+          description: "Required software and tools setup",
+        },
+        {
+          name: "Orientation Checklist",
+          slug: "orientation-checklist",
+          description: "First week tasks and introductions",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Daily Operations",
+        slug: "daily-operations",
+        description: "Daily work procedures",
+      },
+      collections: [
+        {
+          name: "Opening Procedures",
+          slug: "opening-procedures",
+          description: "Morning startup and preparation",
+        },
+        {
+          name: "Closing Procedures",
+          slug: "closing-procedures",
+          description: "End of day shutdown and cleanup",
+        },
+        {
+          name: "Common Tasks",
+          slug: "common-tasks",
+          description: "Regular daily responsibilities",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Role Training",
+        slug: "role-training",
+        description: "Role-specific training materials",
+      },
+      collections: [
+        {
+          name: "Team Lead Training",
+          slug: "team-lead-training",
+          description: "Leadership and management procedures",
+        },
+        {
+          name: "Quality Assurance",
+          slug: "quality-assurance",
+          description: "QA procedures and checklists",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Compliance",
+        slug: "compliance",
+        description: "Compliance and standards",
+      },
+      collections: [
+        {
+          name: "Safety Standards",
+          slug: "safety-standards",
+          description: "Safety procedures and protocols",
+        },
+        {
+          name: "Data Protection",
+          slug: "data-protection",
+          description: "Data handling and privacy",
+        },
+      ],
+    },
+  ],
+}
+
+/**
+ * Get all available scaffold templates
+ */
+export function getAllScaffoldTemplates(): ScaffoldTemplate[] {
+  return [GAMING_SCAFFOLD, REPAIR_SCAFFOLD, SOP_SCAFFOLD]
+}
+
+/**
+ * Get a specific template by ID
+ */
+export function getScaffoldTemplate(id: string): ScaffoldTemplate | null {
+  const templates = getAllScaffoldTemplates()
+  return templates.find((t) => t.id === id) || null
+}
+
+/**
+ * Validate scaffold template structure (deterministic check, no side effects)
+ */
+export function validateScaffoldTemplate(template: ScaffoldTemplate): {
+  valid: boolean
+  errors: string[]
+} {
+  const errors: string[] = []
+
+  // Check network template
+  if (!template.networkTemplate.name) {
+    errors.push("Network name is required")
+  }
+  if (!template.networkTemplate.slug) {
+    errors.push("Network slug is required")
+  }
+
+  // Check hubs
+  if (!template.hubs || template.hubs.length === 0) {
+    errors.push("At least one hub is required")
+  }
+
+  template.hubs.forEach((hubGroup, hubIndex) => {
+    if (!hubGroup.hub.name) {
+      errors.push(`Hub ${hubIndex + 1}: name is required`)
+    }
+    if (!hubGroup.hub.slug) {
+      errors.push(`Hub ${hubIndex + 1}: slug is required`)
+    }
+    if (!hubGroup.collections || hubGroup.collections.length === 0) {
+      errors.push(`Hub ${hubIndex + 1}: at least one collection is required`)
+    }
+
+    hubGroup.collections.forEach((collection, colIndex) => {
+      if (!collection.name) {
+        errors.push(`Hub ${hubIndex + 1}, Collection ${colIndex + 1}: name is required`)
+      }
+      if (!collection.slug) {
+        errors.push(`Hub ${hubIndex + 1}, Collection ${colIndex + 1}: slug is required`)
+      }
+    })
+  })
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  }
 }
