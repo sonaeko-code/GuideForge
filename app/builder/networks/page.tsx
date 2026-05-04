@@ -6,6 +6,9 @@ import { SiteHeader } from "@/components/guideforge/site-header"
 import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 
+// Disable caching for this page so it always fetches fresh network data from Supabase
+export const dynamic = "force-dynamic"
+
 export default async function NetworksDirectoryPage() {
   // Load all networks from Supabase
   let networks = await getAllNetworks()
