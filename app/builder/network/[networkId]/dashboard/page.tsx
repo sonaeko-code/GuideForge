@@ -19,6 +19,18 @@ export default async function NetworkDashboardPage({
   params: Promise<{ networkId: string }>
   searchParams: Promise<{ tab?: string; collection?: string }>
 }) {
+  /**
+   * GuideForge Data Spine Contract Dashboard
+   * 
+   * This page loads guides from Supabase filtered by collection IDs.
+   * The complete guide persistence contract is documented in:
+   * docs/guideforge-data-spine-contract.md
+   * 
+   * Data flow: networkId → hubs → collections → collection IDs → 
+   *            Supabase WHERE collection_id IN (ids)
+   * 
+   * Do not change this data loading path without explicit approval.
+   */
   const { networkId } = await params
   const { tab, collection: filterCollectionId } = await searchParams
 
