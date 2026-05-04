@@ -132,7 +132,6 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   // Future: Network Settings should allow editing network name, slug, description, hubs, and collections.
   const defaults = DEFAULTS_BY_TYPE[initialType]
   const router = useRouter()
-  const scaffoldTemplate = SCAFFOLD_TEMPLATE_MAP[initialType] ? getScaffoldTemplate(SCAFFOLD_TEMPLATE_MAP[initialType]!) : null
 
   const [step, setStep] = useState<"configure" | "preview">("configure")
   const [name, setName] = useState(defaults.name)
@@ -145,6 +144,10 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [submitting, setSubmitting] = useState(false)
   const [autofilled, setAutofilled] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Compute current scaffold template based on current type (not initialType)
+  const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
+  const scaffoldTemplate = currentScaffoldId ? getScaffoldTemplate(currentScaffoldId) : null
 
   // Auto-sync slug from name unless user manually edited it
   const slug = useMemo(() => {
@@ -162,6 +165,17 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setDomainPrefix(draft.subdomainSuggestion)
     setDomainPrefixManuallyEdited(false)
     setAutofilled(true)
+  }
+
+  function handleTypeChange(newType: NetworkType) {
+    const newDefaults = DEFAULTS_BY_TYPE[newType]
+    setType(newType)
+    setName(newDefaults.name)
+    setDescription(newDefaults.description)
+    setTheme(newDefaults.theme)
+    setDomainPrefix(newDefaults.slug)
+    setDomainPrefixManuallyEdited(false)
+    setStep("configure")
   }
 
   function handleContinueToPreview() {
@@ -183,16 +197,13 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setError(null)
 
     try {
-      const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
-      
       // Check if this is a scaffold type
       if (currentScaffoldId) {
-        const scaffoldTemplate = getScaffoldTemplate(currentScaffoldId)
         if (!scaffoldTemplate) {
           throw new Error(`Invalid scaffold template: ${currentScaffoldId}`)
         }
 
-        console.log("[v0] CreateNetworkForm: Creating scaffold network:", { name, type, slug })
+        console.log("[v0] CreateNetworkForm: Creating scaffold network:", { name, type, slug, scaffoldId: currentScaffoldId })
 
         const result = await createNetworkScaffold(scaffoldTemplate, {
           networkName: name,
@@ -292,7 +303,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 <FieldLabel htmlFor="network-type">Network type</FieldLabel>
                 <Select
                   value={type}
-                  onValueChange={(value) => setType(value as NetworkType)}
+                  onValueChange={(value) => handleTypeChange(value as NetworkType)}
                 >
                   <SelectTrigger id="network-type">
                     <SelectValue />

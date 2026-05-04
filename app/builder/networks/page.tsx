@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, Folder, ArrowRight, AlertCircle } from "lucide-react"
+import { Plus, Folder, ArrowRight, AlertCircle, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SiteHeader } from "@/components/guideforge/site-header"
@@ -156,6 +156,12 @@ export default async function NetworksDirectoryPage() {
                 <Button asChild size="sm" variant="outline" className="flex-1">
                   <Link href={`/builder/network/${network.id}/dashboard`}>
                     Dashboard
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/builder/network/${network.id}/settings`}>
+                    <Settings className="size-3.5" aria-hidden="true" />
+                    <span className="sr-only">Settings</span>
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="outline" className="flex-1">
