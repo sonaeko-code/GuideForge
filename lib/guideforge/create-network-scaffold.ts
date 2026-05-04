@@ -93,7 +93,7 @@ export async function createNetworkScaffold(
         name: hubGroup.hub.name,
         slug: hubGroup.hub.slug,
         description: hubGroup.hub.description,
-        hubKind: "category", // Default hub kind
+        hubKind: "topic", // Safe default - allowed values: game, product, department, topic, channel, other
         collectionIds: [],
       })
 

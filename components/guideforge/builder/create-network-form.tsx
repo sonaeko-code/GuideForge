@@ -129,6 +129,7 @@ function slugify(value: string): string {
 }
 
 export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
+  // Future: Network Settings should allow editing network name, slug, description, hubs, and collections.
   const defaults = DEFAULTS_BY_TYPE[initialType]
   const router = useRouter()
   const scaffoldTemplate = SCAFFOLD_TEMPLATE_MAP[initialType] ? getScaffoldTemplate(SCAFFOLD_TEMPLATE_MAP[initialType]!) : null
@@ -388,7 +389,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 </InputGroupAddon>
                 <InputGroupInput
                   id="network-domain"
-                  value={domainPrefix}
+                  value={slug}
                   onChange={(e) => {
                     setDomainPrefix(e.target.value)
                     setDomainPrefixManuallyEdited(true)
