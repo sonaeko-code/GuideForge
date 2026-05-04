@@ -5,6 +5,33 @@
 import type { Guide } from "./types"
 
 /**
+ * Normalizes a guide's status to one of three canonical values: draft | ready | published
+ * Handles edge cases where status might be ready_to_publish, active, or other variants.
+ * 
+ * Mapping:
+ * - "draft" → "draft"
+ * - "ready", "ready_to_publish" → "ready"
+ * - "published", "active" → "published"
+ * - unknown values → "draft"
+ * 
+ * @param status - The raw status value
+ * @returns Normalized status: "draft" | "ready" | "published"
+ */
+export function normalizeGuideStatus(status: string | undefined | null): "draft" | "ready" | "published" {
+  if (!status) return "draft"
+  
+  const normalized = status.toLowerCase().trim()
+  
+  if (normalized === "draft") return "draft"
+  if (normalized === "ready" || normalized === "ready_to_publish") return "ready"
+  if (normalized === "published" || normalized === "active") return "published"
+  
+  // Defensive: unknown status defaults to draft
+  console.warn("[v0] normalizeGuideStatus: Unknown status value", { status, defaulted: "draft" })
+  return "draft"
+}
+
+/**
  * Normalizes a guide's display status for consistent UI representation.
  * Handles edge cases where status might be in-review, pending, or other transient states.
  * 
@@ -13,21 +40,7 @@ import type { Guide } from "./types"
  */
 export function getGuideDisplayStatus(guide: Guide | Partial<Guide>): "draft" | "ready" | "published" {
   const status = guide.status as string
-
-  // Explicit mappings for known statuses
-  if (status === "draft") return "draft"
-  if (status === "ready") return "ready"
-  if (status === "published") return "published"
-
-  // Fallback for in-review, pending, or other transient states → treat as draft
-  if (status === "in-review" || status === "pending" || !status) {
-    console.warn("[v0] getGuideDisplayStatus: Unknown status mapped to draft", { status, guideId: guide.id })
-    return "draft"
-  }
-
-  // Defensive: unknown status defaults to draft
-  console.warn("[v0] getGuideDisplayStatus: Unmapped status defaulting to draft", { status, guideId: guide.id })
-  return "draft"
+  return normalizeGuideStatus(status)
 }
 
 /**
@@ -43,15 +56,15 @@ export function isGuideMutable(guide: Guide | Partial<Guide>): boolean {
 }
 
 /**
- * Filters guides by their display status.
+ * Filters guides by their normalized status.
  * 
  * @param guides - Array of guides to filter
- * @param targetStatus - The status to filter by
+ * @param targetStatus - The status to filter by (uses normalized values)
  * @returns Filtered guides matching the target status
  */
 export function filterGuidesByStatus(
   guides: Guide[],
   targetStatus: "draft" | "ready" | "published"
 ): Guide[] {
-  return guides.filter((g) => getGuideDisplayStatus(g) === targetStatus)
+  return guides.filter((g) => normalizeGuideStatus(g.status) === targetStatus)
 }

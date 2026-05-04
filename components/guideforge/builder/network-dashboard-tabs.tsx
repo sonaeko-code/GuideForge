@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
+import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import { getGuidesByCollection } from "@/lib/guideforge/mock-data"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
@@ -74,9 +75,11 @@ export function NetworkDashboardTabs({
   const safeHubs = Array.isArray(hubs) ? hubs : []
   const safeCollections = Array.isArray(collections) ? collections : []
   const safeGuides = Array.isArray(guides) ? guides : []
-  const safeDrafts = Array.isArray(drafts) ? drafts : []
-  const safeReady = Array.isArray(ready) ? ready : []
-  const safePublished = Array.isArray(published) ? published : []
+  
+  // Use normalized status filtering for all guides
+  const safeDrafts = filterGuidesByStatus(safeGuides, "draft")
+  const safeReady = filterGuidesByStatus(safeGuides, "ready")
+  const safePublished = filterGuidesByStatus(safeGuides, "published")
 
   // Guides tab filtering
   const filteredCollection = initialCollectionId
