@@ -44,19 +44,20 @@ export function DraftList({ networkId, scopedDrafts, scopedPublished }: DraftLis
       try {
         // If scoped drafts are provided (from dashboard page), use them directly
         if (scopedDrafts !== undefined && scopedPublished !== undefined) {
-          console.log("[v0] Draft guide list source: page props (network-scoped)")
-          const allScoped = [...scopedDrafts, ...scopedPublished]
-          setDrafts(allScoped)
+          console.log("[v0] Draft list source: page props (network-scoped)")
+          // Only include draft status guides in the drafts list
+          const draftOnly = scopedDrafts.filter((g: any) => g.status === "draft")
+          setDrafts(draftOnly)
           setLoadError(null)
         } else {
           // Fallback: load from storage (for standalone use)
-          console.log("[v0] Draft guide list source: storage lookup")
+          console.log("[v0] Draft list source: storage lookup")
           const networkDrafts = await getDraftsByNetwork(networkId)
           setDrafts(networkDrafts)
         }
         // Use getPersistenceSource to get the actual source
         setDraftSource(getPersistenceSource())
-        console.log("[v0] DraftList loaded | count:", scopedDrafts?.length ?? 0, "published:", scopedPublished?.length ?? 0)
+        console.log("[v0] DraftList loaded | draft count:", scopedDrafts?.filter((g: any) => g.status === "draft").length ?? 0)
         setLoadError(null)
       } catch (error) {
         console.error("[v0] DraftList error loading drafts:", error)
@@ -113,46 +114,24 @@ export function DraftList({ networkId, scopedDrafts, scopedPublished }: DraftLis
     )
   }
 
-  // Separate drafts, ready, and published guides
-  const draftGuides = drafts.filter(g => g.status === "draft")
-  const readyGuides = drafts.filter(g => g.status === "ready")
-  const publishedGuides = drafts.filter(g => g.status === "published")
-
   return (
-    <div className="space-y-6">
-      {/* Draft Guides Section */}
-      {draftGuides.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-foreground">Drafts ({draftGuides.length})</h3>
-          <div className="space-y-2">
-            {draftGuides.map((draft) => (
-              <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Ready Guides Section */}
-      {readyGuides.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-foreground">Ready to publish ({readyGuides.length})</h3>
-          <div className="space-y-2">
-            {readyGuides.map((draft) => (
-              <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Published Guides Section */}
-      {publishedGuides.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-foreground">Published ({publishedGuides.length})</h3>
-          <div className="space-y-2">
-            {publishedGuides.map((draft) => (
-              <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
-            ))}
-          </div>
+    <div className="space-y-2">
+      {drafts.length > 0 ? (
+        drafts.map((draft) => (
+          <GuideCard key={draft.id} draft={draft} networkId={networkId} draftSource={draftSource} onDelete={handleDelete} />
+        ))
+      ) : (
+        <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+          <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
+          <p className="font-semibold text-foreground">No draft guides</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Start by creating or generating your first guide.
+          </p>
+          <Button size="sm" asChild className="mt-4">
+            <Link href={`/builder/network/${networkId}/generate`}>
+              Generate First Guide
+            </Link>
+          </Button>
         </div>
       )}
     </div>

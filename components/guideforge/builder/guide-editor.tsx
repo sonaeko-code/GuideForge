@@ -352,43 +352,19 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   }
 
   const handlePublishDraft = async () => {
-    console.log("[v0] Mark Ready status before:", guideStatus)
-    
-    // Check if validation is stale
-    if (rulesStale) {
+    // Forge rules validation before status transition
+    const rulesErrors = rulesCheckResult?.filter((r) => r.severity === "error") ?? []
+    if (rulesErrors.length > 0) {
+      console.log("[v0] Status transition blocked: draft → ready (forge rules errors)")
       setMarkReadyError(true)
       setTimeout(() => setMarkReadyError(false), 3000)
+      setSaveError("Cannot mark ready: Forge Rules have errors. Please fix them first.")
       return
     }
-
-    // Check if REQUIRED Forge Rules pass
-    if (rulesCheckResult && rulesCheckResult.length > 0) {
-      const requiredFailures = rulesCheckResult.filter(
-        (r: any) => !r.passed && (r.required !== false)
-      )
-      if (requiredFailures.length > 0) {
-        console.log("[v0] Mark Ready blocked by required failures:", requiredFailures)
-        setMarkReadyError(true)
-        setTimeout(() => setMarkReadyError(false), 3000)
-        return
-      }
-    }
     
-    // Cancel any pending autosave before changing status
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current)
-      autosaveTimerRef.current = null
-    }
-    
-    // Normalize requirements from textarea for save
-    const requirementsArray = requirementsText
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-
-    // Update status to "ready"
+    console.log("[v0] Status transition requested: draft → ready")
+    setMarkReadyError(false)
     setGuideStatus("ready")
-    console.log("[v0] Mark Ready status after: ready")
     
     // Build guide object — use normalizedGuide as base so collectionId is preserved
     const updatedGuide: Guide = {
@@ -442,8 +418,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     setShowPublishDialog(false)
     setIsPublishing(true)
     
-    console.log("[v0] Publishing guide id:", guide.id)
-    console.log("[v0] Autosave triggered by: Publish button")
+    console.log("[v0] Status transition requested: ready → published | guideId:", guide.id)
     setAutosaveStatus("saving")
     
     try {

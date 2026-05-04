@@ -32,6 +32,7 @@ interface NetworkDashboardTabsProps {
   collections: NormalizedCollection[]
   guides: Guide[]
   drafts: any[]
+  ready: any[]
   published: any[]
 }
 
@@ -43,6 +44,7 @@ export function NetworkDashboardTabs({
   collections,
   guides,
   drafts,
+  ready,
   published,
 }: NetworkDashboardTabsProps) {
   const router = useRouter()
@@ -73,6 +75,7 @@ export function NetworkDashboardTabs({
   const safeCollections = Array.isArray(collections) ? collections : []
   const safeGuides = Array.isArray(guides) ? guides : []
   const safeDrafts = Array.isArray(drafts) ? drafts : []
+  const safeReady = Array.isArray(ready) ? ready : []
   const safePublished = Array.isArray(published) ? published : []
 
   // Guides tab filtering
@@ -100,11 +103,17 @@ export function NetworkDashboardTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-5 mb-6">
+      <TabsList className="grid w-full grid-cols-6 mb-6">
         <TabsTrigger value="drafts">
           Drafts
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold text-primary">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
             {safeDrafts.length}
+          </span>
+        </TabsTrigger>
+        <TabsTrigger value="ready">
+          Ready
+          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+            {safeReady.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="published">
@@ -153,6 +162,50 @@ export function NetworkDashboardTabs({
         </div>
 
         <DraftList networkId={networkId} scopedDrafts={drafts} scopedPublished={published} />
+      </TabsContent>
+
+      {/* Ready tab */}
+      <TabsContent value="ready" className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Ready to Publish</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Guides validated and ready for publishing.
+            </p>
+          </div>
+        </div>
+
+        {safeReady.length === 0 ? (
+          <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+            <Clock className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
+            <p className="font-semibold text-foreground">No guides ready yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Mark a draft guide as ready to see it here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {safeReady.map((guide: Guide) => (
+              <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
+                <div className="space-y-2 flex-1">
+                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                  <StatusBadge status={guide.status} />
+                  {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                  <Button size="sm" asChild variant="ghost" className="ml-auto">
+                    <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
+                      Edit
+                    </Link>
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </TabsContent>
 
       {/* Published tab */}
