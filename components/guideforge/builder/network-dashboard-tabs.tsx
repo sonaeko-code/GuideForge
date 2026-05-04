@@ -32,9 +32,6 @@ interface NetworkDashboardTabsProps {
   hubs: NormalizedHub[]
   collections: NormalizedCollection[]
   guides: Guide[]
-  drafts: any[]
-  ready: any[]
-  published: any[]
 }
 
 export function NetworkDashboardTabs({
@@ -44,9 +41,6 @@ export function NetworkDashboardTabs({
   hubs,
   collections,
   guides,
-  drafts,
-  ready,
-  published,
 }: NetworkDashboardTabsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
