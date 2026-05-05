@@ -252,6 +252,8 @@ export interface Network {
   hubIds: string[]
   createdAt: string
   updatedAt: string
+  /** Ownership Phase 2: Owner user ID from auth.users(id). Nullable for legacy networks and signed-out creation. */
+  ownerUserId?: string | null
 }
 
 // ---------- Wizard / builder helpers ----------

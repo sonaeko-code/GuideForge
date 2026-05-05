@@ -104,12 +104,21 @@ export async function createNetwork(
     const profileId = await getCurrentProfileId()
     
     // Only include schema-supported fields. Do NOT include UI-only fields.
-    // The networks table only has: id, slug, name, description, created_at, updated_at
+    // The networks table only has: id, slug, name, description, created_at, updated_at, owner_user_id
     // All other fields (theme, visibility, branding, etc) are UI-only and stored in app state
-    const networkData = {
+    const networkData: Record<string, any> = {
       slug: draft.slug,
       name: draft.name,
       description: draft.description,
+    }
+
+    // Ownership Phase 2: Include owner_user_id if user is logged in
+    // If profileId is DEV_PROFILE_ID (no real user session), omit owner_user_id to save as null
+    if (profileId !== DEV_PROFILE_ID) {
+      networkData.owner_user_id = profileId
+      console.log("[v0] Network save with owner_user_id:", profileId)
+    } else {
+      console.log("[v0] Network save without owner (signed out or mock)")
     }
 
     console.log("[v0] Network save payload:", networkData)
@@ -125,7 +134,7 @@ export async function createNetwork(
       return { network: {} as Network, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Network saved:", data.id)
+    console.log("[v0] Network saved:", data.id, "owner:", data.owner_user_id || "null")
     return { network: data as Network, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"

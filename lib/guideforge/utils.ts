@@ -103,3 +103,39 @@ export function slugify(str: string): string {
     .replace(/-+/g, "-")
 }
 
+/**
+ * Ownership Phase 2: Determine owner status of a network
+ * Returns a label based on relationship between network owner and current user
+ * 
+ * @param ownerUserId - The network's owner user ID (from database)
+ * @param currentUserId - The current logged-in user's ID
+ * @returns Status label: "Owned by you" | "No owner assigned" | "Owned by another user"
+ */
+export function getNetworkOwnershipStatus(
+  ownerUserId: string | null | undefined,
+  currentUserId: string | null | undefined
+): "owned-by-you" | "no-owner" | "owned-by-other" {
+  if (!ownerUserId) {
+    return "no-owner"
+  }
+  if (currentUserId && ownerUserId === currentUserId) {
+    return "owned-by-you"
+  }
+  return "owned-by-other"
+}
+
+/**
+ * Get human-readable label for ownership status
+ */
+export function getOwnershipLabel(status: "owned-by-you" | "no-owner" | "owned-by-other"): string {
+  switch (status) {
+    case "owned-by-you":
+      return "Owned by you"
+    case "no-owner":
+      return "No owner assigned"
+    case "owned-by-other":
+      return "Owned by another user"
+  }
+}
+
+
