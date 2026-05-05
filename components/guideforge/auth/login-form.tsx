@@ -13,10 +13,11 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { SiteHeader } from '@/components/guideforge/site-header'
+import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
 
 /**
- * Login form - Phase 1 Foundation
- * Phase 2: Will integrate with Supabase Auth
+ * Login form - Phase 2: Supabase Auth integration
+ * Calls supabase.auth.signInWithPassword() on submit
  */
 export function LoginForm() {
   const router = useRouter()
@@ -30,24 +31,43 @@ export function LoginForm() {
     setIsLoading(true)
     setError(null)
 
-    try {
-      // Phase 2: Call Supabase Auth API
-      // const { data, error: authError } = await supabase.auth.signInWithPassword({
-      //   email,
-      //   password,
-      // })
-      // if (authError) throw authError
+    if (!isSupabaseConfigured() || !supabase) {
+      setError('Authentication service not available')
+      setIsLoading(false)
+      return
+    }
 
-      // For now, just mock the flow
-      console.log('[v0] LoginForm: Login attempt (Phase 2 will implement)', { email })
+    try {
+      console.log('[v0] LoginForm: Signing in with email:', email)
       
-      // Placeholder: route to builder after successful auth
-      // router.push('/builder/welcome')
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) {
+        console.error('[v0] LoginForm: Auth error:', authError.message)
+        setError(authError.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (!data.session) {
+        console.error('[v0] LoginForm: No session returned')
+        setError('Login failed - no session')
+        setIsLoading(false)
+        return
+      }
+
+      console.log('[v0] LoginForm: Login successful, user:', data.user.id)
+      
+      // Session is stored in Supabase and AuthProvider will pick it up via onAuthStateChange
+      // Redirect to builder
+      router.push('/builder/networks')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed'
       console.error('[v0] LoginForm error:', message)
       setError(message)
-    } finally {
       setIsLoading(false)
     }
   }
@@ -125,12 +145,6 @@ export function LoginForm() {
             <Link href="/auth/signup" className="text-primary font-semibold hover:underline">
               Sign up
             </Link>
-          </p>
-        </div>
-
-        <div className="mt-8 pt-8 border-t">
-          <p className="text-xs text-muted-foreground text-center mb-4">
-            ℹ️ Auth Phase 1 Foundation - Phase 2 will add login/signup
           </p>
         </div>
       </div>
