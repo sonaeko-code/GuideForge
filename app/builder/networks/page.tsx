@@ -3,6 +3,7 @@ import { Plus, Folder, ArrowRight, AlertCircle, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SiteHeader } from "@/components/guideforge/site-header"
+import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
 import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 
@@ -131,13 +132,16 @@ export default async function NetworksDirectoryPage() {
               key={network.id}
               className="flex flex-col gap-4 p-5 hover:border-primary/50 transition-colors"
             >
-              <div>
-                <h3 className="text-base font-semibold text-foreground">
-                  {network.name}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  /{network.slug}
-                </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <h3 className="text-base font-semibold text-foreground">
+                    {network.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    /{network.slug}
+                  </p>
+                </div>
+                <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
               </div>
 
               {network.description && (
