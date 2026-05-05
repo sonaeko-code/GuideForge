@@ -1,5 +1,7 @@
 # Network Ownership & Authority Contract
 
+> **Phase 2 Status:** Schema migration prepared and ready for manual deployment. See [Phase 2 SQL Migration](#phase-2-sql-migration) below.
+
 ## Purpose
 
 This document defines who can own, edit, publish, and manage GuideForge networks before enforcement is added. It establishes the social contract and technical model for network access control, outlining the planned phases for transitioning from the current open builder model to a role-based ownership system.
@@ -64,6 +66,41 @@ This document defines who can own, edit, publish, and manage GuideForge networks
 - **Non-Breaking Changes:** When ownership is added, existing networks will have `owner_user_id = null` until backfilled or explicitly assigned. Existing routes and dashboards will continue to work.
 - **Auth Proven:** Supabase Auth is working correctly. Account management is ready for phase 2 (profile editing).
 - **Next Steps:** Once this foundation is solid, Phase 2 begins adding owner fields and preparing enforcement.
+
+---
+
+## Phase 2 SQL Migration
+
+**Status:** Prepared and ready for manual deployment to Supabase.
+
+This migration adds ownership support without breaking existing networks.
+
+```sql
+-- Ownership Phase 2: Add owner_user_id to networks table
+-- This migration is NON-BREAKING and NULLABLE
+-- All existing networks continue working with owner_user_id = NULL
+
+ALTER TABLE networks
+ADD COLUMN owner_user_id uuid NULL
+REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- Create an index for efficient ownership queries (Phase 3+)
+CREATE INDEX idx_networks_owner_user_id ON networks(owner_user_id);
+
+-- Add a comment explaining the column purpose
+COMMENT ON COLUMN networks.owner_user_id IS 'FK to auth.users(id) - the user who created/owns this network. Nullable to support legacy networks and signed-out creation.';
+```
+
+**What This Does:**
+- ✓ Adds `owner_user_id` column to networks table (nullable, UUID type)
+- ✓ References `auth.users(id)` with `ON DELETE SET NULL` (orphaned networks when user deleted)
+- ✓ Creates index for efficient future lookups
+- ✓ Non-breaking: all existing networks have `owner_user_id = NULL`
+- ✓ No RLS added (Phase 6+)
+- ✓ No auto-backfill (Phase 3+ handles new networks only)
+
+**No Code Changes Yet:**
+TypeScript types and `createNetwork()` helper are ready to be updated after schema is confirmed and deployed.
 
 ---
 
