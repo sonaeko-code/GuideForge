@@ -64,6 +64,7 @@ export function SignupForm() {
           data: {
             display_name: displayName,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
@@ -94,7 +95,7 @@ export function SignupForm() {
         }, 1000)
       } else {
         console.log('[v0] SignupForm: Email confirmation required')
-        setSuccessMessage('Check your email to confirm your account')
+        setSuccessMessage('Check your email to confirm your account.')
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Signup failed'
