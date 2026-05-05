@@ -62,7 +62,11 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         <div className="hidden md:flex items-center gap-3">
           {isAuthenticated ? (
             <>
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
+                  {user?.displayName || user?.email}
+                </Link>
+              </Button>
               <Button asChild variant="ghost" size="sm">
                 <Link href="/auth/logout" className="flex items-center gap-2">
                   <LogOut className="size-4" aria-hidden="true" />
@@ -95,11 +99,18 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         {/* Mobile: CTA + hamburger */}
         <div className="flex items-center gap-2 md:hidden">
           {isAuthenticated ? (
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/auth/logout" className="flex items-center gap-2">
-                <LogOut className="size-3" aria-hidden="true" />
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
+                  {user?.displayName || user?.email}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/auth/logout" className="flex items-center gap-2">
+                  <LogOut className="size-3" aria-hidden="true" />
+                </Link>
+              </Button>
+            </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
