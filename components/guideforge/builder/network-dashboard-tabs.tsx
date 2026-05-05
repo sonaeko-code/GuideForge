@@ -505,34 +505,35 @@ export function NetworkDashboardTabs({
                                   <Badge variant="secondary" className="shrink-0 text-xs">
                                     Hub: {col.hubName || hub.name}
                                   </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{col.description}</p>
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  {collectionGuideCount} guide{collectionGuideCount !== 1 ? "s" : ""}
+                                </p>
                               </div>
-                              <p className="text-sm text-muted-foreground">{col.description}</p>
-                              <p className="text-xs font-medium text-muted-foreground">
-                                {collectionGuideCount} guide{collectionGuideCount !== 1 ? "s" : ""}
-                              </p>
-                            </div>
-                            <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">
-                              <Button size="sm" asChild variant="ghost" onClick={() => {
-                                setActiveTab("guides")
-                                router.push(`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`)
-                              }}>
-                                Manage Guides
-                              </Button>
-                            </div>
-                          </Card>
-                        )
-                      } else {
-                        return (
-                          <span key={col.id} className="text-xs text-red-600 dark:text-red-400">
-                            Missing hub/collection link
-                          </span>
-                        )
-                      }
-                    })}
+                              <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">
+                                <Button size="sm" asChild variant="ghost" onClick={() => {
+                                  setActiveTab("guides")
+                                  router.push(`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`)
+                                }}>
+                                  Manage Guides
+                                </Button>
+                              </div>
+                            </Card>
+                          )
+                        } else {
+                          return (
+                            <span key={col.id} className="text-xs text-red-600 dark:text-red-400">
+                              Missing hub/collection link
+                            </span>
+                          )
+                        }
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         )}
       </TabsContent>

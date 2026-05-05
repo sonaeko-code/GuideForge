@@ -86,3 +86,20 @@ export function filterGuidesByStatus(
 ): Guide[] {
   return guides.filter((g) => normalizeGuideStatus(g.status) === targetStatus)
 }
+
+/**
+ * Converts a string to a URL-safe slug.
+ * Converts to lowercase, removes special characters, replaces spaces with hyphens.
+ * 
+ * @param str - The string to slugify
+ * @returns URL-safe slug
+ */
+export function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+}
+
