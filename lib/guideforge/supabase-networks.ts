@@ -33,6 +33,30 @@ async function getCurrentProfileId(): Promise<string> {
   return session?.user?.id || DEV_PROFILE_ID
 }
 
+/**
+ * Normalize a raw Supabase network row to the Network type
+ * Maps snake_case columns to camelCase properties
+ * Handles Ownership Phase 2: owner_user_id → ownerUserId
+ */
+function normalizeNetwork(row: any): Network {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    type: row.type,
+    visibility: row.visibility,
+    domain: row.domain,
+    branding: row.branding,
+    forgeRuleIds: row.forgeRuleIds || [],
+    hubIds: row.hubIds || [],
+    createdAt: row.created_at || row.createdAt,
+    updatedAt: row.updated_at || row.updatedAt,
+    // Ownership Phase 2: Map snake_case owner_user_id to camelCase ownerUserId
+    ownerUserId: row.owner_user_id || row.ownerUserId || null,
+  }
+}
+
 // ========== NETWORKS ==========
 
 /**
@@ -135,7 +159,8 @@ export async function createNetwork(
     }
 
     console.log("[v0] Network saved:", data.id, "owner:", data.owner_user_id || "null")
-    return { network: data as Network, source: "supabase" }
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return { network: normalizeNetwork(data), source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Network save error:", message)
@@ -204,7 +229,8 @@ export async function updateNetwork(
     }
 
     console.log("[v0] Network updated:", data.id, data.name)
-    return { network: data as Network }
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return { network: normalizeNetwork(data) }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Network update error:", message)
@@ -232,7 +258,8 @@ export async function getAllNetworks(): Promise<Network[]> {
     }
 
     console.log("[v0] Loaded networks from Supabase:", data?.length || 0)
-    return data as Network[]
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return (data || []).map(normalizeNetwork)
   } catch (err) {
     console.warn("[v0] Exception loading networks:", err)
     return []
@@ -259,7 +286,8 @@ export async function getNetworkBySlug(slug: string): Promise<Network | null> {
       return null
     }
 
-    return data as Network
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return data ? normalizeNetwork(data) : null
   } catch (err) {
     console.warn("[v0] Exception loading network by slug:", err)
     return null
@@ -289,7 +317,8 @@ export async function getNetworkById(id: string): Promise<Network | null> {
     }
 
     console.log("[v0] Found network:", data?.name)
-    return data as Network
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return data ? normalizeNetwork(data) : null
   } catch (err) {
     console.warn("[v0] Exception loading network by ID:", err)
     return null
