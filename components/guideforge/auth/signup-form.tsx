@@ -13,10 +13,11 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { SiteHeader } from '@/components/guideforge/site-header'
+import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
 
 /**
- * Signup form - Phase 1 Foundation
- * Phase 2: Will integrate with Supabase Auth
+ * Signup form - Phase 2: Supabase Auth integration
+ * Calls supabase.auth.signUp() on submit
  */
 export function SignupForm() {
   const router = useRouter()
@@ -26,13 +27,15 @@ export function SignupForm() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    setSuccessMessage(null)
 
-    // Basic validation
+    // Client-side validation
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       setIsLoading(false)
@@ -45,29 +48,59 @@ export function SignupForm() {
       return
     }
 
-    try {
-      // Phase 2: Call Supabase Auth API
-      // const { data, error: authError } = await supabase.auth.signUp({
-      //   email,
-      //   password,
-      //   options: {
-      //     data: {
-      //       display_name: displayName,
-      //     },
-      //   },
-      // })
-      // if (authError) throw authError
+    if (!isSupabaseConfigured() || !supabase) {
+      setError('Authentication service not available')
+      setIsLoading(false)
+      return
+    }
 
-      // For now, just mock the flow
-      console.log('[v0] SignupForm: Signup attempt (Phase 2 will implement)', { email, displayName })
+    try {
+      console.log('[v0] SignupForm: Signing up with email:', email)
       
-      // Placeholder: route to builder after successful signup
-      // router.push('/builder/welcome')
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+
+      if (authError) {
+        console.error('[v0] SignupForm: Auth error:', authError.message)
+        setError(authError.message)
+        setIsLoading(false)
+        return
+      }
+
+      console.log('[v0] SignupForm: Signup response:', data.user?.id)
+      
+      // Check if email confirmation is required
+      if (data.user?.identities?.length === 0) {
+        // User already exists
+        setError('Email already registered')
+        setIsLoading(false)
+        return
+      }
+
+      // Supabase may require email confirmation
+      if (data.session) {
+        console.log('[v0] SignupForm: Session created immediately, redirecting')
+        setSuccessMessage('Account created! Redirecting...')
+        // Session is stored and AuthProvider will pick it up
+        setTimeout(() => {
+          router.push('/builder/networks')
+        }, 1000)
+      } else {
+        console.log('[v0] SignupForm: Email confirmation required')
+        setSuccessMessage('Check your email to confirm your account.')
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Signup failed'
       console.error('[v0] SignupForm error:', message)
       setError(message)
-    } finally {
       setIsLoading(false)
     }
   }
@@ -86,6 +119,12 @@ export function SignupForm() {
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
               <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+              <p className="text-sm text-emerald-700 dark:text-emerald-300">{successMessage}</p>
             </div>
           )}
 
@@ -175,12 +214,6 @@ export function SignupForm() {
             <Link href="/auth/login" className="text-primary font-semibold hover:underline">
               Sign in
             </Link>
-          </p>
-        </div>
-
-        <div className="mt-8 pt-8 border-t">
-          <p className="text-xs text-muted-foreground text-center mb-4">
-            ℹ️ Auth Phase 1 Foundation - Phase 2 will add login/signup
           </p>
         </div>
       </div>

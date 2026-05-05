@@ -5,7 +5,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { GuideMark } from "@/components/guideforge/brand/guide-mark"
 import { cn } from "@/lib/utils"
-import { Menu, X } from "lucide-react"
+import { Menu, X, LogOut, LogIn } from "lucide-react"
+import { useAuth } from "@/lib/guideforge/auth-context"
 
 interface SiteHeaderProps {
   className?: string
@@ -15,6 +16,7 @@ interface SiteHeaderProps {
 
 export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { user, isAuthenticated } = useAuth()
 
   const navLinks = [
     { href: "/#what", label: "What it builds" },
@@ -57,25 +59,67 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         </nav>
 
         {/* Desktop CTA */}
-        <div className="hidden md:block">
-          {hideCta ? (
-            <div className="text-sm text-muted-foreground">Builder</div>
+        <div className="hidden md:flex items-center gap-3">
+          {isAuthenticated ? (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
+                  {user?.displayName || user?.email}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/auth/logout" className="flex items-center gap-2">
+                  <LogOut className="size-4" aria-hidden="true" />
+                  Sign out
+                </Link>
+              </Button>
+            </>
           ) : (
-            <Button asChild size="sm">
-              <Link href="/builder">Start building</Link>
-            </Button>
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/auth/login" className="flex items-center gap-2">
+                  <LogIn className="size-4" aria-hidden="true" />
+                  Sign in
+                </Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/auth/signup">Sign up</Link>
+              </Button>
+            </>
+          )}
+          {!hideCta && !isAuthenticated && (
+            <div className="ml-2 pl-2 border-l border-border">
+              <Button asChild size="sm">
+                <Link href="/builder">Start building</Link>
+              </Button>
+            </div>
           )}
         </div>
 
         {/* Mobile: CTA + hamburger */}
         <div className="flex items-center gap-2 md:hidden">
-          {hideCta && (
-            <span className="text-sm text-muted-foreground">Builder</span>
-          )}
-          {!hideCta && (
-            <Button asChild size="sm">
-              <Link href="/builder">Start building</Link>
-            </Button>
+          {isAuthenticated ? (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
+                  {user?.displayName || user?.email}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/auth/logout" className="flex items-center gap-2">
+                  <LogOut className="size-3" aria-hidden="true" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/auth/login">Sign in</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/auth/signup">Sign up</Link>
+              </Button>
+            </>
           )}
           <Button
             variant="ghost"

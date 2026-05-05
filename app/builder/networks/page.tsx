@@ -1,10 +1,13 @@
 import Link from "next/link"
-import { Plus, Folder, ArrowRight, AlertCircle } from "lucide-react"
+import { Plus, Folder, ArrowRight, AlertCircle, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
+
+// Disable caching for this page so it always fetches fresh network data from Supabase
+export const dynamic = "force-dynamic"
 
 export default async function NetworksDirectoryPage() {
   // Load all networks from Supabase
@@ -156,6 +159,12 @@ export default async function NetworksDirectoryPage() {
                 <Button asChild size="sm" variant="outline" className="flex-1">
                   <Link href={`/builder/network/${network.id}/dashboard`}>
                     Dashboard
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/builder/network/${network.id}/settings`}>
+                    <Settings className="size-3.5" aria-hidden="true" />
+                    <span className="sr-only">Settings</span>
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="outline" className="flex-1">

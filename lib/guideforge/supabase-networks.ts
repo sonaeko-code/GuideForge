@@ -33,6 +33,30 @@ async function getCurrentProfileId(): Promise<string> {
   return session?.user?.id || DEV_PROFILE_ID
 }
 
+/**
+ * Normalize a raw Supabase network row to the Network type
+ * Maps snake_case columns to camelCase properties
+ * Handles Ownership Phase 2: owner_user_id → ownerUserId
+ */
+function normalizeNetwork(row: any): Network {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    type: row.type,
+    visibility: row.visibility,
+    domain: row.domain,
+    branding: row.branding,
+    forgeRuleIds: row.forgeRuleIds || [],
+    hubIds: row.hubIds || [],
+    createdAt: row.created_at || row.createdAt,
+    updatedAt: row.updated_at || row.updatedAt,
+    // Ownership Phase 2: Map snake_case owner_user_id to camelCase ownerUserId
+    ownerUserId: row.owner_user_id || row.ownerUserId || null,
+  }
+}
+
 // ========== NETWORKS ==========
 
 /**
@@ -104,12 +128,21 @@ export async function createNetwork(
     const profileId = await getCurrentProfileId()
     
     // Only include schema-supported fields. Do NOT include UI-only fields.
-    // The networks table only has: id, slug, name, description, created_at, updated_at
+    // The networks table only has: id, slug, name, description, created_at, updated_at, owner_user_id
     // All other fields (theme, visibility, branding, etc) are UI-only and stored in app state
-    const networkData = {
+    const networkData: Record<string, any> = {
       slug: draft.slug,
       name: draft.name,
       description: draft.description,
+    }
+
+    // Ownership Phase 2: Include owner_user_id if user is logged in
+    // If profileId is DEV_PROFILE_ID (no real user session), omit owner_user_id to save as null
+    if (profileId !== DEV_PROFILE_ID) {
+      networkData.owner_user_id = profileId
+      console.log("[v0] Network save with owner_user_id:", profileId)
+    } else {
+      console.log("[v0] Network save without owner (signed out or mock)")
     }
 
     console.log("[v0] Network save payload:", networkData)
@@ -125,12 +158,83 @@ export async function createNetwork(
       return { network: {} as Network, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Network saved:", data.id)
-    return { network: data as Network, source: "supabase" }
+    console.log("[v0] Network saved:", data.id, "owner:", data.owner_user_id || "null")
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return { network: normalizeNetwork(data), source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Network save error:", message)
     return { network: {} as Network, source: "supabase", error: message }
+  }
+}
+
+/**
+ * Update an existing network's editable fields
+ */
+export async function updateNetwork(
+  networkId: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+  }
+): Promise<{ network: Network | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, cannot update network")
+    return { network: null, error: "Supabase not configured" }
+  }
+
+  if (!networkId) {
+    return { network: null, error: "No network ID provided" }
+  }
+
+  try {
+    // Normalize networkId to UUID if needed
+    let normalizedId = networkId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(networkId)) {
+      // Try to look up by slug
+      const bySlug = await getNetworkBySlug(networkId)
+      if (bySlug) {
+        normalizedId = bySlug.id
+      } else {
+        return { network: null, error: `No network found for id: ${networkId}` }
+      }
+    }
+
+    const updateData: Record<string, any> = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.slug !== undefined) updateData.slug = updates.slug
+    if (updates.description !== undefined) updateData.description = updates.description
+    updateData.updated_at = new Date().toISOString()
+
+    console.log("[v0] Network update payload:", updateData)
+
+    const { data, error } = await supabase
+      .from("networks")
+      .update(updateData)
+      .eq("id", normalizedId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Network update error:", error.message)
+      return { network: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No network found for id: ${networkId}`
+      console.error("[v0] Network update error:", notFoundError)
+      return { network: null, error: notFoundError }
+    }
+
+    console.log("[v0] Network updated:", data.id, data.name)
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return { network: normalizeNetwork(data) }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Network update error:", message)
+    return { network: null, error: message }
   }
 }
 
@@ -154,7 +258,8 @@ export async function getAllNetworks(): Promise<Network[]> {
     }
 
     console.log("[v0] Loaded networks from Supabase:", data?.length || 0)
-    return data as Network[]
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return (data || []).map(normalizeNetwork)
   } catch (err) {
     console.warn("[v0] Exception loading networks:", err)
     return []
@@ -181,7 +286,8 @@ export async function getNetworkBySlug(slug: string): Promise<Network | null> {
       return null
     }
 
-    return data as Network
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return data ? normalizeNetwork(data) : null
   } catch (err) {
     console.warn("[v0] Exception loading network by slug:", err)
     return null
@@ -211,7 +317,8 @@ export async function getNetworkById(id: string): Promise<Network | null> {
     }
 
     console.log("[v0] Found network:", data?.name)
-    return data as Network
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return data ? normalizeNetwork(data) : null
   } catch (err) {
     console.warn("[v0] Exception loading network by ID:", err)
     return null
@@ -333,6 +440,61 @@ export async function createHub(
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Hub save error:", message)
     return { hub: {} as Hub, source: "supabase", error: message }
+  }
+}
+
+/**
+ * Update an existing hub
+ */
+export async function updateHub(
+  hubId: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+  }
+): Promise<{ hub: Hub | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { hub: null, error: "Supabase not configured" }
+  }
+
+  if (!hubId) {
+    return { hub: null, error: "No hub ID provided" }
+  }
+
+  try {
+    const updateData: Record<string, any> = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.slug !== undefined) updateData.slug = updates.slug
+    if (updates.description !== undefined) updateData.description = updates.description
+    updateData.updated_at = new Date().toISOString()
+
+    console.log("[v0] Hub update payload:", updateData)
+
+    const { data, error } = await supabase
+      .from("hubs")
+      .update(updateData)
+      .eq("id", hubId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Hub update error:", error.message)
+      return { hub: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No hub found for id: ${hubId}`
+      console.error("[v0] Hub update error:", notFoundError)
+      return { hub: null, error: notFoundError }
+    }
+
+    console.log("[v0] Hub updated:", data.id, data.name)
+    return { hub: data as Hub }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Hub update error:", message)
+    return { hub: null, error: message }
   }
 }
 
@@ -491,6 +653,74 @@ export async function getCollectionsByHubId(hubId: string): Promise<Collection[]
   } catch (err) {
     console.warn("[v0] Exception loading collections:", err)
     return []
+  }
+}
+
+/**
+ * Update an existing collection
+ */
+export async function updateCollection(
+  collectionId: string,
+  updates: {
+    name?: string
+    slug?: string
+    description?: string
+  }
+): Promise<{ collection: Collection | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { collection: null, error: "Supabase not configured" }
+  }
+
+  if (!collectionId) {
+    return { collection: null, error: "No collection ID provided" }
+  }
+
+  try {
+    const updateData: Record<string, any> = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.slug !== undefined) updateData.slug = updates.slug
+    if (updates.description !== undefined) updateData.description = updates.description
+    updateData.updated_at = new Date().toISOString()
+
+    console.log("[v0] Collection update payload:", updateData)
+
+    const { data, error } = await supabase
+      .from("collections")
+      .update(updateData)
+      .eq("id", collectionId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Collection update error:", error.message)
+      return { collection: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No collection found for id: ${collectionId}`
+      console.error("[v0] Collection update error:", notFoundError)
+      return { collection: null, error: notFoundError }
+    }
+
+    console.log("[v0] Collection updated:", data.id, data.name)
+    
+    // Normalize the returned data
+    const normalized = {
+      id: data.id,
+      hubId: data.hub_id,
+      networkId: data.network_id,
+      slug: data.slug,
+      name: data.name,
+      description: data.description,
+      defaultGuideType: data.default_guide_type,
+      guideIds: data.guide_ids || [],
+    }
+    
+    return { collection: normalized as Collection }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Collection update error:", message)
+    return { collection: null, error: message }
   }
 }
 

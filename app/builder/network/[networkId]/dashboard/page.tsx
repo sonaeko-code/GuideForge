@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, ArrowLeft, AlertCircle } from "lucide-react"
+import { Plus, ArrowLeft, AlertCircle, Settings } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
@@ -55,12 +55,20 @@ export default async function NetworkDashboardPage({
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
           <div className="mb-6 flex items-center justify-between gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
-            <Button asChild>
-              <Link href={`/builder/network/${networkId}/generate`}>
-                <Plus className="size-4 mr-1" aria-hidden="true" />
-                Generate Guide
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild variant="outline">
+                <Link href={`/builder/network/${networkId}/settings`}>
+                  <Settings className="size-4 mr-1" aria-hidden="true" />
+                  Settings
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href={`/builder/network/${networkId}/generate`}>
+                  <Plus className="size-4 mr-1" aria-hidden="true" />
+                  Generate Guide
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {/* GuideForge Data Spine Contract - Dashboard Guide Loading
