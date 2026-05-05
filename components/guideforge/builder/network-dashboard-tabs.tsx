@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
+import { CreateCollectionForm } from "@/components/guideforge/builder/create-collection-form"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
 interface NetworkDashboardTabsProps {
@@ -466,37 +467,44 @@ export function NetworkDashboardTabs({
                 ? "Create a hub first to add collections."
                 : "Create your first collection to organize guides."}
             </p>
+            <div className="mt-6 max-w-md mx-auto">
+              <CreateCollectionForm networkId={networkId} hubs={safeHubs} />
+            </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {safeHubs.map((hub: NormalizedHub) => {
-              const hubCollections = safeCollections.filter((c: NormalizedCollection) => c.hubId === hub.id)
+          <div className="space-y-6">
+            <div className="max-w-md">
+              <CreateCollectionForm networkId={networkId} hubs={safeHubs} />
+            </div>
+            <div className="space-y-4">
+              {safeHubs.map((hub: NormalizedHub) => {
+                const hubCollections = safeCollections.filter((c: NormalizedCollection) => c.hubId === hub.id)
 
-              if (hubCollections.length === 0) return null
+                if (hubCollections.length === 0) return null
 
-              return (
-                <div key={hub.id}>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-3">{hub.name}</h3>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {hubCollections.map((col: NormalizedCollection) => {
-                      const hubIdValid = col.hubId && col.hubId !== "undefined"
-                      const colIdValid = col.id && col.id !== "undefined"
-                      
-                      // Calculate guide count for this collection from loaded guides
-                      const collectionGuideCount = safeGuides.filter((g: Guide) => g.collectionId === col.id).length
-                      
-                      if (hubIdValid && colIdValid) {
-                        return (
-                          <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
-                            <div className="space-y-2 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="flex items-center gap-2 font-semibold text-foreground">
-                                  <FolderOpen className="size-4 text-primary" aria-hidden="true" />
-                                  {col.name}
-                                </h4>
-                                <Badge variant="secondary" className="shrink-0 text-xs">
-                                  Hub: {col.hubName || hub.name}
-                                </Badge>
+                return (
+                  <div key={hub.id}>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-3">{hub.name}</h3>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {hubCollections.map((col: NormalizedCollection) => {
+                        const hubIdValid = col.hubId && col.hubId !== "undefined"
+                        const colIdValid = col.id && col.id !== "undefined"
+                        
+                        // Calculate guide count for this collection from loaded guides
+                        const collectionGuideCount = safeGuides.filter((g: Guide) => g.collectionId === col.id).length
+                        
+                        if (hubIdValid && colIdValid) {
+                          return (
+                            <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
+                              <div className="space-y-2 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className="flex items-center gap-2 font-semibold text-foreground">
+                                    <FolderOpen className="size-4 text-primary" aria-hidden="true" />
+                                    {col.name}
+                                  </h4>
+                                  <Badge variant="secondary" className="shrink-0 text-xs">
+                                    Hub: {col.hubName || hub.name}
+                                  </Badge>
                               </div>
                               <p className="text-sm text-muted-foreground">{col.description}</p>
                               <p className="text-xs font-medium text-muted-foreground">
