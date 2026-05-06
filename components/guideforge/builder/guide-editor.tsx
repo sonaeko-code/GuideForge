@@ -227,21 +227,29 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           
           // Show actual error if Supabase save failed
           if (source === "supabase" && !error) {
+            // Save succeeded - explicitly clear all failure state
             setSaveError(null)
             setLastSaveDebug(null)
             setAutosaveStatus("saved")
             
             // Update snapshot to reflect saved state
             lastSavedSnapshotRef.current = finalSnapshot
-            console.log("[v0] Autosave completed: saved to Supabase")
+            console.log("[v0] Save success state cleared:", {
+              guideId,
+              stage,
+              source,
+            })
             
-            // Keep "Saved" for at least 2000ms
+            // Keep "Saved" indicator for at least 2000ms before returning to idle
             if (autosaveStatusTimeoutRef.current) {
               clearTimeout(autosaveStatusTimeoutRef.current)
             }
             autosaveStatusTimeoutRef.current = setTimeout(() => {
               setAutosaveStatus("idle")
-              console.log("[v0] Autosave idle: returning to idle state")
+              // Final cleanup on return to idle
+              setSaveError(null)
+              setLastSaveDebug(null)
+              console.log("[v0] Autosave idle: cleared all save state, returning to idle")
             }, 2000)
           } else {
             // Save failed - store full debug context
@@ -614,8 +622,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           </div>
         )}
 
-        {/* Detailed error debug panel - appears when save fails */}
-        {(autosaveStatus === "failed" || lastSaveDebug) && (
+        {/* Detailed error debug panel - appears only when save currently failed */}
+        {autosaveStatus === "failed" && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-xs">
             <div className="mb-3">
               <h3 className="font-semibold text-red-900 dark:text-red-100 mb-2">Save Failed — Debug Information</h3>
