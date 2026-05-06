@@ -95,6 +95,19 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  const [lastSaveDebug, setLastSaveDebug] = useState<{
+    source?: string
+    stage?: string
+    error?: string
+    errorCode?: string
+    errorDetails?: string
+    errorHint?: string
+    guideId?: string
+    collectionId?: string
+    authorId?: string
+    status?: string
+    verificationStatus?: string
+  } | null>(null)
   const autosaveStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Debounce autosave timer
@@ -192,14 +205,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       
       ;(async () => {
         try {
-          const { source, error } = await saveGuideDraft(updatedGuide)
-          console.log("[v0] Guide save Supabase result:", {
+          const result = await saveGuideDraft(updatedGuide)
+          const { source, error, errorCode, errorDetails, errorHint, stage, guideId, collectionId, authorId, status, verificationStatus } = result
+          
+          console.log("[v0] Guide save result:", {
             success: source === "supabase",
             source,
-            guideId: updatedGuide.id,
-            collectionId: updatedGuide.collectionId,
-            errorCode: error ? (error.match(/^(\w+):/) || [])[1] || "unknown" : null,
-            errorMessage: error || null,
+            stage,
+            guideId,
+            collectionId,
+            authorId,
+            status,
+            verificationStatus,
+            errorCode,
+            errorDetails,
+            errorHint,
           })
           
           setSaveSource(source)
@@ -207,28 +227,73 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           
           // Show actual error if Supabase save failed
           if (source === "supabase" && !error) {
+            // Save succeeded - explicitly clear all failure state
             setSaveError(null)
+            setLastSaveDebug(null)
             setAutosaveStatus("saved")
             
             // Update snapshot to reflect saved state
             lastSavedSnapshotRef.current = finalSnapshot
-            console.log("[v0] Autosave completed: saved to Supabase")
+            console.log("[v0] Save success state cleared:", {
+              guideId,
+              stage,
+              source,
+            })
             
-            // Keep "Saved" for at least 2000ms
+            // Keep "Saved" indicator for at least 2000ms before returning to idle
             if (autosaveStatusTimeoutRef.current) {
               clearTimeout(autosaveStatusTimeoutRef.current)
             }
             autosaveStatusTimeoutRef.current = setTimeout(() => {
               setAutosaveStatus("idle")
-              console.log("[v0] Autosave idle: returning to idle state")
+              // Final cleanup on return to idle
+              setSaveError(null)
+              setLastSaveDebug(null)
+              console.log("[v0] Autosave idle: cleared all save state, returning to idle")
             }, 2000)
           } else {
+            // Save failed - store full debug context
             setSaveError(error ? `Autosave failed: ${error}` : "Autosave failed — localStorage only")
+            setLastSaveDebug({
+              source,
+              stage,
+              error,
+              errorCode,
+              errorDetails,
+              errorHint,
+              guideId,
+              collectionId,
+              authorId,
+              status,
+              verificationStatus,
+            })
             setAutosaveStatus("failed")
+            
+            console.log("[v0] Guide save failed debug:", {
+              source,
+              stage,
+              error,
+              errorCode,
+              errorDetails,
+              errorHint,
+              guideId,
+              collectionId,
+              authorId,
+              status,
+              verificationStatus,
+            })
           }
         } catch (error) {
           console.error("[v0] Autosave exception:", error)
           setSaveError(error instanceof Error ? error.message : "Autosave failed")
+          setLastSaveDebug({
+            stage: "unknown-catch",
+            error: error instanceof Error ? error.message : "Autosave exception",
+            guideId: updatedGuide.id,
+            collectionId: updatedGuide.collectionId,
+            status: updatedGuide.status,
+            verificationStatus: updatedGuide.verification,
+          })
           setAutosaveStatus("failed")
         }
       })()
@@ -557,6 +622,69 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           </div>
         )}
 
+        {/* Detailed error debug panel - appears only when save currently failed */}
+        {autosaveStatus === "failed" && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-xs">
+            <div className="mb-3">
+              <h3 className="font-semibold text-red-900 dark:text-red-100 mb-2">Save Failed — Debug Information</h3>
+              <div className="space-y-1 text-red-800 dark:text-red-200/90">
+                <div>
+                  <span className="font-medium">Error:</span> {saveError || lastSaveDebug?.error || "Unknown error"}
+                </div>
+                {lastSaveDebug?.source && (
+                  <div>
+                    <span className="font-medium">Source:</span> {lastSaveDebug.source}
+                  </div>
+                )}
+                {lastSaveDebug?.stage && (
+                  <div>
+                    <span className="font-medium">Failed Stage:</span> {lastSaveDebug.stage}
+                  </div>
+                )}
+                {lastSaveDebug?.errorCode && (
+                  <div>
+                    <span className="font-medium">Error Code:</span> {lastSaveDebug.errorCode}
+                  </div>
+                )}
+                {lastSaveDebug?.errorDetails && (
+                  <div>
+                    <span className="font-medium">Error Details:</span> {lastSaveDebug.errorDetails}
+                  </div>
+                )}
+                {lastSaveDebug?.errorHint && (
+                  <div>
+                    <span className="font-medium">Error Hint:</span> {lastSaveDebug.errorHint}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-red-200 dark:border-red-800/50">
+              <div className="text-red-700 dark:text-red-300/80">
+                <span className="font-medium">Guide ID:</span>
+                <div className="font-mono break-all text-xs">{lastSaveDebug?.guideId || normalizedGuide.id}</div>
+              </div>
+              <div className="text-red-700 dark:text-red-300/80">
+                <span className="font-medium">Status:</span>
+                <div className="font-mono">{lastSaveDebug?.status || normalizedGuide.status}</div>
+              </div>
+              <div className="text-red-700 dark:text-red-300/80">
+                <span className="font-medium">Collection ID:</span>
+                <div className="font-mono break-all text-xs">{lastSaveDebug?.collectionId || normalizedGuide.collectionId || "(empty)"}</div>
+              </div>
+              <div className="text-red-700 dark:text-red-300/80">
+                <span className="font-medium">Verification Status:</span>
+                <div className="font-mono">{lastSaveDebug?.verificationStatus || normalizedGuide.verification || "unverified"}</div>
+              </div>
+              {lastSaveDebug?.authorId && (
+                <div className="text-red-700 dark:text-red-300/80">
+                  <span className="font-medium">Author ID:</span>
+                  <div className="font-mono break-all text-xs">{lastSaveDebug.authorId}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Collection missing warning */}
         {!normalizedGuide.collectionId && (
           <div className="text-xs text-amber-600 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/20 p-2 rounded flex gap-2 items-start">
@@ -657,25 +785,35 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             )}
 
             {isDraft && (
-              <div className="flex gap-2 items-center">
-                <Button size="sm" variant="outline" onClick={handlePreview}>
-                  <Eye className="size-4 mr-1" aria-hidden="true" />
-                  Preview
-                </Button>
-                {/* Phase 8: Submit for Review */}
-                <Button
-                  size="sm"
-                  onClick={handleSubmitForReview}
-                  disabled={isSubmittingForReview}
-                  variant="default"
-                >
-                  <Send className="size-4 mr-1" aria-hidden="true" />
-                  {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={handleDelete}>
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </Button>
-              </div>
+              <>
+                <div className="flex gap-2 items-center">
+                  <Button size="sm" variant="outline" onClick={handlePreview}>
+                    <Eye className="size-4 mr-1" aria-hidden="true" />
+                    Preview
+                  </Button>
+                  {/* Phase 8: Submit for Review */}
+                  <Button
+                    size="sm"
+                    onClick={handleSubmitForReview}
+                    disabled={isSubmittingForReview || (autosaveStatus === "failed")}
+                    variant="default"
+                    title={autosaveStatus === "failed" ? "Fix the save error before submitting for review" : undefined}
+                  >
+                    <Send className="size-4 mr-1" aria-hidden="true" />
+                    {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleDelete}>
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </Button>
+                </div>
+                
+                {/* Helper text if save is failing */}
+                {autosaveStatus === "failed" && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                    Fix the save error before submitting for review.
+                  </p>
+                )}
+              </>
             )}
 
             {/* Ready state actions */}

@@ -2,6 +2,89 @@ import { getSupabaseSession, isSupabaseConfigured, supabase } from './supabase-c
 import { getCurrentUserNetworkMembership } from './supabase-networks'
 
 /**
+ * Resolve guide network context by traversing collection → hub → network
+ * The guides table does not have network_id; we must derive it from:
+ * guide.collection_id → collection.hub_id → hub.network_id
+ */
+async function resolveGuideReviewContext(guideId: string): Promise<{
+  guideId: string
+  collectionId: string
+  hubId: string
+  networkId: string
+  status: string
+  verificationStatus: string
+} | null> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return null
+  }
+
+  try {
+    // 1. Fetch guide with collection_id
+    const { data: guide, error: guideError } = await supabase
+      .from('guides')
+      .select('id, collection_id, status, verification_status')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (guideError || !guide) {
+      console.error('[v0] resolveGuideReviewContext: Guide not found:', guideError?.message || 'no guide')
+      return null
+    }
+
+    if (!guide.collection_id) {
+      console.error('[v0] resolveGuideReviewContext: Guide is missing collection_id')
+      return null
+    }
+
+    // 2. Fetch collection with hub_id
+    const { data: collection, error: collectionError } = await supabase
+      .from('collections')
+      .select('id, hub_id')
+      .eq('id', guide.collection_id)
+      .maybeSingle()
+
+    if (collectionError || !collection) {
+      console.error('[v0] resolveGuideReviewContext: Collection not found:', collectionError?.message || 'no collection')
+      return null
+    }
+
+    if (!collection.hub_id) {
+      console.error('[v0] resolveGuideReviewContext: Collection is missing hub_id')
+      return null
+    }
+
+    // 3. Fetch hub with network_id
+    const { data: hub, error: hubError } = await supabase
+      .from('hubs')
+      .select('id, network_id')
+      .eq('id', collection.hub_id)
+      .maybeSingle()
+
+    if (hubError || !hub) {
+      console.error('[v0] resolveGuideReviewContext: Hub not found:', hubError?.message || 'no hub')
+      return null
+    }
+
+    if (!hub.network_id) {
+      console.error('[v0] resolveGuideReviewContext: Hub is missing network_id')
+      return null
+    }
+
+    return {
+      guideId: guide.id,
+      collectionId: guide.collection_id,
+      hubId: collection.hub_id,
+      networkId: hub.network_id,
+      status: guide.status,
+      verificationStatus: guide.verification_status,
+    }
+  } catch (err) {
+    console.error('[v0] resolveGuideReviewContext: Exception:', err instanceof Error ? err.message : String(err))
+    return null
+  }
+}
+
+/**
  * Get review summary for a guide
  * Phase 8: Guide Review Voting Lite
  * 
@@ -27,6 +110,7 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
     notes: string | null
     createdAt: string
   }>
+  error?: string
 } | null> {
   if (!isSupabaseConfigured() || !supabase) {
     console.log('[v0] getGuideReviewSummary: Supabase not configured')
@@ -37,19 +121,24 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
     const session = await getSupabaseSession()
     const userId = session?.user?.id
 
-    // Fetch guide to get network_id
-    const { data: guide, error: guideError } = await supabase
-      .from('guides')
-      .select('id, network_id')
-      .eq('id', guideId)
-      .maybeSingle()
-
-    if (guideError || !guide) {
-      console.warn('[v0] getGuideReviewSummary: Guide not found:', guideError?.message || 'no guide')
-      return null
+    // Resolve guide network context through collection → hub
+    const context = await resolveGuideReviewContext(guideId)
+    
+    if (!context) {
+      console.warn('[v0] getGuideReviewSummary: Could not resolve guide network context')
+      return {
+        guideId,
+        networkId: null,
+        approveWeight: 0,
+        requestChangesWeight: 0,
+        totalVotes: 0,
+        currentUserVote: null,
+        currentUserRole: null,
+        canCurrentUserVote: false,
+        votes: [],
+        error: 'Could not resolve guide context. Please verify guide is attached to a collection and hub.',
+      }
     }
-
-    const networkId = guide.network_id
 
     // Fetch all votes for this guide
     const { data: votes, error: votesError } = await supabase
@@ -99,7 +188,7 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
     let canCurrentUserVote = false
 
     if (userId) {
-      const membership = await getCurrentUserNetworkMembership(networkId || '')
+      const membership = await getCurrentUserNetworkMembership(context.networkId)
       if (membership) {
         currentUserRole = membership.canonicalRole
         canCurrentUserVote = membership.can_vote_on_reviews === true
@@ -114,7 +203,7 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
 
     return {
       guideId,
-      networkId: networkId || null,
+      networkId: context.networkId,
       approveWeight,
       requestChangesWeight,
       totalVotes: formattedVotes.length,
@@ -154,21 +243,15 @@ export async function castGuideReviewVote(
       return { success: false, error: 'User not authenticated' }
     }
 
-    // Fetch guide to get network_id
-    const { data: guide, error: guideError } = await supabase
-      .from('guides')
-      .select('id, network_id')
-      .eq('id', guideId)
-      .maybeSingle()
-
-    if (guideError || !guide) {
-      return { success: false, error: 'Guide not found' }
+    // Resolve guide network context through collection → hub
+    const context = await resolveGuideReviewContext(guideId)
+    
+    if (!context) {
+      return { success: false, error: 'Could not resolve guide network context. Guide may be missing collection or hub.' }
     }
 
-    const networkId = guide.network_id
-
     // Check user's network authority
-    const membership = await getCurrentUserNetworkMembership(networkId || '')
+    const membership = await getCurrentUserNetworkMembership(context.networkId)
     if (!membership || !membership.can_vote_on_reviews) {
       return { success: false, error: 'You do not have permission to vote on guide reviews' }
     }
@@ -179,12 +262,13 @@ export async function castGuideReviewVote(
     console.log('[v0] castGuideReviewVote: Casting vote for guide:', guideId, 'vote:', vote, 'weight:', weight)
 
     // Upsert vote using UNIQUE(guide_id, voter_id)
+    // network_id is derived from context
     const { data: upsertResult, error: upsertError } = await supabase
       .from('guide_review_votes')
       .upsert([
         {
           guide_id: guideId,
-          network_id: networkId,
+          network_id: context.networkId,
           voter_id: userId,
           voter_role: voterRole,
           vote,
@@ -237,24 +321,20 @@ export async function submitGuideForReview(
       return { success: false, error: 'User not authenticated' }
     }
 
-    // Fetch guide to check status and get network_id
-    const { data: guide, error: guideError } = await supabase
-      .from('guides')
-      .select('id, status, network_id')
-      .eq('id', guideId)
-      .maybeSingle()
-
-    if (guideError || !guide) {
-      return { success: false, error: 'Guide not found' }
+    // Resolve guide network context through collection → hub
+    const context = await resolveGuideReviewContext(guideId)
+    
+    if (!context) {
+      return { success: false, error: 'Could not resolve guide network context. Guide may be missing collection or hub.' }
     }
 
     // Only allow submission from draft status
-    if (guide.status !== 'draft') {
-      return { success: false, error: `Guide is already in ${guide.status} status` }
+    if (context.status !== 'draft') {
+      return { success: false, error: `Guide is already in ${context.status} status` }
     }
 
     // Check user's network authority
-    const membership = await getCurrentUserNetworkMembership(guide.network_id || '')
+    const membership = await getCurrentUserNetworkMembership(context.networkId)
     if (!membership || !membership.can_submit_guides) {
       return { success: false, error: 'You do not have permission to submit guides for review' }
     }
