@@ -26,7 +26,7 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
     }
 
     loadSummary()
-  }, [guideId])
+  }, [guideId, guideStatus])
 
   const handleVote = async (vote: 'approve' | 'request_changes') => {
     setIsVoting(true)
@@ -44,9 +44,20 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
     setIsVoting(false)
   }
 
-  // Only show panel if status is ready or if there are votes
-  if (!summary || (guideStatus !== 'ready' && summary.totalVotes === 0)) {
+  // Only show panel if status is ready (even with 0 votes)
+  if (guideStatus !== 'ready') {
     return null
+  }
+
+  if (isLoading || !summary) {
+    return (
+      <div className="p-4 rounded-lg border border-border/50 bg-muted/30">
+        <div className="flex items-center justify-center gap-2">
+          <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">Loading review status...</p>
+        </div>
+      </div>
+    )
   }
 
   const canVote = summary.canCurrentUserVote && guideStatus === 'ready'
