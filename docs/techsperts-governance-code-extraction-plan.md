@@ -422,17 +422,31 @@ This schema provides the foundation for phases 3-5 (data, voting, UI) without bl
 
 ### Phase 1 Status
 
-**Phase 1 schema draft prepared.** 
+**Phase 1 schema deployed.** 
 
-SQL migration proposal created at `docs/sql/guideforge_governance_schema_phase_1.sql`:
-- Creates 4 foundation tables (idempotent, safe)
-- Seeds default roles for each network (owner, admin, reviewer, contributor, member, viewer)
-- Backfills owner memberships from `networks.owner_user_id`
-- Uses `ON CONFLICT DO NOTHING` for idempotency
-- No RLS, no triggers, no enforcement
-- Ready for manual deployment to Supabase
+SQL migration created at `docs/sql/guideforge_governance_schema_phase_1.sql` and manually deployed to Supabase:
+- ✓ 4 foundation tables created (network_role_definitions, network_members, guide_review_votes, guide_publish_audit)
+- ✓ Default roles seeded for each network (owner, admin, reviewer, contributor, member, viewer)
+- ✓ Owner memberships backfilled from `networks.owner_user_id`
+- ✓ No RLS, no triggers, no enforcement
+- ✓ Tables live in Supabase with data
 
-To proceed: Review SQL, then manually run migration in Supabase dashboard.
+---
+
+### Phase 2 Status
+
+**Phase 2 read-only visibility implemented.**
+
+Governance visibility added to Network Settings page:
+- ✓ Data helpers created: getRoleDefinitionsForNetwork, getNetworkMembersForNetwork, getCurrentUserNetworkMembership
+- ✓ NetworkGovernancePanel component displays (175 lines):
+  - Current user role (with signed-out state)
+  - Role definitions with permissions matrix
+  - Network members list with user IDs
+  - Empty state handling
+- ✓ Panel appears on `/builder/network/[id]/settings` between form and structure manager
+- ✓ No RLS, no route protection, no editing, no voting, no enforcement
+- ✓ All existing settings save functionality unchanged
 
 ---
 

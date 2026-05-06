@@ -15,7 +15,7 @@
  * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
-import type { Network, Hub, Collection, NetworkDraft } from "./types"
+import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
 
@@ -1211,3 +1211,142 @@ export async function loadNetworkBuilderContext(
     source,
   }
 }
+
+// ========== GOVERNANCE (Phase 2+) ==========
+
+/**
+ * Get role definitions for a network
+ * Returns all canonical roles defined for this network
+ * Reads only, no RLS enforcement
+ */
+export async function getRoleDefinitionsForNetwork(
+  networkId: string
+): Promise<NetworkRoleDefinition[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("network_role_definitions")
+      .select("*")
+      .eq("network_id", networkId)
+      .eq("is_active", true)
+      .order("review_weight", { ascending: false })
+
+    if (error) {
+      console.warn("[v0] Error loading role definitions:", error.message)
+      return []
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      networkId: row.network_id,
+      canonicalRole: row.canonical_role,
+      displayName: row.display_name,
+      reviewWeight: row.review_weight,
+      canSubmitGuides: row.can_submit_guides,
+      canVoteOnReviews: row.can_vote_on_reviews,
+      canManageMembers: row.can_manage_members,
+      canPublishOverride: row.can_publish_override,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    console.warn("[v0] Exception loading role definitions:", err)
+    return []
+  }
+}
+
+/**
+ * Get network members for a network
+ * Returns all member assignments for this network
+ * Reads only, no RLS enforcement
+ */
+export async function getNetworkMembersForNetwork(
+  networkId: string
+): Promise<NetworkMember[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("network_members")
+      .select("*")
+      .eq("network_id", networkId)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      console.warn("[v0] Error loading network members:", error.message)
+      return []
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      networkId: row.network_id,
+      userId: row.user_id,
+      canonicalRole: row.canonical_role,
+      displayName: row.display_name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    console.warn("[v0] Exception loading network members:", err)
+    return []
+  }
+}
+
+/**
+ * Get current user's network membership
+ * Returns user's role in this network, or null if not a member
+ * Reads only, no RLS enforcement
+ */
+export async function getCurrentUserNetworkMembership(
+  networkId: string
+): Promise<NetworkMember | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  try {
+    const session = await getSupabaseSession()
+    const userId = session?.user?.id
+    if (!userId) {
+      return null
+    }
+
+    const { data, error } = await supabase
+      .from("network_members")
+      .select("*")
+      .eq("network_id", networkId)
+      .eq("user_id", userId)
+      .single()
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        // Not a member (single() returned no rows)
+        return null
+      }
+      console.warn("[v0] Error loading user network membership:", error.message)
+      return null
+    }
+
+    if (!data) return null
+
+    return {
+      id: data.id,
+      networkId: data.network_id,
+      userId: data.user_id,
+      canonicalRole: data.canonical_role,
+      displayName: data.display_name,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    }
+  } catch (err) {
+    console.warn("[v0] Exception loading user network membership:", err)
+    return null
+  }
+}
+
