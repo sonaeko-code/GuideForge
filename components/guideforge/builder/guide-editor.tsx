@@ -97,6 +97,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
   const [lastSaveDebug, setLastSaveDebug] = useState<{
     source?: string
+    stage?: string
     error?: string
     errorCode?: string
     errorDetails?: string
@@ -205,11 +206,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       ;(async () => {
         try {
           const result = await saveGuideDraft(updatedGuide)
-          const { source, error, errorCode, errorDetails, errorHint, guideId, collectionId, authorId, status, verificationStatus } = result
+          const { source, error, errorCode, errorDetails, errorHint, stage, guideId, collectionId, authorId, status, verificationStatus } = result
           
           console.log("[v0] Guide save result:", {
             success: source === "supabase",
             source,
+            stage,
             guideId,
             collectionId,
             authorId,
@@ -246,6 +248,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             setSaveError(error ? `Autosave failed: ${error}` : "Autosave failed — localStorage only")
             setLastSaveDebug({
               source,
+              stage,
               error,
               errorCode,
               errorDetails,
@@ -260,6 +263,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             
             console.log("[v0] Guide save failed debug:", {
               source,
+              stage,
               error,
               errorCode,
               errorDetails,
@@ -275,6 +279,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           console.error("[v0] Autosave exception:", error)
           setSaveError(error instanceof Error ? error.message : "Autosave failed")
           setLastSaveDebug({
+            stage: "unknown-catch",
             error: error instanceof Error ? error.message : "Autosave exception",
             guideId: updatedGuide.id,
             collectionId: updatedGuide.collectionId,
@@ -621,6 +626,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {lastSaveDebug?.source && (
                   <div>
                     <span className="font-medium">Source:</span> {lastSaveDebug.source}
+                  </div>
+                )}
+                {lastSaveDebug?.stage && (
+                  <div>
+                    <span className="font-medium">Failed Stage:</span> {lastSaveDebug.stage}
                   </div>
                 )}
                 {lastSaveDebug?.errorCode && (

@@ -330,6 +330,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
     errorCode?: string
     errorDetails?: string
     errorHint?: string
+    stage?: string // Which save stage failed: load-user, prepare-payload, update-guide, insert-guide, save-steps-delete, save-steps-insert, verify-guide, etc.
     guideId?: string
     collectionId?: string
     authorId?: string
@@ -349,6 +350,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         source: "localStorage",
         error: reason,
         errorCode: "SUPABASE_NOT_CONFIGURED",
+        stage: "load-supabase-config",
         guideId: guide.id,
         collectionId: guide.collectionId,
         verificationStatus: guide.verification,
@@ -377,6 +379,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           source: "localStorage",
           error: reason,
           errorCode: "COLLECTION_ID_MISSING",
+          stage: "validate-collection-id",
           guideId: guide.id,
           collectionId: guide.collectionId || "",
           authorId: authorId,
@@ -490,6 +493,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
             errorCode: error?.code,
             errorDetails: error?.message,
             errorHint: error?.hint,
+            stage: "update-guide-row",
             guideId: guide.id,
             collectionId: normalizedCollectionId,
             authorId: authorId,
@@ -540,10 +544,12 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
               errorCode: retryError?.code,
               errorDetails: retryError?.message,
               errorHint: retryError?.hint,
+              stage: "insert-guide-retry",
               guideId: guide.id,
               collectionId: normalizedCollectionId,
               authorId: authorId,
               status: normalizedStatus,
+              verificationStatus: guide.verification,
             }
           }
           
@@ -592,10 +598,12 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
               errorCode: error?.code,
               errorDetails: error?.message,
               errorHint: error?.hint,
+              stage: "insert-guide-duplicate-slug",
               guideId: guide.id,
               collectionId: normalizedCollectionId,
               authorId: authorId,
               status: normalizedStatus,
+              verificationStatus: guide.verification,
             }
           }
         }
@@ -615,10 +623,12 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           errorCode: guideError.code,
           errorDetails: guideError.message,
           errorHint: guideError.hint,
+          stage: "post-insert-check",
           guideId: guide.id,
           collectionId: normalizedCollectionId,
           authorId: authorId,
           status: normalizedStatus,
+          verificationStatus: guide.verification,
         }
       }
 
@@ -691,8 +701,26 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
             code: stepsError.code,
             message: stepsError.message,
             details: stepsError.details,
+            hint: stepsError.hint,
             stepCount,
           })
+          // CRITICAL: If steps failed to save, return error instead of continuing
+          const errorMsg = `${stepsError.code}: ${stepsError.message}${stepsError.hint ? ` (${stepsError.hint})` : ""}`
+          this.localStorageAdapter.saveDraftSync(guide)
+          return {
+            id: canonicalGuideId,
+            source: "localStorage",
+            error: errorMsg,
+            errorCode: stepsError.code,
+            errorDetails: stepsError.message,
+            errorHint: stepsError.hint,
+            stage: "save-steps-insert",
+            guideId: canonicalGuideId,
+            collectionId: normalizedCollectionId,
+            authorId: authorId,
+            status: normalizedStatus,
+            verificationStatus: guide.verification,
+          }
         } else {
           console.log("[v0] guide_steps insert SUCCESS:", stepCount, "steps saved")
         }
@@ -714,10 +742,12 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           source: "localStorage",
           error: verification.error,
           errorCode: "VERIFICATION_FAILED",
+          stage: "verify-guide-after-save",
           guideId: canonicalGuideId,
           collectionId: normalizedCollectionId,
           authorId: authorId,
           status: normalizedStatus,
+          verificationStatus: guide.verification,
         }
       }
       
@@ -725,20 +755,31 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       return {
         id: canonicalGuideId,
         source: "supabase",
+        stage: "save-complete",
         guideId: canonicalGuideId,
         collectionId: normalizedCollectionId,
         authorId: authorId,
         status: normalizedStatus,
+        verificationStatus: guide.verification,
       }
-    } catch (error) {
-      console.error("[v0] saveDraft: Unexpected error", error)
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : JSON.stringify(err)
+      console.error("[v0] saveDraft: Unexpected error", message, err)
       this.localStorageAdapter.saveDraftSync(guide)
       return {
         id: guide.id,
         source: "localStorage",
-        error: error instanceof Error ? error.message : String(error),
-        errorCode: "UNEXPECTED_ERROR",
+        error: message || "Unexpected error during save",
+        errorCode: "UNEXPECTED_CATCH",
+        stage: "unknown-catch",
         guideId: guide.id,
+        collectionId: guide.collectionId,
+        verificationStatus: guide.verification,
       }
     }
   }
