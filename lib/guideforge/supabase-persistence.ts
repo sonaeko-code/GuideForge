@@ -24,6 +24,7 @@ import type { Guide, GuideStep } from "./types"
 import type { GuidePersistenceAdapter } from "./persistence"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
+import { ensureCurrentUserProfile } from "./supabase-profiles"
 
 // Phase 1: Seeded dev profile UUID
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -294,16 +295,23 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
 
   /**
    * Get effective author ID for Supabase writes.
-   * Uses authenticated user ID if available, else seeded dev profile ID.
+   * Phase 6: Ensures user has a profile in profiles table before returning ID
+   * Uses authenticated user ID if available and profile exists/created.
+   * Falls back to seeded dev profile if not authenticated.
    */
   private async getAuthorId(): Promise<string> {
     try {
       const session = await getSupabaseSession()
       if (session?.user?.id) {
-        return session.user.id
+        // Ensure profile exists for this user
+        const profileId = await ensureCurrentUserProfile()
+        if (profileId) {
+          return profileId
+        }
+        console.warn('[v0] Profile bootstrap failed for user:', session.user.id, "using dev profile")
       }
     } catch (error) {
-      console.warn("[v0] Failed to get session, using dev profile", error)
+      console.warn("[v0] Failed to get session or ensure profile, using dev profile", error)
     }
     console.log("[v0] Using seeded dev profile:", DEV_PROFILE_ID)
     return DEV_PROFILE_ID

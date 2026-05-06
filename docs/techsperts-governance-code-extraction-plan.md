@@ -9,11 +9,11 @@
 - Phase 4: Editable role display names and theme labels
 - Phase 5: Member Management Lite (add members by UUID, change roles, remove members)
 
-### Governance Phase 6: Permission-Aware UI Gating - COMPLETED ✓
+### Governance Phase 6: Permission-Aware UI Gating + Profile/Author Safety - COMPLETED ✓
 
-**Permission-aware UI gating for network editing (UI-only, no RLS/database enforcement).**
+**Permission-aware UI gating for network editing + author/profile foreign key safety (UI-only, no RLS/database enforcement).**
 
-#### Files Changed
+#### Files Changed / Created
 1. **lib/guideforge/supabase-networks.ts** (+159 lines)
    - Added `getCurrentUserNetworkAuthority(networkId)` helper
    - Queries `network_members` + `network_role_definitions`
@@ -21,33 +21,89 @@
    - Derives `canManageNetwork = owner OR admin OR can_manage_members`
    - No RLS, no service role keys
 
-2. **components/guideforge/builder/network-settings-form.tsx**
+2. **lib/guideforge/supabase-profiles.ts** (NEW, +88 lines)
+   - Added `ensureCurrentUserProfile()` helper - Phase 6 profile bootstrap
+   - Ensures user has a profiles row before guide creation
+   - Gets current authenticated user, checks if profile exists
+   - If not exists, creates profile with display_name from email, bio/handle/role defaults
+   - Returns profile ID for use as guides.author_id FK
+   - Fixes FK constraint error: guides_author_id_fkey violation for new authenticated users
+
+3. **lib/guideforge/supabase-persistence.ts**
+   - Updated `getAuthorId()` method to call `ensureCurrentUserProfile()`
+   - Now returns authenticated user's profile ID instead of raw auth.user.id
+   - Falls back to DEV_PROFILE_ID only if profile bootstrap fails or user not authenticated
+   - Prevents FK violation by ensuring profile row exists before guide insert/update
+
+4. **components/guideforge/builder/network-settings-form.tsx**
    - Added permission check on mount via `getCurrentUserNetworkAuthority`
    - If cannot manage network: shows amber notice, disables all fields, hides save button
    - If can manage: existing behavior unchanged
 
-3. **components/guideforge/builder/network-structure-manager.tsx**
+5. **components/guideforge/builder/network-structure-manager.tsx**
    - Added permission check on mount via `getCurrentUserNetworkAuthority`
    - Wraps entire hub/collection UI in conditional render
    - If cannot manage network: shows amber notice, hides add/edit/delete buttons
    - If can manage: existing behavior unchanged
 
-4. **components/guideforge/builder/network-governance-panel.tsx**
+6. **components/guideforge/builder/network-governance-panel.tsx**
    - Added `canManageMembers` permission loading
    - Wrapped member management UI in conditional
    - If cannot manage members: shows read-only member list, hides add/edit/remove UI
    - If can manage: existing Phase 5 behavior unchanged
    - Applied `shortUUID()` to all member display cards
 
-5. **lib/guideforge/uuid-utils.ts** (NEW)
-   - Created `shortUUID(uuid)` helper
-   - Shortens to format: `4b18022e…eeb4e7` (first 8 + last 6)
+7. **components/guideforge/builder/create-guide-form.tsx**
+   - Added permission check on mount via `getCurrentUserNetworkAuthority`
+   - If cannot submit guides: shows amber notice, disables form
+   - If can submit: existing behavior unchanged
+   - Prevents non-contributor users from seeing guide creation UI
+
+8. **lib/guideforge/uuid-utils.ts** (EXISTING, verified)
+   - `shortUUID(uuid)` helper - shortens to format: `4b18022e…eeb4e7` (first 8 + last 6)
    - Full UUID in title attribute for hover
+   - Applied to member display cards
 
 #### Permission Logic
-- Authority source: `network_members` + `network_role_definitions`
-- No frontend role selection trusted
+- Authority source: `network_members` + `network_role_definitions` (database-backed, no frontend role selection)
 - `canManageNetwork` = owner OR admin OR (can_manage_members = true)
+- `canManageMembers` = role.can_manage_members = true
+- `canSubmitGuides` = role.can_submit_guides = true
+
+#### Author/Profile FK Issue - FIXED
+- **Root Cause**: guides.author_id references profiles(id), but authenticated users had no profile row
+  - Second user login creates auth.users row but no public.profiles row
+  - Guide insert attempted to use auth.user.id directly, violating FK constraint
+  - Error: "23503: insert or update on table guides violates foreign key constraint guides_author_id_fkey"
+- **Solution**: ensureCurrentUserProfile() bootstrap helper
+  - Called during guide save (via getAuthorId)
+  - Checks if profile exists for current user ID
+  - Creates profile if needed (display_name from email, defaults for other fields)
+  - Returns valid profile ID for FK reference
+  - Falls back to DEV_PROFILE_ID only if bootstrap fails
+
+#### UI Gating & Permission Notices
+- Settings form: red/amber permission notice + read-only inputs when user cannot manage
+- Structure manager: amber permission notice + hidden controls when user cannot manage
+- Governance panel: amber permission notice + read-only member list when user cannot manage members
+- Create guide form: amber permission notice + disabled form when user cannot submit guides
+- No breaking of existing routes or public viewing
+
+#### UUID Display Improvements
+- Member cards now show shortened UUIDs: 4b18022e…eeb4e7
+- Full UUID available in title attribute for hover tooltip
+- Applied to governance member list and read-only display
+
+#### Not Changed (Phase 6 UI-only + minimal bootstrap)
+- No RLS policies added
+- No database enforcement
+- No route protection
+- No guide creation blocking at DB level
+- No voting UI
+- No auto-publish
+- No schema changes (only bootstrap helper, no schema migration)
+
+---
 - `canManageMembers` = role.can_manage_members = true
 - `canSubmitGuides` = role.can_submit_guides = true
 

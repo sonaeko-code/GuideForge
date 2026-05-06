@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Sparkles, Loader2 } from "lucide-react"
+import { ArrowLeft, Sparkles, Loader2, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -24,6 +24,8 @@ import {
 import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
 import { createAndSaveGuideDraft } from "@/lib/guideforge/create-and-save-guide-draft"
 import { generateMockResponse } from "@/lib/guideforge/mock-generator"
+import { getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networks"
+import { useAuth } from "@/lib/guideforge/auth-context"
 
 interface CreateGuideFormProps {
   networkId: string
@@ -55,8 +57,29 @@ export function CreateGuideForm({
 }: CreateGuideFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  
+  // Phase 6: Permission gating
+  const [canSubmitGuides, setCanSubmitGuides] = useState(false)
+  const [checkingPermissions, setCheckingPermissions] = useState(true)
+
+  // Check permissions on mount
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (!isAuthenticated) {
+        setCheckingPermissions(false)
+        return
+      }
+      
+      const authority = await getCurrentUserNetworkAuthority(networkId)
+      setCanSubmitGuides(authority.canSubmitGuides)
+      setCheckingPermissions(false)
+    }
+    
+    checkPermissions()
+  }, [networkId, isAuthenticated])
 
   // Check if this is a fresh form load (should start blank)
   const isFresh = searchParams.get("fresh") === "true"
@@ -225,6 +248,19 @@ export function CreateGuideForm({
 
   return (
     <div className="space-y-8">
+      {checkingPermissions ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        </div>
+      ) : !canSubmitGuides ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <Lock className="size-5 text-amber-700 dark:text-amber-300 mt-0.5 flex-shrink-0" aria-hidden="true" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            You need contributor access or higher to create guides in this network.
+          </p>
+        </div>
+      ) : (
+        <>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="hub-select">Hub</FieldLabel>
@@ -440,6 +476,8 @@ export function CreateGuideForm({
         <p className="text-xs text-muted-foreground">
           Enter a title and select a hub and collection to enable creation.
         </p>
+      )}
+        </>
       )}
     </div>
   )
