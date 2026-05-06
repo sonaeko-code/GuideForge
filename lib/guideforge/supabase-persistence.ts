@@ -322,7 +322,20 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
    * Returns { id, source: "supabase" } if save succeeds.
    * Returns { id, source: "localStorage", error } if save fails or Supabase unavailable.
    */
-  async saveDraft(guide: Guide): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> {
+  async saveDraft(guide: Guide): Promise<{
+    id: string
+    source: "supabase" | "localStorage"
+    error?: string
+    // Enhanced debug fields for error diagnosis
+    errorCode?: string
+    errorDetails?: string
+    errorHint?: string
+    guideId?: string
+    collectionId?: string
+    authorId?: string
+    status?: string
+    verificationStatus?: string
+  }> {
     const configured = isSupabaseConfigured()
 
     if (!configured || !supabase) {
@@ -331,7 +344,14 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         : "Supabase env vars missing or invalid"
       console.log("[v0] saveDraft:", reason, "— using localStorage")
       this.localStorageAdapter.saveDraftSync(guide)
-      return { id: guide.id, source: "localStorage", error: reason }
+      return {
+        id: guide.id,
+        source: "localStorage",
+        error: reason,
+        errorCode: "SUPABASE_NOT_CONFIGURED",
+        guideId: guide.id,
+        collectionId: guide.collectionId,
+      }
     }
 
     try {
@@ -351,7 +371,16 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         // Mirror to localStorage so the user does not lose their edits, but
         // surface the error so the UI does not present this as a Supabase save.
         this.localStorageAdapter.saveDraftSync(guide)
-        return { id: guide.id, source: "localStorage", error: reason }
+        return {
+          id: guide.id,
+          source: "localStorage",
+          error: reason,
+          errorCode: "COLLECTION_ID_MISSING",
+          guideId: guide.id,
+          collectionId: guide.collectionId || "",
+          authorId: authorId,
+          status: normalizedStatus,
+        }
       }
 
       // Normalize type, status, and difficulty to Supabase-allowed values
@@ -452,7 +481,19 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           const errorMsg = error ? `${error.code}: ${error.message}` : "Update failed: no row returned"
           console.error("[v0] Supabase guide update FAILED:", errorMsg)
           this.localStorageAdapter.saveDraftSync(guide)
-          return { id: guide.id, source: "localStorage", error: errorMsg }
+          return {
+            id: guide.id,
+            source: "localStorage",
+            error: errorMsg,
+            errorCode: error?.code,
+            errorDetails: error?.message,
+            errorHint: error?.hint,
+            guideId: guide.id,
+            collectionId: normalizedCollectionId,
+            authorId: authorId,
+            status: normalizedStatus,
+            verificationStatus: guide.verification,
+          }
         }
         
         canonicalGuideId = updateData.id
@@ -490,7 +531,18 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
             const errorMsg = retryError ? `${retryError.code}: ${retryError.message}` : "Retry insert (without id) failed: no row returned"
             console.error("[v0] Supabase guide retry insert FAILED:", errorMsg)
             this.localStorageAdapter.saveDraftSync(guide)
-            return { id: guide.id, source: "localStorage", error: errorMsg }
+            return {
+              id: guide.id,
+              source: "localStorage",
+              error: errorMsg,
+              errorCode: retryError?.code,
+              errorDetails: retryError?.message,
+              errorHint: retryError?.hint,
+              guideId: guide.id,
+              collectionId: normalizedCollectionId,
+              authorId: authorId,
+              status: normalizedStatus,
+            }
           }
           
           insertData = retryData
@@ -512,7 +564,18 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
               const errorMsg = retryError ? `${retryError.code}: ${retryError.message}` : "Retry insert failed: no row returned"
               console.error("[v0] Supabase guide retry insert FAILED:", errorMsg)
               this.localStorageAdapter.saveDraftSync(guide)
-              return { id: guide.id, source: "localStorage", error: errorMsg }
+              return {
+                id: guide.id,
+                source: "localStorage",
+                error: errorMsg,
+                errorCode: retryError?.code,
+                errorDetails: retryError?.message,
+                errorHint: retryError?.hint,
+                guideId: guide.id,
+                collectionId: normalizedCollectionId,
+                authorId: authorId,
+                status: normalizedStatus,
+              }
             }
             insertData = retryData
             error = retryError
@@ -520,7 +583,18 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
             const errorMsg = error ? `${error.code}: ${error.message}` : "Insert failed: no row returned"
             console.error("[v0] Supabase guide insert FAILED:", errorMsg)
             this.localStorageAdapter.saveDraftSync(guide)
-            return { id: guide.id, source: "localStorage", error: errorMsg }
+            return {
+              id: guide.id,
+              source: "localStorage",
+              error: errorMsg,
+              errorCode: error?.code,
+              errorDetails: error?.message,
+              errorHint: error?.hint,
+              guideId: guide.id,
+              collectionId: normalizedCollectionId,
+              authorId: authorId,
+              status: normalizedStatus,
+            }
           }
         }
 
@@ -532,7 +606,18 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         const errorMsg = `${guideError.code}: ${guideError.message}${guideError.hint ? ` (${guideError.hint})` : ""}`
         console.error("[v0] Supabase guide save FAILED:", errorMsg)
         this.localStorageAdapter.saveDraftSync(guide)
-        return { id: guide.id, source: "localStorage", error: errorMsg }
+        return {
+          id: guide.id,
+          source: "localStorage",
+          error: errorMsg,
+          errorCode: guideError.code,
+          errorDetails: guideError.message,
+          errorHint: guideError.hint,
+          guideId: guide.id,
+          collectionId: normalizedCollectionId,
+          authorId: authorId,
+          status: normalizedStatus,
+        }
       }
 
       console.log("[v0] Guide save result: success | mode:", saveMode, "| status:", normalizedStatus)
@@ -622,15 +707,37 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       const verification = await verifyGuideInSupabase(canonicalGuideId)
       if (!verification.found) {
         console.error("[v0] saveDraft: Supabase save reported success but verification FAILED:", verification.error)
-        return { id: canonicalGuideId, source: "localStorage", error: verification.error }
+        return {
+          id: canonicalGuideId,
+          source: "localStorage",
+          error: verification.error,
+          errorCode: "VERIFICATION_FAILED",
+          guideId: canonicalGuideId,
+          collectionId: normalizedCollectionId,
+          authorId: authorId,
+          status: normalizedStatus,
+        }
       }
       
       console.log("[v0] saveDraft: Supabase save verified successfully")
-      return { id: canonicalGuideId, source: "supabase" }
+      return {
+        id: canonicalGuideId,
+        source: "supabase",
+        guideId: canonicalGuideId,
+        collectionId: normalizedCollectionId,
+        authorId: authorId,
+        status: normalizedStatus,
+      }
     } catch (error) {
       console.error("[v0] saveDraft: Unexpected error", error)
       this.localStorageAdapter.saveDraftSync(guide)
-      return { id: guide.id, source: "localStorage" }
+      return {
+        id: guide.id,
+        source: "localStorage",
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: "UNEXPECTED_ERROR",
+        guideId: guide.id,
+      }
     }
   }
 
