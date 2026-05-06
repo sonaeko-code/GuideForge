@@ -1,10 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Users, Shield, Check, X, Edit2 } from 'lucide-react'
+import { AlertCircle, Users, Shield, Check, X, Edit2, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuth } from '@/lib/guideforge/auth-context'
 import {
   getRoleDefinitionsForNetwork,
@@ -12,6 +19,9 @@ import {
   getCurrentUserNetworkMembership,
   claimOwnerlessNetwork,
   updateNetworkRoleDisplayNames,
+  addNetworkMember,
+  updateNetworkMemberRole,
+  removeNetworkMember,
 } from '@/lib/guideforge/supabase-networks'
 import type { NetworkRoleDefinition, NetworkMember, Network } from '@/lib/guideforge/types'
 
@@ -21,10 +31,11 @@ interface NetworkGovernancePanelProps {
 }
 
 /**
- * Network Governance Panel - Phase 2, 3, & 4
+ * Network Governance Panel - Phase 2, 3, 4, & 5
  * Phase 2: Read-only display of network roles and members
  * Phase 3: Allow claiming ownerless networks
  * Phase 4: Editable role display names (theme labels)
+ * Phase 5: Basic member management (add/update/remove)
  */
 export function NetworkGovernancePanel({ networkId, network }: NetworkGovernancePanelProps) {
   const { user, isAuthenticated } = useAuth()
@@ -40,6 +51,15 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   const [editedDisplayNames, setEditedDisplayNames] = useState<Record<string, string>>({})
   const [isUpdatingLabels, setIsUpdatingLabels] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Phase 5: Member management
+  const [newMemberId, setNewMemberId] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState('member')
+  const [isAddingMember, setIsAddingMember] = useState(false)
+  const [memberMessage, setMemberMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [updatingMemberRoles, setUpdatingMemberRoles] = useState<Record<string, string>>({})
+  const [isUpdatingMemberRole, setIsUpdatingMemberRole] = useState<Record<string, boolean>>({})
+  const [isRemovingMember, setIsRemovingMember] = useState<Record<string, boolean>>({})
 
   const loadGovernanceData = async () => {
     setIsLoading(true)
@@ -150,6 +170,90 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   // Determine if claim button should show
   // Only show if: authenticated, network is ownerless, current user not already a member
   const canClaim = isAuthenticated && network && !network.ownerUserId && !currentUserRole
+
+  // Governance Phase 5: Member management
+  const handleAddMember = async () => {
+    if (!newMemberId.trim()) {
+      setMemberMessage({ type: 'error', text: 'User ID cannot be empty' })
+      return
+    }
+
+    if (!newMemberRole) {
+      setMemberMessage({ type: 'error', text: 'Role cannot be empty' })
+      return
+    }
+
+    setIsAddingMember(true)
+    setMemberMessage(null)
+
+    try {
+      const result = await addNetworkMember(networkId, newMemberId.trim(), newMemberRole)
+      if (result.success) {
+        setMemberMessage({ type: 'success', text: `Member added successfully!` })
+        setNewMemberId('')
+        setNewMemberRole('member')
+        await loadGovernanceData()
+      } else {
+        setMemberMessage({ type: 'error', text: result.error || 'Failed to add member' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMemberMessage({ type: 'error', text: `Error adding member: ${message}` })
+    } finally {
+      setIsAddingMember(false)
+    }
+  }
+
+  const handleUpdateMemberRole = async (memberId: string, userId: string) => {
+    const newRole = updatingMemberRoles[memberId]
+    if (!newRole) {
+      setMemberMessage({ type: 'error', text: 'Role cannot be empty' })
+      return
+    }
+
+    setIsUpdatingMemberRole((prev) => ({ ...prev, [memberId]: true }))
+    setMemberMessage(null)
+
+    try {
+      const result = await updateNetworkMemberRole(networkId, userId, newRole)
+      if (result.success) {
+        setMemberMessage({ type: 'success', text: 'Member role updated!' })
+        setUpdatingMemberRoles((prev) => {
+          const updated = { ...prev }
+          delete updated[memberId]
+          return updated
+        })
+        await loadGovernanceData()
+      } else {
+        setMemberMessage({ type: 'error', text: result.error || 'Failed to update role' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMemberMessage({ type: 'error', text: `Error updating role: ${message}` })
+    } finally {
+      setIsUpdatingMemberRole((prev) => ({ ...prev, [memberId]: false }))
+    }
+  }
+
+  const handleRemoveMember = async (memberId: string, userId: string) => {
+    setIsRemovingMember((prev) => ({ ...prev, [memberId]: true }))
+    setMemberMessage(null)
+
+    try {
+      const result = await removeNetworkMember(networkId, userId, user?.id)
+      if (result.success) {
+        setMemberMessage({ type: 'success', text: 'Member removed!' })
+        await loadGovernanceData()
+      } else {
+        setMemberMessage({ type: 'error', text: result.error || 'Failed to remove member' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMemberMessage({ type: 'error', text: `Error removing member: ${message}` })
+    } finally {
+      setIsRemovingMember((prev) => ({ ...prev, [memberId]: false }))
+    }
+  }
 
   if (isLoading) {
     return (
@@ -358,29 +462,148 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
           )}
         </div>
 
-        {/* Network Members */}
+        {/* Network Members - Phase 5: Manage Members */}
         <div>
           <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
             <Users className="size-4" aria-hidden="true" />
-            Network Members ({members.length})
+            Manage Members ({members.length})
           </h3>
+
+          {/* Add Member Form */}
+          <div className="p-4 rounded-lg border border-border/50 bg-muted/30 mb-4">
+            <p className="text-xs text-muted-foreground mb-3">Add a new member by user ID</p>
+            <div className="space-y-3">
+              <Input
+                type="text"
+                placeholder="User ID (UUID)"
+                value={newMemberId}
+                onChange={(e) => setNewMemberId(e.target.value)}
+                className="h-8 text-sm"
+              />
+              <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.canonicalRole} value={role.canonicalRole}>
+                      {role.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleAddMember}
+                disabled={isAddingMember || !newMemberId.trim() || !newMemberRole}
+                size="sm"
+                className="w-full h-8 text-xs gap-1"
+              >
+                <Plus className="size-3" aria-hidden="true" />
+                {isAddingMember ? 'Adding...' : 'Add Member'}
+              </Button>
+            </div>
+
+            {memberMessage && (
+              <div
+                className={`mt-3 p-3 rounded text-sm flex items-start gap-2 ${
+                  memberMessage.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-red-500/10 text-red-700 dark:text-red-300'
+                }`}
+              >
+                {memberMessage.type === 'success' ? (
+                  <Check className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                ) : (
+                  <X className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                )}
+                <span>{memberMessage.text}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Members List */}
           {members.length > 0 ? (
-            <div className="space-y-2">
-              {members.map((member) => (
-                <div key={member.id} className="p-3 rounded-lg border border-border/50 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {member.displayName || member.userId}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono break-all">
-                      {member.userId}
-                    </p>
+            <div className="space-y-3">
+              {members.map((member) => {
+                const isEditingRole = updatingMemberRoles[member.id]
+                const newRole = isEditingRole || member.canonicalRole
+                return (
+                  <div
+                    key={member.id}
+                    className="p-3 rounded-lg border border-border/50 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {member.displayName || member.userId}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono break-all">
+                          {member.userId}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Role selector and actions */}
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-xs text-muted-foreground block mb-1">
+                          Role
+                        </label>
+                        <Select
+                          value={isEditingRole ? updatingMemberRoles[member.id] : member.canonicalRole}
+                          onValueChange={(value) =>
+                            setUpdatingMemberRoles((prev) => ({
+                              ...prev,
+                              [member.id]: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role.canonicalRole} value={role.canonicalRole}>
+                                {role.displayName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Save button - only shows if role changed */}
+                      {isEditingRole && updatingMemberRoles[member.id] !== member.canonicalRole && (
+                        <Button
+                          onClick={() => handleUpdateMemberRole(member.id, member.userId)}
+                          disabled={isUpdatingMemberRole[member.id]}
+                          size="sm"
+                          className="h-8 text-xs"
+                        >
+                          {isUpdatingMemberRole[member.id] ? 'Saving...' : 'Save'}
+                        </Button>
+                      )}
+
+                      {/* Remove button */}
+                      <Button
+                        onClick={() => handleRemoveMember(member.id, member.userId)}
+                        disabled={isRemovingMember[member.id] || isAddingMember}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1 text-red-600 dark:text-red-400"
+                      >
+                        {isRemovingMember[member.id] ? (
+                          'Removing...'
+                        ) : (
+                          <>
+                            <Trash2 className="size-3" aria-hidden="true" />
+                            Remove
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded">
-                    {member.canonicalRole}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/20 border border-border/30">

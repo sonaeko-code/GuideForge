@@ -508,6 +508,41 @@ Role label customization in Governance & Roles panel:
 - ✓ No canonical_role changes, no weight changes, no permission changes
 - ✓ No RLS, no route protection, no member editing, no voting
 
+### Governance Phase 5 Status
+
+**Governance Phase 5 added basic member management UI without enforcement.**
+
+Member management in Governance & Roles panel:
+- ✓ addNetworkMember helper (76 lines) - inserts network_members with display_name defaulting to role display name
+  - Prevents duplicate memberships (checks if user already in network)
+  - Validates user ID and role not empty
+  - Does not send email invitations
+- ✓ updateNetworkMemberRole helper (42 lines) - updates canonical_role and display_name only
+  - Fetches role display_name to sync display name with themed labels
+  - Does not update networks.owner_user_id
+  - Does not update auth users
+- ✓ removeNetworkMember helper (54 lines) - deletes network_members row with safety checks
+  - Prevents removal of last owner (counts owners before delete)
+  - Prevents signed-in user removing their own owner membership
+  - Clear error messages for both conditions
+- ✓ NetworkGovernancePanel now displays:
+  - Add Member section with user ID input and role dropdown (uses role definitions)
+  - Members list with:
+    - Member name and user ID
+    - Role dropdown (updates value when changed)
+    - Save Role button (appears only if role changed from current)
+    - Remove button (red warning style with trash icon)
+  - Success/error messages for add/update/remove actions
+  - Automatic data refresh after each action
+- ✓ Safety features:
+  - Cannot add user with empty ID or empty role
+  - Cannot remove last owner from network
+  - Cannot remove yourself as owner (blocks accidental self-removal)
+  - Validation errors shown in red message box below form
+  - Success messages confirm each action
+- ✓ No canonical_role changes, no networks.owner_user_id sync yet
+- ✓ No RLS, no route protection, no enforcement yet, no voting
+
 ---
 
 ## Risk Notes
