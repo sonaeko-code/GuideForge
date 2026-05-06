@@ -60,6 +60,21 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
     )
   }
 
+  // If summary has an error (e.g., missing collection/hub context), show it but still render panel
+  if (summary.error) {
+    return (
+      <div className="p-4 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <h3 className="text-sm font-medium text-amber-900 dark:text-amber-100">Review Status Unavailable</h3>
+            <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">{summary.error}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const canVote = summary.canCurrentUserVote && guideStatus === 'ready'
 
   return (
