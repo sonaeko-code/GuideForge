@@ -1,6 +1,8 @@
 # Network Ownership & Authority Contract
 
 > **Phase 2 Status:** Schema migration prepared and ready for manual deployment. See [Phase 2 SQL Migration](#phase-2-sql-migration) below.
+>
+> **Related Documentation:** See [Platform Authority](./platform-authority.md) for information about platform-level vs network-level roles.
 
 ## Purpose
 

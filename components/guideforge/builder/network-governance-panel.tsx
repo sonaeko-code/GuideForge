@@ -574,21 +574,33 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
               {members.length > 0 ? (
                 <div className="space-y-3">
                   {members.map((member) => {
-                    // Phase 7: Get member's profile display name
+                    // Phase 7B: Polish member card display
                     const memberProfile = memberProfiles.get(member.userId)
-                    const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName || member.userId
+                    const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName
+                    const handle = memberProfile?.handle
                     const shortUuid = member.userId.substring(0, 8) + '…' + member.userId.substring(member.userId.length - 6)
+                    
+                    // Only show UUID if no display name and no handle exist
+                    const showUuid = !displayName && !handle
                     
                     return (
                       <div key={member.id} className="p-3 rounded-lg border border-border/50">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground">
-                              {displayName}
-                            </p>
-                            <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
-                              {shortUuid}
-                            </p>
+                            {displayName ? (
+                              <>
+                                <p className="text-sm font-medium text-foreground">
+                                  {displayName}
+                                </p>
+                                {handle && handle !== displayName && (
+                                  <p className="text-xs text-muted-foreground">@{handle}</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm font-medium text-foreground font-mono" title={member.userId}>
+                                {shortUuid}
+                              </p>
+                            )}
                           </div>
                           <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded flex-shrink-0">
                             {member.displayName || member.canonicalRole}
@@ -621,23 +633,22 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
                   className="h-8 text-sm"
                 />
                 
-                {/* Search results dropdown */}
+                {/* Search results dropdown - Phase 7B: Polish display */}
                 {memberSearchResults.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/50 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                     {memberSearchResults.map((result) => {
                       const displayText = result.displayName || result.handle || result.userId.substring(0, 12)
-                      const shortUuid = result.userId.substring(0, 8) + '…' + result.userId.substring(result.userId.length - 6)
                       return (
                         <button
                           key={result.userId}
                           onClick={() => handleSelectProfile(result)}
                           className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b border-border/30 last:border-b-0 text-sm transition-colors"
+                          title={result.userId}
                         >
                           <div className="font-medium text-foreground">{displayText}</div>
                           {result.handle && result.displayName && (
                             <div className="text-xs text-muted-foreground">@{result.handle}</div>
                           )}
-                          <div className="text-xs text-muted-foreground font-mono">{shortUuid}</div>
                         </button>
                       )
                     })}
@@ -743,10 +754,14 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
           {members.length > 0 ? (
             <div className="space-y-3">
               {members.map((member) => {
-                // Phase 7: Get member's profile display name
+                // Phase 7B: Polish member card display
                 const memberProfile = memberProfiles.get(member.userId)
-                const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName || member.userId
+                const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName
+                const handle = memberProfile?.handle
                 const shortUuid = member.userId.substring(0, 8) + '…' + member.userId.substring(member.userId.length - 6)
+                
+                // Only show UUID if no display name and no handle exist
+                const showUuid = !displayName && !handle
                 const isEditingRole = updatingMemberRoles[member.id]
                 const newRole = isEditingRole || member.canonicalRole
                 
@@ -757,12 +772,20 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">
-                          {displayName}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
-                          {shortUuid}
-                        </p>
+                        {displayName ? (
+                          <>
+                            <p className="text-sm font-medium text-foreground">
+                              {displayName}
+                            </p>
+                            {handle && handle !== displayName && (
+                              <p className="text-xs text-muted-foreground">@{handle}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium text-foreground font-mono" title={member.userId}>
+                            {shortUuid}
+                          </p>
+                        )}
                       </div>
                     </div>
 
