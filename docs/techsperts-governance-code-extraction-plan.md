@@ -420,19 +420,6 @@ This schema provides the foundation for phases 3-5 (data, voting, UI) without bl
 - `/builder/networks` still loads all networks
 - No 401 errors, no permission denied
 
-### Phase 1 Status
-
-**Phase 1 schema deployed.** 
-
-SQL migration created at `docs/sql/guideforge_governance_schema_phase_1.sql` and manually deployed to Supabase:
-- ✓ 4 foundation tables created (network_role_definitions, network_members, guide_review_votes, guide_publish_audit)
-- ✓ Default roles seeded for each network (owner, admin, reviewer, contributor, member, viewer)
-- ✓ Owner memberships backfilled from `networks.owner_user_id`
-- ✓ No RLS, no triggers, no enforcement
-- ✓ Tables live in Supabase with data
-
----
-
 ### Phase 2 Status
 
 **Phase 2 read-only visibility implemented.**
@@ -447,6 +434,38 @@ Governance visibility added to Network Settings page:
 - ✓ Panel appears on `/builder/network/[id]/settings` between form and structure manager
 - ✓ No RLS, no route protection, no editing, no voting, no enforcement
 - ✓ All existing settings save functionality unchanged
+
+### Phase 3 Status
+
+**Phase 3 claim ownerless network implemented.**
+
+Governance ownership claiming added:
+- ✓ claimOwnerlessNetwork helper (60 lines) - atomic two-step update
+- ✓ Claim Network button on governance panel
+- ✓ Success/error messages with state management
+- ✓ Auto-refreshes governance data on claim success
+- ✓ networks.owner_user_id updated + network_members owner row created
+- ✓ Button only shows for authenticated users on ownerless networks
+- ✓ No RLS, no enforcement, no member edits, no voting
+
+### Account Phase 2 Status
+
+**Account Phase 2 added read-only network membership visibility.**
+
+Network memberships visibility on Account page:
+- ✓ getNetworkMembershipsForUser helper (104 lines) - loads memberships with role definitions
+- ✓ Handles missing role definitions gracefully (no crash, fallback values)
+- ✓ NetworkMembership type added to types.ts
+- ✓ Account page now shows:
+  - Owned Networks section (unchanged from Phase 1)
+  - Network Memberships section (new in Phase 2) with:
+    - Network name and slug
+    - Role display name and canonical role
+    - Review weight badge
+    - Permission chips (Submit Guides, Vote Reviews, Manage Members, Publish Override)
+    - Dashboard and Settings links for each membership
+  - Empty state: "No network memberships yet."
+- ✓ No RLS, no route protection, no member editing, no invites, no voting
 
 ---
 

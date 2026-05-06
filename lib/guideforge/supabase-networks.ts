@@ -15,7 +15,7 @@
  * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
-import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember } from "./types"
+import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
 
@@ -1411,5 +1411,109 @@ export async function claimOwnerlessNetwork(
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Exception claiming network:", message)
     return { success: false, error: `Exception claiming network: ${message}` }
+  }
+}
+
+/**
+ * Get all network memberships for a user
+ * Returns memberships with network and role definition info
+ * Account Phase 2: Read-only visibility, no RLS enforcement
+ */
+export async function getNetworkMembershipsForUser(userId: string): Promise<NetworkMembership[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    // Query: network_members -> networks -> network_role_definitions
+    const { data: memberData, error: memberError } = await supabase
+      .from("network_members")
+      .select(
+        `
+        id,
+        network_id,
+        user_id,
+        canonical_role,
+        display_name,
+        created_at,
+        updated_at,
+        networks(
+          id,
+          name,
+          slug
+        )
+        `
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+
+    if (memberError) {
+      console.warn("[v0] Error loading network memberships:", memberError.message)
+      return []
+    }
+
+    if (!memberData || memberData.length === 0) {
+      console.log("[v0] User has no network memberships")
+      return []
+    }
+
+    // For each membership, fetch the role definition
+    const membershipsWithRoles = await Promise.all(
+      memberData.map(async (member: any) => {
+        const { data: roleData, error: roleError } = await supabase
+          .from("network_role_definitions")
+          .select("*")
+          .eq("network_id", member.network_id)
+          .eq("canonical_role", member.canonical_role)
+          .single()
+
+        if (roleError) {
+          console.warn(
+            `[v0] Error loading role definition for ${member.canonical_role} in network ${member.network_id}:`,
+            roleError.message
+          )
+          // Return membership even if role definition missing, with defaults
+          return {
+            networkId: member.network_id,
+            networkName: member.networks?.name || "Unknown Network",
+            networkSlug: member.networks?.slug || "",
+            userId: member.user_id,
+            canonicalRole: member.canonical_role,
+            memberDisplayName: member.display_name,
+            roleDisplayName: member.canonical_role, // Fallback to canonical name
+            reviewWeight: 0,
+            canSubmitGuides: false,
+            canVoteOnReviews: false,
+            canManageMembers: false,
+            canPublishOverride: false,
+            createdAt: member.created_at,
+            updatedAt: member.updated_at,
+          }
+        }
+
+        return {
+          networkId: member.network_id,
+          networkName: member.networks?.name || "Unknown Network",
+          networkSlug: member.networks?.slug || "",
+          userId: member.user_id,
+          canonicalRole: member.canonical_role,
+          memberDisplayName: member.display_name,
+          roleDisplayName: roleData?.display_name || member.canonical_role,
+          reviewWeight: roleData?.review_weight || 0,
+          canSubmitGuides: roleData?.can_submit_guides || false,
+          canVoteOnReviews: roleData?.can_vote_on_reviews || false,
+          canManageMembers: roleData?.can_manage_members || false,
+          canPublishOverride: roleData?.can_publish_override || false,
+          createdAt: member.created_at,
+          updatedAt: member.updated_at,
+        }
+      })
+    )
+
+    console.log("[v0] Loaded network memberships for user:", membershipsWithRoles.length)
+    return membershipsWithRoles
+  } catch (err) {
+    console.warn("[v0] Exception loading network memberships:", err)
+    return []
   }
 }

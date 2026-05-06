@@ -126,6 +126,27 @@ export interface NetworkMember {
   updatedAt: string
 }
 
+/**
+ * Network membership with expanded role and network info
+ * Used for Account page display
+ */
+export interface NetworkMembership {
+  networkId: string
+  networkName: string
+  networkSlug: string
+  userId: string
+  canonicalRole: CanonicalRole
+  memberDisplayName?: string
+  roleDisplayName: string
+  reviewWeight: number
+  canSubmitGuides: boolean
+  canVoteOnReviews: boolean
+  canManageMembers: boolean
+  canPublishOverride: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 // ---------- Forge Rules ----------
 
 export type ForgeRuleCategory =
