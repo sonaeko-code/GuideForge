@@ -66,6 +66,9 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   // Phase 6: Permission gating
   const [canManageMembers, setCanManageMembers] = useState(false)
 
+  // Phase 7: Member profile display
+  const [memberProfiles, setMemberProfiles] = useState<Map<string, any>>(new Map())
+
   const loadGovernanceData = async () => {
     setIsLoading(true)
     const [roleData, memberData, userMembership, authority] = await Promise.all([
@@ -80,6 +83,20 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
     if (authority) {
       setCanManageMembers(authority.canManageMembers)
     }
+
+    // Phase 7: Fetch member profile data for display names
+    if (memberData && memberData.length > 0) {
+      try {
+        const { getUserProfiles } = await import('@/lib/guideforge/supabase-profiles')
+        const userIds = memberData.map(m => m.userId)
+        const profiles = await getUserProfiles(userIds)
+        setMemberProfiles(profiles)
+        console.log('[v0] NetworkGovernancePanel: Fetched profiles for', profiles.size, 'members')
+      } catch (err) {
+        console.warn('[v0] NetworkGovernancePanel: Error fetching member profiles:', err instanceof Error ? err.message : String(err))
+      }
+    }
+
     setIsLoading(false)
   }
 
@@ -489,23 +506,30 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
 
               {members.length > 0 ? (
                 <div className="space-y-3">
-                  {members.map((member) => (
-                    <div key={member.id} className="p-3 rounded-lg border border-border/50">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">
-                            {member.displayName || member.userId}
-                          </p>
-                          <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
-                            {shortUUID(member.userId)}
-                          </p>
-                        </div>
-                        <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded flex-shrink-0">
-                          {member.displayName || member.canonicalRole}
+                  {members.map((member) => {
+                    // Phase 7: Get member's profile display name
+                    const memberProfile = memberProfiles.get(member.userId)
+                    const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName || member.userId
+                    const shortUuid = member.userId.substring(0, 8) + '…' + member.userId.substring(member.userId.length - 6)
+                    
+                    return (
+                      <div key={member.id} className="p-3 rounded-lg border border-border/50">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground">
+                              {displayName}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
+                              {shortUuid}
+                            </p>
+                          </div>
+                          <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded flex-shrink-0">
+                            {member.displayName || member.canonicalRole}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/20 border border-border/30">
@@ -571,8 +595,13 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
           {members.length > 0 ? (
             <div className="space-y-3">
               {members.map((member) => {
+                // Phase 7: Get member's profile display name
+                const memberProfile = memberProfiles.get(member.userId)
+                const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName || member.userId
+                const shortUuid = member.userId.substring(0, 8) + '…' + member.userId.substring(member.userId.length - 6)
                 const isEditingRole = updatingMemberRoles[member.id]
                 const newRole = isEditingRole || member.canonicalRole
+                
                 return (
                   <div
                     key={member.id}
@@ -581,10 +610,10 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground">
-                          {member.displayName || member.userId}
+                          {displayName}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
-                          {shortUUID(member.userId)}
+                          {shortUuid}
                         </p>
                       </div>
                     </div>

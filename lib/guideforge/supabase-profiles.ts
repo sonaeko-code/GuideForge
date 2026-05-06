@@ -106,3 +106,145 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
     return null
   }
 }
+
+/**
+ * Get the current authenticated user's profile from the profiles table
+ * Returns the full profile object including display_name, handle, avatar, bio, role
+ * Phase 3: Account/Profile - Display current user's profile information
+ * 
+ * Returns null if user not authenticated, profile not found, or error occurs
+ */
+export async function getCurrentUserProfile(): Promise<{
+  id: string
+  display_name?: string
+  handle?: string
+  avatar_url?: string
+  bio?: string
+  role?: string
+  created_at?: string
+  updated_at?: string
+} | null> {
+  if (!isSupabaseConfigured() || !supabase) {
+    console.log('[v0] getCurrentUserProfile: Supabase not configured')
+    return null
+  }
+
+  try {
+    const session = await getSupabaseSession()
+    const userId = session?.user?.id
+
+    if (!userId) {
+      console.log('[v0] getCurrentUserProfile: User not authenticated')
+      return null
+    }
+
+    console.log('[v0] getCurrentUserProfile: Fetching profile for user:', userId)
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, handle, avatar_url, bio, role, created_at, updated_at')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[v0] getCurrentUserProfile: Error fetching profile:', {
+        message: error.message,
+        code: error.code,
+      })
+      return null
+    }
+
+    if (!profile) {
+      console.warn('[v0] getCurrentUserProfile: Profile not found for user:', userId)
+      return null
+    }
+
+    console.log('[v0] getCurrentUserProfile: Profile fetched successfully:', {
+      id: profile.id,
+      display_name: profile.display_name,
+      handle: profile.handle,
+    })
+
+    return profile
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[v0] getCurrentUserProfile: Exception:', message)
+    return null
+  }
+}
+
+/**
+ * Get profile information for a specific user by ID
+ * Phase 7: Governance - Display member profile names in member management UI
+ * 
+ * Returns null if profile not found or error occurs
+ */
+export async function getUserProfile(userId: string): Promise<{
+  id: string
+  display_name?: string
+  handle?: string
+  avatar_url?: string
+  bio?: string
+  role?: string
+  created_at?: string
+  updated_at?: string
+} | null> {
+  if (!isSupabaseConfigured() || !supabase || !userId) {
+    return null
+  }
+
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, handle, avatar_url, bio, role, created_at, updated_at')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) {
+      console.warn('[v0] getUserProfile: Error fetching profile for user:', userId, error.message)
+      return null
+    }
+
+    return profile
+  } catch (err) {
+    console.warn('[v0] getUserProfile: Exception fetching profile for user:', userId, err instanceof Error ? err.message : String(err))
+    return null
+  }
+}
+
+/**
+ * Batch fetch profiles for multiple user IDs
+ * Phase 7: Governance - Efficiently fetch all member profile names for member list display
+ * 
+ * Returns a map of userId -> profile, with null values for users not found
+ */
+export async function getUserProfiles(userIds: string[]): Promise<Map<string, any>> {
+  if (!isSupabaseConfigured() || !supabase || userIds.length === 0) {
+    return new Map()
+  }
+
+  const profileMap = new Map()
+
+  try {
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, handle, avatar_url, bio, role, created_at, updated_at')
+      .in('id', userIds)
+
+    if (error) {
+      console.warn('[v0] getUserProfiles: Error fetching profiles:', error.message)
+      return profileMap
+    }
+
+    if (profiles) {
+      profiles.forEach((profile) => {
+        profileMap.set(profile.id, profile)
+      })
+    }
+
+    return profileMap
+  } catch (err) {
+    console.warn('[v0] getUserProfiles: Exception fetching profiles:', err instanceof Error ? err.message : String(err))
+    return profileMap
+  }
+}

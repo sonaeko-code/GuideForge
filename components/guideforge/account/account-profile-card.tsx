@@ -21,9 +21,11 @@ export function AccountProfileCard() {
   const [memberships, setMemberships] = useState<NetworkMembership[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [profileBootstrapError, setProfileBootstrapError] = useState<string | null>(null)
+  const [userProfile, setUserProfile] = useState<any | null>(null)
 
   // Load networks to show owned networks list, and memberships for all networks
   // Phase 6: Also bootstrap profile on account page load
+  // Phase 3: Fetch current user's profile information
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
@@ -33,10 +35,17 @@ export function AccountProfileCard() {
       if (isAuthenticated && user?.id) {
         try {
           console.log('[v0] AccountProfileCard: Starting profile bootstrap for user:', user.id)
-          const { ensureCurrentUserProfile } = await import('@/lib/guideforge/supabase-profiles')
+          const { ensureCurrentUserProfile, getCurrentUserProfile } = await import('@/lib/guideforge/supabase-profiles')
           const profileId = await ensureCurrentUserProfile()
           if (profileId) {
             console.log('[v0] AccountProfileCard: Profile bootstrap successful, profileId:', profileId)
+            
+            // Phase 3: Fetch the user's full profile information
+            const profile = await getCurrentUserProfile()
+            if (profile) {
+              console.log('[v0] AccountProfileCard: User profile fetched:', profile.display_name || profile.handle)
+              setUserProfile(profile)
+            }
           } else {
             const errorMsg = 'Profile bootstrap returned null - check browser console for details'
             console.warn('[v0] AccountProfileCard: Profile bootstrap failed:', errorMsg)
@@ -96,11 +105,22 @@ export function AccountProfileCard() {
               <User className="size-4" aria-hidden="true" />
               Display Name
             </label>
-            <p className="text-foreground">{user.displayName || 'Not set'}</p>
-            {!user.displayName && (
+            <p className="text-foreground">{userProfile?.display_name || user?.displayName || 'Not set'}</p>
+            {!userProfile?.display_name && !user?.displayName && (
               <p className="text-xs text-muted-foreground mt-1">Using email as display name</p>
             )}
           </div>
+
+          {/* Handle */}
+          {userProfile?.handle && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+                <User className="size-4" aria-hidden="true" />
+                Handle
+              </label>
+              <p className="text-foreground">@{userProfile.handle}</p>
+            </div>
+          )}
 
           {/* Email */}
           <div>
@@ -108,8 +128,18 @@ export function AccountProfileCard() {
               <Mail className="size-4" aria-hidden="true" />
               Email Address
             </label>
-            <p className="text-foreground">{user.email}</p>
+            <p className="text-foreground">{user?.email}</p>
           </div>
+
+          {/* Bio */}
+          {userProfile?.bio && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+                Bio
+              </label>
+              <p className="text-foreground text-sm">{userProfile.bio}</p>
+            </div>
+          )}
 
           {/* User ID */}
           <div>
@@ -117,7 +147,7 @@ export function AccountProfileCard() {
               <Lock className="size-4" aria-hidden="true" />
               User ID
             </label>
-            <p className="text-foreground font-mono text-xs break-all">{user.id}</p>
+            <p className="text-foreground font-mono text-xs break-all">{user?.id}</p>
           </div>
 
           {/* Auth Status */}
