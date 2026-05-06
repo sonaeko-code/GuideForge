@@ -3,6 +3,7 @@ import { Plus, ArrowLeft, AlertCircle, Settings } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
+import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
 import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
 import {
@@ -53,23 +54,28 @@ export default async function NetworkDashboardPage({
       <main className="min-h-screen bg-background">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
-            <div className="flex gap-2">
-              <Button asChild variant="outline">
-                <Link href={`/builder/network/${networkId}/settings`}>
-                  <Settings className="size-4 mr-1" aria-hidden="true" />
-                  Settings
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href={`/builder/network/${networkId}/generate`}>
-                  <Plus className="size-4 mr-1" aria-hidden="true" />
-                  Generate Guide
-                </Link>
-              </Button>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
+              <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
             </div>
           </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/builder/network/${networkId}/settings`}>
+                <Settings className="size-4 mr-1" aria-hidden="true" />
+                Settings
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/builder/network/${networkId}/generate`}>
+                <Plus className="size-4 mr-1" aria-hidden="true" />
+                Generate Guide
+              </Link>
+            </Button>
+          </div>
+        </div>
 
           {/* GuideForge Data Spine Contract - Dashboard Guide Loading
              The dashboard loads guides directly from Supabase filtered by collection IDs.

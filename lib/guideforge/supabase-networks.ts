@@ -15,7 +15,7 @@
  * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
-import type { Network, Hub, Collection, NetworkDraft } from "./types"
+import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
 
@@ -1209,5 +1209,311 @@ export async function loadNetworkBuilderContext(
     collectionsByHub,
     errors,
     source,
+  }
+}
+
+// ========== GOVERNANCE (Phase 2+) ==========
+
+/**
+ * Get role definitions for a network
+ * Returns all canonical roles defined for this network
+ * Reads only, no RLS enforcement
+ */
+export async function getRoleDefinitionsForNetwork(
+  networkId: string
+): Promise<NetworkRoleDefinition[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("network_role_definitions")
+      .select("*")
+      .eq("network_id", networkId)
+      .eq("is_active", true)
+      .order("review_weight", { ascending: false })
+
+    if (error) {
+      console.warn("[v0] Error loading role definitions:", error.message)
+      return []
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      networkId: row.network_id,
+      canonicalRole: row.canonical_role,
+      displayName: row.display_name,
+      reviewWeight: row.review_weight,
+      canSubmitGuides: row.can_submit_guides,
+      canVoteOnReviews: row.can_vote_on_reviews,
+      canManageMembers: row.can_manage_members,
+      canPublishOverride: row.can_publish_override,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    console.warn("[v0] Exception loading role definitions:", err)
+    return []
+  }
+}
+
+/**
+ * Get network members for a network
+ * Returns all member assignments for this network
+ * Reads only, no RLS enforcement
+ */
+export async function getNetworkMembersForNetwork(
+  networkId: string
+): Promise<NetworkMember[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("network_members")
+      .select("*")
+      .eq("network_id", networkId)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      console.warn("[v0] Error loading network members:", error.message)
+      return []
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      networkId: row.network_id,
+      userId: row.user_id,
+      canonicalRole: row.canonical_role,
+      displayName: row.display_name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    console.warn("[v0] Exception loading network members:", err)
+    return []
+  }
+}
+
+/**
+ * Get current user's network membership
+ * Returns user's role in this network, or null if not a member
+ * Reads only, no RLS enforcement
+ */
+export async function getCurrentUserNetworkMembership(
+  networkId: string
+): Promise<NetworkMember | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  try {
+    const session = await getSupabaseSession()
+    const userId = session?.user?.id
+    if (!userId) {
+      return null
+    }
+
+    const { data, error } = await supabase
+      .from("network_members")
+      .select("*")
+      .eq("network_id", networkId)
+      .eq("user_id", userId)
+      .single()
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        // Not a member (single() returned no rows)
+        return null
+      }
+      console.warn("[v0] Error loading user network membership:", error.message)
+      return null
+    }
+
+    if (!data) return null
+
+    return {
+      id: data.id,
+      networkId: data.network_id,
+      userId: data.user_id,
+      canonicalRole: data.canonical_role,
+      displayName: data.display_name,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    }
+  } catch (err) {
+    console.warn("[v0] Exception loading user network membership:", err)
+    return null
+  }
+}
+
+/**
+ * Claim an ownerless network as the current user
+ * Returns error if network already has an owner
+ * Governance Phase 3: Non-blocking, no RLS, no enforcement
+ */
+export async function claimOwnerlessNetwork(
+  networkId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    // Step 1: Update networks.owner_user_id only where it's currently NULL
+    const { data: updateData, error: updateError } = await supabase
+      .from("networks")
+      .update({ owner_user_id: userId })
+      .eq("id", networkId)
+      .is("owner_user_id", null)
+      .select()
+
+    if (updateError) {
+      console.error("[v0] Error updating network owner:", updateError.message)
+      return { success: false, error: `Failed to claim network: ${updateError.message}` }
+    }
+
+    // If update affected 0 rows, network already has an owner
+    if (!updateData || updateData.length === 0) {
+      console.warn("[v0] Network already owned, claim failed")
+      return { success: false, error: "Network is already owned." }
+    }
+
+    console.log("[v0] Network owner updated to:", userId)
+
+    // Step 2: Insert network_members row with owner role
+    const { data: memberData, error: memberError } = await supabase
+      .from("network_members")
+      .insert([
+        {
+          network_id: networkId,
+          user_id: userId,
+          canonical_role: "owner",
+          display_name: "Owner",
+        },
+      ])
+      .select()
+      .single()
+
+    if (memberError) {
+      console.error("[v0] Error creating network member:", memberError.message)
+      // Don't fail completely—owner was set, just warn about member row
+      return { success: true, error: `Network claimed but member row creation failed: ${memberError.message}` }
+    }
+
+    console.log("[v0] Network member row created for owner:", memberData?.id)
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception claiming network:", message)
+    return { success: false, error: `Exception claiming network: ${message}` }
+  }
+}
+
+/**
+ * Get all network memberships for a user
+ * Returns memberships with network and role definition info
+ * Account Phase 2: Read-only visibility, no RLS enforcement
+ */
+export async function getNetworkMembershipsForUser(userId: string): Promise<NetworkMembership[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    // Query: network_members -> networks -> network_role_definitions
+    const { data: memberData, error: memberError } = await supabase
+      .from("network_members")
+      .select(
+        `
+        id,
+        network_id,
+        user_id,
+        canonical_role,
+        display_name,
+        created_at,
+        updated_at,
+        networks(
+          id,
+          name,
+          slug
+        )
+        `
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+
+    if (memberError) {
+      console.warn("[v0] Error loading network memberships:", memberError.message)
+      return []
+    }
+
+    if (!memberData || memberData.length === 0) {
+      console.log("[v0] User has no network memberships")
+      return []
+    }
+
+    // For each membership, fetch the role definition
+    const membershipsWithRoles = await Promise.all(
+      memberData.map(async (member: any) => {
+        const { data: roleData, error: roleError } = await supabase
+          .from("network_role_definitions")
+          .select("*")
+          .eq("network_id", member.network_id)
+          .eq("canonical_role", member.canonical_role)
+          .single()
+
+        if (roleError) {
+          console.warn(
+            `[v0] Error loading role definition for ${member.canonical_role} in network ${member.network_id}:`,
+            roleError.message
+          )
+          // Return membership even if role definition missing, with defaults
+          return {
+            networkId: member.network_id,
+            networkName: member.networks?.name || "Unknown Network",
+            networkSlug: member.networks?.slug || "",
+            userId: member.user_id,
+            canonicalRole: member.canonical_role,
+            memberDisplayName: member.display_name,
+            roleDisplayName: member.canonical_role, // Fallback to canonical name
+            reviewWeight: 0,
+            canSubmitGuides: false,
+            canVoteOnReviews: false,
+            canManageMembers: false,
+            canPublishOverride: false,
+            createdAt: member.created_at,
+            updatedAt: member.updated_at,
+          }
+        }
+
+        return {
+          networkId: member.network_id,
+          networkName: member.networks?.name || "Unknown Network",
+          networkSlug: member.networks?.slug || "",
+          userId: member.user_id,
+          canonicalRole: member.canonical_role,
+          memberDisplayName: member.display_name,
+          roleDisplayName: roleData?.display_name || member.canonical_role,
+          reviewWeight: roleData?.review_weight || 0,
+          canSubmitGuides: roleData?.can_submit_guides || false,
+          canVoteOnReviews: roleData?.can_vote_on_reviews || false,
+          canManageMembers: roleData?.can_manage_members || false,
+          canPublishOverride: roleData?.can_publish_override || false,
+          createdAt: member.created_at,
+          updatedAt: member.updated_at,
+        }
+      })
+    )
+
+    console.log("[v0] Loaded network memberships for user:", membershipsWithRoles.length)
+    return membershipsWithRoles
+  } catch (err) {
+    console.warn("[v0] Exception loading network memberships:", err)
+    return []
   }
 }

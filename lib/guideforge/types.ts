@@ -87,6 +87,66 @@ export type ThemeDirection =
 
 export type Visibility = "public" | "private" | "unlisted"
 
+// ---------- Governance (Phase 2+) ----------
+
+/**
+ * Canonical roles used across network governance.
+ * Each network can customize display_name (e.g., "Owner" → "Guildmaster").
+ */
+export type CanonicalRole =
+  | "owner"
+  | "admin"
+  | "reviewer"
+  | "contributor"
+  | "member"
+  | "viewer"
+
+export interface NetworkRoleDefinition {
+  id: string
+  networkId: string
+  canonicalRole: CanonicalRole
+  displayName: string
+  reviewWeight: number
+  canSubmitGuides: boolean
+  canVoteOnReviews: boolean
+  canManageMembers: boolean
+  canPublishOverride: boolean
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface NetworkMember {
+  id: string
+  networkId: string
+  userId: string
+  canonicalRole: CanonicalRole
+  displayName?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Network membership with expanded role and network info
+ * Used for Account page display
+ */
+export interface NetworkMembership {
+  networkId: string
+  networkName: string
+  networkSlug: string
+  userId: string
+  canonicalRole: CanonicalRole
+  memberDisplayName?: string
+  roleDisplayName: string
+  reviewWeight: number
+  canSubmitGuides: boolean
+  canVoteOnReviews: boolean
+  canManageMembers: boolean
+  canPublishOverride: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 // ---------- Forge Rules ----------
 
 export type ForgeRuleCategory =

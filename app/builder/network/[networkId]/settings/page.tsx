@@ -2,6 +2,8 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
+import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
+import { NetworkGovernancePanel } from "@/components/guideforge/builder/network-governance-panel"
 import { NetworkSettingsForm } from "@/components/guideforge/builder/network-settings-form"
 import { NetworkStructureManager } from "@/components/guideforge/builder/network-structure-manager"
 import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
@@ -29,12 +31,16 @@ export default async function NetworkSettingsPage({
           </Button>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">{network.name} Settings</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold tracking-tight">{network.name} Settings</h1>
+              <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
+            </div>
             <p className="text-muted-foreground mt-2">Edit network information and structure</p>
           </div>
 
           <div className="space-y-8">
             <NetworkSettingsForm network={network} networkId={networkId} />
+            <NetworkGovernancePanel networkId={networkId} network={network} />
             <NetworkStructureManager network={network} networkId={networkId} />
           </div>
         </div>
