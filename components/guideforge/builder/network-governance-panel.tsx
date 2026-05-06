@@ -63,6 +63,23 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   const [isUpdatingMemberRole, setIsUpdatingMemberRole] = useState<Record<string, boolean>>({})
   const [isRemovingMember, setIsRemovingMember] = useState<Record<string, boolean>>({})
 
+  // Phase 7: Member lookup by profile display name/handle
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [memberSearchResults, setMemberSearchResults] = useState<Array<{
+    userId: string
+    displayName: string | null
+    handle: string | null
+    avatarUrl: string | null
+    role: string | null
+  }>>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState<{
+    userId: string
+    displayName: string | null
+    handle: string | null
+  } | null>(null)
+  const [showAdvancedUUID, setShowAdvancedUUID] = useState(false)
+
   // Phase 6: Permission gating
   const [canManageMembers, setCanManageMembers] = useState(false)
 
@@ -198,9 +215,57 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   const canClaim = isAuthenticated && network && !network.ownerUserId && !currentUserRole
 
   // Governance Phase 5: Member management
+  const handleSearchMembers = async (query: string) => {
+    setMemberSearchQuery(query)
+    
+    if (query.trim().length < 2) {
+      setMemberSearchResults([])
+      return
+    }
+    
+    setIsSearching(true)
+    try {
+      const { searchProfilesForMemberLookup } = await import('@/lib/guideforge/supabase-profiles')
+      const results = await searchProfilesForMemberLookup(query)
+      setMemberSearchResults(results)
+    } catch (err) {
+      console.error('[v0] handleSearchMembers: Error searching profiles:', err)
+      setMemberSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleSelectProfile = (profile: {
+    userId: string
+    displayName: string | null
+    handle: string | null
+  }) => {
+    // Check if user is already a member
+    const isDuplicate = members.some((m) => m.userId === profile.userId)
+    if (isDuplicate) {
+      setMemberMessage({ type: 'error', text: 'This user is already a member of this network.' })
+      return
+    }
+    
+    // Check if user is the current owner (prevent duplicate owner membership)
+    if (network?.ownerUserId === profile.userId) {
+      setMemberMessage({ type: 'error', text: 'This user is already the network owner.' })
+      return
+    }
+    
+    setSelectedProfile(profile)
+    setMemberSearchResults([])
+    setMemberSearchQuery('')
+    setMemberMessage(null)
+  }
+
   const handleAddMember = async () => {
-    if (!newMemberId.trim()) {
-      setMemberMessage({ type: 'error', text: 'User ID cannot be empty' })
+    // Determine which ID to use (search result or UUID fallback)
+    const userIdToAdd = selectedProfile?.userId || newMemberId.trim()
+    
+    if (!userIdToAdd) {
+      setMemberMessage({ type: 'error', text: 'Please select a user or enter a User ID' })
       return
     }
 
@@ -213,11 +278,13 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
     setMemberMessage(null)
 
     try {
-      const result = await addNetworkMember(networkId, newMemberId.trim(), newMemberRole)
+      const result = await addNetworkMember(networkId, userIdToAdd, newMemberRole)
       if (result.success) {
         setMemberMessage({ type: 'success', text: `Member added successfully!` })
         setNewMemberId('')
         setNewMemberRole('member')
+        setSelectedProfile(null)
+        setMemberSearchQuery('')
         await loadGovernanceData()
       } else {
         setMemberMessage({ type: 'error', text: result.error || 'Failed to add member' })
@@ -539,17 +606,66 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
             </>
           ) : (
             <>
-          {/* Add Member Form */}
+          {/* Add Member Form - Phase 7: Member search by profile display name/handle */}
           <div className="p-4 rounded-lg border border-border/50 bg-muted/30 mb-4">
-            <p className="text-xs text-muted-foreground mb-3">Add a new member by user ID</p>
+            <p className="text-xs text-muted-foreground mb-3">Add a new member</p>
             <div className="space-y-3">
-              <Input
-                type="text"
-                placeholder="User ID (UUID)"
-                value={newMemberId}
-                onChange={(e) => setNewMemberId(e.target.value)}
-                className="h-8 text-sm"
-              />
+              {/* Phase 7: Search user by display name or handle */}
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search by display name or handle"
+                  value={selectedProfile ? '' : memberSearchQuery}
+                  onChange={(e) => handleSearchMembers(e.target.value)}
+                  disabled={!!selectedProfile}
+                  className="h-8 text-sm"
+                />
+                
+                {/* Search results dropdown */}
+                {memberSearchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/50 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {memberSearchResults.map((result) => {
+                      const displayText = result.displayName || result.handle || result.userId.substring(0, 12)
+                      const shortUuid = result.userId.substring(0, 8) + '…' + result.userId.substring(result.userId.length - 6)
+                      return (
+                        <button
+                          key={result.userId}
+                          onClick={() => handleSelectProfile(result)}
+                          className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b border-border/30 last:border-b-0 text-sm transition-colors"
+                        >
+                          <div className="font-medium text-foreground">{displayText}</div>
+                          {result.handle && result.displayName && (
+                            <div className="text-xs text-muted-foreground">@{result.handle}</div>
+                          )}
+                          <div className="text-xs text-muted-foreground font-mono">{shortUuid}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected user display */}
+              {selectedProfile && (
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedProfile.displayName || selectedProfile.handle || selectedProfile.userId}
+                    </p>
+                    {selectedProfile.handle && selectedProfile.displayName && (
+                      <p className="text-xs text-muted-foreground">@{selectedProfile.handle}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedProfile(null)}
+                    className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+
+              {/* Role selector */}
               <Select value={newMemberRole} onValueChange={setNewMemberRole}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue placeholder="Select role" />
@@ -562,15 +678,47 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Add button */}
               <Button
                 onClick={handleAddMember}
-                disabled={isAddingMember || !newMemberId.trim() || !newMemberRole}
+                disabled={isAddingMember || (!selectedProfile && !newMemberId.trim()) || !newMemberRole}
                 size="sm"
                 className="w-full h-8 text-xs gap-1"
               >
                 <Plus className="size-3" aria-hidden="true" />
                 {isAddingMember ? 'Adding...' : 'Add Member'}
               </Button>
+
+              {/* Advanced: UUID fallback toggle */}
+              <button
+                onClick={() => setShowAdvancedUUID(!showAdvancedUUID)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left py-1"
+              >
+                {showAdvancedUUID ? '▼' : '▶'} Advanced: add by UUID
+              </button>
+
+              {/* UUID fallback form (hidden by default) */}
+              {showAdvancedUUID && (
+                <div className="pt-2 border-t border-border/30 space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="User ID (UUID)"
+                    value={selectedProfile ? '' : newMemberId}
+                    onChange={(e) => setNewMemberId(e.target.value)}
+                    disabled={!!selectedProfile}
+                    className="h-8 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Or paste a user ID directly. This requires knowing the exact UUID.
+                  </p>
+                </div>
+              )}
+
+              {/* Helper text */}
+              <p className="text-xs text-muted-foreground">
+                Search by display name or handle. Email lookup will require a secure profile/email lookup later.
+              </p>
             </div>
 
             {memberMessage && (

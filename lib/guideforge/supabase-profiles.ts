@@ -324,3 +324,60 @@ export async function getUserProfiles(userIds: string[]): Promise<Map<string, an
     return profileMap
   }
 }
+
+/**
+ * Search profiles for member lookup by display name or handle
+ * Phase 7: Governance - Member lookup by profile display name/handle
+ * 
+ * Returns array of matching profiles with userId, displayName, handle, avatarUrl, role
+ * Max 10 results. Requires query >= 2 characters.
+ * Searches public.profiles only (not auth.users for security).
+ */
+export async function searchProfilesForMemberLookup(query: string): Promise<Array<{
+  userId: string
+  displayName: string | null
+  handle: string | null
+  avatarUrl: string | null
+  role: string | null
+}>> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return []
+  }
+
+  const trimmedQuery = query.trim()
+  
+  // Skip search if query is too short
+  if (trimmedQuery.length < 2) {
+    return []
+  }
+
+  try {
+    const searchPattern = `%${trimmedQuery}%`
+    
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, handle, avatar_url, role')
+      .or(`display_name.ilike.${searchPattern},handle.ilike.${searchPattern}`)
+      .limit(10)
+
+    if (error) {
+      console.warn('[v0] searchProfilesForMemberLookup: Error searching profiles:', error.message)
+      return []
+    }
+
+    if (!profiles) {
+      return []
+    }
+
+    return profiles.map((profile) => ({
+      userId: profile.id,
+      displayName: profile.display_name,
+      handle: profile.handle,
+      avatarUrl: profile.avatar_url,
+      role: profile.role,
+    }))
+  } catch (err) {
+    console.warn('[v0] searchProfilesForMemberLookup: Exception:', err instanceof Error ? err.message : String(err))
+    return []
+  }
+}
