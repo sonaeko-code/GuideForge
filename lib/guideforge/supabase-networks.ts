@@ -1344,6 +1344,12 @@ export async function getCurrentUserNetworkMembership(
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }
+  } catch (err) {
+    console.warn("[v0] Exception loading user network membership:", err)
+    return null
+  }
+}
+
 /**
  * Claim an ownerless network as the current user
  * Returns error if network already has an owner
