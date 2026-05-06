@@ -351,6 +351,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         errorCode: "SUPABASE_NOT_CONFIGURED",
         guideId: guide.id,
         collectionId: guide.collectionId,
+        verificationStatus: guide.verification,
       }
     }
 
@@ -380,6 +381,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           collectionId: guide.collectionId || "",
           authorId: authorId,
           status: normalizedStatus,
+          verificationStatus: guide.verification,
         }
       }
 
