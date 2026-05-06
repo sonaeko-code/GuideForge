@@ -1545,3 +1545,79 @@ export async function getNetworkMembershipsForUser(userId: string): Promise<Netw
     return []
   }
 }
+
+/**
+ * Update display_name for network role definitions
+ * Governance Phase 4: Editable theme labels for roles
+ * Only updates display_name, protects canonical_role and permissions
+ * 
+ * Updates is an array of: { canonicalRole: string, displayName: string }
+ */
+export async function updateNetworkRoleDisplayNames(
+  networkId: string,
+  updates: Array<{ canonicalRole: string; displayName: string }>
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  if (!updates || updates.length === 0) {
+    return { success: false, error: "No updates provided" }
+  }
+
+  try {
+    console.log("[v0] Updating role display names for network:", networkId, "updates:", updates.length)
+
+    // Validate all updates
+    for (const update of updates) {
+      if (!update.displayName || !update.displayName.trim()) {
+        return { success: false, error: `Display name cannot be empty for role ${update.canonicalRole}` }
+      }
+      const trimmed = update.displayName.trim()
+      if (trimmed.length > 40) {
+        return { success: false, error: `Display name too long (max 40 chars) for role ${update.canonicalRole}` }
+      }
+    }
+
+    // Execute updates sequentially to ensure consistency
+    let updatedCount = 0
+    for (const update of updates) {
+      const { data, error } = await supabase
+        .from("network_role_definitions")
+        .update({ display_name: update.displayName.trim() })
+        .eq("network_id", networkId)
+        .eq("canonical_role", update.canonicalRole)
+        .select()
+
+      if (error) {
+        console.error(
+          `[v0] Error updating display name for ${update.canonicalRole}:`,
+          error.message
+        )
+        return {
+          success: false,
+          error: `Failed to update ${update.canonicalRole}: ${error.message}`,
+        }
+      }
+
+      if (data && data.length > 0) {
+        updatedCount++
+        console.log(
+          `[v0] Updated display name for ${update.canonicalRole} to "${update.displayName.trim()}"`
+        )
+      } else {
+        console.warn(
+          `[v0] No rows updated for ${update.canonicalRole} in network ${networkId}`
+        )
+      }
+    }
+
+    console.log("[v0] Successfully updated", updatedCount, "role display names")
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception updating role display names:", message)
+    return { success: false, error: `Exception updating roles: ${message}` }
+  }
+}
+

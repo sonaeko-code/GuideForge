@@ -1,15 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Users, Shield, Check, X } from 'lucide-react'
+import { AlertCircle, Users, Shield, Check, X, Edit2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useAuth } from '@/lib/guideforge/auth-context'
 import {
   getRoleDefinitionsForNetwork,
   getNetworkMembersForNetwork,
   getCurrentUserNetworkMembership,
   claimOwnerlessNetwork,
+  updateNetworkRoleDisplayNames,
 } from '@/lib/guideforge/supabase-networks'
 import type { NetworkRoleDefinition, NetworkMember, Network } from '@/lib/guideforge/types'
 
@@ -19,9 +21,10 @@ interface NetworkGovernancePanelProps {
 }
 
 /**
- * Network Governance Panel - Phase 2 & 3
+ * Network Governance Panel - Phase 2, 3, & 4
  * Phase 2: Read-only display of network roles and members
  * Phase 3: Allow claiming ownerless networks
+ * Phase 4: Editable role display names (theme labels)
  */
 export function NetworkGovernancePanel({ networkId, network }: NetworkGovernancePanelProps) {
   const { user, isAuthenticated } = useAuth()
@@ -31,6 +34,12 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   const [isLoading, setIsLoading] = useState(true)
   const [isClaiming, setIsClaiming] = useState(false)
   const [claimMessage, setClaimMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  
+  // Phase 4: Editable display names
+  const [isEditingLabels, setIsEditingLabels] = useState(false)
+  const [editedDisplayNames, setEditedDisplayNames] = useState<Record<string, string>>({})
+  const [isUpdatingLabels, setIsUpdatingLabels] = useState(false)
+  const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const loadGovernanceData = async () => {
     setIsLoading(true)
@@ -74,6 +83,68 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
     } finally {
       setIsClaiming(false)
     }
+  }
+
+  // Governance Phase 4: Edit role display names
+  const handleStartEditing = () => {
+    const initial: Record<string, string> = {}
+    roles.forEach((role) => {
+      initial[role.canonicalRole] = role.displayName
+    })
+    setEditedDisplayNames(initial)
+    setIsEditingLabels(true)
+    setUpdateMessage(null)
+  }
+
+  const handleCancelEditing = () => {
+    setIsEditingLabels(false)
+    setEditedDisplayNames({})
+    setUpdateMessage(null)
+  }
+
+  const handleSaveLabels = async () => {
+    // Validate changes exist
+    const changes = roles.filter(
+      (role) => editedDisplayNames[role.canonicalRole] !== role.displayName
+    )
+
+    if (changes.length === 0) {
+      setUpdateMessage({ type: 'error', text: 'No changes to save' })
+      return
+    }
+
+    setIsUpdatingLabels(true)
+    setUpdateMessage(null)
+
+    try {
+      const updates = changes.map((role) => ({
+        canonicalRole: role.canonicalRole,
+        displayName: editedDisplayNames[role.canonicalRole],
+      }))
+
+      const result = await updateNetworkRoleDisplayNames(networkId, updates)
+
+      if (result.success) {
+        setUpdateMessage({ type: 'success', text: 'Role labels saved successfully!' })
+        setIsEditingLabels(false)
+        // Reload to get updated display names
+        await loadGovernanceData()
+      } else {
+        setUpdateMessage({ type: 'error', text: result.error || 'Failed to save labels' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setUpdateMessage({ type: 'error', text: `Error saving labels: ${message}` })
+    } finally {
+      setIsUpdatingLabels(false)
+    }
+  }
+
+  const handleDisplayNameChange = (canonicalRole: string, value: string) => {
+    setEditedDisplayNames((prev) => ({
+      ...prev,
+      [canonicalRole]: value,
+    }))
   }
 
   // Determine if claim button should show
@@ -164,10 +235,92 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
 
         {/* Role Definitions */}
         <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-            <Shield className="size-4" aria-hidden="true" />
-            Role Definitions ({roles.length})
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Shield className="size-4" aria-hidden="true" />
+              Role Definitions ({roles.length})
+            </h3>
+            {!isEditingLabels && roles.length > 0 && (
+              <Button
+                onClick={handleStartEditing}
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1"
+              >
+                <Edit2 className="size-3" aria-hidden="true" />
+                Edit Role Labels
+              </Button>
+            )}
+          </div>
+
+          {isEditingLabels ? (
+            <div className="space-y-3 p-4 rounded-lg border border-border/50 bg-muted/30 mb-4">
+              <p className="text-xs text-muted-foreground mb-4">
+                Display names change what users see. Permissions still use the locked canonical role.
+              </p>
+              {roles.map((role) => (
+                <div key={role.id} className="space-y-2">
+                  <label className="text-xs font-medium text-foreground">
+                    {role.canonicalRole} (canonical role - locked)
+                  </label>
+                  <Input
+                    type="text"
+                    value={editedDisplayNames[role.canonicalRole] || ''}
+                    onChange={(e) =>
+                      handleDisplayNameChange(
+                        role.canonicalRole,
+                        e.target.value
+                      )
+                    }
+                    placeholder={`Display name for ${role.canonicalRole}`}
+                    maxLength={40}
+                    className="h-8 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {(editedDisplayNames[role.canonicalRole] || '').length}/40
+                  </p>
+                </div>
+              ))}
+
+              {updateMessage && (
+                <div
+                  className={`p-3 rounded text-sm flex items-start gap-2 ${
+                    updateMessage.type === 'success'
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-red-500/10 text-red-700 dark:text-red-300'
+                  }`}
+                >
+                  {updateMessage.type === 'success' ? (
+                    <Check className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  ) : (
+                    <X className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  )}
+                  <span>{updateMessage.text}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={handleSaveLabels}
+                  disabled={isUpdatingLabels}
+                  size="sm"
+                  className="flex-1 h-8 text-xs"
+                >
+                  {isUpdatingLabels ? 'Saving...' : 'Save Role Labels'}
+                </Button>
+                <Button
+                  onClick={handleCancelEditing}
+                  disabled={isUpdatingLabels}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-8 text-xs"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {roles.length > 0 ? (
             <div className="space-y-2">
               {roles.map((role) => (
