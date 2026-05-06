@@ -9,6 +9,7 @@ import { supabase, isSupabaseConfigured, getSupabaseSession } from './supabase-c
 /**
  * Ensure current authenticated user has a profile in the profiles table
  * Phase 6: Profile bootstrap for guide author_id foreign key constraint
+ * Phase 3B: Sync signup display name from auth metadata when profile display_name is email-prefix fallback
  * 
  * Returns the profile ID if successful, null if not authenticated or error
  * Safe for client-side calls - uses authenticated user's own data only
@@ -24,6 +25,7 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
     const session = await getSupabaseSession()
     const userId = session?.user?.id
     const userEmail = session?.user?.email
+    const emailPrefix = userEmail?.split('@')[0]
 
     if (!userId) {
       console.log('[v0] ensureCurrentUserProfile: User not authenticated')
@@ -35,7 +37,7 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
     // Check if profile already exists
     const { data: existingProfile, error: checkError } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, display_name')
       .eq('id', userId)
       .maybeSingle()
 
@@ -48,22 +50,72 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
       return null
     }
 
-    // Profile already exists
+    // Phase 3B: Determine display name with priority
+    // 1. auth.user.user_metadata.display_name (signup form)
+    // 2. auth.user.user_metadata.full_name
+    // 3. auth.user.user_metadata.name
+    // 4. email prefix fallback
+    // 5. "GuideForge User"
+    const authMetadataDisplayName = 
+      session.user?.user_metadata?.display_name ||
+      session.user?.user_metadata?.full_name ||
+      session.user?.user_metadata?.name
+
+    const finalDisplayName = authMetadataDisplayName || emailPrefix || 'GuideForge User'
+
+    // Phase 3B: Check if existing profile display_name needs sync
+    let shouldUpdateProfile = false
+    let displayNameToUse = finalDisplayName
+
     if (existingProfile) {
-      console.log('[v0] ensureCurrentUserProfile: Profile already exists for user:', userId)
+      console.log('[v0] ensureCurrentUserProfile: Profile exists with display_name:', existingProfile.display_name)
+      
+      // Safe heuristic: Only auto-replace display_name if it exactly equals the email prefix fallback
+      // This indicates the profile was created with the fallback, not user-chosen
+      if (existingProfile.display_name === emailPrefix && authMetadataDisplayName) {
+        console.log('[v0] ensureCurrentUserProfile: Profile display_name is email-prefix fallback and auth has metadata, will sync')
+        shouldUpdateProfile = true
+        displayNameToUse = authMetadataDisplayName
+      } else {
+        console.log('[v0] ensureCurrentUserProfile: Profile exists with user-chosen name, will not overwrite')
+        displayNameToUse = existingProfile.display_name
+      }
+
+      // If we need to sync, update the profile
+      if (shouldUpdateProfile) {
+        console.log('[v0] ensureCurrentUserProfile: Syncing display_name from auth metadata:', displayNameToUse)
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            display_name: displayNameToUse,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId)
+
+        if (updateError) {
+          console.error('[v0] ensureCurrentUserProfile: Error updating profile display_name:', {
+            message: updateError.message,
+            code: updateError.code,
+          })
+          // Continue anyway - profile exists, just couldn't sync the name
+        } else {
+          console.log('[v0] ensureCurrentUserProfile: Profile display_name synced successfully to:', displayNameToUse)
+        }
+      }
+
       return userId
     }
 
+    // Profile doesn't exist, create one
     console.log('[v0] ensureCurrentUserProfile: Profile not found, attempting to create for user:', userId)
 
-    // Profile doesn't exist, create one
     // Use upsert to handle race conditions (if another request creates it simultaneously)
     const { data: newProfile, error: upsertError } = await supabase
       .from('profiles')
       .upsert([
         {
           id: userId,
-          display_name: userEmail?.split('@')[0] || 'User',
+          display_name: displayNameToUse,
           handle: null,
           avatar_url: session.user?.user_metadata?.avatar_url || null,
           bio: null,
@@ -98,7 +150,7 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
       return null
     }
 
-    console.log('[v0] ensureCurrentUserProfile: Profile upserted successfully for user:', userId, 'profileId:', newProfile.id)
+    console.log('[v0] ensureCurrentUserProfile: Profile upserted successfully for user:', userId, 'profileId:', newProfile.id, 'display_name:', displayNameToUse)
     return newProfile.id
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -108,9 +160,21 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
 }
 
 /**
- * Get the current authenticated user's profile from the profiles table
- * Returns the full profile object including display_name, handle, avatar, bio, role
- * Phase 3: Account/Profile - Display current user's profile information
+ * Format a date as "Month Year" for member-since display
+ * Example: "May 2026"
+ */
+export function formatMemberSinceDate(dateString: string | undefined): string | null {
+  if (!dateString) return null
+  
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return null
+    
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  } catch {
+    return null
+  }
+}
  * 
  * Returns null if user not authenticated, profile not found, or error occurs
  */

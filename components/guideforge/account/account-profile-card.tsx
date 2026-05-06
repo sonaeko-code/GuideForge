@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Mail, User, Lock, Users, Settings, Folder, Shield, CheckCircle2, Settings2 } from 'lucide-react'
+import { ArrowLeft, Mail, User, Lock, Users, Settings, Folder, Shield, CheckCircle2, Settings2, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAuth } from '@/lib/guideforge/auth-context'
@@ -140,6 +140,21 @@ export function AccountProfileCard() {
               <p className="text-foreground text-sm">{userProfile.bio}</p>
             </div>
           )}
+
+          {/* Member Since - Phase 3B */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+              <Calendar className="size-4" aria-hidden="true" />
+              Member Since
+            </label>
+            {userProfile?.created_at ? (
+              <p className="text-foreground">
+                {new Date(userProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </p>
+            ) : (
+              <p className="text-muted-foreground">Not available</p>
+            )}
+          </div>
 
           {/* User ID */}
           <div>

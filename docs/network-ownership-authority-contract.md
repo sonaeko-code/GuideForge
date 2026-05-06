@@ -56,6 +56,8 @@ This document defines who can own, edit, publish, and manage GuideForge networks
 ### What Exists Now
 - **Auth Phase 2:** Supabase Auth is fully integrated. Users can sign up, sign in, and log out.
 - **Account Phase 1:** Users can view their profile with display name and email.
+- **Account Phase 3:** Profile bootstrap on sign-in with automatic profile creation for all authenticated users.
+- **Account Phase 3B:** Signup display name synced from auth metadata into profiles table. Member-since date displayed on account page showing account creation month/year.
 - **Builder is Non-Blocking:** All `/builder` routes load successfully even when logged out. No 401 errors or redirects.
 - **Networks are Not Owned:** Networks are created without an owner_user_id field. Any authenticated user can create and edit any network.
 - **RLS is Not Active:** No Row-Level Security policies are enforced. All networks and guides are visible to all users and modifiable by any user (via API calls).
