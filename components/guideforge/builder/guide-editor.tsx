@@ -22,10 +22,12 @@ import {
 import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { makeTempId } from "@/lib/guideforge/utils"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
+import GuideReviewPanel from "@/components/guideforge/builder/guide-review-panel"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
 import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
+import { submitGuideForReview } from "@/lib/guideforge/supabase-guide-reviews"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -85,6 +87,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedMessage, setPublishedMessage] = useState(false)
+  
+  // Phase 8: Review voting submission
+  const [isSubmittingForReview, setIsSubmittingForReview] = useState(false)
+  const [submitReviewError, setSubmitReviewError] = useState<string | null>(null)
+  const [refreshReviewPanel, setRefreshReviewPanel] = useState(0)
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -443,6 +450,38 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
   }
 
+  // Phase 8: Submit guide for review
+  const handleSubmitForReview = async () => {
+    setIsSubmittingForReview(true)
+    setSubmitReviewError(null)
+
+    try {
+      const result = await submitGuideForReview(normalizedGuide.id)
+
+      if (result.success) {
+        console.log('[v0] Submit for review succeeded')
+        setGuideStatus('ready')
+        setAutosaveStatus('saved')
+        
+        // Trigger review panel refresh
+        setRefreshReviewPanel(prev => prev + 1)
+
+        setTimeout(() => {
+          setAutosaveStatus('idle')
+        }, 2000)
+      } else {
+        setSubmitReviewError(result.error || 'Failed to submit for review')
+        setAutosaveStatus('failed')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setSubmitReviewError(message)
+      setAutosaveStatus('failed')
+    } finally {
+      setIsSubmittingForReview(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Publish confirmation dialog */}
@@ -601,14 +640,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
+                {/* Phase 8: Submit for Review */}
                 <Button
                   size="sm"
-                  onClick={handlePublishDraft}
-                  className={markReadyError ? "border-red-500 text-red-600" : ""}
-                  variant={markReadyError ? "outline" : "default"}
+                  onClick={handleSubmitForReview}
+                  disabled={isSubmittingForReview}
+                  variant="default"
                 >
-                  <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
-                  {markReadyError ? "Fix required rules first" : "Mark Ready"}
+                  <Send className="size-4 mr-1" aria-hidden="true" />
+                  {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -877,6 +917,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </div>
           </Card>
         )}
+
+        {/* Phase 8: Guide Review Panel */}
+        <GuideReviewPanel 
+          guideId={normalizedGuide.id} 
+          guideStatus={guideStatus}
+          onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}
+        />
 
         {/* Sections Editor */}
         <div className="space-y-4">
