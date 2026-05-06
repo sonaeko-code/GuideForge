@@ -56,13 +56,19 @@ export function SignupForm() {
 
     try {
       console.log('[v0] SignupForm: Signing up with email:', email)
+      console.log('[v0] SignupForm: Display name length:', displayName.trim().length)
+      
+      const trimmedDisplayName = displayName.trim()
       
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            display_name: displayName,
+            // Phase 3C: Store display name in multiple metadata fields for compatibility
+            display_name: trimmedDisplayName,
+            name: trimmedDisplayName,
+            full_name: trimmedDisplayName,
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -76,6 +82,7 @@ export function SignupForm() {
       }
 
       console.log('[v0] SignupForm: Signup response:', data.user?.id)
+      console.log('[v0] SignupForm: User metadata keys:', data.user?.user_metadata ? Object.keys(data.user.user_metadata) : 'none')
       
       // Check if email confirmation is required
       if (data.user?.identities?.length === 0) {
@@ -87,14 +94,28 @@ export function SignupForm() {
 
       // Supabase may require email confirmation
       if (data.session) {
-        console.log('[v0] SignupForm: Session created immediately, redirecting')
+        console.log('[v0] SignupForm: Session created immediately')
+        
+        // Phase 3C: Attempt immediate profile bootstrap with signup metadata
+        try {
+          console.log('[v0] SignupForm: Attempting immediate profile bootstrap after signup')
+          const { ensureCurrentUserProfile } = await import('@/lib/guideforge/supabase-profiles')
+          const profileId = await ensureCurrentUserProfile()
+          if (profileId) {
+            console.log('[v0] SignupForm: Profile bootstrap successful after signup, profileId:', profileId)
+          } else {
+            console.warn('[v0] SignupForm: Profile bootstrap returned null after signup, will retry on login')
+          }
+        } catch (bootstrapErr) {
+          console.warn('[v0] SignupForm: Profile bootstrap failed after signup:', bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr), '- will retry on login')
+        }
+        
         setSuccessMessage('Account created! Redirecting...')
-        // Session is stored and AuthProvider will pick it up
         setTimeout(() => {
           router.push('/builder/networks')
         }, 1000)
       } else {
-        console.log('[v0] SignupForm: Email confirmation required')
+        console.log('[v0] SignupForm: Email confirmation required, profile bootstrap will happen after confirmation')
         setSuccessMessage('Check your email to confirm your account.')
       }
     } catch (err) {

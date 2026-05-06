@@ -34,6 +34,12 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
 
     console.log('[v0] ensureCurrentUserProfile: Starting profile check for user:', userId, 'email:', userEmail)
 
+    // Phase 3C: Check what auth metadata contains
+    const authDisplayName = session.user?.user_metadata?.display_name
+    const authName = session.user?.user_metadata?.name
+    const authFullName = session.user?.user_metadata?.full_name
+    console.log('[v0] ensureCurrentUserProfile: Auth metadata - display_name:', authDisplayName, 'name:', authName, 'full_name:', authFullName)
+
     // Check if profile already exists
     const { data: existingProfile, error: checkError } = await supabase
       .from('profiles')
@@ -108,6 +114,7 @@ export async function ensureCurrentUserProfile(): Promise<string | null> {
 
     // Profile doesn't exist, create one
     console.log('[v0] ensureCurrentUserProfile: Profile not found, attempting to create for user:', userId)
+    console.log('[v0] ensureCurrentUserProfile: Creating profile with display_name:', displayNameToUse)
 
     // Use upsert to handle race conditions (if another request creates it simultaneously)
     const { data: newProfile, error: upsertError } = await supabase

@@ -58,6 +58,7 @@ This document defines who can own, edit, publish, and manage GuideForge networks
 - **Account Phase 1:** Users can view their profile with display name and email.
 - **Account Phase 3:** Profile bootstrap on sign-in with automatic profile creation for all authenticated users.
 - **Account Phase 3B:** Signup display name synced from auth metadata into profiles table. Member-since date displayed on account page showing account creation month/year.
+- **Account Phase 3C:** Signup form now stores display_name in auth metadata with aliases (display_name, name, full_name for compatibility). Auth callback route handles email confirmation. Profile bootstrap uses auth metadata priority: display_name > name > full_name > email-prefix fallback. Immediate profile creation after signup if session available, otherwise after email confirmation.
 - **Builder is Non-Blocking:** All `/builder` routes load successfully even when logged out. No 401 errors or redirects.
 - **Networks are Not Owned:** Networks are created without an owner_user_id field. Any authenticated user can create and edit any network.
 - **RLS is Not Active:** No Row-Level Security policies are enforced. All networks and guides are visible to all users and modifiable by any user (via API calls).
