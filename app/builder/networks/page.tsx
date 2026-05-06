@@ -1,11 +1,12 @@
 import Link from "next/link"
-import { Plus, Folder, ArrowRight, AlertCircle, Settings } from "lucide-react"
+import { Plus, Folder, ArrowRight, AlertCircle, Settings, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
-import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
+import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId, getCurrentUserNetworkAuthority, getNetworkMembershipsForUser } from "@/lib/guideforge/supabase-networks"
 import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
+import { getSupabaseSession } from "@/lib/guideforge/supabase-client"
 
 // Disable caching for this page so it always fetches fresh network data from Supabase
 export const dynamic = "force-dynamic"
@@ -15,6 +16,19 @@ export default async function NetworksDirectoryPage() {
   let networks = await getAllNetworks()
   
   console.log("[v0] Networks directory loaded networks:", networks.length)
+
+  // Get current user for sorting and membership display
+  const session = await getSupabaseSession()
+  const currentUserId = session?.user?.id
+
+  // If we have a current user, get their memberships and authority for each network
+  let userMemberships: Record<string, any> = {}
+  if (currentUserId) {
+    const memberships = await getNetworkMembershipsForUser(currentUserId)
+    memberships.forEach((m) => {
+      userMemberships[m.networkId] = m
+    })
+  }
 
   // If no real networks exist, show empty state
   if (networks.length === 0) {
@@ -50,10 +64,12 @@ export default async function NetworksDirectoryPage() {
   }
 
   // Load hub and collection counts for each network safely
+  // Phase 6: Also prefetch authority for current user for each network
   const networksWithCounts = await Promise.all(
-    networks.map(async (network) => {
+    sortedNetworks.map(async (network) => {
       let hubCount = 0
       let collectionCount = 0
+      let canManageNetwork = false
       
       try {
         const hubs = await getHubsByNetworkId(network.id)
@@ -69,21 +85,30 @@ export default async function NetworksDirectoryPage() {
             console.log("[v0] Network card counts:", network.id, "collections:", collectionCount)
           } catch (collErr) {
             console.warn("[v0] Network count error (collections for", network.id, "):", collErr)
-            // Return zero collections if query fails, don't let it break the whole card
             collectionCount = 0
           }
         }
       } catch (err) {
         console.warn("[v0] Network count error (hubs for", network.id, "):", err)
-        // Return zeroes if counts fail to load, but still render the card
         hubCount = 0
         collectionCount = 0
+      }
+
+      // Phase 6: Check if current user can manage this network
+      if (currentUserId) {
+        try {
+          const authority = await getCurrentUserNetworkAuthority(network.id)
+          canManageNetwork = authority.canManageNetwork
+        } catch (err) {
+          console.warn('[v0] Failed to check authority for network:', network.id, err)
+        }
       }
 
       return {
         ...network,
         hubCount,
         collectionCount,
+        canManageNetwork,
       }
     })
   )
@@ -127,67 +152,94 @@ export default async function NetworksDirectoryPage() {
           </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {networksWithCounts.map((network) => (
-            <Card
-              key={network.id}
-              className="flex flex-col gap-4 p-5 hover:border-primary/50 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <h3 className="text-base font-semibold text-foreground">
-                    {network.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    /{network.slug}
+          {networksWithCounts.map((network) => {
+            // Determine relationship badge for this network
+            let relationshipBadge = null
+            if (currentUserId && network.ownerUserId === currentUserId) {
+              relationshipBadge = "Owned by you"
+            } else if (userMemberships[network.id]) {
+              relationshipBadge = `Member: ${userMemberships[network.id].displayName}`
+            } else if (!network.ownerUserId) {
+              relationshipBadge = "No owner assigned"
+            }
+
+            return (
+              <Card
+                key={network.id}
+                className="flex flex-col gap-4 p-5 hover:border-primary/50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <h3 className="text-base font-semibold text-foreground">
+                      {network.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      /{network.slug}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    {relationshipBadge && (
+                      <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded">
+                        {relationshipBadge}
+                      </div>
+                    )}
+                    <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
+                  </div>
+                </div>
+
+                {network.description && (
+                  <p className="text-sm text-muted-foreground flex-1">
+                    {network.description}
                   </p>
+                )}
+
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground py-2 border-t border-border/50">
+                  <div>
+                    <span className="font-semibold text-foreground">{network.hubCount}</span> {network.hubCount === 1 ? 'hub' : 'hubs'}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground">{network.collectionCount}</span> {network.collectionCount === 1 ? 'collection' : 'collections'}
+                  </div>
                 </div>
-                <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
-              </div>
 
-              {network.description && (
-                <p className="text-sm text-muted-foreground flex-1">
-                  {network.description}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground py-2 border-t border-border/50">
-                <div>
-                  <span className="font-semibold text-foreground">{network.hubCount}</span> {network.hubCount === 1 ? 'hub' : 'hubs'}
+                <div className="flex gap-2 pt-2">
+                  <Button asChild size="sm" variant="outline" className="flex-1">
+                    <Link href={`/builder/network/${network.id}/dashboard`}>
+                      Dashboard
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/builder/network/${network.id}/settings`}>
+                      <Settings className="size-3.5" aria-hidden="true" />
+                      <span className="sr-only">Settings</span>
+                    </Link>
+                  </Button>
+                  {/* Phase 6: Gate New Hub button based on permissions */}
+                  {network.canManageNetwork ? (
+                    <Button asChild size="sm" variant="outline" className="flex-1">
+                      <Link href={`/builder/network/${network.id}/hub/new`}>
+                        New Hub
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" disabled className="flex-1 opacity-50 cursor-not-allowed" title="Only owners/admins can add hubs">
+                      <Lock className="size-3 mr-1" aria-hidden="true" />
+                      New Hub
+                    </Button>
+                  )}
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground">{network.collectionCount}</span> {network.collectionCount === 1 ? 'collection' : 'collections'}
-                </div>
-              </div>
 
-              <div className="flex gap-2 pt-2">
-                <Button asChild size="sm" variant="outline" className="flex-1">
-                  <Link href={`/builder/network/${network.id}/dashboard`}>
-                    Dashboard
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/builder/network/${network.id}/settings`}>
-                    <Settings className="size-3.5" aria-hidden="true" />
-                    <span className="sr-only">Settings</span>
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline" className="flex-1">
-                  <Link href={`/builder/network/${network.id}/hub/new`}>
-                    New Hub
-                  </Link>
-                </Button>
-              </div>
-
-              {network.slug === 'questline' && (
-                <Button asChild size="sm" variant="ghost" className="w-full gap-2">
-                  <Link href="/n/questline">
-                    View Site
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </Link>
-                </Button>
-              )}
-            </Card>
-          ))}
+                {network.slug === 'questline' && (
+                  <Button asChild size="sm" variant="ghost" className="w-full gap-2">
+                    <Link href="/n/questline">
+                      View Site
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
+                    </Link>
+                  </Button>
+                )}
+              </Card>
+            )
+          })}
         </div>
       </div>
     </main>

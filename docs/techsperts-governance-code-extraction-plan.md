@@ -104,6 +104,94 @@
 - No schema changes (only bootstrap helper, no schema migration)
 
 ---
+
+### Governance Phase 6 Cleanup: Profile Bootstrap, Network Sorting & Membership Badges - COMPLETED ✓
+
+**Phase 6 follow-up addressing state refresh issues, profile bootstrap reliability, network relevance sorting, and membership visibility (UI-only, no RLS/policies).**
+
+#### Files Modified: 2
+
+1. **components/guideforge/account/account-profile-card.tsx**
+   - Added profile bootstrap on account page load
+   - Calls `ensureCurrentUserProfile()` when authenticated user opens /account
+   - Creates profile row if missing (prevents FK violations for new users)
+   - Logs success/failure but doesn't block page load
+
+2. **app/builder/networks/page.tsx**
+   - Added current user detection via `getSupabaseSession()`
+   - Fetches user network memberships server-side
+   - Prefetches `canManageNetwork` authority for each network
+   - Implements Phase 6 network sorting by user relationship:
+     1. Owned by you
+     2. Member of network (shows `Member: {roleDisplayName}`)
+     3. Ownerless / claimable (shows `No owner assigned`)
+     4. Owned by another user
+     5. Everything else
+   - Within same group, sorts by name alphabetically
+   - Shows relationship badge on each network card
+   - Gated "New Hub" button: disabled with lock icon for non-managers
+   - Dashboard button remains visible to all
+   - Settings button remains visible (page itself is read-only gated)
+
+#### Profile Bootstrap Locations: 2
+
+1. **account page** (`/account`)
+   - On mount, calls `ensureCurrentUserProfile()` for authenticated user
+   - Ensures profile exists before showing membership data
+   - Non-blocking: continues even if bootstrap fails
+
+2. **network settings page** (existing from Phase 6)
+   - During guide save via `getAuthorId()` in `supabase-persistence.ts`
+   - Ensures profile exists before FK-constrained INSERT/UPDATE
+
+#### Network Sorting Logic
+
+Priority order on `/builder/networks`:
+```
+0. Owned by you: network.ownerUserId === currentUserId
+1. Member: current user exists in network_members for this network
+2. Ownerless: network.ownerUserId === null
+3. Owned by another: network.ownerUserId != null and != currentUserId
+4. All else
+```
+
+Within each group: sort by `name` alphabetically
+
+#### Membership Badge Logic
+
+Show one of:
+- "Owned by you" — if currentUserId === network.ownerUserId
+- "Member: {roleDisplayName}" — if current user is in network_members with role
+- "No owner assigned" — if ownerUserId is null
+- (hidden) — if owned by another or not a member
+
+#### New Hub Button Gating
+
+On each network card:
+- If `canManageNetwork` === true: Show "New Hub" button as normal, clickable link
+- If `canManageNetwork` === false: Show disabled button with lock icon, `title="Only owners/admins can add hubs"`
+- Dashboard button remains visible for all
+- Settings button remains visible for all (read-only gating on the page itself)
+
+#### UUID Display
+
+- Ownership badge shows: `getOwnershipLabel(status)` (already short, e.g., "Owned by you", "Owned by another user")
+- Member display cards show shortened UUIDs: `4b18022e…eeb4e7` with full UUID in title attribute
+- No full UUIDs as primary visible labels
+
+#### No RLS, No Policies, No Route Protection
+
+- ✓ No RLS policies added
+- ✓ No database policies added
+- ✓ No route protection added
+- ✓ Public dashboard routes still load
+- ✓ Public networks still visible to all
+- ✓ No schema changes
+- ✓ No voting UI
+- ✓ No auto-publish
+- ✓ No publish guards
+
+---
 - `canManageMembers` = role.can_manage_members = true
 - `canSubmitGuides` = role.can_submit_guides = true
 

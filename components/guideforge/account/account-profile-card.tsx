@@ -22,9 +22,22 @@ export function AccountProfileCard() {
   const [isLoading, setIsLoading] = useState(true)
 
   // Load networks to show owned networks list, and memberships for all networks
+  // Phase 6: Also bootstrap profile on account page load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
+      
+      // Phase 6: Ensure profile exists for authenticated user
+      if (isAuthenticated && user?.id) {
+        try {
+          const { ensureCurrentUserProfile } = await import('@/lib/guideforge/supabase-profiles')
+          await ensureCurrentUserProfile()
+          console.log('[v0] Profile bootstrapped on account page for user:', user.id)
+        } catch (err) {
+          console.warn('[v0] Profile bootstrap on account page failed:', err)
+        }
+      }
+      
       const [allNetworks, userMemberships] = await Promise.all([
         getAllNetworks(),
         isAuthenticated && user ? getNetworkMembershipsForUser(user.id) : Promise.resolve([]),
