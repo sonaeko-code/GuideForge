@@ -124,82 +124,88 @@ export function AccountProfileCard() {
       )}
 
       {/* Network Memberships Section - Account Phase 2 */}
-      {!isLoading && memberships.length > 0 && (
+      {!isLoading && (
         <Card className="border-border/50 p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Users className="size-5" aria-hidden="true" />
             Network Memberships ({memberships.length})
           </h2>
           
-          <div className="space-y-3">
-            {memberships.map((membership) => (
-              <div
-                key={`${membership.networkId}-${membership.userId}`}
-                className="p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{membership.networkName}</p>
-                    <p className="text-xs text-muted-foreground">/{membership.networkSlug}</p>
+          {memberships.length > 0 ? (
+            <div className="space-y-3">
+              {memberships.map((membership) => (
+                <div
+                  key={`${membership.networkId}-${membership.userId}`}
+                  className="p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{membership.networkName}</p>
+                      <p className="text-xs text-muted-foreground">/{membership.networkSlug}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                      <span className="text-xs font-semibold text-foreground">{membership.roleDisplayName}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
-                    <span className="text-xs font-semibold text-foreground">{membership.roleDisplayName}</span>
+
+                  {/* Role Weight Badge */}
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="text-xs font-mono px-2 py-1 rounded bg-muted text-muted-foreground">
+                      Weight: {membership.reviewWeight}
+                    </span>
+                  </div>
+
+                  {/* Permissions Chips */}
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {membership.canSubmitGuides && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                        <CheckCircle2 className="size-3" aria-hidden="true" />
+                        Submit Guides
+                      </span>
+                    )}
+                    {membership.canVoteOnReviews && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                        <CheckCircle2 className="size-3" aria-hidden="true" />
+                        Vote Reviews
+                      </span>
+                    )}
+                    {membership.canManageMembers && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                        <CheckCircle2 className="size-3" aria-hidden="true" />
+                        Manage Members
+                      </span>
+                    )}
+                    {membership.canPublishOverride && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-300 flex items-center gap-1">
+                        <CheckCircle2 className="size-3" aria-hidden="true" />
+                        Publish Override
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Links */}
+                  <div className="flex gap-2 pt-2 border-t border-border/30">
+                    <Button asChild size="sm" variant="ghost" className="flex-1 h-8 text-xs">
+                      <Link href={`/builder/network/${membership.networkId}/dashboard`}>
+                        Dashboard
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="ghost" className="flex-1 h-8 text-xs">
+                      <Link href={`/builder/network/${membership.networkId}/settings`}>
+                        <Settings2 className="size-3 mr-1" aria-hidden="true" />
+                        Settings
+                      </Link>
+                    </Button>
                   </div>
                 </div>
-
-                {/* Role Weight Badge */}
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-xs font-mono px-2 py-1 rounded bg-muted text-muted-foreground">
-                    Weight: {membership.reviewWeight}
-                  </span>
-                </div>
-
-                {/* Permissions Chips */}
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {membership.canSubmitGuides && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                      <CheckCircle2 className="size-3" aria-hidden="true" />
-                      Submit Guides
-                    </span>
-                  )}
-                  {membership.canVoteOnReviews && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-center gap-1">
-                      <CheckCircle2 className="size-3" aria-hidden="true" />
-                      Vote Reviews
-                    </span>
-                  )}
-                  {membership.canManageMembers && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 flex items-center gap-1">
-                      <CheckCircle2 className="size-3" aria-hidden="true" />
-                      Manage Members
-                    </span>
-                  )}
-                  {membership.canPublishOverride && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-300 flex items-center gap-1">
-                      <CheckCircle2 className="size-3" aria-hidden="true" />
-                      Publish Override
-                    </span>
-                  )}
-                </div>
-
-                {/* Action Links */}
-                <div className="flex gap-2 pt-2 border-t border-border/30">
-                  <Button asChild size="sm" variant="ghost" className="flex-1 h-8 text-xs">
-                    <Link href={`/builder/network/${membership.networkId}/dashboard`}>
-                      Dashboard
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="ghost" className="flex-1 h-8 text-xs">
-                    <Link href={`/builder/network/${membership.networkId}/settings`}>
-                      <Settings2 className="size-3 mr-1" aria-hidden="true" />
-                      Settings
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-sm text-muted-foreground">No network memberships yet.</p>
+            </div>
+          )}
         </Card>
       )}
 

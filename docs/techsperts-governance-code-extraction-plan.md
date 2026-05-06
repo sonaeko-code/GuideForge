@@ -467,6 +467,47 @@ Network memberships visibility on Account page:
   - Empty state: "No network memberships yet."
 - ✓ No RLS, no route protection, no member editing, no invites, no voting
 
+### Account Phase 2 Status
+
+**Account Phase 2 added read-only network membership visibility.**
+
+Network memberships visibility on Account page:
+- ✓ getNetworkMembershipsForUser helper (104 lines) - loads memberships with role definitions
+- ✓ Handles missing role definitions gracefully (no crash, fallback values)
+- ✓ NetworkMembership type added to types.ts
+- ✓ Account page now shows:
+  - Owned Networks section (unchanged from Phase 1)
+  - Network Memberships section (new in Phase 2) with:
+    - Network name and slug
+    - Role display name and canonical role
+    - Review weight badge
+    - Permission chips (Submit Guides, Vote Reviews, Manage Members, Publish Override)
+    - Dashboard and Settings links for each membership
+  - Empty state: "No network memberships yet."
+- ✓ No RLS, no route protection, no member editing, no invites, no voting
+
+### Governance Phase 4 Status
+
+**Governance Phase 4 added editable role display names/theme labels.**
+
+Role label customization in Governance & Roles panel:
+- ✓ updateNetworkRoleDisplayNames helper (76 lines) - updates display_name only, protects canonical_role and permissions
+- ✓ Validation: display_name cannot be empty, max 40 characters, trimmed whitespace
+- ✓ Sequential update execution prevents partial failures
+- ✓ NetworkGovernancePanel now has:
+  - Edit Role Labels button in Role Definitions header
+  - Edit mode with text inputs for each role's display_name
+  - Canonical role shown as locked/system value (not editable)
+  - Helper text: "Display names change what users see. Permissions still use locked canonical role."
+  - Save/Cancel buttons
+  - Success/error messages
+- ✓ After save, updated display names appear in:
+  - Governance & Roles panel (read-only view)
+  - Account page Network Memberships cards (roleDisplayName)
+  - Network Members list if visible
+- ✓ No canonical_role changes, no weight changes, no permission changes
+- ✓ No RLS, no route protection, no member editing, no voting
+
 ---
 
 ## Risk Notes
