@@ -95,29 +95,20 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
-  const [lastSaveDebug, setLastSaveDebug] = useState<any>(null)
+  const [lastSaveDebug, setLastSaveDebug] = useState<{
+    source?: string
+    stage?: string
+    error?: string
+    errorCode?: string
+    errorDetails?: string
+    errorHint?: string
+    guideId?: string
+    collectionId?: string
+    authorId?: string
+    status?: string
+    verificationStatus?: string
+  } | null>(null)
   const autosaveStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
-  // Create unique instance ID for this component
-  const instanceIdRef = useRef(Math.random().toString(36).slice(2, 9))
-  
-  // Single source of truth for save failure UI
-  // Only show failure UI if autosave is CURRENTLY failing AND we have an error message
-  const isCurrentSaveFailed = autosaveStatus === "failed" && !!saveError
-  
-  // Log render state for debugging duplicate instances
-  useEffect(() => {
-    if (autosaveStatus !== "idle" || saveError || lastSaveDebug) {
-      console.log("[v0] GuideEditor render state", {
-        instanceId: instanceIdRef.current,
-        guideId: guide.id,
-        autosaveStatus,
-        saveError: saveError ? "has-error" : "null",
-        hasLastSaveDebug: !!lastSaveDebug,
-        isCurrentSaveFailed,
-      })
-    }
-  }, [autosaveStatus, saveError, lastSaveDebug, guide.id])
   
   // Debounce autosave timer
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -129,23 +120,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Mark hydration complete on mount
   useEffect(() => {
-    console.log("[v0] GuideEditor mounted", { instanceId: instanceIdRef.current, guideId: guide.id })
-    console.log("[v0] Guide editor hydrated: initial state loaded, clearing any stale save failure state")
-    // Clear stale save failure state from previous sessions
-    setSaveError(null)
-    setLastSaveDebug(null)
-    setAutosaveStatus("idle")
+    console.log("[v0] Guide editor hydrated: initial state loaded, autosave disabled until user edit")
     hasHydratedRef.current = true
     userEditedRef.current = false
-    console.log("[v0] Cleared stale save failure state", {
-      reason: "hydration-success",
-      instanceId: instanceIdRef.current,
-    })
-    
-    return () => {
-      console.log("[v0] GuideEditor unmounted", { instanceId: instanceIdRef.current, guideId: guide.id })
-    }
-  }, [guide.id])
+  }, [])
 
   // Autosave effect - debounced by 1500ms, only saves if snapshot changed
   // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
@@ -553,31 +531,77 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   // Phase 8: Submit guide for review
   const handleSubmitForReview = async () => {
+    console.log('[v0] Submit for Review clicked', {
+      guideId: normalizedGuide.id,
+      currentGuideStatus: guideStatus,
+      isCurrentSaveFailed,
+      autosaveStatus,
+      saveError,
+    })
+
     setIsSubmittingForReview(true)
+    setSubmitReviewStatus("submitting")
     setSubmitReviewError(null)
+    setSubmitReviewDebug(null)
 
     try {
+      console.log('[v0] Calling submitGuideForReview')
       const result = await submitGuideForReview(normalizedGuide.id)
 
+      console.log('[v0] submitGuideForReview result', {
+        success: result.success,
+        error: result.error,
+        guideId: result.guideId,
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+        networkId: result.networkId,
+        stage: result.stage,
+        verifiedStatus: result.verifiedStatus,
+      })
+
       if (result.success) {
-        console.log('[v0] Submit for review succeeded')
+        console.log('[v0] Submit for review succeeded - updating local state')
         setGuideStatus('ready')
+        setSubmitReviewStatus("success")
+        setSubmitReviewError(null)
+        setSubmitReviewDebug(null)
         setAutosaveStatus('saved')
         
-        // Trigger review panel refresh
+        // Trigger review panel refresh to load votes
         setRefreshReviewPanel(prev => prev + 1)
 
+        // Clear success message after 3 seconds
         setTimeout(() => {
+          setSubmitReviewStatus("idle")
           setAutosaveStatus('idle')
-        }, 2000)
+        }, 3000)
       } else {
+        console.error('[v0] Submit for review failed', {
+          error: result.error,
+          stage: result.stage,
+        })
+        setSubmitReviewStatus("error")
         setSubmitReviewError(result.error || 'Failed to submit for review')
-        setAutosaveStatus('failed')
+        setSubmitReviewDebug({
+          error: result.error,
+          stage: result.stage,
+          guideId: result.guideId,
+          previousStatus: result.previousStatus,
+          networkId: result.networkId,
+        })
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
+      console.error('[v0] submitGuideForReview exception', {
+        message,
+        error: err,
+      })
+      setSubmitReviewStatus("error")
       setSubmitReviewError(message)
-      setAutosaveStatus('failed')
+      setSubmitReviewDebug({
+        error: message,
+        stage: 'unknown-catch',
+      })
     } finally {
       setIsSubmittingForReview(false)
     }
@@ -613,7 +637,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             ? "bg-amber-500 text-white"
             : autosaveStatus === "saved"
             ? "bg-emerald-500 text-white"
-            : isCurrentSaveFailed
+            : autosaveStatus === "failed"
             ? "bg-red-500 text-white"
             : "bg-muted text-foreground"
         }`}>
@@ -631,21 +655,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <span>Saved to Supabase</span>
             </>
           )}
-          {isCurrentSaveFailed && (
+          {autosaveStatus === "failed" && (
             <>
               <AlertCircle className="size-4" />
               <span>Save failed</span>
             </>
           )}
         </div>
-        {isCurrentSaveFailed && (
+        {autosaveStatus === "failed" && saveError && (
           <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded">
             {saveError}
           </div>
         )}
 
         {/* Detailed error debug panel - appears only when save currently failed */}
-        {isCurrentSaveFailed && (
+        {autosaveStatus === "failed" && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-xs">
             <div className="mb-3">
               <h3 className="font-semibold text-red-900 dark:text-red-100 mb-2">Save Failed — Debug Information</h3>
@@ -769,7 +793,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
                 : autosaveStatus === "saved"
                 ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-                : isCurrentSaveFailed
+                : autosaveStatus === "failed"
                 ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300"
                 : "bg-muted text-muted-foreground"
             }`}>
@@ -785,7 +809,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <span>Saved to Supabase</span>
                 </>
               )}
-              {isCurrentSaveFailed && (
+              {autosaveStatus === "failed" && (
                 <>
                   <AlertCircle className="size-3.5" aria-hidden="true" />
                   <span>Save failed</span>
@@ -800,8 +824,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </div>
 
             {/* Error detail when save fails */}
-            {isCurrentSaveFailed && (
-              <div className="text-xs text-red-600 dark:text-red-400 max-w-[200px] truncate" title={saveError || ""}>
+            {autosaveStatus === "failed" && saveError && (
+              <div className="text-xs text-red-600 dark:text-red-400 max-w-[200px] truncate" title={saveError}>
                 {saveError}
               </div>
             )}
@@ -817,9 +841,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Button
                     size="sm"
                     onClick={handleSubmitForReview}
-                    disabled={isSubmittingForReview || isCurrentSaveFailed}
+                    disabled={isSubmittingForReview || (autosaveStatus === "failed")}
                     variant="default"
-                    title={isCurrentSaveFailed ? "Fix the save error before submitting for review" : undefined}
+                    title={autosaveStatus === "failed" ? "Fix the save error before submitting for review" : undefined}
                   >
                     <Send className="size-4 mr-1" aria-hidden="true" />
                     {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
@@ -834,6 +858,25 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
                     Fix the save error before submitting for review.
                   </p>
+                )}
+
+                {/* Submit for Review success message */}
+                {submitReviewStatus === "success" && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                    Guide submitted for review.
+                  </div>
+                )}
+
+                {/* Submit for Review error message */}
+                {submitReviewStatus === "error" && submitReviewError && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded text-xs text-red-700 dark:text-red-300">
+                    <div className="font-semibold mb-1">Submit for Review failed:</div>
+                    <div>{submitReviewError}</div>
+                    {submitReviewDebug?.stage && (
+                      <div className="mt-1 text-xs opacity-75">Stage: {submitReviewDebug.stage}</div>
+                    )}
+                  </div>
                 )}
               </>
             )}
