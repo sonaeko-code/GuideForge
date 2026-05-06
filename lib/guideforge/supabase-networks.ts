@@ -1418,6 +1418,7 @@ export async function claimOwnerlessNetwork(
  * Get all network memberships for a user
  * Returns memberships with network and role definition info
  * Account Phase 2: Read-only visibility, no RLS enforcement
+ * Uses multi-query approach for reliability (avoids nested select issues)
  */
 export async function getNetworkMembershipsForUser(userId: string): Promise<NetworkMembership[]> {
   if (!isSupabaseConfigured()) {
@@ -1425,25 +1426,12 @@ export async function getNetworkMembershipsForUser(userId: string): Promise<Netw
   }
 
   try {
-    // Query: network_members -> networks -> network_role_definitions
+    console.log("[v0] Loading memberships for user:", userId)
+
+    // Step 1: Query network_members for this user
     const { data: memberData, error: memberError } = await supabase
       .from("network_members")
-      .select(
-        `
-        id,
-        network_id,
-        user_id,
-        canonical_role,
-        display_name,
-        created_at,
-        updated_at,
-        networks(
-          id,
-          name,
-          slug
-        )
-        `
-      )
+      .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: true })
 
@@ -1457,58 +1445,98 @@ export async function getNetworkMembershipsForUser(userId: string): Promise<Netw
       return []
     }
 
-    // For each membership, fetch the role definition
-    const membershipsWithRoles = await Promise.all(
-      memberData.map(async (member: any) => {
-        const { data: roleData, error: roleError } = await supabase
-          .from("network_role_definitions")
-          .select("*")
-          .eq("network_id", member.network_id)
-          .eq("canonical_role", member.canonical_role)
-          .single()
+    console.log("[v0] Found network members:", memberData.length)
 
-        if (roleError) {
-          console.warn(
-            `[v0] Error loading role definition for ${member.canonical_role} in network ${member.network_id}:`,
-            roleError.message
-          )
-          // Return membership even if role definition missing, with defaults
-          return {
-            networkId: member.network_id,
-            networkName: member.networks?.name || "Unknown Network",
-            networkSlug: member.networks?.slug || "",
-            userId: member.user_id,
-            canonicalRole: member.canonical_role,
-            memberDisplayName: member.display_name,
-            roleDisplayName: member.canonical_role, // Fallback to canonical name
-            reviewWeight: 0,
-            canSubmitGuides: false,
-            canVoteOnReviews: false,
-            canManageMembers: false,
-            canPublishOverride: false,
-            createdAt: member.created_at,
-            updatedAt: member.updated_at,
-          }
-        }
+    // Step 2: Collect unique network IDs
+    const networkIds = memberData.map((m: any) => m.network_id)
 
-        return {
-          networkId: member.network_id,
-          networkName: member.networks?.name || "Unknown Network",
-          networkSlug: member.networks?.slug || "",
-          userId: member.user_id,
-          canonicalRole: member.canonical_role,
-          memberDisplayName: member.display_name,
-          roleDisplayName: roleData?.display_name || member.canonical_role,
-          reviewWeight: roleData?.review_weight || 0,
-          canSubmitGuides: roleData?.can_submit_guides || false,
-          canVoteOnReviews: roleData?.can_vote_on_reviews || false,
-          canManageMembers: roleData?.can_manage_members || false,
-          canPublishOverride: roleData?.can_publish_override || false,
-          createdAt: member.created_at,
-          updatedAt: member.updated_at,
-        }
-      })
+    // Step 3: Query networks table for those IDs
+    const { data: networkData, error: networkError } = await supabase
+      .from("networks")
+      .select("id, name, slug")
+      .in("id", networkIds)
+
+    if (networkError) {
+      console.warn("[v0] Error loading networks:", networkError.message)
+      return []
+    }
+
+    // Create map for quick lookup
+    const networkMap = new Map(
+      (networkData || []).map((n: any) => [n.id, { name: n.name, slug: n.slug }])
     )
+
+    // Step 4: Query role definitions for all these networks and roles
+    const roleQueries = memberData.map((m: any) => ({
+      network_id: m.network_id,
+      canonical_role: m.canonical_role,
+    }))
+
+    // Collect unique (network_id, canonical_role) pairs
+    const uniqueRolePairs = Array.from(
+      new Map(
+        roleQueries.map((r) => [
+          `${r.network_id}:${r.canonical_role}`,
+          r,
+        ])
+      ).values()
+    )
+
+    // Query all role definitions needed
+    let roleDefinitions: any[] = []
+    if (uniqueRolePairs.length > 0) {
+      // Use OR filters for multiple pairs
+      let query = supabase.from("network_role_definitions").select("*")
+
+      for (const pair of uniqueRolePairs) {
+        query = query.or(
+          `network_id.eq.${pair.network_id},canonical_role.eq.${pair.canonical_role}`
+        )
+      }
+
+      const { data: roles, error: roleError } = await query
+
+      if (roleError) {
+        console.warn("[v0] Error loading role definitions:", roleError.message)
+        // Continue without role definitions, will use defaults
+      } else {
+        roleDefinitions = roles || []
+      }
+    }
+
+    // Create map for role definitions
+    const roleMap = new Map(
+      roleDefinitions.map((r: any) => [
+        `${r.network_id}:${r.canonical_role}`,
+        r,
+      ])
+    )
+
+    // Step 5: Merge all data in TypeScript
+    const membershipsWithRoles = memberData.map((member: any) => {
+      const network = networkMap.get(member.network_id) || {
+        name: "Unknown Network",
+        slug: "",
+      }
+      const role = roleMap.get(`${member.network_id}:${member.canonical_role}`)
+
+      return {
+        networkId: member.network_id,
+        networkName: network.name,
+        networkSlug: network.slug,
+        userId: member.user_id,
+        canonicalRole: member.canonical_role,
+        memberDisplayName: member.display_name,
+        roleDisplayName: role?.display_name || member.canonical_role,
+        reviewWeight: role?.review_weight || 0,
+        canSubmitGuides: role?.can_submit_guides || false,
+        canVoteOnReviews: role?.can_vote_on_reviews || false,
+        canManageMembers: role?.can_manage_members || false,
+        canPublishOverride: role?.can_publish_override || false,
+        createdAt: member.created_at,
+        updatedAt: member.updated_at,
+      }
+    })
 
     console.log("[v0] Loaded network memberships for user:", membershipsWithRoles.length)
     return membershipsWithRoles
