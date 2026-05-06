@@ -53,7 +53,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     difficulty: guide?.difficulty || "Beginner",
     networkId: guide?.networkId || networkId || "unknown-network",
     hubId: guide?.hubId || "unknown-hub",
-    collectionId: guide?.collectionId || "unknown-collection",
+    collectionId: guide?.collectionId || "", // IMPORTANT: Empty string, NOT "unknown-collection". If collectionId is missing, it's a real error that blocks save.
     audience: guide?.audience && Array.isArray(guide.audience) ? guide.audience : [],
   }
   
@@ -178,12 +178,26 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         isReady: updatedGuide.status === "ready",
       })
       setSaveError(null)
+      
+      // Pre-flight check: collectionId is required to save
+      if (!updatedGuide.collectionId) {
+        console.warn('[v0] Autosave blocked: collectionId is missing', {
+          guideId: updatedGuide.id,
+          title: updatedGuide.title,
+        })
+        setSaveError("This guide is not attached to a collection. Choose a collection before saving.")
+        setAutosaveStatus("failed")
+        return
+      }
+      
       ;(async () => {
         try {
           const { source, error } = await saveGuideDraft(updatedGuide)
           console.log("[v0] Guide save Supabase result:", {
             success: source === "supabase",
             source,
+            guideId: updatedGuide.id,
+            collectionId: updatedGuide.collectionId,
             errorCode: error ? (error.match(/^(\w+):/) || [])[1] || "unknown" : null,
             errorMessage: error || null,
           })
@@ -192,7 +206,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           setLastSaved(new Date())
           
           // Show actual error if Supabase save failed
-          if (source === "supabase") {
+          if (source === "supabase" && !error) {
             setSaveError(null)
             setAutosaveStatus("saved")
             
@@ -213,7 +227,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             setAutosaveStatus("failed")
           }
         } catch (error) {
-          console.error("[v0] Autosave error:", error)
+          console.error("[v0] Autosave exception:", error)
           setSaveError(error instanceof Error ? error.message : "Autosave failed")
           setAutosaveStatus("failed")
         }
@@ -540,6 +554,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         {autosaveStatus === "failed" && saveError && (
           <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded">
             {saveError}
+          </div>
+        )}
+
+        {/* Collection missing warning */}
+        {!normalizedGuide.collectionId && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/20 p-2 rounded flex gap-2 items-start">
+            <AlertCircle className="size-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <span>This guide is not attached to a collection. Choose a collection before saving.</span>
           </div>
         )}
       </div>
