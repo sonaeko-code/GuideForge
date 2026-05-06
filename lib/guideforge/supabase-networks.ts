@@ -1830,3 +1830,162 @@ export async function removeNetworkMember(
     return { success: false, error: `Exception removing member: ${message}` }
   }
 }
+
+/**
+ * Get current user's network authority and permissions
+ * Governance Phase 6: Permission-aware UI gating
+ * 
+ * Returns comprehensive permissions object for a specific network
+ * Uses network_members + network_role_definitions as authority source
+ * No RLS, no service role keys
+ */
+export async function getCurrentUserNetworkAuthority(networkId: string): Promise<{
+  isSignedIn: boolean
+  userId: string | null
+  membership: NetworkMember | null
+  roleDefinition: NetworkRoleDefinition | null
+  canonicalRole: string | null
+  roleDisplayName: string | null
+  canManageNetwork: boolean
+  canManageMembers: boolean
+  canSubmitGuides: boolean
+  canVoteOnReviews: boolean
+  canPublishOverride: boolean
+}> {
+  if (!isSupabaseConfigured()) {
+    return {
+      isSignedIn: false,
+      userId: null,
+      membership: null,
+      roleDefinition: null,
+      canonicalRole: null,
+      roleDisplayName: null,
+      canManageNetwork: false,
+      canManageMembers: false,
+      canSubmitGuides: false,
+      canVoteOnReviews: false,
+      canPublishOverride: false,
+    }
+  }
+
+  try {
+    // Get authenticated user
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData.user?.id
+
+    if (!userId) {
+      console.log("[v0] User not signed in")
+      return {
+        isSignedIn: false,
+        userId: null,
+        membership: null,
+        roleDefinition: null,
+        canonicalRole: null,
+        roleDisplayName: null,
+        canManageNetwork: false,
+        canManageMembers: false,
+        canSubmitGuides: false,
+        canVoteOnReviews: false,
+        canPublishOverride: false,
+      }
+    }
+
+    console.log("[v0] Getting network authority for user:", userId, "network:", networkId)
+
+    // Get membership for this user in this network
+    const { data: memberData } = await supabase
+      .from("network_members")
+      .select("*")
+      .eq("network_id", networkId)
+      .eq("user_id", userId)
+      .maybeSingle()
+
+    if (!memberData) {
+      console.log("[v0] User is not a member of this network")
+      return {
+        isSignedIn: true,
+        userId,
+        membership: null,
+        roleDefinition: null,
+        canonicalRole: null,
+        roleDisplayName: null,
+        canManageNetwork: false,
+        canManageMembers: false,
+        canSubmitGuides: false,
+        canVoteOnReviews: false,
+        canPublishOverride: false,
+      }
+    }
+
+    const canonicalRole = memberData.canonical_role
+
+    // Get role definition for this role
+    const { data: roleData } = await supabase
+      .from("network_role_definitions")
+      .select("*")
+      .eq("network_id", networkId)
+      .eq("canonical_role", canonicalRole)
+      .maybeSingle()
+
+    if (!roleData) {
+      console.warn("[v0] Role definition not found for role:", canonicalRole)
+      return {
+        isSignedIn: true,
+        userId,
+        membership: memberData,
+        roleDefinition: null,
+        canonicalRole,
+        roleDisplayName: memberData.display_name,
+        canManageNetwork: false,
+        canManageMembers: false,
+        canSubmitGuides: false,
+        canVoteOnReviews: false,
+        canPublishOverride: false,
+      }
+    }
+
+    // Derive canManageNetwork: owner OR admin OR can_manage_members
+    const canManageNetwork =
+      canonicalRole === "owner" ||
+      canonicalRole === "admin" ||
+      roleData.can_manage_members === true
+
+    console.log("[v0] User authority resolved:", {
+      userId,
+      canonicalRole,
+      canManageNetwork,
+      canManageMembers: roleData.can_manage_members,
+      canSubmitGuides: roleData.can_submit_guides,
+    })
+
+    return {
+      isSignedIn: true,
+      userId,
+      membership: memberData,
+      roleDefinition: roleData,
+      canonicalRole,
+      roleDisplayName: memberData.display_name,
+      canManageNetwork,
+      canManageMembers: roleData.can_manage_members || false,
+      canSubmitGuides: roleData.can_submit_guides || false,
+      canVoteOnReviews: roleData.can_vote_on_reviews || false,
+      canPublishOverride: roleData.can_publish_override || false,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.warn("[v0] Exception getting network authority:", message)
+    return {
+      isSignedIn: false,
+      userId: null,
+      membership: null,
+      roleDefinition: null,
+      canonicalRole: null,
+      roleDisplayName: null,
+      canManageNetwork: false,
+      canManageMembers: false,
+      canSubmitGuides: false,
+      canVoteOnReviews: false,
+      canPublishOverride: false,
+    }
+  }
+}

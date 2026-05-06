@@ -22,7 +22,9 @@ import {
   addNetworkMember,
   updateNetworkMemberRole,
   removeNetworkMember,
+  getCurrentUserNetworkAuthority,
 } from '@/lib/guideforge/supabase-networks'
+import { shortUUID } from '@/lib/guideforge/uuid-utils'
 import type { NetworkRoleDefinition, NetworkMember, Network } from '@/lib/guideforge/types'
 
 interface NetworkGovernancePanelProps {
@@ -61,16 +63,23 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   const [isUpdatingMemberRole, setIsUpdatingMemberRole] = useState<Record<string, boolean>>({})
   const [isRemovingMember, setIsRemovingMember] = useState<Record<string, boolean>>({})
 
+  // Phase 6: Permission gating
+  const [canManageMembers, setCanManageMembers] = useState(false)
+
   const loadGovernanceData = async () => {
     setIsLoading(true)
-    const [roleData, memberData, userMembership] = await Promise.all([
+    const [roleData, memberData, userMembership, authority] = await Promise.all([
       getRoleDefinitionsForNetwork(networkId),
       getNetworkMembersForNetwork(networkId),
       isAuthenticated ? getCurrentUserNetworkMembership(networkId) : Promise.resolve(null),
+      isAuthenticated ? getCurrentUserNetworkAuthority(networkId) : Promise.resolve(null),
     ])
     setRoles(roleData)
     setMembers(memberData)
     setCurrentUserRole(userMembership)
+    if (authority) {
+      setCanManageMembers(authority.canManageMembers)
+    }
     setIsLoading(false)
   }
 
@@ -462,13 +471,50 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
           )}
         </div>
 
-        {/* Network Members - Phase 5: Manage Members */}
+        {/* Network Members - Phase 5: Manage Members, Phase 6: Permission gating */}
         <div>
           <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
             <Users className="size-4" aria-hidden="true" />
             Manage Members ({members.length})
           </h3>
 
+          {!canManageMembers ? (
+            <>
+              {/* Read-only member list when user cannot manage */}
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-4">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Only network owners/admins can manage members.
+                </p>
+              </div>
+
+              {members.length > 0 ? (
+                <div className="space-y-3">
+                  {members.map((member) => (
+                    <div key={member.id} className="p-3 rounded-lg border border-border/50">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {member.displayName || member.userId}
+                          </p>
+                          <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
+                            {shortUUID(member.userId)}
+                          </p>
+                        </div>
+                        <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded flex-shrink-0">
+                          {member.displayName || member.canonicalRole}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/20 border border-border/30">
+                  No members assigned yet.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
           {/* Add Member Form */}
           <div className="p-4 rounded-lg border border-border/50 bg-muted/30 mb-4">
             <p className="text-xs text-muted-foreground mb-3">Add a new member by user ID</p>
@@ -537,8 +583,8 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
                         <p className="text-sm font-medium text-foreground">
                           {member.displayName || member.userId}
                         </p>
-                        <p className="text-xs text-muted-foreground font-mono break-all">
-                          {member.userId}
+                        <p className="text-xs text-muted-foreground font-mono break-all" title={member.userId}>
+                          {shortUUID(member.userId)}
                         </p>
                       </div>
                     </div>
@@ -609,6 +655,8 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
             <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/20 border border-border/30">
               No members assigned yet.
             </div>
+          )}
+        </>
           )}
         </div>
       </div>

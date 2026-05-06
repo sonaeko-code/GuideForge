@@ -1,6 +1,73 @@
 # Techsperts Governance Code Extraction Plan
 
-## Purpose
+## Current Implementation Status
+
+### Governance Phases 1-5: COMPLETED ✓
+- Phase 1: Governance Schema (network_role_definitions, network_members, roles seeded)
+- Phase 2: Governance read-only panel (display roles, members, governance info)
+- Phase 3: Claim Network (allow ownerless network claim)
+- Phase 4: Editable role display names and theme labels
+- Phase 5: Member Management Lite (add members by UUID, change roles, remove members)
+
+### Governance Phase 6: Permission-Aware UI Gating - COMPLETED ✓
+
+**Permission-aware UI gating for network editing (UI-only, no RLS/database enforcement).**
+
+#### Files Changed
+1. **lib/guideforge/supabase-networks.ts** (+159 lines)
+   - Added `getCurrentUserNetworkAuthority(networkId)` helper
+   - Queries `network_members` + `network_role_definitions`
+   - Returns: isSignedIn, userId, membership, roleDefinition, canonicalRole, roleDisplayName, canManageNetwork, canManageMembers, canSubmitGuides, canVoteOnReviews, canPublishOverride
+   - Derives `canManageNetwork = owner OR admin OR can_manage_members`
+   - No RLS, no service role keys
+
+2. **components/guideforge/builder/network-settings-form.tsx**
+   - Added permission check on mount via `getCurrentUserNetworkAuthority`
+   - If cannot manage network: shows amber notice, disables all fields, hides save button
+   - If can manage: existing behavior unchanged
+
+3. **components/guideforge/builder/network-structure-manager.tsx**
+   - Added permission check on mount via `getCurrentUserNetworkAuthority`
+   - Wraps entire hub/collection UI in conditional render
+   - If cannot manage network: shows amber notice, hides add/edit/delete buttons
+   - If can manage: existing behavior unchanged
+
+4. **components/guideforge/builder/network-governance-panel.tsx**
+   - Added `canManageMembers` permission loading
+   - Wrapped member management UI in conditional
+   - If cannot manage members: shows read-only member list, hides add/edit/remove UI
+   - If can manage: existing Phase 5 behavior unchanged
+   - Applied `shortUUID()` to all member display cards
+
+5. **lib/guideforge/uuid-utils.ts** (NEW)
+   - Created `shortUUID(uuid)` helper
+   - Shortens to format: `4b18022e…eeb4e7` (first 8 + last 6)
+   - Full UUID in title attribute for hover
+
+#### Permission Logic
+- Authority source: `network_members` + `network_role_definitions`
+- No frontend role selection trusted
+- `canManageNetwork` = owner OR admin OR (can_manage_members = true)
+- `canManageMembers` = role.can_manage_members = true
+- `canSubmitGuides` = role.can_submit_guides = true
+
+#### UI Changes
+- Settings form: read-only view when cannot manage
+- Structure manager: permission notice instead of edit controls
+- Governance panel: read-only member list when cannot manage
+- Member cards: shortened UUIDs with full UUID on hover
+
+#### Not Changed (Phase 6 UI-only)
+- No RLS policies
+- No database enforcement
+- No route protection
+- No guide creation blocking
+- No voting UI
+- No auto-publish
+- No schema changes
+
+---
+
 
 This document is the code-level blueprint for reusing Techsperts governance patterns in GuideForge **without blindly copying repair-specific assumptions**. 
 
