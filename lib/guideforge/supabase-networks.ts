@@ -1344,9 +1344,66 @@ export async function getCurrentUserNetworkMembership(
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }
+/**
+ * Claim an ownerless network as the current user
+ * Returns error if network already has an owner
+ * Governance Phase 3: Non-blocking, no RLS, no enforcement
+ */
+export async function claimOwnerlessNetwork(
+  networkId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    // Step 1: Update networks.owner_user_id only where it's currently NULL
+    const { data: updateData, error: updateError } = await supabase
+      .from("networks")
+      .update({ owner_user_id: userId })
+      .eq("id", networkId)
+      .is("owner_user_id", null)
+      .select()
+
+    if (updateError) {
+      console.error("[v0] Error updating network owner:", updateError.message)
+      return { success: false, error: `Failed to claim network: ${updateError.message}` }
+    }
+
+    // If update affected 0 rows, network already has an owner
+    if (!updateData || updateData.length === 0) {
+      console.warn("[v0] Network already owned, claim failed")
+      return { success: false, error: "Network is already owned." }
+    }
+
+    console.log("[v0] Network owner updated to:", userId)
+
+    // Step 2: Insert network_members row with owner role
+    const { data: memberData, error: memberError } = await supabase
+      .from("network_members")
+      .insert([
+        {
+          network_id: networkId,
+          user_id: userId,
+          canonical_role: "owner",
+          display_name: "Owner",
+        },
+      ])
+      .select()
+      .single()
+
+    if (memberError) {
+      console.error("[v0] Error creating network member:", memberError.message)
+      // Don't fail completely—owner was set, just warn about member row
+      return { success: true, error: `Network claimed but member row creation failed: ${memberError.message}` }
+    }
+
+    console.log("[v0] Network member row created for owner:", memberData?.id)
+    return { success: true }
   } catch (err) {
-    console.warn("[v0] Exception loading user network membership:", err)
-    return null
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception claiming network:", message)
+    return { success: false, error: `Exception claiming network: ${message}` }
   }
 }
-

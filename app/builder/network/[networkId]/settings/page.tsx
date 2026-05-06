@@ -40,7 +40,7 @@ export default async function NetworkSettingsPage({
 
           <div className="space-y-8">
             <NetworkSettingsForm network={network} networkId={networkId} />
-            <NetworkGovernancePanel networkId={networkId} />
+            <NetworkGovernancePanel networkId={networkId} network={network} />
             <NetworkStructureManager network={network} networkId={networkId} />
           </div>
         </div>
