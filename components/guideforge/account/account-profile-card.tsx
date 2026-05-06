@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Mail, User, Lock, Users, Settings, Folder, Shield, CheckCircle2, Settings2 } from 'lucide-react'
+import { ArrowLeft, Mail, User, Lock, Users, Settings, Folder, Shield, CheckCircle2, Settings2, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAuth } from '@/lib/guideforge/auth-context'
@@ -20,11 +20,44 @@ export function AccountProfileCard() {
   const [networks, setNetworks] = useState<Network[]>([])
   const [memberships, setMemberships] = useState<NetworkMembership[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [profileBootstrapError, setProfileBootstrapError] = useState<string | null>(null)
+  const [userProfile, setUserProfile] = useState<any | null>(null)
 
   // Load networks to show owned networks list, and memberships for all networks
+  // Phase 6: Also bootstrap profile on account page load
+  // Phase 3: Fetch current user's profile information
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
+      setProfileBootstrapError(null)
+      
+      // Phase 6: Ensure profile exists for authenticated user
+      if (isAuthenticated && user?.id) {
+        try {
+          console.log('[v0] AccountProfileCard: Starting profile bootstrap for user:', user.id)
+          const { ensureCurrentUserProfile, getCurrentUserProfile } = await import('@/lib/guideforge/supabase-profiles')
+          const profileId = await ensureCurrentUserProfile()
+          if (profileId) {
+            console.log('[v0] AccountProfileCard: Profile bootstrap successful, profileId:', profileId)
+            
+            // Phase 3: Fetch the user's full profile information
+            const profile = await getCurrentUserProfile()
+            if (profile) {
+              console.log('[v0] AccountProfileCard: User profile fetched:', profile.display_name || profile.handle)
+              setUserProfile(profile)
+            }
+          } else {
+            const errorMsg = 'Profile bootstrap returned null - check browser console for details'
+            console.warn('[v0] AccountProfileCard: Profile bootstrap failed:', errorMsg)
+            setProfileBootstrapError(errorMsg)
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err)
+          console.error('[v0] AccountProfileCard: Profile bootstrap exception:', errorMsg)
+          setProfileBootstrapError(errorMsg)
+        }
+      }
+      
       const [allNetworks, userMemberships] = await Promise.all([
         getAllNetworks(),
         isAuthenticated && user ? getNetworkMembershipsForUser(user.id) : Promise.resolve([]),
@@ -52,6 +85,15 @@ export function AccountProfileCard() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Bootstrap Error Notice */}
+      {profileBootstrapError && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            <strong>Profile Setup Issue:</strong> {profileBootstrapError}. Check the browser console (F12) for detailed error logs.
+          </p>
+        </div>
+      )}
+
       {/* Profile Section */}
       <Card className="border-border/50 p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Profile Information</h2>
@@ -63,11 +105,22 @@ export function AccountProfileCard() {
               <User className="size-4" aria-hidden="true" />
               Display Name
             </label>
-            <p className="text-foreground">{user.displayName || 'Not set'}</p>
-            {!user.displayName && (
+            <p className="text-foreground">{userProfile?.display_name || user?.displayName || 'Not set'}</p>
+            {!userProfile?.display_name && !user?.displayName && (
               <p className="text-xs text-muted-foreground mt-1">Using email as display name</p>
             )}
           </div>
+
+          {/* Handle */}
+          {userProfile?.handle && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+                <User className="size-4" aria-hidden="true" />
+                Handle
+              </label>
+              <p className="text-foreground">@{userProfile.handle}</p>
+            </div>
+          )}
 
           {/* Email */}
           <div>
@@ -75,7 +128,32 @@ export function AccountProfileCard() {
               <Mail className="size-4" aria-hidden="true" />
               Email Address
             </label>
-            <p className="text-foreground">{user.email}</p>
+            <p className="text-foreground">{user?.email}</p>
+          </div>
+
+          {/* Bio */}
+          {userProfile?.bio && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+                Bio
+              </label>
+              <p className="text-foreground text-sm">{userProfile.bio}</p>
+            </div>
+          )}
+
+          {/* Member Since - Phase 3B */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+              <Calendar className="size-4" aria-hidden="true" />
+              Member Since
+            </label>
+            {userProfile?.created_at ? (
+              <p className="text-foreground">
+                {new Date(userProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </p>
+            ) : (
+              <p className="text-muted-foreground">Not available</p>
+            )}
           </div>
 
           {/* User ID */}
@@ -84,7 +162,7 @@ export function AccountProfileCard() {
               <Lock className="size-4" aria-hidden="true" />
               User ID
             </label>
-            <p className="text-foreground font-mono text-xs break-all">{user.id}</p>
+            <p className="text-foreground font-mono text-xs break-all">{user?.id}</p>
           </div>
 
           {/* Auth Status */}

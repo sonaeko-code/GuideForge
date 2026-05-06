@@ -22,10 +22,12 @@ import {
 import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { makeTempId } from "@/lib/guideforge/utils"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
+import GuideReviewPanel from "@/components/guideforge/builder/guide-review-panel"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
 import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
+import { submitGuideForReview } from "@/lib/guideforge/supabase-guide-reviews"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -51,7 +53,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     difficulty: guide?.difficulty || "Beginner",
     networkId: guide?.networkId || networkId || "unknown-network",
     hubId: guide?.hubId || "unknown-hub",
-    collectionId: guide?.collectionId || "unknown-collection",
+    collectionId: guide?.collectionId || "", // IMPORTANT: Empty string, NOT "unknown-collection". If collectionId is missing, it's a real error that blocks save.
     audience: guide?.audience && Array.isArray(guide.audience) ? guide.audience : [],
   }
   
@@ -85,6 +87,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishedMessage, setPublishedMessage] = useState(false)
+  
+  // Phase 8: Review voting submission
+  const [isSubmittingForReview, setIsSubmittingForReview] = useState(false)
+  const [submitReviewError, setSubmitReviewError] = useState<string | null>(null)
+  const [refreshReviewPanel, setRefreshReviewPanel] = useState(0)
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -171,12 +178,26 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         isReady: updatedGuide.status === "ready",
       })
       setSaveError(null)
+      
+      // Pre-flight check: collectionId is required to save
+      if (!updatedGuide.collectionId) {
+        console.warn('[v0] Autosave blocked: collectionId is missing', {
+          guideId: updatedGuide.id,
+          title: updatedGuide.title,
+        })
+        setSaveError("This guide is not attached to a collection. Choose a collection before saving.")
+        setAutosaveStatus("failed")
+        return
+      }
+      
       ;(async () => {
         try {
           const { source, error } = await saveGuideDraft(updatedGuide)
           console.log("[v0] Guide save Supabase result:", {
             success: source === "supabase",
             source,
+            guideId: updatedGuide.id,
+            collectionId: updatedGuide.collectionId,
             errorCode: error ? (error.match(/^(\w+):/) || [])[1] || "unknown" : null,
             errorMessage: error || null,
           })
@@ -185,7 +206,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           setLastSaved(new Date())
           
           // Show actual error if Supabase save failed
-          if (source === "supabase") {
+          if (source === "supabase" && !error) {
             setSaveError(null)
             setAutosaveStatus("saved")
             
@@ -206,7 +227,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             setAutosaveStatus("failed")
           }
         } catch (error) {
-          console.error("[v0] Autosave error:", error)
+          console.error("[v0] Autosave exception:", error)
           setSaveError(error instanceof Error ? error.message : "Autosave failed")
           setAutosaveStatus("failed")
         }
@@ -443,6 +464,38 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
   }
 
+  // Phase 8: Submit guide for review
+  const handleSubmitForReview = async () => {
+    setIsSubmittingForReview(true)
+    setSubmitReviewError(null)
+
+    try {
+      const result = await submitGuideForReview(normalizedGuide.id)
+
+      if (result.success) {
+        console.log('[v0] Submit for review succeeded')
+        setGuideStatus('ready')
+        setAutosaveStatus('saved')
+        
+        // Trigger review panel refresh
+        setRefreshReviewPanel(prev => prev + 1)
+
+        setTimeout(() => {
+          setAutosaveStatus('idle')
+        }, 2000)
+      } else {
+        setSubmitReviewError(result.error || 'Failed to submit for review')
+        setAutosaveStatus('failed')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setSubmitReviewError(message)
+      setAutosaveStatus('failed')
+    } finally {
+      setIsSubmittingForReview(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Publish confirmation dialog */}
@@ -501,6 +554,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         {autosaveStatus === "failed" && saveError && (
           <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded">
             {saveError}
+          </div>
+        )}
+
+        {/* Collection missing warning */}
+        {!normalizedGuide.collectionId && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/20 p-2 rounded flex gap-2 items-start">
+            <AlertCircle className="size-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <span>This guide is not attached to a collection. Choose a collection before saving.</span>
           </div>
         )}
       </div>
@@ -601,14 +662,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
+                {/* Phase 8: Submit for Review */}
                 <Button
                   size="sm"
-                  onClick={handlePublishDraft}
-                  className={markReadyError ? "border-red-500 text-red-600" : ""}
-                  variant={markReadyError ? "outline" : "default"}
+                  onClick={handleSubmitForReview}
+                  disabled={isSubmittingForReview}
+                  variant="default"
                 >
-                  <CheckCircle2 className="size-4 mr-1" aria-hidden="true" />
-                  {markReadyError ? "Fix required rules first" : "Mark Ready"}
+                  <Send className="size-4 mr-1" aria-hidden="true" />
+                  {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -877,6 +939,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             </div>
           </Card>
         )}
+
+        {/* Phase 8: Guide Review Panel */}
+        <GuideReviewPanel 
+          guideId={normalizedGuide.id} 
+          guideStatus={guideStatus}
+          onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}
+        />
 
         {/* Sections Editor */}
         <div className="space-y-4">

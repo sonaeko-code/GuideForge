@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, ArrowLeft, AlertCircle, Settings } from "lucide-react"
+import { ArrowLeft, AlertCircle, Settings } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
@@ -66,12 +66,6 @@ export default async function NetworkDashboardPage({
               <Link href={`/builder/network/${networkId}/settings`}>
                 <Settings className="size-4 mr-1" aria-hidden="true" />
                 Settings
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href={`/builder/network/${networkId}/generate`}>
-                <Plus className="size-4 mr-1" aria-hidden="true" />
-                Generate Guide
               </Link>
             </Button>
           </div>

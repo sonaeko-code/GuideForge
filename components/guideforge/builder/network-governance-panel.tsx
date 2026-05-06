@@ -1,10 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Users, Shield, Check, X, Edit2 } from 'lucide-react'
+import { AlertCircle, Users, Shield, Check, X, Edit2, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuth } from '@/lib/guideforge/auth-context'
 import {
   getRoleDefinitionsForNetwork,
@@ -12,7 +19,12 @@ import {
   getCurrentUserNetworkMembership,
   claimOwnerlessNetwork,
   updateNetworkRoleDisplayNames,
+  addNetworkMember,
+  updateNetworkMemberRole,
+  removeNetworkMember,
+  getCurrentUserNetworkAuthority,
 } from '@/lib/guideforge/supabase-networks'
+import { shortUUID } from '@/lib/guideforge/uuid-utils'
 import type { NetworkRoleDefinition, NetworkMember, Network } from '@/lib/guideforge/types'
 
 interface NetworkGovernancePanelProps {
@@ -21,10 +33,11 @@ interface NetworkGovernancePanelProps {
 }
 
 /**
- * Network Governance Panel - Phase 2, 3, & 4
+ * Network Governance Panel - Phase 2, 3, 4, & 5
  * Phase 2: Read-only display of network roles and members
  * Phase 3: Allow claiming ownerless networks
  * Phase 4: Editable role display names (theme labels)
+ * Phase 5: Basic member management (add/update/remove)
  */
 export function NetworkGovernancePanel({ networkId, network }: NetworkGovernancePanelProps) {
   const { user, isAuthenticated } = useAuth()
@@ -41,16 +54,66 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   const [isUpdatingLabels, setIsUpdatingLabels] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Phase 5: Member management
+  const [newMemberId, setNewMemberId] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState('member')
+  const [isAddingMember, setIsAddingMember] = useState(false)
+  const [memberMessage, setMemberMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [updatingMemberRoles, setUpdatingMemberRoles] = useState<Record<string, string>>({})
+  const [isUpdatingMemberRole, setIsUpdatingMemberRole] = useState<Record<string, boolean>>({})
+  const [isRemovingMember, setIsRemovingMember] = useState<Record<string, boolean>>({})
+
+  // Phase 7: Member lookup by profile display name/handle
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [memberSearchResults, setMemberSearchResults] = useState<Array<{
+    userId: string
+    displayName: string | null
+    handle: string | null
+    avatarUrl: string | null
+    role: string | null
+  }>>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState<{
+    userId: string
+    displayName: string | null
+    handle: string | null
+  } | null>(null)
+  const [showAdvancedUUID, setShowAdvancedUUID] = useState(false)
+
+  // Phase 6: Permission gating
+  const [canManageMembers, setCanManageMembers] = useState(false)
+
+  // Phase 7: Member profile display
+  const [memberProfiles, setMemberProfiles] = useState<Map<string, any>>(new Map())
+
   const loadGovernanceData = async () => {
     setIsLoading(true)
-    const [roleData, memberData, userMembership] = await Promise.all([
+    const [roleData, memberData, userMembership, authority] = await Promise.all([
       getRoleDefinitionsForNetwork(networkId),
       getNetworkMembersForNetwork(networkId),
       isAuthenticated ? getCurrentUserNetworkMembership(networkId) : Promise.resolve(null),
+      isAuthenticated ? getCurrentUserNetworkAuthority(networkId) : Promise.resolve(null),
     ])
     setRoles(roleData)
     setMembers(memberData)
     setCurrentUserRole(userMembership)
+    if (authority) {
+      setCanManageMembers(authority.canManageMembers)
+    }
+
+    // Phase 7: Fetch member profile data for display names
+    if (memberData && memberData.length > 0) {
+      try {
+        const { getUserProfiles } = await import('@/lib/guideforge/supabase-profiles')
+        const userIds = memberData.map(m => m.userId)
+        const profiles = await getUserProfiles(userIds)
+        setMemberProfiles(profiles)
+        console.log('[v0] NetworkGovernancePanel: Fetched profiles for', profiles.size, 'members')
+      } catch (err) {
+        console.warn('[v0] NetworkGovernancePanel: Error fetching member profiles:', err instanceof Error ? err.message : String(err))
+      }
+    }
+
     setIsLoading(false)
   }
 
@@ -150,6 +213,140 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
   // Determine if claim button should show
   // Only show if: authenticated, network is ownerless, current user not already a member
   const canClaim = isAuthenticated && network && !network.ownerUserId && !currentUserRole
+
+  // Governance Phase 5: Member management
+  const handleSearchMembers = async (query: string) => {
+    setMemberSearchQuery(query)
+    
+    if (query.trim().length < 2) {
+      setMemberSearchResults([])
+      return
+    }
+    
+    setIsSearching(true)
+    try {
+      const { searchProfilesForMemberLookup } = await import('@/lib/guideforge/supabase-profiles')
+      const results = await searchProfilesForMemberLookup(query)
+      setMemberSearchResults(results)
+    } catch (err) {
+      console.error('[v0] handleSearchMembers: Error searching profiles:', err)
+      setMemberSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleSelectProfile = (profile: {
+    userId: string
+    displayName: string | null
+    handle: string | null
+  }) => {
+    // Check if user is already a member
+    const isDuplicate = members.some((m) => m.userId === profile.userId)
+    if (isDuplicate) {
+      setMemberMessage({ type: 'error', text: 'This user is already a member of this network.' })
+      return
+    }
+    
+    // Check if user is the current owner (prevent duplicate owner membership)
+    if (network?.ownerUserId === profile.userId) {
+      setMemberMessage({ type: 'error', text: 'This user is already the network owner.' })
+      return
+    }
+    
+    setSelectedProfile(profile)
+    setMemberSearchResults([])
+    setMemberSearchQuery('')
+    setMemberMessage(null)
+  }
+
+  const handleAddMember = async () => {
+    // Determine which ID to use (search result or UUID fallback)
+    const userIdToAdd = selectedProfile?.userId || newMemberId.trim()
+    
+    if (!userIdToAdd) {
+      setMemberMessage({ type: 'error', text: 'Please select a user or enter a User ID' })
+      return
+    }
+
+    if (!newMemberRole) {
+      setMemberMessage({ type: 'error', text: 'Role cannot be empty' })
+      return
+    }
+
+    setIsAddingMember(true)
+    setMemberMessage(null)
+
+    try {
+      const result = await addNetworkMember(networkId, userIdToAdd, newMemberRole)
+      if (result.success) {
+        setMemberMessage({ type: 'success', text: `Member added successfully!` })
+        setNewMemberId('')
+        setNewMemberRole('member')
+        setSelectedProfile(null)
+        setMemberSearchQuery('')
+        await loadGovernanceData()
+      } else {
+        setMemberMessage({ type: 'error', text: result.error || 'Failed to add member' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMemberMessage({ type: 'error', text: `Error adding member: ${message}` })
+    } finally {
+      setIsAddingMember(false)
+    }
+  }
+
+  const handleUpdateMemberRole = async (memberId: string, userId: string) => {
+    const newRole = updatingMemberRoles[memberId]
+    if (!newRole) {
+      setMemberMessage({ type: 'error', text: 'Role cannot be empty' })
+      return
+    }
+
+    setIsUpdatingMemberRole((prev) => ({ ...prev, [memberId]: true }))
+    setMemberMessage(null)
+
+    try {
+      const result = await updateNetworkMemberRole(networkId, userId, newRole)
+      if (result.success) {
+        setMemberMessage({ type: 'success', text: 'Member role updated!' })
+        setUpdatingMemberRoles((prev) => {
+          const updated = { ...prev }
+          delete updated[memberId]
+          return updated
+        })
+        await loadGovernanceData()
+      } else {
+        setMemberMessage({ type: 'error', text: result.error || 'Failed to update role' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMemberMessage({ type: 'error', text: `Error updating role: ${message}` })
+    } finally {
+      setIsUpdatingMemberRole((prev) => ({ ...prev, [memberId]: false }))
+    }
+  }
+
+  const handleRemoveMember = async (memberId: string, userId: string) => {
+    setIsRemovingMember((prev) => ({ ...prev, [memberId]: true }))
+    setMemberMessage(null)
+
+    try {
+      const result = await removeNetworkMember(networkId, userId, user?.id)
+      if (result.success) {
+        setMemberMessage({ type: 'success', text: 'Member removed!' })
+        await loadGovernanceData()
+      } else {
+        setMemberMessage({ type: 'error', text: result.error || 'Failed to remove member' })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMemberMessage({ type: 'error', text: `Error removing member: ${message}` })
+    } finally {
+      setIsRemovingMember((prev) => ({ ...prev, [memberId]: false }))
+    }
+  }
 
   if (isLoading) {
     return (
@@ -358,34 +555,308 @@ export function NetworkGovernancePanel({ networkId, network }: NetworkGovernance
           )}
         </div>
 
-        {/* Network Members */}
+        {/* Network Members - Phase 5: Manage Members, Phase 6: Permission gating */}
         <div>
           <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
             <Users className="size-4" aria-hidden="true" />
-            Network Members ({members.length})
+            Manage Members ({members.length})
           </h3>
-          {members.length > 0 ? (
-            <div className="space-y-2">
-              {members.map((member) => (
-                <div key={member.id} className="p-3 rounded-lg border border-border/50 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {member.displayName || member.userId}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono break-all">
-                      {member.userId}
-                    </p>
-                  </div>
-                  <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded">
-                    {member.canonicalRole}
-                  </div>
+
+          {!canManageMembers ? (
+            <>
+              {/* Read-only member list when user cannot manage */}
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-4">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Only network owners/admins can manage members.
+                </p>
+              </div>
+
+              {members.length > 0 ? (
+                <div className="space-y-3">
+                  {members.map((member) => {
+                    // Phase 7B: Polish member card display
+                    const memberProfile = memberProfiles.get(member.userId)
+                    const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName
+                    const handle = memberProfile?.handle
+                    const shortUuid = member.userId.substring(0, 8) + '…' + member.userId.substring(member.userId.length - 6)
+                    
+                    // Only show UUID if no display name and no handle exist
+                    const showUuid = !displayName && !handle
+                    
+                    return (
+                      <div key={member.id} className="p-3 rounded-lg border border-border/50">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            {displayName ? (
+                              <>
+                                <p className="text-sm font-medium text-foreground">
+                                  {displayName}
+                                </p>
+                                {handle && handle !== displayName && (
+                                  <p className="text-xs text-muted-foreground">@{handle}</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm font-medium text-foreground font-mono" title={member.userId}>
+                                {shortUuid}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded flex-shrink-0">
+                            {member.displayName || member.canonicalRole}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
+              ) : (
+                <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/20 border border-border/30">
+                  No members assigned yet.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+          {/* Add Member Form - Phase 7: Member search by profile display name/handle */}
+          <div className="p-4 rounded-lg border border-border/50 bg-muted/30 mb-4">
+            <p className="text-xs text-muted-foreground mb-3">Add a new member</p>
+            <div className="space-y-3">
+              {/* Phase 7: Search user by display name or handle */}
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search by display name or handle"
+                  value={selectedProfile ? '' : memberSearchQuery}
+                  onChange={(e) => handleSearchMembers(e.target.value)}
+                  disabled={!!selectedProfile}
+                  className="h-8 text-sm"
+                />
+                
+                {/* Search results dropdown - Phase 7B: Polish display */}
+                {memberSearchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/50 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {memberSearchResults.map((result) => {
+                      const displayText = result.displayName || result.handle || result.userId.substring(0, 12)
+                      return (
+                        <button
+                          key={result.userId}
+                          onClick={() => handleSelectProfile(result)}
+                          className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b border-border/30 last:border-b-0 text-sm transition-colors"
+                          title={result.userId}
+                        >
+                          <div className="font-medium text-foreground">{displayText}</div>
+                          {result.handle && result.displayName && (
+                            <div className="text-xs text-muted-foreground">@{result.handle}</div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected user display */}
+              {selectedProfile && (
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedProfile.displayName || selectedProfile.handle || selectedProfile.userId}
+                    </p>
+                    {selectedProfile.handle && selectedProfile.displayName && (
+                      <p className="text-xs text-muted-foreground">@{selectedProfile.handle}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedProfile(null)}
+                    className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+
+              {/* Role selector */}
+              <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.canonicalRole} value={role.canonicalRole}>
+                      {role.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Add button */}
+              <Button
+                onClick={handleAddMember}
+                disabled={isAddingMember || (!selectedProfile && !newMemberId.trim()) || !newMemberRole}
+                size="sm"
+                className="w-full h-8 text-xs gap-1"
+              >
+                <Plus className="size-3" aria-hidden="true" />
+                {isAddingMember ? 'Adding...' : 'Add Member'}
+              </Button>
+
+              {/* Advanced: UUID fallback toggle */}
+              <button
+                onClick={() => setShowAdvancedUUID(!showAdvancedUUID)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left py-1"
+              >
+                {showAdvancedUUID ? '▼' : '▶'} Advanced: add by UUID
+              </button>
+
+              {/* UUID fallback form (hidden by default) */}
+              {showAdvancedUUID && (
+                <div className="pt-2 border-t border-border/30 space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="User ID (UUID)"
+                    value={selectedProfile ? '' : newMemberId}
+                    onChange={(e) => setNewMemberId(e.target.value)}
+                    disabled={!!selectedProfile}
+                    className="h-8 text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Or paste a user ID directly. This requires knowing the exact UUID.
+                  </p>
+                </div>
+              )}
+
+              {/* Helper text */}
+              <p className="text-xs text-muted-foreground">
+                Search by display name or handle. Email lookup will require a secure profile/email lookup later.
+              </p>
+            </div>
+
+            {memberMessage && (
+              <div
+                className={`mt-3 p-3 rounded text-sm flex items-start gap-2 ${
+                  memberMessage.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-red-500/10 text-red-700 dark:text-red-300'
+                }`}
+              >
+                {memberMessage.type === 'success' ? (
+                  <Check className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                ) : (
+                  <X className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                )}
+                <span>{memberMessage.text}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Members List */}
+          {members.length > 0 ? (
+            <div className="space-y-3">
+              {members.map((member) => {
+                // Phase 7B: Polish member card display
+                const memberProfile = memberProfiles.get(member.userId)
+                const displayName = memberProfile?.display_name || memberProfile?.handle || member.displayName
+                const handle = memberProfile?.handle
+                const shortUuid = member.userId.substring(0, 8) + '…' + member.userId.substring(member.userId.length - 6)
+                
+                // Only show UUID if no display name and no handle exist
+                const showUuid = !displayName && !handle
+                const isEditingRole = updatingMemberRoles[member.id]
+                const newRole = isEditingRole || member.canonicalRole
+                
+                return (
+                  <div
+                    key={member.id}
+                    className="p-3 rounded-lg border border-border/50 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        {displayName ? (
+                          <>
+                            <p className="text-sm font-medium text-foreground">
+                              {displayName}
+                            </p>
+                            {handle && handle !== displayName && (
+                              <p className="text-xs text-muted-foreground">@{handle}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium text-foreground font-mono" title={member.userId}>
+                            {shortUuid}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Role selector and actions */}
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-xs text-muted-foreground block mb-1">
+                          Role
+                        </label>
+                        <Select
+                          value={isEditingRole ? updatingMemberRoles[member.id] : member.canonicalRole}
+                          onValueChange={(value) =>
+                            setUpdatingMemberRoles((prev) => ({
+                              ...prev,
+                              [member.id]: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role.canonicalRole} value={role.canonicalRole}>
+                                {role.displayName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Save button - only shows if role changed */}
+                      {isEditingRole && updatingMemberRoles[member.id] !== member.canonicalRole && (
+                        <Button
+                          onClick={() => handleUpdateMemberRole(member.id, member.userId)}
+                          disabled={isUpdatingMemberRole[member.id]}
+                          size="sm"
+                          className="h-8 text-xs"
+                        >
+                          {isUpdatingMemberRole[member.id] ? 'Saving...' : 'Save'}
+                        </Button>
+                      )}
+
+                      {/* Remove button */}
+                      <Button
+                        onClick={() => handleRemoveMember(member.id, member.userId)}
+                        disabled={isRemovingMember[member.id] || isAddingMember}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1 text-red-600 dark:text-red-400"
+                      >
+                        {isRemovingMember[member.id] ? (
+                          'Removing...'
+                        ) : (
+                          <>
+                            <Trash2 className="size-3" aria-hidden="true" />
+                            Remove
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/20 border border-border/30">
               No members assigned yet.
             </div>
+          )}
+        </>
           )}
         </div>
       </div>

@@ -22,7 +22,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
-import { CreateCollectionForm } from "@/components/guideforge/builder/create-collection-form"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
 interface NetworkDashboardTabsProps {
@@ -456,6 +455,14 @@ export function NetworkDashboardTabs({
           <h2 className="text-lg font-semibold text-foreground">
             Collections ({safeCollections.length})
           </h2>
+          {safeHubs.length > 0 && (
+            <Button size="sm" asChild>
+              <Link href={`/builder/network/${networkId}/collection/new`}>
+                <Plus className="size-4 mr-1" aria-hidden="true" />
+                Create Collection
+              </Link>
+            </Button>
+          )}
         </div>
 
         {safeCollections.length === 0 ? (
@@ -467,16 +474,16 @@ export function NetworkDashboardTabs({
                 ? "Create a hub first to add collections."
                 : "Create your first collection to organize guides."}
             </p>
-            <div className="mt-6 max-w-md mx-auto">
-              <CreateCollectionForm networkId={networkId} hubs={safeHubs} />
-            </div>
+            {safeHubs.length > 0 && (
+              <Button size="sm" asChild className="mt-4">
+                <Link href={`/builder/network/${networkId}/collection/new`}>
+                  Create First Collection
+                </Link>
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="max-w-md">
-              <CreateCollectionForm networkId={networkId} hubs={safeHubs} />
-            </div>
-            <div className="space-y-4">
+          <div className="space-y-4">
               {safeHubs.map((hub: NormalizedHub) => {
                 const hubCollections = safeCollections.filter((c: NormalizedCollection) => c.hubId === hub.id)
 
@@ -534,7 +541,6 @@ export function NetworkDashboardTabs({
                 )
               })}
             </div>
-          </div>
         )}
       </TabsContent>
     </Tabs>

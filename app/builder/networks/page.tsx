@@ -1,11 +1,9 @@
 import Link from "next/link"
-import { Plus, Folder, ArrowRight, AlertCircle, Settings } from "lucide-react"
+import { Plus, Folder, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { SiteHeader } from "@/components/guideforge/site-header"
-import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
+import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
 import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
-import { getHubsByNetwork, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 
 // Disable caching for this page so it always fetches fresh network data from Supabase
 export const dynamic = "force-dynamic"
@@ -69,13 +67,11 @@ export default async function NetworksDirectoryPage() {
             console.log("[v0] Network card counts:", network.id, "collections:", collectionCount)
           } catch (collErr) {
             console.warn("[v0] Network count error (collections for", network.id, "):", collErr)
-            // Return zero collections if query fails, don't let it break the whole card
             collectionCount = 0
           }
         }
       } catch (err) {
         console.warn("[v0] Network count error (hubs for", network.id, "):", err)
-        // Return zeroes if counts fail to load, but still render the card
         hubCount = 0
         collectionCount = 0
       }
@@ -101,94 +97,33 @@ export default async function NetworksDirectoryPage() {
           </Button>
         </div>
 
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex-1">
-              <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-                All Networks
-              </h1>
-              <p className="mt-2 text-pretty text-lg text-muted-foreground">
-                {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 md:flex-row md:gap-3">
-              <Button asChild variant="outline">
-                <Link href="/builder/network/scaffold">
-                  <Plus className="mr-2 size-4" aria-hidden="true" />
-                  From Template
-                </Link>
-              </Button>
-              <Button asChild size="lg">
-                <Link href="/builder/network/new">
-                  <Plus className="mr-2 size-4" aria-hidden="true" />
-                  Create Network
-                </Link>
-              </Button>
-            </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex-1">
+            <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+              All Networks
+            </h1>
+            <p className="mt-2 text-pretty text-lg text-muted-foreground">
+              {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
+            </p>
           </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {networksWithCounts.map((network) => (
-            <Card
-              key={network.id}
-              className="flex flex-col gap-4 p-5 hover:border-primary/50 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <h3 className="text-base font-semibold text-foreground">
-                    {network.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    /{network.slug}
-                  </p>
-                </div>
-                <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
-              </div>
-
-              {network.description && (
-                <p className="text-sm text-muted-foreground flex-1">
-                  {network.description}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground py-2 border-t border-border/50">
-                <div>
-                  <span className="font-semibold text-foreground">{network.hubCount}</span> {network.hubCount === 1 ? 'hub' : 'hubs'}
-                </div>
-                <div>
-                  <span className="font-semibold text-foreground">{network.collectionCount}</span> {network.collectionCount === 1 ? 'collection' : 'collections'}
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button asChild size="sm" variant="outline" className="flex-1">
-                  <Link href={`/builder/network/${network.id}/dashboard`}>
-                    Dashboard
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/builder/network/${network.id}/settings`}>
-                    <Settings className="size-3.5" aria-hidden="true" />
-                    <span className="sr-only">Settings</span>
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline" className="flex-1">
-                  <Link href={`/builder/network/${network.id}/hub/new`}>
-                    New Hub
-                  </Link>
-                </Button>
-              </div>
-
-              {network.slug === 'questline' && (
-                <Button asChild size="sm" variant="ghost" className="w-full gap-2">
-                  <Link href="/n/questline">
-                    View Site
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </Link>
-                </Button>
-              )}
-            </Card>
-          ))}
+          <div className="flex flex-col gap-2 md:flex-row md:gap-3">
+            <Button asChild variant="outline">
+              <Link href="/builder/network/scaffold">
+                <Plus className="mr-2 size-4" aria-hidden="true" />
+                From Template
+              </Link>
+            </Button>
+            <Button asChild size="lg">
+              <Link href="/builder/network/new">
+                <Plus className="mr-2 size-4" aria-hidden="true" />
+                Create Network
+              </Link>
+            </Button>
+          </div>
         </div>
+
+        {/* Client component handles relationship sorting, badges, and New Hub gating */}
+        <NetworksClientList networks={networksWithCounts} />
       </div>
     </main>
   )

@@ -1,6 +1,217 @@
 # Techsperts Governance Code Extraction Plan
 
-## Purpose
+## Current Implementation Status
+
+### Governance Phases 1-5: COMPLETED ✓
+- Phase 1: Governance Schema (network_role_definitions, network_members, roles seeded)
+- Phase 2: Governance read-only panel (display roles, members, governance info)
+- Phase 3: Claim Network (allow ownerless network claim)
+- Phase 4: Editable role display names and theme labels
+- Phase 5: Member Management Lite (add members by UUID, change roles, remove members)
+
+### Governance Phase 6: Permission-Aware UI Gating + Profile/Author Safety - COMPLETED ✓
+
+**Permission-aware UI gating for network editing + author/profile foreign key safety (UI-only, no RLS/database enforcement).**
+
+#### Files Changed / Created
+1. **lib/guideforge/supabase-networks.ts** (+159 lines)
+   - Added `getCurrentUserNetworkAuthority(networkId)` helper
+   - Queries `network_members` + `network_role_definitions`
+   - Returns: isSignedIn, userId, membership, roleDefinition, canonicalRole, roleDisplayName, canManageNetwork, canManageMembers, canSubmitGuides, canVoteOnReviews, canPublishOverride
+   - Derives `canManageNetwork = owner OR admin OR can_manage_members`
+   - No RLS, no service role keys
+
+2. **lib/guideforge/supabase-profiles.ts** (NEW, +88 lines)
+   - Added `ensureCurrentUserProfile()` helper - Phase 6 profile bootstrap
+   - Ensures user has a profiles row before guide creation
+   - Gets current authenticated user, checks if profile exists
+   - If not exists, creates profile with display_name from email, bio/handle/role defaults
+   - Returns profile ID for use as guides.author_id FK
+   - Fixes FK constraint error: guides_author_id_fkey violation for new authenticated users
+
+3. **lib/guideforge/supabase-persistence.ts**
+   - Updated `getAuthorId()` method to call `ensureCurrentUserProfile()`
+   - Now returns authenticated user's profile ID instead of raw auth.user.id
+   - Falls back to DEV_PROFILE_ID only if profile bootstrap fails or user not authenticated
+   - Prevents FK violation by ensuring profile row exists before guide insert/update
+
+4. **components/guideforge/builder/network-settings-form.tsx**
+   - Added permission check on mount via `getCurrentUserNetworkAuthority`
+   - If cannot manage network: shows amber notice, disables all fields, hides save button
+   - If can manage: existing behavior unchanged
+
+5. **components/guideforge/builder/network-structure-manager.tsx**
+   - Added permission check on mount via `getCurrentUserNetworkAuthority`
+   - Wraps entire hub/collection UI in conditional render
+   - If cannot manage network: shows amber notice, hides add/edit/delete buttons
+   - If can manage: existing behavior unchanged
+
+6. **components/guideforge/builder/network-governance-panel.tsx**
+   - Added `canManageMembers` permission loading
+   - Wrapped member management UI in conditional
+   - If cannot manage members: shows read-only member list, hides add/edit/remove UI
+   - If can manage: existing Phase 5 behavior unchanged
+   - Applied `shortUUID()` to all member display cards
+
+7. **components/guideforge/builder/create-guide-form.tsx**
+   - Added permission check on mount via `getCurrentUserNetworkAuthority`
+   - If cannot submit guides: shows amber notice, disables form
+   - If can submit: existing behavior unchanged
+   - Prevents non-contributor users from seeing guide creation UI
+
+8. **lib/guideforge/uuid-utils.ts** (EXISTING, verified)
+   - `shortUUID(uuid)` helper - shortens to format: `4b18022e…eeb4e7` (first 8 + last 6)
+   - Full UUID in title attribute for hover
+   - Applied to member display cards
+
+#### Permission Logic
+- Authority source: `network_members` + `network_role_definitions` (database-backed, no frontend role selection)
+- `canManageNetwork` = owner OR admin OR (can_manage_members = true)
+- `canManageMembers` = role.can_manage_members = true
+- `canSubmitGuides` = role.can_submit_guides = true
+
+#### Author/Profile FK Issue - FIXED
+- **Root Cause**: guides.author_id references profiles(id), but authenticated users had no profile row
+  - Second user login creates auth.users row but no public.profiles row
+  - Guide insert attempted to use auth.user.id directly, violating FK constraint
+  - Error: "23503: insert or update on table guides violates foreign key constraint guides_author_id_fkey"
+- **Solution**: ensureCurrentUserProfile() bootstrap helper
+  - Called during guide save (via getAuthorId)
+  - Checks if profile exists for current user ID
+  - Creates profile if needed (display_name from email, defaults for other fields)
+  - Returns valid profile ID for FK reference
+  - Falls back to DEV_PROFILE_ID only if bootstrap fails
+
+#### UI Gating & Permission Notices
+- Settings form: red/amber permission notice + read-only inputs when user cannot manage
+- Structure manager: amber permission notice + hidden controls when user cannot manage
+- Governance panel: amber permission notice + read-only member list when user cannot manage members
+- Create guide form: amber permission notice + disabled form when user cannot submit guides
+- No breaking of existing routes or public viewing
+
+#### UUID Display Improvements
+- Member cards now show shortened UUIDs: 4b18022e…eeb4e7
+- Full UUID available in title attribute for hover tooltip
+- Applied to governance member list and read-only display
+
+#### Not Changed (Phase 6 UI-only + minimal bootstrap)
+- No RLS policies added
+- No database enforcement
+- No route protection
+- No guide creation blocking at DB level
+- No voting UI
+- No auto-publish
+- No schema changes (only bootstrap helper, no schema migration)
+
+---
+
+### Governance Phase 6 Cleanup: Profile Bootstrap, Network Sorting & Membership Badges - COMPLETED ✓
+
+**Phase 6 follow-up addressing state refresh issues, profile bootstrap reliability, network relevance sorting, and membership visibility (UI-only, no RLS/policies).**
+
+#### Files Modified: 2
+
+1. **components/guideforge/account/account-profile-card.tsx**
+   - Added profile bootstrap on account page load
+   - Calls `ensureCurrentUserProfile()` when authenticated user opens /account
+   - Creates profile row if missing (prevents FK violations for new users)
+   - Logs success/failure but doesn't block page load
+
+2. **app/builder/networks/page.tsx**
+   - Added current user detection via `getSupabaseSession()`
+   - Fetches user network memberships server-side
+   - Prefetches `canManageNetwork` authority for each network
+   - Implements Phase 6 network sorting by user relationship:
+     1. Owned by you
+     2. Member of network (shows `Member: {roleDisplayName}`)
+     3. Ownerless / claimable (shows `No owner assigned`)
+     4. Owned by another user
+     5. Everything else
+   - Within same group, sorts by name alphabetically
+   - Shows relationship badge on each network card
+   - Gated "New Hub" button: disabled with lock icon for non-managers
+   - Dashboard button remains visible to all
+   - Settings button remains visible (page itself is read-only gated)
+
+#### Profile Bootstrap Locations: 2
+
+1. **account page** (`/account`)
+   - On mount, calls `ensureCurrentUserProfile()` for authenticated user
+   - Ensures profile exists before showing membership data
+   - Non-blocking: continues even if bootstrap fails
+
+2. **network settings page** (existing from Phase 6)
+   - During guide save via `getAuthorId()` in `supabase-persistence.ts`
+   - Ensures profile exists before FK-constrained INSERT/UPDATE
+
+#### Network Sorting Logic
+
+Priority order on `/builder/networks`:
+```
+0. Owned by you: network.ownerUserId === currentUserId
+1. Member: current user exists in network_members for this network
+2. Ownerless: network.ownerUserId === null
+3. Owned by another: network.ownerUserId != null and != currentUserId
+4. All else
+```
+
+Within each group: sort by `name` alphabetically
+
+#### Membership Badge Logic
+
+Show one of:
+- "Owned by you" — if currentUserId === network.ownerUserId
+- "Member: {roleDisplayName}" — if current user is in network_members with role
+- "No owner assigned" — if ownerUserId is null
+- (hidden) — if owned by another or not a member
+
+#### New Hub Button Gating
+
+On each network card:
+- If `canManageNetwork` === true: Show "New Hub" button as normal, clickable link
+- If `canManageNetwork` === false: Show disabled button with lock icon, `title="Only owners/admins can add hubs"`
+- Dashboard button remains visible for all
+- Settings button remains visible for all (read-only gating on the page itself)
+
+#### UUID Display
+
+- Ownership badge shows: `getOwnershipLabel(status)` (already short, e.g., "Owned by you", "Owned by another user")
+- Member display cards show shortened UUIDs: `4b18022e…eeb4e7` with full UUID in title attribute
+- No full UUIDs as primary visible labels
+
+#### No RLS, No Policies, No Route Protection
+
+- ✓ No RLS policies added
+- ✓ No database policies added
+- ✓ No route protection added
+- ✓ Public dashboard routes still load
+- ✓ Public networks still visible to all
+- ✓ No schema changes
+- ✓ No voting UI
+- ✓ No auto-publish
+- ✓ No publish guards
+
+---
+- `canManageMembers` = role.can_manage_members = true
+- `canSubmitGuides` = role.can_submit_guides = true
+
+#### UI Changes
+- Settings form: read-only view when cannot manage
+- Structure manager: permission notice instead of edit controls
+- Governance panel: read-only member list when cannot manage
+- Member cards: shortened UUIDs with full UUID on hover
+
+#### Not Changed (Phase 6 UI-only)
+- No RLS policies
+- No database enforcement
+- No route protection
+- No guide creation blocking
+- No voting UI
+- No auto-publish
+- No schema changes
+
+---
+
 
 This document is the code-level blueprint for reusing Techsperts governance patterns in GuideForge **without blindly copying repair-specific assumptions**. 
 
@@ -507,6 +718,41 @@ Role label customization in Governance & Roles panel:
   - Network Members list if visible
 - ✓ No canonical_role changes, no weight changes, no permission changes
 - ✓ No RLS, no route protection, no member editing, no voting
+
+### Governance Phase 5 Status
+
+**Governance Phase 5 added basic member management UI without enforcement.**
+
+Member management in Governance & Roles panel:
+- ✓ addNetworkMember helper (76 lines) - inserts network_members with display_name defaulting to role display name
+  - Prevents duplicate memberships (checks if user already in network)
+  - Validates user ID and role not empty
+  - Does not send email invitations
+- ✓ updateNetworkMemberRole helper (42 lines) - updates canonical_role and display_name only
+  - Fetches role display_name to sync display name with themed labels
+  - Does not update networks.owner_user_id
+  - Does not update auth users
+- ✓ removeNetworkMember helper (54 lines) - deletes network_members row with safety checks
+  - Prevents removal of last owner (counts owners before delete)
+  - Prevents signed-in user removing their own owner membership
+  - Clear error messages for both conditions
+- ✓ NetworkGovernancePanel now displays:
+  - Add Member section with user ID input and role dropdown (uses role definitions)
+  - Members list with:
+    - Member name and user ID
+    - Role dropdown (updates value when changed)
+    - Save Role button (appears only if role changed from current)
+    - Remove button (red warning style with trash icon)
+  - Success/error messages for add/update/remove actions
+  - Automatic data refresh after each action
+- ✓ Safety features:
+  - Cannot add user with empty ID or empty role
+  - Cannot remove last owner from network
+  - Cannot remove yourself as owner (blocks accidental self-removal)
+  - Validation errors shown in red message box below form
+  - Success messages confirm each action
+- ✓ No canonical_role changes, no networks.owner_user_id sync yet
+- ✓ No RLS, no route protection, no enforcement yet, no voting
 
 ---
 

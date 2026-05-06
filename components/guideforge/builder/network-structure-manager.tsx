@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Plus, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,7 +14,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
-import { createHub, updateHub, createCollection, updateCollection, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
+import { createHub, updateHub, createCollection, updateCollection, getHubsByNetworkId, getCollectionsByHubId, getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networks"
 import type { Hub, Collection, Network } from "@/lib/guideforge/types"
 
 interface NetworkStructureManagerProps {
@@ -33,6 +33,10 @@ function slugify(text: string): string {
 
 export function NetworkStructureManager({ network, networkId }: NetworkStructureManagerProps) {
   const router = useRouter()
+
+  // Phase 6: Permission gating
+  const [canManageNetwork, setCanManageNetwork] = useState(false)
+  const [checkingPermissions, setCheckingPermissions] = useState(true)
 
   // Hub management
   const [hubs, setHubs] = useState<Hub[]>([])
@@ -79,8 +83,19 @@ export function NetworkStructureManager({ network, networkId }: NetworkStructure
   // Success message
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
+  // Phase 6: Check permissions on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      setCheckingPermissions(true)
+      const authority = await getCurrentUserNetworkAuthority(networkId)
+      setCanManageNetwork(authority.canManageNetwork)
+      setCheckingPermissions(false)
+    }
+    checkAuth()
+  }, [networkId])
+
   // Load hubs on mount
-  if (!hubsLoaded) {
+  if (!hubsLoaded && !checkingPermissions) {
     loadHubs()
   }
 
@@ -310,6 +325,20 @@ export function NetworkStructureManager({ network, networkId }: NetworkStructure
 
   return (
     <div className="space-y-6">
+      {/* Phase 6: Permission check */}
+      {checkingPermissions ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        </div>
+      ) : !canManageNetwork ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+          <Lock className="size-5 text-amber-700 dark:text-amber-300 mt-0.5 flex-shrink-0" aria-hidden="true" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            You can view this network, but only owners/admins can edit hubs and collections.
+          </p>
+        </div>
+      ) : (
+        <>
       {successMessage && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 flex gap-3">
           <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
@@ -676,6 +705,8 @@ export function NetworkStructureManager({ network, networkId }: NetworkStructure
           )}
         </div>
       </Card>
+    </>
+      )}
     </div>
   )
 }
