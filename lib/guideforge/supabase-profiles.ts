@@ -175,6 +175,11 @@ export function formatMemberSinceDate(dateString: string | undefined): string | 
     return null
   }
 }
+
+/**
+ * Get the current authenticated user's profile from the profiles table
+ * Returns the full profile object including display_name, handle, avatar, bio, role
+ * Phase 3: Account/Profile - Display current user's profile information
  * 
  * Returns null if user not authenticated, profile not found, or error occurs
  */
