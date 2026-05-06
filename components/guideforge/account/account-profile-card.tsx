@@ -20,21 +20,32 @@ export function AccountProfileCard() {
   const [networks, setNetworks] = useState<Network[]>([])
   const [memberships, setMemberships] = useState<NetworkMembership[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [profileBootstrapError, setProfileBootstrapError] = useState<string | null>(null)
 
   // Load networks to show owned networks list, and memberships for all networks
   // Phase 6: Also bootstrap profile on account page load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
+      setProfileBootstrapError(null)
       
       // Phase 6: Ensure profile exists for authenticated user
       if (isAuthenticated && user?.id) {
         try {
+          console.log('[v0] AccountProfileCard: Starting profile bootstrap for user:', user.id)
           const { ensureCurrentUserProfile } = await import('@/lib/guideforge/supabase-profiles')
-          await ensureCurrentUserProfile()
-          console.log('[v0] Profile bootstrapped on account page for user:', user.id)
+          const profileId = await ensureCurrentUserProfile()
+          if (profileId) {
+            console.log('[v0] AccountProfileCard: Profile bootstrap successful, profileId:', profileId)
+          } else {
+            const errorMsg = 'Profile bootstrap returned null - check browser console for details'
+            console.warn('[v0] AccountProfileCard: Profile bootstrap failed:', errorMsg)
+            setProfileBootstrapError(errorMsg)
+          }
         } catch (err) {
-          console.warn('[v0] Profile bootstrap on account page failed:', err)
+          const errorMsg = err instanceof Error ? err.message : String(err)
+          console.error('[v0] AccountProfileCard: Profile bootstrap exception:', errorMsg)
+          setProfileBootstrapError(errorMsg)
         }
       }
       
@@ -65,6 +76,15 @@ export function AccountProfileCard() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Bootstrap Error Notice */}
+      {profileBootstrapError && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            <strong>Profile Setup Issue:</strong> {profileBootstrapError}. Check the browser console (F12) for detailed error logs.
+          </p>
+        </div>
+      )}
+
       {/* Profile Section */}
       <Card className="border-border/50 p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Profile Information</h2>
