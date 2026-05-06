@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { ArrowRight, Lock, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { NetworkOwnershipBadge } from './network-ownership-badge'
 import { useAuth } from '@/lib/guideforge/auth-context'
 import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
 import type { Network } from '@/lib/guideforge/types'
@@ -21,7 +20,6 @@ interface NetworksClientListProps {
 
 interface NetworkCardData extends NetworkWithCounts {
   relationshipBadge: string | null
-  ownerDisplayName: string | null
   canManageNetwork: boolean
 }
 
@@ -47,7 +45,6 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
         setSortedNetworks(networks.map((n) => ({
           ...n,
           relationshipBadge: null,
-          ownerDisplayName: null,
           canManageNetwork: false,
         })))
         setIsLoading(false)
@@ -105,36 +102,47 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
           let relationshipBadge: string | null = null
           let canManageNetwork = false
 
-          // Determine relationship badge
+          // Determine relationship badge - SINGLE PRIMARY BADGE ONLY
+          // Priority:
+          // 1. "Owned by you" (if current user owns)
+          // 2. "Member: {roleDisplayName}" (if current user is member)
+          // 3. "No owner assigned" (if no owner)
+          // 4. "Owned by {displayNameOrHandle}" (if owner exists with display name)
+          // 5. "Owned by another user" (fallback)
+          
           if (isAuthenticated && user?.id === network.ownerUserId) {
+            // Current user owns this network
             relationshipBadge = 'Owned by you'
-            canManageNetwork = true // Owners can manage
-          } else if (userMembershipRoleId && role?.can_manage_network) {
-            relationshipBadge = 'Member: Manager'
             canManageNetwork = true
           } else if (userMembershipRoleId) {
-            // Member but not a manager - get role name from somewhere else if needed
-            relationshipBadge = 'Member'
-            canManageNetwork = false
+            // Current user is a member - check role permissions
+            if (role?.can_manage_network) {
+              relationshipBadge = 'Member: Manager'
+              canManageNetwork = true
+            } else {
+              // For other roles, try to get a role display name or default to "Member"
+              relationshipBadge = 'Member'
+              canManageNetwork = false
+            }
           } else if (!network.ownerUserId) {
+            // No owner assigned
             relationshipBadge = 'No owner assigned'
             canManageNetwork = false
-          } else {
-            // Owned by another user
-            relationshipBadge = null
+          } else if (ownerProfile) {
+            // Owned by another user - use display name or handle
+            const ownerName = ownerProfile.display_name || ownerProfile.handle
+            relationshipBadge = ownerName ? `Owned by ${ownerName}` : 'Owned by another user'
             canManageNetwork = false
-          }
-
-          // Determine owner display name
-          let ownerDisplayName: string | null = null
-          if (network.ownerUserId && ownerProfile) {
-            ownerDisplayName = ownerProfile.display_name || ownerProfile.handle || null
+          } else {
+            // Owned by another user but profile not found (shouldn't happen)
+            relationshipBadge = 'Owned by another user'
+            canManageNetwork = false
           }
 
           return {
             ...network,
             relationshipBadge,
-            ownerDisplayName,
+            ownerDisplayName: null, // No longer needed - badge includes owner name
             canManageNetwork,
           }
         })
@@ -168,7 +176,6 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
         setSortedNetworks(networks.map((n) => ({
           ...n,
           relationshipBadge: null,
-          ownerDisplayName: null,
           canManageNetwork: false,
         })))
       } finally {
@@ -208,23 +215,12 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
                 /{network.slug}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
               {network.relationshipBadge && (
                 <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded whitespace-nowrap">
                   {network.relationshipBadge}
                 </div>
               )}
-              {network.ownerDisplayName && !network.relationshipBadge?.startsWith('Owned by you') && (
-                <div className="text-xs font-medium text-muted-foreground px-2 py-1">
-                  Owned by {network.ownerDisplayName}
-                </div>
-              )}
-              {network.ownerUserId && !network.ownerDisplayName && !network.relationshipBadge?.startsWith('Owned by you') && (
-                <div className="text-xs font-medium text-muted-foreground px-2 py-1">
-                  Owned by another
-                </div>
-              )}
-              <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
             </div>
           </div>
 
