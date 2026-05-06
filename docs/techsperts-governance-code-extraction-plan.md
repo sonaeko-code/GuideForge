@@ -420,6 +420,20 @@ This schema provides the foundation for phases 3-5 (data, voting, UI) without bl
 - `/builder/networks` still loads all networks
 - No 401 errors, no permission denied
 
+### Phase 1 Status
+
+**Phase 1 schema draft prepared.** 
+
+SQL migration proposal created at `docs/sql/guideforge_governance_schema_phase_1.sql`:
+- Creates 4 foundation tables (idempotent, safe)
+- Seeds default roles for each network (owner, admin, reviewer, contributor, member, viewer)
+- Backfills owner memberships from `networks.owner_user_id`
+- Uses `ON CONFLICT DO NOTHING` for idempotency
+- No RLS, no triggers, no enforcement
+- Ready for manual deployment to Supabase
+
+To proceed: Review SQL, then manually run migration in Supabase dashboard.
+
 ---
 
 ## Risk Notes
