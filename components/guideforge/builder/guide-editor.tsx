@@ -531,31 +531,77 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   // Phase 8: Submit guide for review
   const handleSubmitForReview = async () => {
+    console.log('[v0] Submit for Review clicked', {
+      guideId: normalizedGuide.id,
+      currentGuideStatus: guideStatus,
+      isCurrentSaveFailed,
+      autosaveStatus,
+      saveError,
+    })
+
     setIsSubmittingForReview(true)
+    setSubmitReviewStatus("submitting")
     setSubmitReviewError(null)
+    setSubmitReviewDebug(null)
 
     try {
+      console.log('[v0] Calling submitGuideForReview')
       const result = await submitGuideForReview(normalizedGuide.id)
 
+      console.log('[v0] submitGuideForReview result', {
+        success: result.success,
+        error: result.error,
+        guideId: result.guideId,
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+        networkId: result.networkId,
+        stage: result.stage,
+        verifiedStatus: result.verifiedStatus,
+      })
+
       if (result.success) {
-        console.log('[v0] Submit for review succeeded')
+        console.log('[v0] Submit for review succeeded - updating local state')
         setGuideStatus('ready')
+        setSubmitReviewStatus("success")
+        setSubmitReviewError(null)
+        setSubmitReviewDebug(null)
         setAutosaveStatus('saved')
         
-        // Trigger review panel refresh
+        // Trigger review panel refresh to load votes
         setRefreshReviewPanel(prev => prev + 1)
 
+        // Clear success message after 3 seconds
         setTimeout(() => {
+          setSubmitReviewStatus("idle")
           setAutosaveStatus('idle')
-        }, 2000)
+        }, 3000)
       } else {
+        console.error('[v0] Submit for review failed', {
+          error: result.error,
+          stage: result.stage,
+        })
+        setSubmitReviewStatus("error")
         setSubmitReviewError(result.error || 'Failed to submit for review')
-        setAutosaveStatus('failed')
+        setSubmitReviewDebug({
+          error: result.error,
+          stage: result.stage,
+          guideId: result.guideId,
+          previousStatus: result.previousStatus,
+          networkId: result.networkId,
+        })
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
+      console.error('[v0] submitGuideForReview exception', {
+        message,
+        error: err,
+      })
+      setSubmitReviewStatus("error")
       setSubmitReviewError(message)
-      setAutosaveStatus('failed')
+      setSubmitReviewDebug({
+        error: message,
+        stage: 'unknown-catch',
+      })
     } finally {
       setIsSubmittingForReview(false)
     }
@@ -808,10 +854,29 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 </div>
                 
                 {/* Helper text if save is failing */}
-                {autosaveStatus === "failed" && (
+                {isCurrentSaveFailed && (
                   <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
                     Fix the save error before submitting for review.
                   </p>
+                )}
+
+                {/* Submit for Review success message */}
+                {submitReviewStatus === "success" && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                    Guide submitted for review.
+                  </div>
+                )}
+
+                {/* Submit for Review error message */}
+                {submitReviewStatus === "error" && submitReviewError && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded text-xs text-red-700 dark:text-red-300">
+                    <div className="font-semibold mb-1">Submit for Review failed:</div>
+                    <div>{submitReviewError}</div>
+                    {submitReviewDebug?.stage && (
+                      <div className="mt-1 text-xs opacity-75">Stage: {submitReviewDebug.stage}</div>
+                    )}
+                  </div>
                 )}
               </>
             )}
