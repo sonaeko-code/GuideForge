@@ -231,32 +231,34 @@ export function NetworkDashboardTabs({
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {safeReady.map((guide: Guide) => (
-              <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+              <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
                     {/* Phase 10C: Revision badge on card */}
                     {guide.revisionOf && (
-                      <Badge variant="outline" className="text-xs whitespace-nowrap border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
                         Rev #{guide.revisionNumber || 1}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mb-2">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
                   {/* Phase 10C: Revision context helper text */}
                   {guide.revisionOf && (
-                    <p className="text-xs text-purple-600 dark:text-purple-400 italic">Revision of another guide</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
                   )}
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge status={guide.status} />
+                    {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
+                    {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
-                  <StatusBadge status={guide.status} />
-                  {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
-                  {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                  <Button size="sm" asChild variant="ghost" className="ml-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button size="sm" asChild variant="outline">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                       Edit
                     </Link>
@@ -299,32 +301,34 @@ export function NetworkDashboardTabs({
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {safePublished.map((guide: Guide) => (
-              <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+              <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
                     {/* Phase 10D/10E: Badge for published guides */}
                     {!guide.revisionOf ? (
-                      <Badge variant="outline" className="text-xs whitespace-nowrap border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
                         Original
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs whitespace-nowrap border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
                         Rev #{guide.revisionNumber || 1}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mb-2">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge status={guide.status} />
+                    {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
+                    {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
-                  <StatusBadge status={guide.status} />
-                  {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
-                  {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                  <Button size="sm" asChild variant="ghost" className="ml-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button size="sm" asChild variant="outline">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                       Edit
                     </Link>
@@ -385,18 +389,18 @@ export function NetworkDashboardTabs({
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {filteredGuides.map((guide: Guide) => (
-                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
+                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                       <p className="text-xs text-muted-foreground">
                         {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
                       <StatusBadge status={guide.status} />
-                      {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
+                      {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
                       {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                      <Button size="sm" asChild variant="ghost" className="ml-auto">
+                      <Button size="sm" asChild variant="outline" className="ml-auto">
                         <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                           Edit
                         </Link>
@@ -459,17 +463,18 @@ export function NetworkDashboardTabs({
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {safeGuides.map((guide: Guide) => (
-                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
+                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                       <p className="text-xs text-muted-foreground">
                         {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
                       <StatusBadge status={guide.status} />
+                      {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
                       {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                      <Button size="sm" asChild variant="ghost" className="ml-auto">
+                      <Button size="sm" asChild variant="outline" className="ml-auto">
                         <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                           Edit
                         </Link>
@@ -518,17 +523,17 @@ export function NetworkDashboardTabs({
               ).length
 
               return (
-                <Card key={hub.id} className="border-border/50 px-4 py-3 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1">
+                <Card key={hub.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2 flex-1">
+                    <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-foreground flex items-center gap-2">
-                        <Gamepad2 className="size-4 text-primary" aria-hidden="true" />
-                        {hub.name}
+                        <Gamepad2 className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                        <span className="truncate">{hub.name}</span>
                       </h4>
                       <p className="text-xs text-muted-foreground mt-1">{hub.description}</p>
                     </div>
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-xs font-medium text-muted-foreground mt-2">
                     {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
                   </p>
                 </Card>
@@ -591,29 +596,20 @@ export function NetworkDashboardTabs({
                         
                         if (hubIdValid && colIdValid) {
                           return (
-                            <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
+                            <Card key={col.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                               <div className="space-y-2 flex-1">
                                 <div className="flex items-start justify-between gap-2">
-                                  <h4 className="flex items-center gap-2 font-semibold text-foreground">
-                                    <FolderOpen className="size-4 text-primary" aria-hidden="true" />
-                                    {col.name}
+                                  <h4 className="flex items-center gap-2 font-semibold text-foreground truncate">
+                                    <FolderOpen className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                                    <span className="truncate">{col.name}</span>
                                   </h4>
-                                  <Badge variant="secondary" className="shrink-0 text-xs">
-                                    Hub: {col.hubName || hub.name}
-                                  </Badge>
                                 </div>
-                                <p className="text-sm text-muted-foreground">{col.description}</p>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  {collectionGuideCount} guide{collectionGuideCount !== 1 ? "s" : ""}
+                                <p className="text-xs text-muted-foreground">
+                                  {col.description || "No description yet"}
                                 </p>
                               </div>
-                              <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">
-                                <Button size="sm" asChild variant="ghost" onClick={() => {
-                                  setActiveTab("guides")
-                                  router.push(`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`)
-                                }}>
-                                  Manage Guides
-                                </Button>
+                              <div className="mt-2 text-xs font-medium text-muted-foreground">
+                                {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
                               </div>
                             </Card>
                           )
