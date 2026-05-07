@@ -350,6 +350,21 @@ Published guides are stable, citable versions intended to be referenced external
 - Vote totals shown (read-only)
 - "Create Revision — Soon" button is placeholder (non-functional)
 
+### Phase 10A Implementation Status
+
+**Phase 10A has implemented the first step of the revision workflow:**
+- ✅ Published guides have a "Create Revision" button (no longer "Soon")
+- ✅ Button creates a new draft copy with `revision_of` pointing to the original
+- ✅ New draft has status='draft' and revision_number auto-incremented
+- ✅ Steps are copied from the published guide to the new draft
+- ✅ User is routed to the new draft for editing
+- ✅ Original published guide remains protected and unchanged
+- ❌ Revision approval/publishing (Phase 10B+)
+- ❌ Revision history/comparison (Phase 10B+)
+- ❌ Obsolescence marking (Phase 10B+)
+
+The revision system is now partially functional. Users can create editable drafts from published guides, but approval and publishing workflows are still being developed.
+
 ### Why Published Guides Are Protected
 
 1. **Stability** - External links/citations to published guides should not change

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -29,6 +29,7 @@ import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge
 import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
 import { submitGuideForReview } from "@/lib/guideforge/supabase-guide-reviews"
 import { getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networks"
+import { createGuideRevisionDraft } from "@/lib/guideforge/supabase-guide-revisions"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -97,6 +98,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Phase 9B: Publish authority
   const [canPublish, setCanPublish] = useState(false)
+  
+  // Phase 10A: Create revision action
+  const [isCreatingRevision, setIsCreatingRevision] = useState(false)
+  const [createRevisionStatus, setCreateRevisionStatus] = useState<"idle" | "creating" | "success" | "error">("idle")
+  const [createRevisionError, setCreateRevisionError] = useState<string | null>(null)
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -593,6 +599,38 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     }
   }
 
+  // Phase 10A: Create revision from published guide
+  const handleCreateRevision = async () => {
+    setIsCreatingRevision(true)
+    setCreateRevisionStatus("creating")
+    setCreateRevisionError(null)
+
+    try {
+      const result = await createGuideRevisionDraft(normalizedGuide.id)
+
+      if (result.success && result.revisionGuideId) {
+        console.log('[v0] Revision created successfully:', result.revisionGuideId)
+        setCreateRevisionStatus("success")
+        
+        // Navigate to the new revision draft editor
+        setTimeout(() => {
+          router.push(`/builder/network/${networkId}/guide/${result.revisionGuideId}`)
+        }, 500)
+      } else {
+        console.error('[v0] Create revision failed:', result.error)
+        setCreateRevisionStatus("error")
+        setCreateRevisionError(result.error || "Failed to create revision")
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error"
+      console.error('[v0] Create revision error:', message)
+      setCreateRevisionStatus("error")
+      setCreateRevisionError(message)
+    } finally {
+      setIsCreatingRevision(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Publish confirmation dialog */}
@@ -915,9 +953,26 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
-                <Button size="sm" variant="outline" disabled title="Revision editing coming soon">
-                  <span>Create Revision — Soon</span>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={handleCreateRevision}
+                  disabled={isCreatingRevision || createRevisionStatus === "creating"}
+                >
+                  {createRevisionStatus === "creating" || isCreatingRevision ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent mr-1" aria-hidden="true" />
+                      Creating revision…
+                    </>
+                  ) : (
+                    "Create Revision"
+                  )}
                 </Button>
+                {createRevisionStatus === "error" && createRevisionError && (
+                  <div className="text-xs text-red-600 dark:text-red-400">
+                    {createRevisionError}
+                  </div>
+                )}
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
