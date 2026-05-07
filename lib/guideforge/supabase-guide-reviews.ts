@@ -1,3 +1,5 @@
+'use server'
+
 import { getSupabaseSession, isSupabaseConfigured, supabase } from './supabase-client'
 import { getCurrentUserNetworkMembership, getCurrentUserNetworkAuthority } from './supabase-networks'
 
@@ -622,12 +624,17 @@ export async function publishEligibleGuide(
   success: boolean
   error?: string
   guideId: string
+  isRevision?: boolean
+  revisionOf?: string | null
+  revisionNumber?: number
+  archivedGuideIds?: string[]
   previousStatus?: string
   newStatus?: string
   publishedAt?: string
   networkId?: string
   canPublish?: boolean
   stage?: string
+  debugInfo?: any
 }> {
   if (!isSupabaseConfigured() || !supabase) {
     return {
@@ -715,7 +722,280 @@ export async function publishEligibleGuide(
       }
     }
 
-    console.log('[v0] publishEligibleGuide: Publishing guide:', guideId)
+    // Phase 10F: Load current guide including revision fields
+    const { data: currentGuide, error: loadError } = await supabase
+      .from('guides')
+      .select('id, status, revision_of, revision_number')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (loadError || !currentGuide) {
+      return {
+        success: false,
+        error: 'Could not load guide revision data',
+        guideId,
+        networkId: context.networkId,
+        stage: 'load-guide-data',
+      }
+    }
+
+    // Phase 10F: Determine root guide ID
+    let rootGuideId = currentGuide.revision_of
+    const isRevision = rootGuideId !== null && rootGuideId !== undefined
+
+    if (!isRevision) {
+      rootGuideId = currentGuide.id
+    }
+
+    const archivedGuideIds: string[] = []
+
+    // Phase 10F: Handle revision family archiving for revisions only
+    if (isRevision) {
+      console.log('[v0] publishEligibleGuide revision family before archive', {
+        rootGuideId,
+        currentGuideId: guideId,
+        isRevision: true,
+        currentRevisionNumber: currentGuide.revision_number,
+      })
+
+      // Query root guide
+      const { data: rootGuide, error: rootError } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('id', rootGuideId)
+        .maybeSingle()
+
+      if (rootError || !rootGuide) {
+        return {
+          success: false,
+          error: 'Could not load root guide for revision family',
+          guideId,
+          networkId: context.networkId,
+          stage: 'load-root-guide',
+        }
+      }
+
+      // Query all revisions of root guide
+      const { data: revisionFamily, error: familyError } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('revision_of', rootGuideId)
+
+      if (familyError) {
+        return {
+          success: false,
+          error: 'Could not load revision family',
+          guideId,
+          networkId: context.networkId,
+          stage: 'load-revision-family',
+        }
+      }
+
+      // Combine root guide with revision family
+      const familyGuides = [rootGuide, ...(revisionFamily || [])]
+
+      console.log('[v0] publishEligibleGuide revision family loaded', {
+        rootGuideId,
+        currentGuideId: guideId,
+        familySize: familyGuides.length,
+        familyStatuses: familyGuides.map((g) => ({
+          id: g.id,
+          status: g.status,
+          revisionNumber: g.revision_number,
+        })),
+      })
+
+      // Find all published guides in the family (except current guide being published)
+      const previousPublishedGuides = familyGuides.filter(
+        (g) => g.status === 'published' && g.id !== guideId
+      )
+
+      if (previousPublishedGuides.length > 0) {
+        archivedGuideIds.push(...previousPublishedGuides.map((g) => g.id))
+
+        console.log('[v0] publishEligibleGuide archived previous versions', {
+          rootGuideId,
+          currentGuideId: guideId,
+          archivedGuideIds,
+          archivedGuideDetails: previousPublishedGuides.map((g) => ({
+            id: g.id,
+            revisionNumber: g.revision_number,
+          })),
+        })
+
+        // Archive all previous published guides
+        const { error: archiveError } = await supabase
+          .from('guides')
+          .update({
+            status: 'archived',
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', archivedGuideIds)
+
+        if (archiveError) {
+          console.error('[v0] publishEligibleGuide: Archive error:', archiveError.message)
+          return {
+            success: false,
+            error: `Failed to archive previous published versions: ${archiveError.message}`,
+            guideId,
+            networkId: context.networkId,
+            stage: 'archive-previous-published',
+            debugInfo: {
+              rootGuideId,
+              currentGuideId: guideId,
+              archivedGuideIds,
+            },
+  }
+}
+
+/**
+ * Phase 10F: Internal helper to repair guide family published state
+ * 
+ * Archives all published guides in a revision family except the one to keep.
+ * This is an internal helper for debugging - not exported or used in production.
+ */
+async function repairGuideFamilyPublishedStateHelper(
+  rootGuideId: string,
+  keepGuideId: string
+): Promise<{
+  success: boolean
+  error?: string
+  rootGuideId: string
+  keepGuideId: string
+  archivedGuideIds: string[]
+  stage?: string
+}> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      success: false,
+      error: 'Supabase not configured',
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds: [],
+      stage: 'supabase-check',
+    }
+  }
+
+  try {
+    // Query root guide
+    const { data: rootGuide, error: rootError } = await supabase
+      .from('guides')
+      .select('id, status, revision_of, revision_number')
+      .eq('id', rootGuideId)
+      .maybeSingle()
+
+    if (rootError || !rootGuide) {
+      return {
+        success: false,
+        error: 'Could not load root guide',
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'load-root-guide',
+      }
+    }
+
+    // Query all revisions of root guide
+    const { data: revisionFamily, error: familyError } = await supabase
+      .from('guides')
+      .select('id, status, revision_of, revision_number')
+      .eq('revision_of', rootGuideId)
+
+    if (familyError) {
+      return {
+        success: false,
+        error: 'Could not load revision family',
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'load-revision-family',
+      }
+    }
+
+    // Combine family
+    const familyGuides = [rootGuide, ...(revisionFamily || [])]
+
+    // Find all published guides except the one to keep
+    const toArchive = familyGuides.filter(
+      (g) => g.status === 'published' && g.id !== keepGuideId
+    )
+
+    if (toArchive.length === 0) {
+      return {
+        success: true,
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'no-guides-to-archive',
+      }
+    }
+
+    const archivedGuideIds = toArchive.map((g) => g.id)
+
+    console.log('[v0] repairGuideFamilyPublishedState: Archiving published guides', {
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds,
+      familyDetails: familyGuides.map((g) => ({
+        id: g.id,
+        status: g.status,
+        revisionNumber: g.revision_number,
+      })),
+    })
+
+    // Archive the guides
+    const { error: archiveError } = await supabase
+      .from('guides')
+      .update({
+        status: 'archived',
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', archivedGuideIds)
+
+    if (archiveError) {
+      return {
+        success: false,
+        error: `Failed to archive guides: ${archiveError.message}`,
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'archive-failed',
+      }
+    }
+
+    console.log('[v0] repairGuideFamilyPublishedState: Successfully archived', {
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds,
+    })
+
+    return {
+      success: true,
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds,
+      stage: 'complete',
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[v0] repairGuideFamilyPublishedState: Exception:', message)
+    return {
+      success: false,
+      error: message,
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds: [],
+      stage: 'exception',
+    }
+  }
+}
+      }
+    }
+
+    console.log('[v0] publishEligibleGuide: Publishing guide:', guideId, {
+      isRevision,
+      archivedCount: archivedGuideIds.length,
+    })
 
     // Update guide status to 'published' and set published_at
     const now = new Date().toISOString()
@@ -789,11 +1069,73 @@ export async function publishEligibleGuide(
       }
     }
 
-    console.log('[v0] publishEligibleGuide: Guide published successfully, verified status:', verifiedGuide.status)
+    // Phase 10F: Final verification for revisions - ensure exactly one published guide in family
+    if (isRevision) {
+      // Query root guide final state
+      const { data: rootGuideFinal } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('id', rootGuideId)
+        .maybeSingle()
+
+      // Query all revisions final state
+      const { data: revisionFamilyFinal } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('revision_of', rootGuideId)
+
+      const familyGuidesFinal = [rootGuideFinal, ...(revisionFamilyFinal || [])].filter(Boolean)
+      const publishedGuideIds = familyGuidesFinal
+        .filter((g) => g.status === 'published')
+        .map((g) => g.id)
+
+      console.log('[v0] publishEligibleGuide revision family after publish', {
+        rootGuideId,
+        currentGuideId: guideId,
+        familySize: familyGuidesFinal.length,
+        publishedCount: publishedGuideIds.length,
+        familyStatuses: familyGuidesFinal.map((g) => ({
+          id: g.id,
+          status: g.status,
+          revisionNumber: g.revision_number,
+        })),
+      })
+
+      if (publishedGuideIds.length !== 1) {
+        console.error('[v0] publishEligibleGuide: Verification failed - published count not exactly 1:', publishedGuideIds.length)
+        return {
+          success: false,
+          error: `Revision publish verification failed: expected exactly one current published version, found ${publishedGuideIds.length}`,
+          guideId,
+          networkId: context.networkId,
+          stage: 'verify-single-current-published',
+          debugInfo: {
+            rootGuideId,
+            currentGuideId: guideId,
+            publishedGuideIds,
+            archivedGuideIds,
+            familyStatuses: familyGuidesFinal.map((g) => ({
+              id: g.id,
+              status: g.status,
+              revisionNumber: g.revision_number,
+            })),
+          },
+        }
+      }
+    }
+
+    console.log('[v0] publishEligibleGuide: Guide published successfully, verified status:', verifiedGuide.status, {
+      isRevision,
+      archivedCount: archivedGuideIds.length,
+    })
 
     return {
       success: true,
       guideId,
+      isRevision,
+      revisionOf: currentGuide.revision_of,
+      revisionNumber: currentGuide.revision_number,
+      archivedGuideIds: archivedGuideIds.length > 0 ? archivedGuideIds : undefined,
       previousStatus: context.status,
       newStatus: 'published',
       publishedAt: verifiedGuide.published_at,
