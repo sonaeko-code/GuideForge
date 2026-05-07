@@ -69,10 +69,31 @@ export function NetworkDashboardTabs({
   const safeCollections = Array.isArray(collections) ? collections : []
   const safeGuides = Array.isArray(guides) ? guides : []
   
+  // Phase 10E: Debug dashboard data source
+  console.log("[v0] Dashboard guide source", {
+    source: "supabase (page-level fetch)",
+    total: safeGuides.length,
+    statuses: safeGuides.map(g => ({
+      id: g.id,
+      title: g.title,
+      status: g.status,
+      revisionOf: g.revisionOf,
+      revisionNumber: g.revisionNumber,
+    })),
+  })
+  
   // Use normalized status filtering for all guides
   const safeDrafts = filterGuidesByStatus(safeGuides, "draft")
   const safeReady = filterGuidesByStatus(safeGuides, "ready")
   const safePublished = filterGuidesByStatus(safeGuides, "published")
+  
+  // Phase 10E: Debug filtered counts
+  console.log("[v0] Dashboard filtered counts", {
+    totalLoaded: safeGuides.length,
+    drafts: safeDrafts.length,
+    ready: safeReady.length,
+    published: safePublished.length,
+  })
 
   // Guides tab filtering
   const filteredCollection = initialCollectionId
@@ -240,10 +261,14 @@ export function NetworkDashboardTabs({
                 <div className="space-y-2 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
-                    {/* Phase 10C: Original badge for published guides */}
-                    {!guide.revisionOf && (
+                    {/* Phase 10D/10E: Badge for published guides */}
+                    {!guide.revisionOf ? (
                       <Badge variant="outline" className="text-xs whitespace-nowrap border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
                         Original
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs whitespace-nowrap border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
                       </Badge>
                     )}
                   </div>
