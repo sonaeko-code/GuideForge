@@ -109,6 +109,37 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
         </div>
       </div>
 
+      {/* Publish Eligibility */}
+      <div className="space-y-2">
+        <div className="flex items-start justify-between">
+          <h4 className="text-xs font-semibold text-foreground">Publish Eligibility</h4>
+          <div className={`px-2 py-1 rounded text-xs font-medium ${
+            summary.publishEligibility.publishEligible
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+              : summary.publishEligibility.needsChanges
+              ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
+              : 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+          }`}>
+            {summary.publishEligibility.label}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">{summary.publishEligibility.helperText}</p>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="p-2 rounded bg-background border border-border/30">
+            <div className="text-muted-foreground">Approve</div>
+            <div className="font-semibold text-foreground">{summary.publishEligibility.approveWeight}</div>
+          </div>
+          <div className="p-2 rounded bg-background border border-border/30">
+            <div className="text-muted-foreground">Changes</div>
+            <div className="font-semibold text-foreground">{summary.publishEligibility.requestChangesWeight}</div>
+          </div>
+          <div className="p-2 rounded bg-background border border-border/30">
+            <div className="text-muted-foreground">Net</div>
+            <div className="font-semibold text-foreground">{summary.publishEligibility.netApprovalWeight}</div>
+          </div>
+        </div>
+      </div>
+
       {/* Voting UI */}
       {canVote ? (
         <div className="space-y-2">
@@ -192,7 +223,7 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
       {/* Threshold note */}
       <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-start gap-2 border border-blue-500/20">
         <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
-        <span>Review thresholds are not enforced yet.</span>
+        <span>Publishing thresholds are visible but not enforced yet.</span>
       </div>
     </div>
   )

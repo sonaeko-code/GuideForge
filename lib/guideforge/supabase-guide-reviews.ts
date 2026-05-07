@@ -86,11 +86,11 @@ async function resolveGuideReviewContext(guideId: string): Promise<{
 
 /**
  * Get review summary for a guide
- * Phase 8: Guide Review Voting Lite
+ * Phase 8: Guide Review Voting Lite + Phase 9A: Publish Eligibility Visibility
  * 
  * Fetches guide_review_votes and calculates weighted vote totals.
  * Checks current user's voting permission based on network role.
- * Returns vote summary with approve/request_changes weights.
+ * Returns vote summary with approve/request_changes weights and publish eligibility.
  */
 export async function getGuideReviewSummary(guideId: string): Promise<{
   guideId: string
@@ -110,6 +110,18 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
     notes: string | null
     createdAt: string
   }>
+  publishEligibility: {
+    publishEligible: boolean
+    needsChanges: boolean
+    needsMoreReview: boolean
+    approveWeight: number
+    requestChangesWeight: number
+    netApprovalWeight: number
+    requiredApproveWeight: number
+    blockingRequestChanges: boolean
+    label: string
+    helperText: string
+  }
   error?: string
 } | null> {
   if (!isSupabaseConfigured() || !supabase) {
@@ -136,6 +148,18 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
         currentUserRole: null,
         canCurrentUserVote: false,
         votes: [],
+        publishEligibility: {
+          publishEligible: false,
+          needsChanges: false,
+          needsMoreReview: true,
+          approveWeight: 0,
+          requestChangesWeight: 0,
+          netApprovalWeight: 0,
+          requiredApproveWeight: 10,
+          blockingRequestChanges: false,
+          label: 'Needs more review',
+          helperText: 'More approval weight is needed before this guide should be published.',
+        },
         error: 'Could not resolve guide context. Please verify guide is attached to a collection and hub.',
       }
     }
@@ -201,6 +225,24 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
       }
     }
 
+    // Calculate publish eligibility
+    const requiredApproveWeight = 10
+    const publishEligible = approveWeight >= requiredApproveWeight && requestChangesWeight === 0
+    const needsChanges = requestChangesWeight > 0
+    const needsMoreReview = !publishEligible && !needsChanges
+    const netApprovalWeight = approveWeight - requestChangesWeight
+
+    let label = 'Needs more review'
+    let helperText = 'More approval weight is needed before this guide should be published.'
+
+    if (publishEligible) {
+      label = 'Publish eligible'
+      helperText = 'This guide has enough approval weight for publishing, but publishing is not enforced yet.'
+    } else if (needsChanges) {
+      label = 'Changes requested'
+      helperText = 'A reviewer requested changes. Resolve feedback before publishing.'
+    }
+
     return {
       guideId,
       networkId: context.networkId,
@@ -211,6 +253,18 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
       currentUserRole,
       canCurrentUserVote,
       votes: formattedVotes,
+      publishEligibility: {
+        publishEligible,
+        needsChanges,
+        needsMoreReview,
+        approveWeight,
+        requestChangesWeight,
+        netApprovalWeight,
+        requiredApproveWeight,
+        blockingRequestChanges: requestChangesWeight > 0,
+        label,
+        helperText,
+      },
     }
   } catch (err) {
     console.warn('[v0] getGuideReviewSummary: Exception:', err instanceof Error ? err.message : String(err))
