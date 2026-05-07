@@ -609,12 +609,21 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       const result = await createGuideRevisionDraft(normalizedGuide.id)
 
       if (result.success && result.revisionGuideId) {
-        console.log('[v0] Revision created successfully:', result.revisionGuideId)
+        const targetPath = `/builder/network/${networkId}/guide/${result.revisionGuideId}/edit`
+        
+        // Task B: Add temporary confirmation log
+        console.log("[v0] Create Revision success navigation", {
+          sourceGuideId: normalizedGuide.id,
+          revisionGuideId: result.revisionGuideId,
+          networkId: networkId,
+          targetPath,
+        })
+        
         setCreateRevisionStatus("success")
         
         // Navigate to the new revision draft editor
         setTimeout(() => {
-          router.push(`/builder/network/${networkId}/guide/${result.revisionGuideId}`)
+          router.push(targetPath)
         }, 500)
       } else {
         console.error('[v0] Create revision failed:', result.error)
@@ -971,6 +980,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 {createRevisionStatus === "error" && createRevisionError && (
                   <div className="text-xs text-red-600 dark:text-red-400">
                     {createRevisionError}
+                  </div>
+                )}
+                {createRevisionStatus === "success" && (
+                  <div className="text-xs text-green-600 dark:text-green-400">
+                    Revision created. Navigating...
                   </div>
                 )}
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
