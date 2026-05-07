@@ -101,6 +101,16 @@ export function NetworkDashboardTabs({
     activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
   })
 
+  // Phase 10H: Debug logs showing what's visible in each tab
+  console.log("[v0] Dashboard active counts", {
+    totalLoaded: safeGuides.length,
+    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
+    drafts: safeDrafts.length,
+    ready: safeReady.length,
+    published: safePublished.length,
+    archived: archivedGuides.length,
+  })
+
   // Phase 10G: Guides tab filtering - exclude archived
   const filteredCollection = initialCollectionId
     ? safeCollections.find((c: NormalizedCollection) => c.id === initialCollectionId)
@@ -148,7 +158,7 @@ export function NetworkDashboardTabs({
         <TabsTrigger value="guides">
           Guides
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
-            {safeGuides.length}
+            {filteredGuides.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="hubs">
@@ -183,6 +193,20 @@ export function NetworkDashboardTabs({
             </Link>
           </Button>
         </div>
+
+        {/* Phase 10H: Debug log for visible guides in drafts tab */}
+        {safeDrafts.length > 0 && (
+          console.log("[v0] Dashboard visible guide ids - drafts", {
+            tab: "drafts",
+            visibleGuideIds: safeDrafts.map(g => ({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              revisionOf: g.revisionOf,
+              revisionNumber: g.revisionNumber,
+            })),
+          })
+        )}
 
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
       </TabsContent>
@@ -251,6 +275,20 @@ export function NetworkDashboardTabs({
             Published Guides ({safePublished.length})
           </h2>
         </div>
+
+        {/* Phase 10H: Debug log for visible guides in published tab */}
+        {safePublished.length > 0 && (
+          console.log("[v0] Dashboard visible guide ids - published", {
+            tab: "published",
+            visibleGuideIds: safePublished.map(g => ({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              revisionOf: g.revisionOf,
+              revisionNumber: g.revisionNumber,
+            })),
+          })
+        )}
 
         {safePublished.length === 0 ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
