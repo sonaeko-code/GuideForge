@@ -601,3 +601,214 @@ export async function submitGuideForReview(
     }
   }
 }
+
+/**
+ * Publish an eligible guide manually
+ * Phase 9B: Manual Publish Button
+ * 
+ * Publishes a guide from status "ready" to "published".
+ * Requires:
+ * - Guide status === "ready"
+ * - Publish eligibility === true (approve >= 10, no request changes)
+ * - User has canPublishOverride permission in network role
+ * - Does NOT auto-publish; only publishes on explicit user action
+ * 
+ * Sets: status = "published", published_at = now()
+ * Leaves: verification_status unchanged
+ */
+export async function publishEligibleGuide(
+  guideId: string
+): Promise<{
+  success: boolean
+  error?: string
+  guideId: string
+  previousStatus?: string
+  newStatus?: string
+  publishedAt?: string
+  networkId?: string
+  canPublish?: boolean
+  stage?: string
+}> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      success: false,
+      error: 'Supabase not configured',
+      guideId,
+      stage: 'supabase-check',
+    }
+  }
+
+  try {
+    const session = await getSupabaseSession()
+    const userId = session?.user?.id
+
+    if (!userId) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        guideId,
+        stage: 'get-user',
+      }
+    }
+
+    // Resolve guide network context
+    const context = await resolveGuideReviewContext(guideId)
+    
+    if (!context) {
+      return {
+        success: false,
+        error: 'Could not resolve guide network context. Guide may be missing collection or hub.',
+        guideId,
+        stage: 'resolve-context',
+      }
+    }
+
+    // Get user's network authority
+    const authority = await getCurrentUserNetworkAuthority(context.networkId)
+    
+    if (!authority.isSignedIn) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        guideId,
+        networkId: context.networkId,
+        stage: 'get-network-authority',
+      }
+    }
+
+    // Check publish permission (canPublishOverride)
+    if (!authority.canPublishOverride) {
+      return {
+        success: false,
+        error: 'You do not have permission to publish guides',
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        canPublish: false,
+        stage: 'permission-check',
+      }
+    }
+
+    // Guide must be in "ready" status
+    if (context.status !== 'ready') {
+      return {
+        success: false,
+        error: `Guide is in ${context.status} status, not ready for publishing`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'status-check',
+      }
+    }
+
+    // Get current review summary to verify publish eligibility
+    const summary = await getGuideReviewSummary(guideId)
+    
+    if (!summary || !summary.publishEligibility.publishEligible) {
+      return {
+        success: false,
+        error: 'Guide is not eligible for publishing. Requires 10+ approval weight and no request changes.',
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'eligibility-check',
+      }
+    }
+
+    console.log('[v0] publishEligibleGuide: Publishing guide:', guideId)
+
+    // Update guide status to 'published' and set published_at
+    const now = new Date().toISOString()
+    const { data: updateResult, error: updateError } = await supabase
+      .from('guides')
+      .update({
+        status: 'published',
+        published_at: now,
+        updated_at: now,
+      })
+      .eq('id', guideId)
+      .select('id, status, published_at')
+      .maybeSingle()
+
+    if (updateError) {
+      console.error('[v0] publishEligibleGuide: Update error:', updateError.message)
+      return {
+        success: false,
+        error: `Failed to publish guide: ${updateError.message}`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'update-guide-status',
+      }
+    }
+
+    // Verify the update persisted
+    if (!updateResult || updateResult.status !== 'published') {
+      console.error('[v0] publishEligibleGuide: Update returned but status not published:', updateResult?.status)
+      return {
+        success: false,
+        error: 'Publish update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-published-guide',
+      }
+    }
+
+    // Re-fetch to verify the change persisted to the database
+    const { data: verifiedGuide, error: verifyError } = await supabase
+      .from('guides')
+      .select('id, status, published_at')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (verifyError || !verifiedGuide) {
+      console.error('[v0] publishEligibleGuide: Verification query failed:', verifyError?.message)
+      return {
+        success: false,
+        error: 'Could not verify guide status after publishing',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-published-guide',
+      }
+    }
+
+    if (verifiedGuide.status !== 'published') {
+      console.error('[v0] publishEligibleGuide: Verified status is not published:', verifiedGuide.status)
+      return {
+        success: false,
+        error: 'Publish update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: verifiedGuide.status,
+        networkId: context.networkId,
+        stage: 'verify-published-guide',
+      }
+    }
+
+    console.log('[v0] publishEligibleGuide: Guide published successfully, verified status:', verifiedGuide.status)
+
+    return {
+      success: true,
+      guideId,
+      previousStatus: context.status,
+      newStatus: 'published',
+      publishedAt: verifiedGuide.published_at,
+      networkId: context.networkId,
+      canPublish: true,
+      stage: 'complete',
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[v0] publishEligibleGuide: Exception:', message)
+    return {
+      success: false,
+      error: message,
+      guideId,
+      stage: 'exception',
+    }
+  }
+}

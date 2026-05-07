@@ -3,19 +3,24 @@
 import { useEffect, useState } from 'react'
 import { ThumbsUp, ThumbsDown, AlertCircle, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getGuideReviewSummary, castGuideReviewVote } from '@/lib/guideforge/supabase-guide-reviews'
+import { getGuideReviewSummary, castGuideReviewVote, publishEligibleGuide } from '@/lib/guideforge/supabase-guide-reviews'
 
 interface GuideReviewPanelProps {
   guideId: string
   guideStatus: string
+  canPublish?: boolean
   onVoteSuccess?: () => void
+  onPublishSuccess?: () => void
 }
 
-export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }: GuideReviewPanelProps) {
+export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onVoteSuccess, onPublishSuccess }: GuideReviewPanelProps) {
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getGuideReviewSummary>> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isVoting, setIsVoting] = useState(false)
   const [voteError, setVoteError] = useState<string | null>(null)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishStatus, setPublishStatus] = useState<"idle" | "publishing" | "success" | "error">("idle")
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -42,6 +47,32 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
     }
 
     setIsVoting(false)
+  }
+
+  const handlePublish = async () => {
+    setIsPublishing(true)
+    setPublishStatus("publishing")
+    setPublishError(null)
+
+    const result = await publishEligibleGuide(guideId)
+
+    if (result.success) {
+      setPublishStatus("success")
+      setPublishError(null)
+      
+      // Notify parent that publish succeeded
+      onPublishSuccess?.()
+      
+      // Show success for 2 seconds
+      setTimeout(() => {
+        setPublishStatus("idle")
+      }, 2000)
+    } else {
+      setPublishStatus("error")
+      setPublishError(result.error || "Failed to publish guide")
+    }
+
+    setIsPublishing(false)
   }
 
   // Only show panel if status is ready (even with 0 votes)
@@ -192,6 +223,49 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
           You can view review status, but your current role cannot vote.
         </div>
       )}
+
+      {/* Publish Button and Status */}
+      <div className="space-y-2">
+        {summary.publishEligibility.publishEligible && canPublish ? (
+          <>
+            <Button
+              onClick={handlePublish}
+              disabled={isPublishing || publishStatus === "publishing"}
+              variant="default"
+              size="sm"
+              className="w-full h-9 text-xs"
+            >
+              {publishStatus === "publishing" || isPublishing ? (
+                <>
+                  <Loader2 className="size-3 animate-spin mr-1" aria-hidden="true" />
+                  Publishing...
+                </>
+              ) : publishStatus === "success" ? (
+                <>
+                  <Check className="size-3 mr-1" aria-hidden="true" />
+                  Guide published.
+                </>
+              ) : (
+                'Publish Guide'
+              )}
+            </Button>
+            {publishStatus === "error" && publishError && (
+              <div className="p-2 rounded text-xs bg-red-500/10 text-red-700 dark:text-red-300 flex items-start gap-2">
+                <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <span>{publishError}</span>
+              </div>
+            )}
+          </>
+        ) : !summary.publishEligibility.publishEligible ? (
+          <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300">
+            Publish becomes available when this guide is eligible.
+          </div>
+        ) : !canPublish ? (
+          <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300">
+            Only network owners/admins can publish eligible guides.
+          </div>
+        ) : null}
+      </div>
 
       {/* Voter List */}
       {summary.totalVotes > 0 && (

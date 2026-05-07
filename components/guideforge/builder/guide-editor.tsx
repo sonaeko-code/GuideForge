@@ -28,6 +28,7 @@ import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/gu
 import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
 import { submitGuideForReview } from "@/lib/guideforge/supabase-guide-reviews"
+import { getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networks"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -94,6 +95,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [submitReviewError, setSubmitReviewError] = useState<string | null>(null)
   const [refreshReviewPanel, setRefreshReviewPanel] = useState(0)
   
+  // Phase 9B: Publish authority
+  const [canPublish, setCanPublish] = useState(false)
+  
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
   const [lastSaveDebug, setLastSaveDebug] = useState<{
@@ -125,6 +129,22 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     hasHydratedRef.current = true
     userEditedRef.current = false
   }, [])
+
+  // Phase 9B: Check publish authority on mount or networkId change
+  useEffect(() => {
+    const checkPublishAuthority = async () => {
+      try {
+        const authority = await getCurrentUserNetworkAuthority(networkId)
+        setCanPublish(authority.canPublishOverride === true)
+      } catch (err) {
+        setCanPublish(false)
+      }
+    }
+
+    if (networkId) {
+      checkPublishAuthority()
+    }
+  }, [networkId])
 
   // Autosave effect - debounced by 1500ms, only saves if snapshot changed
   // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
@@ -1133,7 +1153,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         <GuideReviewPanel 
           guideId={normalizedGuide.id} 
           guideStatus={guideStatus}
+          canPublish={canPublish}
           onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}
+          onPublishSuccess={() => setGuideStatus('published')}
         />
 
         {/* Sections Editor */}
