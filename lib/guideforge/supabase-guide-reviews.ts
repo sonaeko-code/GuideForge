@@ -1055,12 +1055,6 @@ async function repairGuideFamilyPublishedStateHelper(
     // Phase 10F: Final verification for revisions - ensure selected guide is published
     if (isRevision) {
       // Verify selected guide itself is now published
-      console.log('[v0] publishEligibleGuide selected guide verification', {
-        guideId,
-        verifiedStatus: verifiedGuide.status,
-        expectedStatus: 'published',
-      })
-
       if (verifiedGuide.status !== 'published') {
         console.error('[v0] publishEligibleGuide: Selected guide not published after update:', verifiedGuide.status)
         return {
@@ -1082,11 +1076,6 @@ async function repairGuideFamilyPublishedStateHelper(
 
         if (previousPublishedGuides.length > 0) {
           const rawArchivedGuideIds = previousPublishedGuides.map((g) => g.id)
-
-          console.log('[v0] publishEligibleGuide archiving others', {
-            selectedGuideId: guideId,
-            archivedGuideIds: rawArchivedGuideIds,
-          })
 
           // Archive all previous published guides
           const { error: archiveError } = await supabase
@@ -1115,19 +1104,10 @@ async function repairGuideFamilyPublishedStateHelper(
           }
 
           archivedGuideIds.push(...rawArchivedGuideIds)
-
-          console.log('[v0] publishEligibleGuide archive completed', {
-            selectedGuideId: guideId,
-            archivedCount: rawArchivedGuideIds.length,
-          })
         }
       }
 
       // Phase 10K: AFTER archive, refetch family fresh and verify exactly one published
-      console.log('[v0] publishEligibleGuide refetching family after archive', {
-        rootGuideId,
-        selectedGuideId: guideId,
-      })
 
       const { data: rootGuideFinal } = await supabase
         .from('guides')
@@ -1144,18 +1124,6 @@ async function repairGuideFamilyPublishedStateHelper(
       const publishedGuideIds = familyGuidesFinal
         .filter((g) => g.status === 'published')
         .map((g) => g.id)
-
-      console.log('[v0] publishEligibleGuide final verification', {
-        rootGuideId,
-        selectedGuideId: guideId,
-        familySize: familyGuidesFinal.length,
-        publishedGuideIds,
-        familyStatuses: familyGuidesFinal.map((g) => ({
-          id: g.id,
-          status: g.status,
-          revisionNumber: g.revision_number,
-        })),
-      })
 
       // Final verification: exactly one published guide in family
       if (publishedGuideIds.length !== 1) {

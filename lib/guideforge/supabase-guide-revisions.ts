@@ -194,13 +194,6 @@ export async function createGuideRevisionDraft(
     // Otherwise, sourceGuide itself is the root
     const rootGuideId = sourceGuide.revision_of ?? sourceGuide.id
 
-    // TEST LOG: Show root resolution
-    console.log('[v0-TEST] createGuideRevisionDraft: Root resolution', {
-      sourceGuideId: publishedGuideId,
-      'sourceGuide.revision_of': sourceGuide.revision_of,
-      rootGuideId,
-    })
-
     // 7. Phase 10J: Calculate next revision number from entire root family
     // Query root guide + all revisions of root to find max revision_number
     const { data: rootFamily, error: familyError } = await supabase
@@ -224,13 +217,6 @@ export async function createGuideRevisionDraft(
       : 1
     
     const nextRevisionNumber = maxRevisionNumber + 1
-
-    // TEST LOG: Show revision number calculation
-    console.log('[v0-TEST] createGuideRevisionDraft: Revision number', {
-      rootGuideId,
-      maxRevisionNumber,
-      nextRevisionNumber,
-    })
 
     // 8. Create new guide row
     const revisionSlug = sourceGuide.slug + `-rev${nextRevisionNumber}`
@@ -269,15 +255,6 @@ export async function createGuideRevisionDraft(
         stage: 'create-revision-guide',
       }
     }
-
-    // TEST LOG: Show inserted revision details
-    console.log('[v0-TEST] createGuideRevisionDraft: Inserted revision', {
-      'inserted id': newGuide.id,
-      'inserted revision_of': newGuide.revision_of,
-      'inserted revision_number': newGuide.revision_number,
-      'expected revision_of (root)': rootGuideId,
-      'revision_of matches root?': newGuide.revision_of === rootGuideId,
-    })
 
     console.log('[v0] createGuideRevisionDraft: Created revision guide:', newGuide.id)
 
@@ -337,21 +314,6 @@ export async function createGuideRevisionDraft(
       .select('id, status, revision_of, revision_number')
       .eq('id', newGuide.id)
       .maybeSingle()
-
-    // TEST LOG: Comprehensive verification details
-    console.log('[v0-TEST] createGuideRevisionDraft: Verification check', {
-      'publishedGuideId (sourceGuide.id)': publishedGuideId,
-      'sourceGuide.revision_of': sourceGuide.revision_of,
-      'rootGuideId (expected revision_of)': rootGuideId,
-      'nextRevisionNumber (expected)': nextRevisionNumber,
-      'verifyError': verifyError?.message,
-      'verifyGuide.id': verifyGuide?.id,
-      'verifyGuide.status': verifyGuide?.status,
-      'verifyGuide.revision_of (actual)': verifyGuide?.revision_of,
-      'verifyGuide.revision_number (actual)': verifyGuide?.revision_number,
-      'revision_of matches rootGuideId?': verifyGuide?.revision_of === rootGuideId,
-      'revision_number matches nextRevisionNumber?': verifyGuide?.revision_number === nextRevisionNumber,
-    })
 
     // Phase 10K: Verify against rootGuideId, not publishedGuideId
     if (

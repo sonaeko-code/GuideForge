@@ -23,6 +23,7 @@ import type { Guide, GuideStep } from "@/lib/guideforge/types"
 import { makeTempId } from "@/lib/guideforge/utils"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import GuideReviewPanel from "@/components/guideforge/builder/guide-review-panel"
+import { GuideVersionHistory } from "@/components/guideforge/builder/guide-version-history"
 import { MOCK_HUBS } from "@/lib/guideforge/mock-data"
 import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/guideforge/mock-generator"
 import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
@@ -32,6 +33,7 @@ import { getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networ
 import { createGuideRevisionDraft } from "@/lib/guideforge/supabase-guide-revisions"
 import { getGuideRevisionContext, loadOriginalGuideInfo, getRevisionDraftBannerText, formatRevisionNumber, type RevisionContext } from "@/lib/guideforge/revision-context"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
+import { getGuideRevisionFamily } from "@/lib/guideforge/guide-version-utils"
 
 interface GuideEditorProps {
   guide: Guide
@@ -111,6 +113,10 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     revisionOf: null,
     revisionNumber: normalizedGuide.revisionNumber ?? 1,
   })
+
+  // Phase 11: Version history for archived revisions
+  const [versionHistory, setVersionHistory] = useState<any[]>([])
+  const [loadingVersionHistory, setLoadingVersionHistory] = useState(false)
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -194,6 +200,32 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     
     loadRevisionContext()
   }, [normalizedGuide.id, normalizedGuide.revisionOf, normalizedGuide.revisionNumber])
+
+  // Phase 11: Load version history (archived revisions)
+  useEffect(() => {
+    const loadVersionHistory = async () => {
+      setLoadingVersionHistory(true)
+      const family = await getGuideRevisionFamily(normalizedGuide.id)
+      
+      // Transform to version format and sort by revision number descending
+      const versions = family
+        .filter((g: any) => g.status === 'archived') // Only show archived versions
+        .map((g: any) => ({
+          id: g.id,
+          revisionNumber: g.revision_number || 1,
+          status: g.status,
+          publishedAt: g.published_at,
+          updatedAt: g.updated_at,
+          isCurrentPublished: false,
+        }))
+        .sort((a, b) => b.revisionNumber - a.revisionNumber)
+      
+      setVersionHistory(versions)
+      setLoadingVersionHistory(false)
+    }
+
+    loadVersionHistory()
+  }, [normalizedGuide.id])
 
   // Autosave effect - debounced by 1500ms, only saves if snapshot changed
   // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
@@ -559,7 +591,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       
       if (!result.success) {
         console.error("[v0] Publish failed:", result.error)
-        setSaveError(`Publish failed: ${result.error}`)
+        setSaveError(`Publish failed: ${result.error || 'Unknown error'}`)
         setAutosaveStatus("failed")
         setIsPublishing(false)
         return
@@ -638,14 +670,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
       if (result.success && result.revisionGuideId) {
         const targetPath = `/builder/network/${networkId}/guide/${result.revisionGuideId}/edit`
-        
-        // Task B: Add temporary confirmation log
-        console.log("[v0] Create Revision success navigation", {
-          sourceGuideId: normalizedGuide.id,
-          revisionGuideId: result.revisionGuideId,
-          networkId: networkId,
-          targetPath,
-        })
         
         setCreateRevisionStatus("success")
         
@@ -899,7 +923,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             {isPublished && (
               <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
-                <span>Published guide — protected. Create a revision to propose changes.</span>
+                <span>This published guide is read-only. Create a revision to make changes.</span>
               </div>
             )}
 
@@ -1309,6 +1333,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               setGuideStatus('published')
             }
           }}
+        />
+
+        {/* Phase 11: Version History for archived revisions */}
+        <GuideVersionHistory 
+          versions={versionHistory}
+          networkId={networkId}
+          isLoading={loadingVersionHistory}
         />
 
         {/* Sections Editor */}
