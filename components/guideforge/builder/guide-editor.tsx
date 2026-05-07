@@ -30,6 +30,7 @@ import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
 import { submitGuideForReview } from "@/lib/guideforge/supabase-guide-reviews"
 import { getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networks"
 import { createGuideRevisionDraft } from "@/lib/guideforge/supabase-guide-revisions"
+import { getGuideRevisionContext, loadOriginalGuideInfo, getRevisionDraftBannerText, formatRevisionNumber, type RevisionContext } from "@/lib/guideforge/revision-context"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -103,6 +104,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [isCreatingRevision, setIsCreatingRevision] = useState(false)
   const [createRevisionStatus, setCreateRevisionStatus] = useState<"idle" | "creating" | "success" | "error">("idle")
   const [createRevisionError, setCreateRevisionError] = useState<string | null>(null)
+
+  // Phase 10B: Revision context for displaying revision drafts
+  const [revisionContext, setRevisionContext] = useState<RevisionContext>({
+    isRevision: false,
+    revisionOf: null,
+    revisionNumber: normalizedGuide.revisionNumber ?? 1,
+  })
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -166,6 +174,26 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
       checkPublishAuthority()
     }
   }, [networkId])
+
+  // Phase 10B: Load revision context on mount
+  useEffect(() => {
+    const loadRevisionContext = async () => {
+      // Extract initial context from current guide
+      const context = getGuideRevisionContext(normalizedGuide)
+      
+      // If this is a revision and we don't have original guide info, try to load it
+      if (context.isRevision && !context.originalGuide && context.revisionOf) {
+        const originalGuideInfo = await loadOriginalGuideInfo(context.revisionOf)
+        if (originalGuideInfo) {
+          context.originalGuide = originalGuideInfo
+        }
+      }
+      
+      setRevisionContext(context)
+    }
+    
+    loadRevisionContext()
+  }, [normalizedGuide.id, normalizedGuide.revisionOf, normalizedGuide.revisionNumber])
 
   // Autosave effect - debounced by 1500ms, only saves if snapshot changed
   // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
@@ -852,6 +880,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   Published
                 </Badge>
               )}
+              {/* Phase 10B: Revision badge */}
+              {revisionContext.isRevision && (
+                <Badge variant="outline" className="gap-1 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300">
+                  {formatRevisionNumber(revisionContext.revisionNumber)}
+                </Badge>
+              )}
             </div>
 
             {/* Published guide protected message */}
@@ -859,6 +893,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
                 <span>Published guide — protected. Create a revision to propose changes.</span>
+              </div>
+            )}
+
+            {/* Phase 10B: Revision draft context banner */}
+            {revisionContext.isRevision && !isPublished && (
+              <div className="flex items-center gap-2 text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 px-3 py-1.5 rounded-full border border-purple-200 dark:border-purple-800/50 ml-2">
+                <AlertCircle className="size-3" aria-hidden="true" />
+                <span>{getRevisionDraftBannerText(revisionContext)}</span>
               </div>
             )}
 
@@ -1229,7 +1271,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
         {/* Phase 8: Guide Review Panel */}
         <GuideReviewPanel 
-          guideId={normalizedGuide.id} 
+          guide={normalizedGuide}
           guideStatus={guideStatus}
           canPublish={canPublish}
           onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}

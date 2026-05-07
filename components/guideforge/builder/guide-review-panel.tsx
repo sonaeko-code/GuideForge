@@ -4,16 +4,19 @@ import { useEffect, useState } from 'react'
 import { ThumbsUp, ThumbsDown, AlertCircle, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getGuideReviewSummary, castGuideReviewVote, publishEligibleGuide } from '@/lib/guideforge/supabase-guide-reviews'
+import { getGuideRevisionContext, loadOriginalGuideInfo, getRevisionReviewPanelText, type RevisionContext } from '@/lib/guideforge/revision-context'
+import type { Guide } from '@/lib/guideforge/types'
 
 interface GuideReviewPanelProps {
-  guideId: string
+  guide: Guide
   guideStatus: string
   canPublish?: boolean
   onVoteSuccess?: () => void
   onPublishSuccess?: () => void
 }
 
-export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onVoteSuccess, onPublishSuccess }: GuideReviewPanelProps) {
+export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVoteSuccess, onPublishSuccess }: GuideReviewPanelProps) {
+  const guideId = guide.id
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getGuideReviewSummary>> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isVoting, setIsVoting] = useState(false)
@@ -21,6 +24,13 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishStatus, setPublishStatus] = useState<"idle" | "publishing" | "success" | "error">("idle")
   const [publishError, setPublishError] = useState<string | null>(null)
+
+  // Phase 10B: Revision context for displaying revision drafts
+  const [revisionContext, setRevisionContext] = useState<RevisionContext>({
+    isRevision: false,
+    revisionOf: null,
+    revisionNumber: guide.revisionNumber ?? 1,
+  })
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -32,6 +42,26 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
 
     loadSummary()
   }, [guideId, guideStatus])
+
+  // Phase 10B: Load revision context on mount
+  useEffect(() => {
+    const loadRevisionContext = async () => {
+      // Extract initial context from current guide
+      const context = getGuideRevisionContext(guide)
+      
+      // If this is a revision and we don't have original guide info, try to load it
+      if (context.isRevision && !context.originalGuide && context.revisionOf) {
+        const originalGuideInfo = await loadOriginalGuideInfo(context.revisionOf)
+        if (originalGuideInfo) {
+          context.originalGuide = originalGuideInfo
+        }
+      }
+      
+      setRevisionContext(context)
+    }
+    
+    loadRevisionContext()
+  }, [guide.id, guide.revisionOf, guide.revisionNumber])
 
   const handleVote = async (vote: 'approve' | 'request_changes') => {
     setIsVoting(true)
@@ -118,6 +148,17 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
           </p>
         </div>
       </div>
+
+      {/* Phase 10B: Revision context for review panel */}
+      {revisionContext.isRevision && (
+        <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 space-y-1">
+          <p className="text-xs font-medium text-purple-700 dark:text-purple-300">Reviewing Revision #{revisionContext.revisionNumber}</p>
+          {revisionContext.originalGuide && (
+            <p className="text-xs text-purple-600 dark:text-purple-400">Original: {revisionContext.originalGuide.title}</p>
+          )}
+          <p className="text-xs text-purple-600 dark:text-purple-400">{getRevisionReviewPanelText(revisionContext)}</p>
+        </div>
+      )}
 
       {/* Vote Summary */}
       <div className="grid grid-cols-2 gap-3">
