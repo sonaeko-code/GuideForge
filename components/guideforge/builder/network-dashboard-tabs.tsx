@@ -69,6 +69,16 @@ export function NetworkDashboardTabs({
   const safeCollections = Array.isArray(collections) ? collections : []
   const safeGuides = Array.isArray(guides) ? guides : []
   
+  // Helper to get hub/collection names for a guide
+  const getHierarchyNames = (guide: Guide) => {
+    const hub = safeHubs.find(h => h.id === guide.hubId)
+    const collection = safeCollections.find(c => c.id === guide.collectionId)
+    return {
+      hubName: hub?.name || "Unknown Hub",
+      collectionName: collection?.name || "Uncategorized"
+    }
+  }
+
   // Phase 10E: Debug dashboard data source
   console.log("[v0] Dashboard guide source", {
     source: "supabase (page-level fetch)",
@@ -251,6 +261,12 @@ export function NetworkDashboardTabs({
                   {guide.revisionOf && (
                     <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
                   )}
+                  {/* Hierarchy context */}
+                  {!guide.revisionOf && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-1.5">
                     <StatusBadge status={guide.status} />
                     {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
@@ -321,6 +337,12 @@ export function NetworkDashboardTabs({
                   <p className="text-xs text-muted-foreground mb-2">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
+                  {/* Hierarchy context for original published guides */}
+                  {!guide.revisionOf && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-1.5">
                     <StatusBadge status={guide.status} />
                     {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
@@ -330,7 +352,7 @@ export function NetworkDashboardTabs({
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Button size="sm" asChild variant="outline">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
-                      Edit
+                      Open
                     </Link>
                   </Button>
                 </div>
@@ -469,6 +491,12 @@ export function NetworkDashboardTabs({
                       <p className="text-xs text-muted-foreground">
                         {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
+                      {/* Hierarchy context */}
+                      {!guide.revisionOf && (
+                        <p className="text-xs text-muted-foreground">
+                          {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                        </p>
+                      )}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
                       <StatusBadge status={guide.status} />
@@ -585,9 +613,16 @@ export function NetworkDashboardTabs({
                       <p className="text-xs text-muted-foreground mt-1">{hub.description}</p>
                     </div>
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground mt-2">
-                    {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
-                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-border/50">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
+                    </p>
+                    <Button size="sm" asChild variant="outline">
+                      <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
+                        View
+                      </Link>
+                    </Button>
+                  </div>
                 </Card>
               )
             })}
@@ -660,8 +695,15 @@ export function NetworkDashboardTabs({
                                   {col.description || "No description yet"}
                                 </p>
                               </div>
-                              <div className="mt-2 text-xs font-medium text-muted-foreground">
-                                {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
+                              <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
+                                </p>
+                                <Button size="sm" asChild variant="outline">
+                                  <Link href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}>
+                                    View
+                                  </Link>
+                                </Button>
                               </div>
                             </Card>
                           )
