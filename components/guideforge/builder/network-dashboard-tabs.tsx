@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
-import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
+import { normalizeGuideStatus, filterGuidesByStatus, filterOutArchived } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
@@ -82,26 +82,32 @@ export function NetworkDashboardTabs({
     })),
   })
   
-  // Use normalized status filtering for all guides
-  const safeDrafts = filterGuidesByStatus(safeGuides, "draft")
-  const safeReady = filterGuidesByStatus(safeGuides, "ready")
-  const safePublished = filterGuidesByStatus(safeGuides, "published")
+  // Phase 10G: Exclude archived from active tabs, but count them separately
+  const activeGuides = filterOutArchived(safeGuides)
+  const archivedGuides = filterGuidesByStatus(safeGuides, "archived")
   
-  // Phase 10E: Debug filtered counts
+  // Use normalized status filtering for active guides only
+  const safeDrafts = filterGuidesByStatus(activeGuides, "draft")
+  const safeReady = filterGuidesByStatus(activeGuides, "ready")
+  const safePublished = filterGuidesByStatus(activeGuides, "published")
+  
+  // Phase 10G: Enhanced debug logs with archived count
   console.log("[v0] Dashboard filtered counts", {
     totalLoaded: safeGuides.length,
     drafts: safeDrafts.length,
     ready: safeReady.length,
     published: safePublished.length,
+    archived: archivedGuides.length,
+    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
   })
 
-  // Guides tab filtering
+  // Phase 10G: Guides tab filtering - exclude archived
   const filteredCollection = initialCollectionId
     ? safeCollections.find((c: NormalizedCollection) => c.id === initialCollectionId)
     : null
   const filteredGuides = initialCollectionId
-    ? safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId)
-    : safeGuides
+    ? filterOutArchived(safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId))
+    : filterOutArchived(safeGuides)
   
   console.log("[v0] Guides tab rendering:", {
     totalGuides: safeGuides.length,

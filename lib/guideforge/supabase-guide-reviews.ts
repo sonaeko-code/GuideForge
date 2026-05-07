@@ -1,5 +1,3 @@
-'use server'
-
 import { getSupabaseSession, isSupabaseConfigured, supabase } from './supabase-client'
 import { getCurrentUserNetworkMembership, getCurrentUserNetworkAuthority } from './supabase-networks'
 
