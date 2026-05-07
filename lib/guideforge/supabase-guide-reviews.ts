@@ -809,7 +809,29 @@ export async function publishEligibleGuide(
       )
 
       if (previousPublishedGuides.length > 0) {
-        archivedGuideIds.push(...previousPublishedGuides.map((g) => g.id))
+        // Phase 10H: Archive safety check - ensure current guide never in archive list
+        const rawArchivedGuideIds = previousPublishedGuides.map((g) => g.id)
+        const archiveListIncludesCurrent = rawArchivedGuideIds.includes(guideId)
+
+        console.log('[v0] publishEligibleGuide archive safety check', {
+          guideId,
+          archivedGuideIds: rawArchivedGuideIds,
+          archiveIncludesCurrent: archiveListIncludesCurrent,
+        })
+
+        // Phase 10H: If current guide somehow ended up in archive list, fail before executing
+        if (archiveListIncludesCurrent) {
+          console.error('[v0] publishEligibleGuide: SAFETY FAILURE - Archive list includes current guide')
+          return {
+            success: false,
+            error: 'Archive list included current guide. Publishing aborted.',
+            guideId,
+            networkId: context.networkId,
+            stage: 'archive-safety-check',
+          }
+        }
+
+        archivedGuideIds.push(...rawArchivedGuideIds)
 
         console.log('[v0] publishEligibleGuide archived previous versions', {
           rootGuideId,
@@ -843,7 +865,9 @@ export async function publishEligibleGuide(
               currentGuideId: guideId,
               archivedGuideIds,
             },
-  }
+          }
+        }
+      }
 }
 
 /**
@@ -987,8 +1011,6 @@ async function repairGuideFamilyPublishedStateHelper(
     }
   }
 }
-      }
-    }
 
     console.log('[v0] publishEligibleGuide: Publishing guide:', guideId, {
       isRevision,
@@ -1112,6 +1134,32 @@ async function repairGuideFamilyPublishedStateHelper(
             currentGuideId: guideId,
             publishedGuideIds,
             archivedGuideIds,
+            familyStatuses: familyGuidesFinal.map((g) => ({
+              id: g.id,
+              status: g.status,
+              revisionNumber: g.revision_number,
+            })),
+          },
+        }
+      }
+
+      // Phase 10H: CRITICAL - verify the published guide is the one we intended to publish
+      if (publishedGuideIds[0] !== guideId) {
+        console.error('[v0] publishEligibleGuide: Verification failed - published guide is not the current guide:', {
+          expectedGuideId: guideId,
+          actualPublishedGuideId: publishedGuideIds[0],
+        })
+        return {
+          success: false,
+          error: `Revision publish verification failed: expected current guide to be published, but a different guide (${publishedGuideIds[0]}) is published instead`,
+          guideId,
+          networkId: context.networkId,
+          stage: 'verify-current-is-published',
+          debugInfo: {
+            rootGuideId,
+            currentGuideId: guideId,
+            expectedPublishedGuideId: guideId,
+            actualPublishedGuideId: publishedGuideIds[0],
             familyStatuses: familyGuidesFinal.map((g) => ({
               id: g.id,
               status: g.status,
