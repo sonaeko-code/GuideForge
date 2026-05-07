@@ -222,7 +222,10 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
  * Cast or update a guide review vote
  * Phase 8: Guide Review Voting Lite
  * 
- * Uses UNIQUE(guide_id, voter_id) to upsert votes.
+ * Checks for existing vote on (guide_id, voter_id).
+ * Updates if exists, inserts if new.
+ * Prevents duplicate key violations on UNIQUE(guide_id, voter_id).
+ * 
  * Requires user to have can_vote_on_reviews = true in their network role.
  * Returns updated review summary.
  */
@@ -230,7 +233,17 @@ export async function castGuideReviewVote(
   guideId: string,
   vote: 'approve' | 'request_changes',
   notes?: string
-): Promise<{ success: boolean; error?: string; summary?: Awaited<ReturnType<typeof getGuideReviewSummary>> }> {
+): Promise<{ 
+  success: boolean
+  error?: string
+  vote?: 'approve' | 'request_changes'
+  action?: 'inserted' | 'updated'
+  guideId?: string
+  voterId?: string
+  networkId?: string
+  weight?: number
+  summary?: Awaited<ReturnType<typeof getGuideReviewSummary>>
+}> {
   if (!isSupabaseConfigured() || !supabase) {
     return { success: false, error: 'Supabase not configured' }
   }
@@ -259,14 +272,58 @@ export async function castGuideReviewVote(
     const voterRole = authority.canonicalRole || 'member'
     const weight = authority.roleDefinition?.review_weight || 0
 
-    console.log('[v0] castGuideReviewVote: Casting vote for guide:', guideId, 'vote:', vote, 'weight:', weight)
+    console.log('[v0] castGuideReviewVote saving vote', {
+      guideId,
+      voterId: userId,
+      networkId: context.networkId,
+      vote,
+      weight,
+      action: 'checking-for-existing',
+    })
 
-    // Upsert vote using UNIQUE(guide_id, voter_id)
-    // network_id is derived from context
-    const { data: upsertResult, error: upsertError } = await supabase
+    // Check for existing vote
+    const { data: existingVote, error: queryError } = await supabase
       .from('guide_review_votes')
-      .upsert([
-        {
+      .select('id')
+      .eq('guide_id', guideId)
+      .eq('voter_id', userId)
+      .maybeSingle()
+
+    if (queryError) {
+      console.error('[v0] castGuideReviewVote: Query error:', queryError.message)
+      return { success: false, error: `Failed to check existing vote: ${queryError.message}` }
+    }
+
+    let action: 'inserted' | 'updated' = 'inserted'
+
+    if (existingVote) {
+      // Update existing vote
+      console.log('[v0] castGuideReviewVote: Updating existing vote', { voteId: existingVote.id })
+      
+      const { error: updateError } = await supabase
+        .from('guide_review_votes')
+        .update({
+          vote,
+          voter_role: voterRole,
+          weight,
+          notes: notes || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingVote.id)
+
+      if (updateError) {
+        console.error('[v0] castGuideReviewVote: Update error:', updateError.message)
+        return { success: false, error: `Failed to cast vote: ${updateError.message}` }
+      }
+
+      action = 'updated'
+    } else {
+      // Insert new vote
+      console.log('[v0] castGuideReviewVote: Inserting new vote')
+      
+      const { error: insertError } = await supabase
+        .from('guide_review_votes')
+        .insert({
           guide_id: guideId,
           network_id: context.networkId,
           voter_id: userId,
@@ -274,23 +331,39 @@ export async function castGuideReviewVote(
           vote,
           weight,
           notes: notes || null,
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        },
-      ])
-      .select('id')
-      .maybeSingle()
+        })
 
-    if (upsertError) {
-      console.error('[v0] castGuideReviewVote: Upsert error:', upsertError.message)
-      return { success: false, error: `Failed to cast vote: ${upsertError.message}` }
+      if (insertError) {
+        console.error('[v0] castGuideReviewVote: Insert error:', insertError.message)
+        return { success: false, error: `Failed to cast vote: ${insertError.message}` }
+      }
+
+      action = 'inserted'
     }
 
-    console.log('[v0] castGuideReviewVote: Vote cast successfully')
+    console.log('[v0] castGuideReviewVote success', {
+      guideId,
+      voterId: userId,
+      vote,
+      weight,
+      action,
+    })
 
     // Fetch updated summary
     const summary = await getGuideReviewSummary(guideId)
 
-    return { success: true, summary: summary || undefined }
+    return { 
+      success: true, 
+      vote,
+      action,
+      guideId,
+      voterId: userId,
+      networkId: context.networkId,
+      weight,
+      summary: summary || undefined 
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[v0] castGuideReviewVote: Exception:', message)
