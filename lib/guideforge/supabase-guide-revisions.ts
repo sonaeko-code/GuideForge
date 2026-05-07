@@ -194,9 +194,10 @@ export async function createGuideRevisionDraft(
     // Otherwise, sourceGuide itself is the root
     const rootGuideId = sourceGuide.revision_of ?? sourceGuide.id
 
-    console.log('[v0] createGuideRevisionDraft root resolution', {
+    // TEST LOG: Show root resolution
+    console.log('[v0-TEST] createGuideRevisionDraft: Root resolution', {
       sourceGuideId: publishedGuideId,
-      sourceRevisionOf: sourceGuide.revision_of,
+      'sourceGuide.revision_of': sourceGuide.revision_of,
       rootGuideId,
     })
 
@@ -224,11 +225,11 @@ export async function createGuideRevisionDraft(
     
     const nextRevisionNumber = maxRevisionNumber + 1
 
-    console.log('[v0] createGuideRevisionDraft: Next revision number:', {
+    // TEST LOG: Show revision number calculation
+    console.log('[v0-TEST] createGuideRevisionDraft: Revision number', {
       rootGuideId,
       maxRevisionNumber,
       nextRevisionNumber,
-      familySize: rootFamily?.length,
     })
 
     // 8. Create new guide row
@@ -268,6 +269,15 @@ export async function createGuideRevisionDraft(
         stage: 'create-revision-guide',
       }
     }
+
+    // TEST LOG: Show inserted revision details
+    console.log('[v0-TEST] createGuideRevisionDraft: Inserted revision', {
+      'inserted id': newGuide.id,
+      'inserted revision_of': newGuide.revision_of,
+      'inserted revision_number': newGuide.revision_number,
+      'expected revision_of (root)': rootGuideId,
+      'revision_of matches root?': newGuide.revision_of === rootGuideId,
+    })
 
     console.log('[v0] createGuideRevisionDraft: Created revision guide:', newGuide.id)
 
