@@ -92,7 +92,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const [isSubmittingForReview, setIsSubmittingForReview] = useState(false)
   const [submitReviewStatus, setSubmitReviewStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")
   const [submitReviewError, setSubmitReviewError] = useState<string | null>(null)
-  const [submitReviewDebug, setSubmitReviewDebug] = useState<object | null>(null)
   const [refreshReviewPanel, setRefreshReviewPanel] = useState(0)
   
   // Autosave status tracking
@@ -536,41 +535,17 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   // Phase 8: Submit guide for review
   const handleSubmitForReview = async () => {
-    console.log("[v0] Submit for Review clicked", {
-      guideId: normalizedGuide.id,
-      currentGuideStatus: guideStatus,
-      canSubmitForReview: isDraft,
-      isCurrentSaveFailed: autosaveStatus === "failed" && saveError !== null,
-      autosaveStatus,
-      saveError,
-    })
-
     setIsSubmittingForReview(true)
     setSubmitReviewStatus("submitting")
     setSubmitReviewError(null)
-    setSubmitReviewDebug(null)
 
     try {
-      console.log("[v0] Calling submitGuideForReview")
       const result = await submitGuideForReview(normalizedGuide.id)
 
-      console.log("[v0] submitGuideForReview result", {
-        success: result.success,
-        error: result.error,
-        guideId: result.guideId,
-        previousStatus: result.previousStatus,
-        newStatus: result.newStatus,
-        networkId: result.networkId,
-        canSubmit: result.canSubmit,
-        stage: result.stage,
-      })
-
       if (result.success) {
-        console.log("[v0] Submit for Review succeeded")
         setGuideStatus("ready")
         setSubmitReviewStatus("success")
         setSubmitReviewError(null)
-        setSubmitReviewDebug(null)
         
         // Trigger review panel refresh
         setRefreshReviewPanel(prev => prev + 1)
@@ -580,31 +555,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           setSubmitReviewStatus("idle")
         }, 3000)
       } else {
-        console.error("[v0] Submit for Review failed", {
-          stage: result.stage,
-          error: result.error,
-        })
+        console.error("[v0] Submit for Review failed:", result.error)
         setSubmitReviewStatus("error")
         setSubmitReviewError(result.error || "Failed to submit for review")
-        setSubmitReviewDebug({
-          stage: result.stage,
-          guideId: result.guideId,
-          previousStatus: result.previousStatus,
-          newStatus: result.newStatus,
-          networkId: result.networkId,
-          canSubmit: result.canSubmit,
-        })
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
-      console.error("[v0] submitGuideForReview exception", message)
+      console.error("[v0] Submit for Review failed:", message)
       setSubmitReviewStatus("error")
       setSubmitReviewError(message)
-      setSubmitReviewDebug({
-        stage: "exception",
-        guideId: normalizedGuide.id,
-        error: message,
-      })
     } finally {
       setIsSubmittingForReview(false)
     }
@@ -782,14 +741,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         {submitReviewStatus === "error" && submitReviewError && (
           <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded max-w-xs">
             {submitReviewError}
-          </div>
-        )}
-        {submitReviewStatus === "error" && submitReviewDebug && (
-          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-xs max-w-xs">
-            <div className="font-semibold text-red-900 dark:text-red-100 mb-1">Debug Information</div>
-            <pre className="text-red-800 dark:text-red-200/90 overflow-auto max-h-32 whitespace-pre-wrap break-words">
-              {JSON.stringify(submitReviewDebug, null, 2)}
-            </pre>
           </div>
         )}
       </div>

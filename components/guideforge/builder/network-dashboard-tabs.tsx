@@ -107,7 +107,7 @@ export function NetworkDashboardTabs({
           </span>
         </TabsTrigger>
         <TabsTrigger value="ready">
-          Ready
+          Pending Review
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
             {safeReady.length}
           </span>
@@ -160,14 +160,14 @@ export function NetworkDashboardTabs({
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
       </TabsContent>
 
-      {/* Ready tab */}
-      <TabsContent value="ready" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Ready to Publish</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Guides validated and ready for publishing.
-            </p>
+  {/* Ready tab */}
+  <TabsContent value="ready" className="space-y-4">
+  <div className="flex items-center justify-between">
+  <div>
+  <h2 className="text-lg font-semibold text-foreground">Pending Review</h2>
+  <p className="mt-1 text-sm text-muted-foreground">
+  Guides submitted for review and awaiting publication.
+  </p>
           </div>
         </div>
 

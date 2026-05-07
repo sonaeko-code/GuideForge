@@ -319,7 +319,7 @@ export async function castGuideReviewVote(
       action = 'updated'
     } else {
       // Insert new vote
-      console.log('[v0] castGuideReviewVote: Inserting new vote')
+    console.log('[v0] castGuideReviewVote: Inserting new vote')
       
       const { error: insertError } = await supabase
         .from('guide_review_votes')
@@ -442,15 +442,6 @@ export async function submitGuideForReview(
     // Check user's network authority using the same resolver as the rest of the app
     // This handles owner fallback + role definition lookup
     const authority = await getCurrentUserNetworkAuthority(context.networkId)
-    
-    console.log('[v0] Submit permission lookup', {
-      userId,
-      networkId: context.networkId,
-      networkMember: authority.membership,
-      canonicalRole: authority.canonicalRole,
-      roleDefinition: authority.roleDefinition,
-      canSubmitGuides: authority.canSubmitGuides,
-    })
 
     if (!authority.isSignedIn || !authority.canSubmitGuides) {
       return {
@@ -463,8 +454,6 @@ export async function submitGuideForReview(
         stage: 'get-network-authority',
       }
     }
-
-    console.log('[v0] submitGuideForReview: Submitting guide:', guideId, 'for review')
 
     // Update guide status to 'ready'
     const { data: updateResult, error: updateError } = await supabase

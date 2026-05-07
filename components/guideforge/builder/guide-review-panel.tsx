@@ -158,11 +158,7 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
         </div>
       ) : (
         <div className="p-2 rounded text-xs bg-muted/50 text-muted-foreground">
-          {guideStatus === 'ready' ? (
-            <>You need reviewer access or higher to vote on guide reviews.</>
-          ) : (
-            <>Guide is not ready for review.</>
-          )}
+          You can view review status, but your current role cannot vote.
         </div>
       )}
 
