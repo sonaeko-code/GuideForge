@@ -175,7 +175,7 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
       {guideStatus === 'published' ? (
         <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-start gap-2">
           <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
-          <span>This guide is published. Review votes are now locked.</span>
+          <span>This published guide is protected. Review votes are now read-only.</span>
         </div>
       ) : canVote ? (
         <div className="space-y-2">

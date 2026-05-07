@@ -122,7 +122,22 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const currentStep = editingStepId
     ? steps.find((s) => s.id === editingStepId)
     : undefined
+
+  // Derive whether save actually failed (not just autosaveStatus="failed" with null error)
+  const isCurrentSaveFailed = autosaveStatus === "failed" && saveError !== null
   
+  // Mock state tracking for draft/ready/published flow
+  const isDraft = guideStatus === "draft"
+  const isReady = guideStatus === "ready"
+  const isPublished = guideStatus === "published"
+  
+  // Mark guide as edited when user changes content
+  const markDirty = () => {
+    if (!userEditedRef.current) {
+      console.log("[v0] User marked guide dirty: first edit detected")
+      userEditedRef.current = true
+    }
+  }
   // Mark hydration complete on mount
   useEffect(() => {
     console.log("[v0] Guide editor hydrated: initial state loaded, autosave disabled until user edit")
@@ -339,22 +354,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     currentSnapshotRef.current = initialSnapshot
     hasHydratedRef.current = true
   }, [])
-
-  // Derive whether save actually failed (not just autosaveStatus="failed" with null error)
-  const isCurrentSaveFailed = autosaveStatus === "failed" && saveError !== null
-  
-  // Mark guide as edited when user changes content
-  const markDirty = () => {
-    if (!userEditedRef.current) {
-      console.log("[v0] User marked guide dirty: first edit detected")
-      userEditedRef.current = true
-    }
-  }
-  
-  // Mock state tracking for draft/ready/published flow
-  const isDraft = guideStatus === "draft"
-  const isReady = guideStatus === "ready"
-  const isPublished = guideStatus === "published"
 
   // Safe .find() with defensive chaining
   const handleAddSection = async () => {
@@ -808,11 +807,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               )}
             </div>
 
-            {/* Published guide locked message */}
+            {/* Published guide protected message */}
             {isPublished && (
               <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
-                <span>Published guide — locked from editing.</span>
+                <span>Published guide — protected. Create a revision to propose changes.</span>
               </div>
             )}
 
