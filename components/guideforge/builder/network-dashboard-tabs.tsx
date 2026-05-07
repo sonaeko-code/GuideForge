@@ -184,10 +184,22 @@ export function NetworkDashboardTabs({
             {safeReady.map((guide: Guide) => (
               <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
                 <div className="space-y-2 flex-1">
-                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                    {/* Phase 10C: Revision badge on card */}
+                    {guide.revisionOf && (
+                      <Badge variant="outline" className="text-xs whitespace-nowrap border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
+                  {/* Phase 10C: Revision context helper text */}
+                  {guide.revisionOf && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 italic">Revision of another guide</p>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                   <StatusBadge status={guide.status} />
@@ -226,7 +238,15 @@ export function NetworkDashboardTabs({
             {safePublished.map((guide: Guide) => (
               <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
                 <div className="space-y-2 flex-1">
-                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                    {/* Phase 10C: Original badge for published guides */}
+                    {!guide.revisionOf && (
+                      <Badge variant="outline" className="text-xs whitespace-nowrap border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                        Original
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>

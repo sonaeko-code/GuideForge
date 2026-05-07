@@ -854,8 +854,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               </Link>
             </Button>
             <div>
-              <p className="text-xs text-muted-foreground">Guide Editor</p>
+              <p className="text-xs text-muted-foreground">
+                {revisionContext.isRevision ? 'Revision Draft' : 'Guide Editor'}
+              </p>
               <p className="font-semibold text-foreground truncate max-w-xs">{title || "Untitled"}</p>
+              {revisionContext.isRevision && revisionContext.originalGuide && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
+                  Revision of: {revisionContext.originalGuide.title}
+                </p>
+              )}
             </div>
           </div>
           

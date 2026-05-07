@@ -817,6 +817,9 @@ export async function getGuidesForNetworkCollections(
         authorId: g.author_id,
         reviewerId: g.reviewer_id,
         verificationStatus: g.verification_status,
+        // Phase 10A: Revision tracking fields
+        revisionOf: g.revision_of || null,
+        revisionNumber: g.revision_number ?? 1,
       }
     })
 
