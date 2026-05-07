@@ -90,7 +90,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Phase 8: Review voting submission
   const [isSubmittingForReview, setIsSubmittingForReview] = useState(false)
+  const [submitReviewStatus, setSubmitReviewStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")
   const [submitReviewError, setSubmitReviewError] = useState<string | null>(null)
+  const [submitReviewDebug, setSubmitReviewDebug] = useState<object | null>(null)
   const [refreshReviewPanel, setRefreshReviewPanel] = useState(0)
   
   // Autosave status tracking
@@ -314,6 +316,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     hasHydratedRef.current = true
   }, [])
 
+  // Derive whether save actually failed (not just autosaveStatus="failed" with null error)
+  const isCurrentSaveFailed = autosaveStatus === "failed" && saveError !== null
+  
   // Mark guide as edited when user changes content
   const markDirty = () => {
     if (!userEditedRef.current) {
@@ -531,31 +536,75 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   // Phase 8: Submit guide for review
   const handleSubmitForReview = async () => {
+    console.log("[v0] Submit for Review clicked", {
+      guideId: normalizedGuide.id,
+      currentGuideStatus: guideStatus,
+      canSubmitForReview: isDraft,
+      isCurrentSaveFailed: autosaveStatus === "failed" && saveError !== null,
+      autosaveStatus,
+      saveError,
+    })
+
     setIsSubmittingForReview(true)
+    setSubmitReviewStatus("submitting")
     setSubmitReviewError(null)
+    setSubmitReviewDebug(null)
 
     try {
+      console.log("[v0] Calling submitGuideForReview")
       const result = await submitGuideForReview(normalizedGuide.id)
 
+      console.log("[v0] submitGuideForReview result", {
+        success: result.success,
+        error: result.error,
+        guideId: result.guideId,
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+        networkId: result.networkId,
+        canSubmit: result.canSubmit,
+        stage: result.stage,
+      })
+
       if (result.success) {
-        console.log('[v0] Submit for review succeeded')
-        setGuideStatus('ready')
-        setAutosaveStatus('saved')
+        console.log("[v0] Submit for Review succeeded")
+        setGuideStatus("ready")
+        setSubmitReviewStatus("success")
+        setSubmitReviewError(null)
+        setSubmitReviewDebug(null)
         
         // Trigger review panel refresh
         setRefreshReviewPanel(prev => prev + 1)
 
+        // Show success message for 3 seconds, then return to idle
         setTimeout(() => {
-          setAutosaveStatus('idle')
-        }, 2000)
+          setSubmitReviewStatus("idle")
+        }, 3000)
       } else {
-        setSubmitReviewError(result.error || 'Failed to submit for review')
-        setAutosaveStatus('failed')
+        console.error("[v0] Submit for Review failed", {
+          stage: result.stage,
+          error: result.error,
+        })
+        setSubmitReviewStatus("error")
+        setSubmitReviewError(result.error || "Failed to submit for review")
+        setSubmitReviewDebug({
+          stage: result.stage,
+          guideId: result.guideId,
+          previousStatus: result.previousStatus,
+          newStatus: result.newStatus,
+          networkId: result.networkId,
+          canSubmit: result.canSubmit,
+        })
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      const message = err instanceof Error ? err.message : "Unknown error"
+      console.error("[v0] submitGuideForReview exception", message)
+      setSubmitReviewStatus("error")
       setSubmitReviewError(message)
-      setAutosaveStatus('failed')
+      setSubmitReviewDebug({
+        stage: "exception",
+        guideId: normalizedGuide.id,
+        error: message,
+      })
     } finally {
       setIsSubmittingForReview(false)
     }
@@ -694,6 +743,57 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         )}
       </div>
 
+      {/* Submit for Review result toast */}
+      <div 
+        className={`fixed top-[88px] right-6 z-9998 transition-all duration-300 ${
+          submitReviewStatus === "idle" ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className={`rounded-lg shadow-lg p-3 flex items-center gap-2 text-sm font-medium ${
+          submitReviewStatus === "submitting"
+            ? "bg-blue-500 text-white"
+            : submitReviewStatus === "success"
+            ? "bg-emerald-500 text-white"
+            : submitReviewStatus === "error"
+            ? "bg-red-500 text-white"
+            : "bg-muted text-foreground"
+        }`}>
+          {submitReviewStatus === "submitting" && (
+            <>
+              <div className="inline-flex">
+                <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+              </div>
+              <span>Submitting for review...</span>
+            </>
+          )}
+          {submitReviewStatus === "success" && (
+            <>
+              <CheckCircle2 className="size-4" />
+              <span>Guide submitted for review.</span>
+            </>
+          )}
+          {submitReviewStatus === "error" && (
+            <>
+              <AlertCircle className="size-4" />
+              <span>Submit for Review failed</span>
+            </>
+          )}
+        </div>
+        {submitReviewStatus === "error" && submitReviewError && (
+          <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded max-w-xs">
+            {submitReviewError}
+          </div>
+        )}
+        {submitReviewStatus === "error" && submitReviewDebug && (
+          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-xs max-w-xs">
+            <div className="font-semibold text-red-900 dark:text-red-100 mb-1">Debug Information</div>
+            <pre className="text-red-800 dark:text-red-200/90 overflow-auto max-h-32 whitespace-pre-wrap break-words">
+              {JSON.stringify(submitReviewDebug, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+
       {/* Sticky top action bar */}
       <div className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-3">
@@ -795,12 +895,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Button
                     size="sm"
                     onClick={handleSubmitForReview}
-                    disabled={isSubmittingForReview || (autosaveStatus === "failed")}
+                    disabled={isSubmittingForReview || submitReviewStatus === "submitting" || isCurrentSaveFailed}
                     variant="default"
-                    title={autosaveStatus === "failed" ? "Fix the save error before submitting for review" : undefined}
+                    title={isCurrentSaveFailed ? "Fix the save error before submitting for review" : undefined}
                   >
                     <Send className="size-4 mr-1" aria-hidden="true" />
-                    {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
+                    {submitReviewStatus === "submitting" || isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={handleDelete}>
                     <Trash2 className="size-4" aria-hidden="true" />
@@ -808,7 +908,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 </div>
                 
                 {/* Helper text if save is failing */}
-                {autosaveStatus === "failed" && (
+                {isCurrentSaveFailed && (
                   <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
                     Fix the save error before submitting for review.
                   </p>

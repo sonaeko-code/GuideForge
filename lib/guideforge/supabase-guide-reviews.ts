@@ -305,12 +305,28 @@ export async function castGuideReviewVote(
  * Updates guide.status from 'draft' to 'ready'.
  * Requires user to have can_submit_guides = true.
  * Does not auto-publish or set verification_status.
+ * 
+ * Returns structured result with complete context for debugging.
  */
 export async function submitGuideForReview(
   guideId: string
-): Promise<{ success: boolean; error?: string; status?: string }> {
+): Promise<{ 
+  success: boolean
+  error?: string
+  guideId: string
+  previousStatus?: string
+  newStatus?: string
+  networkId?: string
+  canSubmit?: boolean
+  stage?: string
+}> {
   if (!isSupabaseConfigured() || !supabase) {
-    return { success: false, error: 'Supabase not configured' }
+    return {
+      success: false,
+      error: 'Supabase not configured',
+      guideId,
+      stage: 'supabase-check',
+    }
   }
 
   try {
@@ -318,25 +334,50 @@ export async function submitGuideForReview(
     const userId = session?.user?.id
 
     if (!userId) {
-      return { success: false, error: 'User not authenticated' }
+      return {
+        success: false,
+        error: 'User not authenticated',
+        guideId,
+        stage: 'get-user',
+      }
     }
 
     // Resolve guide network context through collection → hub
     const context = await resolveGuideReviewContext(guideId)
     
     if (!context) {
-      return { success: false, error: 'Could not resolve guide network context. Guide may be missing collection or hub.' }
+      return {
+        success: false,
+        error: 'Could not resolve guide network context. Guide may be missing collection or hub.',
+        guideId,
+        stage: 'resolve-context',
+      }
     }
 
     // Only allow submission from draft status
     if (context.status !== 'draft') {
-      return { success: false, error: `Guide is already in ${context.status} status` }
+      return {
+        success: false,
+        error: `Guide is already in ${context.status} status`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'permission-check',
+      }
     }
 
     // Check user's network authority
     const membership = await getCurrentUserNetworkMembership(context.networkId)
     if (!membership || !membership.can_submit_guides) {
-      return { success: false, error: 'You do not have permission to submit guides for review' }
+      return {
+        success: false,
+        error: 'You do not have permission to submit guides for review',
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        canSubmit: membership?.can_submit_guides || false,
+        stage: 'get-network-authority',
+      }
     }
 
     console.log('[v0] submitGuideForReview: Submitting guide:', guideId, 'for review')
@@ -354,15 +395,82 @@ export async function submitGuideForReview(
 
     if (updateError) {
       console.error('[v0] submitGuideForReview: Update error:', updateError.message)
-      return { success: false, error: `Failed to submit guide: ${updateError.message}` }
+      return {
+        success: false,
+        error: `Failed to submit guide: ${updateError.message}`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'update-guide-status',
+      }
     }
 
-    console.log('[v0] submitGuideForReview: Guide submitted successfully, new status:', updateResult?.status)
+    // Verify the update persisted
+    if (!updateResult || updateResult.status !== 'ready') {
+      console.error('[v0] submitGuideForReview: Update returned but status not ready:', updateResult?.status)
+      return {
+        success: false,
+        error: 'Submit for Review update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-updated-guide',
+      }
+    }
 
-    return { success: true, status: updateResult?.status || 'ready' }
+    // Re-fetch to verify the change persisted to the database
+    const { data: verifiedGuide, error: verifyError } = await supabase
+      .from('guides')
+      .select('id, status, verification_status')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (verifyError || !verifiedGuide) {
+      console.error('[v0] submitGuideForReview: Verification query failed:', verifyError?.message)
+      return {
+        success: false,
+        error: 'Could not verify guide status after submission',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-updated-guide',
+      }
+    }
+
+    if (verifiedGuide.status !== 'ready') {
+      console.error('[v0] submitGuideForReview: Verified status is not ready:', verifiedGuide.status)
+      return {
+        success: false,
+        error: 'Submit for Review update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: verifiedGuide.status,
+        networkId: context.networkId,
+        stage: 'verify-updated-guide',
+      }
+    }
+
+    console.log('[v0] submitGuideForReview: Guide submitted successfully, verified status:', verifiedGuide.status)
+
+    return {
+      success: true,
+      guideId,
+      previousStatus: context.status,
+      newStatus: 'ready',
+      networkId: context.networkId,
+      canSubmit: true,
+      stage: 'complete',
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[v0] submitGuideForReview: Exception:', message)
-    return { success: false, error: message }
+    return {
+      success: false,
+      error: message,
+      guideId,
+      stage: 'exception',
+    }
   }
 }
