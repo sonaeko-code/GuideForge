@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
-import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
+import { normalizeGuideStatus, filterGuidesByStatus, filterOutArchived } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
@@ -69,18 +69,55 @@ export function NetworkDashboardTabs({
   const safeCollections = Array.isArray(collections) ? collections : []
   const safeGuides = Array.isArray(guides) ? guides : []
   
-  // Use normalized status filtering for all guides
-  const safeDrafts = filterGuidesByStatus(safeGuides, "draft")
-  const safeReady = filterGuidesByStatus(safeGuides, "ready")
-  const safePublished = filterGuidesByStatus(safeGuides, "published")
+  // Phase 10E: Debug dashboard data source
+  console.log("[v0] Dashboard guide source", {
+    source: "supabase (page-level fetch)",
+    total: safeGuides.length,
+    statuses: safeGuides.map(g => ({
+      id: g.id,
+      title: g.title,
+      status: g.status,
+      revisionOf: g.revisionOf,
+      revisionNumber: g.revisionNumber,
+    })),
+  })
+  
+  // Phase 10G: Exclude archived from active tabs, but count them separately
+  const activeGuides = filterOutArchived(safeGuides)
+  const archivedGuides = filterGuidesByStatus(safeGuides, "archived")
+  
+  // Use normalized status filtering for active guides only
+  const safeDrafts = filterGuidesByStatus(activeGuides, "draft")
+  const safeReady = filterGuidesByStatus(activeGuides, "ready")
+  const safePublished = filterGuidesByStatus(activeGuides, "published")
+  
+  // Phase 10G: Enhanced debug logs with archived count
+  console.log("[v0] Dashboard filtered counts", {
+    totalLoaded: safeGuides.length,
+    drafts: safeDrafts.length,
+    ready: safeReady.length,
+    published: safePublished.length,
+    archived: archivedGuides.length,
+    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
+  })
 
-  // Guides tab filtering
+  // Phase 10H: Debug logs showing what's visible in each tab
+  console.log("[v0] Dashboard active counts", {
+    totalLoaded: safeGuides.length,
+    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
+    drafts: safeDrafts.length,
+    ready: safeReady.length,
+    published: safePublished.length,
+    archived: archivedGuides.length,
+  })
+
+  // Phase 10G: Guides tab filtering - exclude archived
   const filteredCollection = initialCollectionId
     ? safeCollections.find((c: NormalizedCollection) => c.id === initialCollectionId)
     : null
   const filteredGuides = initialCollectionId
-    ? safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId)
-    : safeGuides
+    ? filterOutArchived(safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId))
+    : filterOutArchived(safeGuides)
   
   console.log("[v0] Guides tab rendering:", {
     totalGuides: safeGuides.length,
@@ -107,7 +144,7 @@ export function NetworkDashboardTabs({
           </span>
         </TabsTrigger>
         <TabsTrigger value="ready">
-          Ready
+          Pending Review
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
             {safeReady.length}
           </span>
@@ -121,7 +158,7 @@ export function NetworkDashboardTabs({
         <TabsTrigger value="guides">
           Guides
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
-            {safeGuides.length}
+            {filteredGuides.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="hubs">
@@ -157,17 +194,31 @@ export function NetworkDashboardTabs({
           </Button>
         </div>
 
+        {/* Phase 10H: Debug log for visible guides in drafts tab */}
+        {safeDrafts.length > 0 && (
+          console.log("[v0] Dashboard visible guide ids - drafts", {
+            tab: "drafts",
+            visibleGuideIds: safeDrafts.map(g => ({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              revisionOf: g.revisionOf,
+              revisionNumber: g.revisionNumber,
+            })),
+          })
+        )}
+
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
       </TabsContent>
 
-      {/* Ready tab */}
-      <TabsContent value="ready" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Ready to Publish</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Guides validated and ready for publishing.
-            </p>
+  {/* Ready tab */}
+  <TabsContent value="ready" className="space-y-4">
+  <div className="flex items-center justify-between">
+  <div>
+  <h2 className="text-lg font-semibold text-foreground">Pending Review</h2>
+  <p className="mt-1 text-sm text-muted-foreground">
+  Guides submitted for review and awaiting publication.
+  </p>
           </div>
         </div>
 
@@ -184,10 +235,22 @@ export function NetworkDashboardTabs({
             {safeReady.map((guide: Guide) => (
               <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
                 <div className="space-y-2 flex-1">
-                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                    {/* Phase 10C: Revision badge on card */}
+                    {guide.revisionOf && (
+                      <Badge variant="outline" className="text-xs whitespace-nowrap border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
+                  {/* Phase 10C: Revision context helper text */}
+                  {guide.revisionOf && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 italic">Revision of another guide</p>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
                   <StatusBadge status={guide.status} />
@@ -213,6 +276,20 @@ export function NetworkDashboardTabs({
           </h2>
         </div>
 
+        {/* Phase 10H: Debug log for visible guides in published tab */}
+        {safePublished.length > 0 && (
+          console.log("[v0] Dashboard visible guide ids - published", {
+            tab: "published",
+            visibleGuideIds: safePublished.map(g => ({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              revisionOf: g.revisionOf,
+              revisionNumber: g.revisionNumber,
+            })),
+          })
+        )}
+
         {safePublished.length === 0 ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
             <Eye className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
@@ -226,7 +303,19 @@ export function NetworkDashboardTabs({
             {safePublished.map((guide: Guide) => (
               <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
                 <div className="space-y-2 flex-1">
-                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
+                    {/* Phase 10D/10E: Badge for published guides */}
+                    {!guide.revisionOf ? (
+                      <Badge variant="outline" className="text-xs whitespace-nowrap border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                        Original
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs whitespace-nowrap border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>

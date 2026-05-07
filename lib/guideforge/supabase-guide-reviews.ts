@@ -1,5 +1,5 @@
 import { getSupabaseSession, isSupabaseConfigured, supabase } from './supabase-client'
-import { getCurrentUserNetworkMembership } from './supabase-networks'
+import { getCurrentUserNetworkMembership, getCurrentUserNetworkAuthority } from './supabase-networks'
 
 /**
  * Resolve guide network context by traversing collection → hub → network
@@ -86,11 +86,11 @@ async function resolveGuideReviewContext(guideId: string): Promise<{
 
 /**
  * Get review summary for a guide
- * Phase 8: Guide Review Voting Lite
+ * Phase 8: Guide Review Voting Lite + Phase 9A: Publish Eligibility Visibility
  * 
  * Fetches guide_review_votes and calculates weighted vote totals.
  * Checks current user's voting permission based on network role.
- * Returns vote summary with approve/request_changes weights.
+ * Returns vote summary with approve/request_changes weights and publish eligibility.
  */
 export async function getGuideReviewSummary(guideId: string): Promise<{
   guideId: string
@@ -110,6 +110,18 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
     notes: string | null
     createdAt: string
   }>
+  publishEligibility: {
+    publishEligible: boolean
+    needsChanges: boolean
+    needsMoreReview: boolean
+    approveWeight: number
+    requestChangesWeight: number
+    netApprovalWeight: number
+    requiredApproveWeight: number
+    blockingRequestChanges: boolean
+    label: string
+    helperText: string
+  }
   error?: string
 } | null> {
   if (!isSupabaseConfigured() || !supabase) {
@@ -136,6 +148,18 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
         currentUserRole: null,
         canCurrentUserVote: false,
         votes: [],
+        publishEligibility: {
+          publishEligible: false,
+          needsChanges: false,
+          needsMoreReview: true,
+          approveWeight: 0,
+          requestChangesWeight: 0,
+          netApprovalWeight: 0,
+          requiredApproveWeight: 10,
+          blockingRequestChanges: false,
+          label: 'Needs more review',
+          helperText: 'More approval weight is needed before this guide should be published.',
+        },
         error: 'Could not resolve guide context. Please verify guide is attached to a collection and hub.',
       }
     }
@@ -182,16 +206,16 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
       }
     })
 
-    // Check current user's voting permission
+    // Check current user's voting permission using the same authority resolver
     let currentUserVote: 'approve' | 'request_changes' | null = null
     let currentUserRole: string | null = null
     let canCurrentUserVote = false
 
     if (userId) {
-      const membership = await getCurrentUserNetworkMembership(context.networkId)
-      if (membership) {
-        currentUserRole = membership.canonicalRole
-        canCurrentUserVote = membership.can_vote_on_reviews === true
+      const authority = await getCurrentUserNetworkAuthority(context.networkId)
+      if (authority.isSignedIn && authority.canonicalRole) {
+        currentUserRole = authority.canonicalRole
+        canCurrentUserVote = authority.canVoteOnReviews === true
         
         // Find current user's vote
         const userVote = (votes || []).find((v) => v.voter_id === userId)
@@ -199,6 +223,24 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
           currentUserVote = userVote.vote as 'approve' | 'request_changes'
         }
       }
+    }
+
+    // Calculate publish eligibility
+    const requiredApproveWeight = 10
+    const publishEligible = approveWeight >= requiredApproveWeight && requestChangesWeight === 0
+    const needsChanges = requestChangesWeight > 0
+    const needsMoreReview = !publishEligible && !needsChanges
+    const netApprovalWeight = approveWeight - requestChangesWeight
+
+    let label = 'Needs more review'
+    let helperText = 'More approval weight is needed before this guide should be published.'
+
+    if (publishEligible) {
+      label = 'Publish eligible'
+      helperText = 'This guide has enough approval weight for publishing, but publishing is not enforced yet.'
+    } else if (needsChanges) {
+      label = 'Changes requested'
+      helperText = 'A reviewer requested changes. Resolve feedback before publishing.'
     }
 
     return {
@@ -211,6 +253,18 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
       currentUserRole,
       canCurrentUserVote,
       votes: formattedVotes,
+      publishEligibility: {
+        publishEligible,
+        needsChanges,
+        needsMoreReview,
+        approveWeight,
+        requestChangesWeight,
+        netApprovalWeight,
+        requiredApproveWeight,
+        blockingRequestChanges: requestChangesWeight > 0,
+        label,
+        helperText,
+      },
     }
   } catch (err) {
     console.warn('[v0] getGuideReviewSummary: Exception:', err instanceof Error ? err.message : String(err))
@@ -222,7 +276,10 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
  * Cast or update a guide review vote
  * Phase 8: Guide Review Voting Lite
  * 
- * Uses UNIQUE(guide_id, voter_id) to upsert votes.
+ * Checks for existing vote on (guide_id, voter_id).
+ * Updates if exists, inserts if new.
+ * Prevents duplicate key violations on UNIQUE(guide_id, voter_id).
+ * 
  * Requires user to have can_vote_on_reviews = true in their network role.
  * Returns updated review summary.
  */
@@ -230,7 +287,17 @@ export async function castGuideReviewVote(
   guideId: string,
   vote: 'approve' | 'request_changes',
   notes?: string
-): Promise<{ success: boolean; error?: string; summary?: Awaited<ReturnType<typeof getGuideReviewSummary>> }> {
+): Promise<{ 
+  success: boolean
+  error?: string
+  vote?: 'approve' | 'request_changes'
+  action?: 'inserted' | 'updated'
+  guideId?: string
+  voterId?: string
+  networkId?: string
+  weight?: number
+  summary?: Awaited<ReturnType<typeof getGuideReviewSummary>>
+}> {
   if (!isSupabaseConfigured() || !supabase) {
     return { success: false, error: 'Supabase not configured' }
   }
@@ -250,23 +317,67 @@ export async function castGuideReviewVote(
       return { success: false, error: 'Could not resolve guide network context. Guide may be missing collection or hub.' }
     }
 
-    // Check user's network authority
-    const membership = await getCurrentUserNetworkMembership(context.networkId)
-    if (!membership || !membership.can_vote_on_reviews) {
+    // Check user's network authority using the same resolver
+    const authority = await getCurrentUserNetworkAuthority(context.networkId)
+    if (!authority.isSignedIn || !authority.canVoteOnReviews) {
       return { success: false, error: 'You do not have permission to vote on guide reviews' }
     }
 
-    const voterRole = membership.canonicalRole
-    const weight = membership.weight || 0
+    const voterRole = authority.canonicalRole || 'member'
+    const weight = authority.roleDefinition?.review_weight || 0
 
-    console.log('[v0] castGuideReviewVote: Casting vote for guide:', guideId, 'vote:', vote, 'weight:', weight)
+    console.log('[v0] castGuideReviewVote saving vote', {
+      guideId,
+      voterId: userId,
+      networkId: context.networkId,
+      vote,
+      weight,
+      action: 'checking-for-existing',
+    })
 
-    // Upsert vote using UNIQUE(guide_id, voter_id)
-    // network_id is derived from context
-    const { data: upsertResult, error: upsertError } = await supabase
+    // Check for existing vote
+    const { data: existingVote, error: queryError } = await supabase
       .from('guide_review_votes')
-      .upsert([
-        {
+      .select('id')
+      .eq('guide_id', guideId)
+      .eq('voter_id', userId)
+      .maybeSingle()
+
+    if (queryError) {
+      console.error('[v0] castGuideReviewVote: Query error:', queryError.message)
+      return { success: false, error: `Failed to check existing vote: ${queryError.message}` }
+    }
+
+    let action: 'inserted' | 'updated' = 'inserted'
+
+    if (existingVote) {
+      // Update existing vote
+      console.log('[v0] castGuideReviewVote: Updating existing vote', { voteId: existingVote.id })
+      
+      const { error: updateError } = await supabase
+        .from('guide_review_votes')
+        .update({
+          vote,
+          voter_role: voterRole,
+          weight,
+          notes: notes || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingVote.id)
+
+      if (updateError) {
+        console.error('[v0] castGuideReviewVote: Update error:', updateError.message)
+        return { success: false, error: `Failed to cast vote: ${updateError.message}` }
+      }
+
+      action = 'updated'
+    } else {
+      // Insert new vote
+    console.log('[v0] castGuideReviewVote: Inserting new vote')
+      
+      const { error: insertError } = await supabase
+        .from('guide_review_votes')
+        .insert({
           guide_id: guideId,
           network_id: context.networkId,
           voter_id: userId,
@@ -274,23 +385,39 @@ export async function castGuideReviewVote(
           vote,
           weight,
           notes: notes || null,
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        },
-      ])
-      .select('id')
-      .maybeSingle()
+        })
 
-    if (upsertError) {
-      console.error('[v0] castGuideReviewVote: Upsert error:', upsertError.message)
-      return { success: false, error: `Failed to cast vote: ${upsertError.message}` }
+      if (insertError) {
+        console.error('[v0] castGuideReviewVote: Insert error:', insertError.message)
+        return { success: false, error: `Failed to cast vote: ${insertError.message}` }
+      }
+
+      action = 'inserted'
     }
 
-    console.log('[v0] castGuideReviewVote: Vote cast successfully')
+    console.log('[v0] castGuideReviewVote success', {
+      guideId,
+      voterId: userId,
+      vote,
+      weight,
+      action,
+    })
 
     // Fetch updated summary
     const summary = await getGuideReviewSummary(guideId)
 
-    return { success: true, summary: summary || undefined }
+    return { 
+      success: true, 
+      vote,
+      action,
+      guideId,
+      voterId: userId,
+      networkId: context.networkId,
+      weight,
+      summary: summary || undefined 
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[v0] castGuideReviewVote: Exception:', message)
@@ -305,12 +432,28 @@ export async function castGuideReviewVote(
  * Updates guide.status from 'draft' to 'ready'.
  * Requires user to have can_submit_guides = true.
  * Does not auto-publish or set verification_status.
+ * 
+ * Returns structured result with complete context for debugging.
  */
 export async function submitGuideForReview(
   guideId: string
-): Promise<{ success: boolean; error?: string; status?: string }> {
+): Promise<{ 
+  success: boolean
+  error?: string
+  guideId: string
+  previousStatus?: string
+  newStatus?: string
+  networkId?: string
+  canSubmit?: boolean
+  stage?: string
+}> {
   if (!isSupabaseConfigured() || !supabase) {
-    return { success: false, error: 'Supabase not configured' }
+    return {
+      success: false,
+      error: 'Supabase not configured',
+      guideId,
+      stage: 'supabase-check',
+    }
   }
 
   try {
@@ -318,28 +461,53 @@ export async function submitGuideForReview(
     const userId = session?.user?.id
 
     if (!userId) {
-      return { success: false, error: 'User not authenticated' }
+      return {
+        success: false,
+        error: 'User not authenticated',
+        guideId,
+        stage: 'get-user',
+      }
     }
 
     // Resolve guide network context through collection → hub
     const context = await resolveGuideReviewContext(guideId)
     
     if (!context) {
-      return { success: false, error: 'Could not resolve guide network context. Guide may be missing collection or hub.' }
+      return {
+        success: false,
+        error: 'Could not resolve guide network context. Guide may be missing collection or hub.',
+        guideId,
+        stage: 'resolve-context',
+      }
     }
 
     // Only allow submission from draft status
     if (context.status !== 'draft') {
-      return { success: false, error: `Guide is already in ${context.status} status` }
+      return {
+        success: false,
+        error: `Guide is already in ${context.status} status`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'permission-check',
+      }
     }
 
-    // Check user's network authority
-    const membership = await getCurrentUserNetworkMembership(context.networkId)
-    if (!membership || !membership.can_submit_guides) {
-      return { success: false, error: 'You do not have permission to submit guides for review' }
-    }
+    // Check user's network authority using the same resolver as the rest of the app
+    // This handles owner fallback + role definition lookup
+    const authority = await getCurrentUserNetworkAuthority(context.networkId)
 
-    console.log('[v0] submitGuideForReview: Submitting guide:', guideId, 'for review')
+    if (!authority.isSignedIn || !authority.canSubmitGuides) {
+      return {
+        success: false,
+        error: 'You do not have permission to submit guides for review',
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        canSubmit: authority.canSubmitGuides,
+        stage: 'get-network-authority',
+      }
+    }
 
     // Update guide status to 'ready'
     const { data: updateResult, error: updateError } = await supabase
@@ -354,15 +522,692 @@ export async function submitGuideForReview(
 
     if (updateError) {
       console.error('[v0] submitGuideForReview: Update error:', updateError.message)
-      return { success: false, error: `Failed to submit guide: ${updateError.message}` }
+      return {
+        success: false,
+        error: `Failed to submit guide: ${updateError.message}`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'update-guide-status',
+      }
     }
 
-    console.log('[v0] submitGuideForReview: Guide submitted successfully, new status:', updateResult?.status)
+    // Verify the update persisted
+    if (!updateResult || updateResult.status !== 'ready') {
+      console.error('[v0] submitGuideForReview: Update returned but status not ready:', updateResult?.status)
+      return {
+        success: false,
+        error: 'Submit for Review update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-updated-guide',
+      }
+    }
 
-    return { success: true, status: updateResult?.status || 'ready' }
+    // Re-fetch to verify the change persisted to the database
+    const { data: verifiedGuide, error: verifyError } = await supabase
+      .from('guides')
+      .select('id, status, verification_status')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (verifyError || !verifiedGuide) {
+      console.error('[v0] submitGuideForReview: Verification query failed:', verifyError?.message)
+      return {
+        success: false,
+        error: 'Could not verify guide status after submission',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-updated-guide',
+      }
+    }
+
+    if (verifiedGuide.status !== 'ready') {
+      console.error('[v0] submitGuideForReview: Verified status is not ready:', verifiedGuide.status)
+      return {
+        success: false,
+        error: 'Submit for Review update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: verifiedGuide.status,
+        networkId: context.networkId,
+        stage: 'verify-updated-guide',
+      }
+    }
+
+    console.log('[v0] submitGuideForReview: Guide submitted successfully, verified status:', verifiedGuide.status)
+
+    return {
+      success: true,
+      guideId,
+      previousStatus: context.status,
+      newStatus: 'ready',
+      networkId: context.networkId,
+      canSubmit: true,
+      stage: 'complete',
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[v0] submitGuideForReview: Exception:', message)
-    return { success: false, error: message }
+    return {
+      success: false,
+      error: message,
+      guideId,
+      stage: 'exception',
+    }
+  }
+}
+
+/**
+ * Publish an eligible guide manually
+ * Phase 9B: Manual Publish Button
+ * 
+ * Publishes a guide from status "ready" to "published".
+ * Requires:
+ * - Guide status === "ready"
+ * - Publish eligibility === true (approve >= 10, no request changes)
+ * - User has canPublishOverride permission in network role
+ * - Does NOT auto-publish; only publishes on explicit user action
+ * 
+ * Sets: status = "published", published_at = now()
+ * Leaves: verification_status unchanged
+ */
+export async function publishEligibleGuide(
+  guideId: string
+): Promise<{
+  success: boolean
+  error?: string
+  guideId: string
+  isRevision?: boolean
+  revisionOf?: string | null
+  revisionNumber?: number
+  archivedGuideIds?: string[]
+  previousStatus?: string
+  newStatus?: string
+  publishedAt?: string
+  networkId?: string
+  canPublish?: boolean
+  stage?: string
+  debugInfo?: any
+}> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      success: false,
+      error: 'Supabase not configured',
+      guideId,
+      stage: 'supabase-check',
+    }
+  }
+
+  try {
+    const session = await getSupabaseSession()
+    const userId = session?.user?.id
+
+    if (!userId) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        guideId,
+        stage: 'get-user',
+      }
+    }
+
+    // Resolve guide network context
+    const context = await resolveGuideReviewContext(guideId)
+    
+    if (!context) {
+      return {
+        success: false,
+        error: 'Could not resolve guide network context. Guide may be missing collection or hub.',
+        guideId,
+        stage: 'resolve-context',
+      }
+    }
+
+    // Get user's network authority
+    const authority = await getCurrentUserNetworkAuthority(context.networkId)
+    
+    if (!authority.isSignedIn) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        guideId,
+        networkId: context.networkId,
+        stage: 'get-network-authority',
+      }
+    }
+
+    // Check publish permission (canPublishOverride)
+    if (!authority.canPublishOverride) {
+      return {
+        success: false,
+        error: 'You do not have permission to publish guides',
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        canPublish: false,
+        stage: 'permission-check',
+      }
+    }
+
+    // Guide must be in "ready" status
+    if (context.status !== 'ready') {
+      return {
+        success: false,
+        error: `Guide is in ${context.status} status, not ready for publishing`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'status-check',
+      }
+    }
+
+    // Get current review summary to verify publish eligibility
+    const summary = await getGuideReviewSummary(guideId)
+    
+    if (!summary || !summary.publishEligibility.publishEligible) {
+      return {
+        success: false,
+        error: 'Guide is not eligible for publishing. Requires 10+ approval weight and no request changes.',
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'eligibility-check',
+      }
+    }
+
+    // Phase 10F: Load current guide including revision fields
+    const { data: currentGuide, error: loadError } = await supabase
+      .from('guides')
+      .select('id, status, revision_of, revision_number')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (loadError || !currentGuide) {
+      return {
+        success: false,
+        error: 'Could not load guide revision data',
+        guideId,
+        networkId: context.networkId,
+        stage: 'load-guide-data',
+      }
+    }
+
+    // Phase 10F: Determine root guide ID
+    let rootGuideId = currentGuide.revision_of
+    const isRevision = rootGuideId !== null && rootGuideId !== undefined
+
+    if (!isRevision) {
+      rootGuideId = currentGuide.id
+    }
+
+    // Phase 10J: Defensive branch detection
+    // If currentGuide.revision_of points to another guide that itself has revision_of,
+    // then currentGuide is part of a nested branch that shouldn't exist
+    let nestedBranchDetected = false
+    if (isRevision && rootGuideId) {
+      const { data: parentGuide, error: parentError } = await supabase
+        .from('guides')
+        .select('id, revision_of')
+        .eq('id', rootGuideId)
+        .maybeSingle()
+
+      if (!parentError && parentGuide && parentGuide.revision_of) {
+        // Parent guide itself is a revision - this is a nested branch!
+        nestedBranchDetected = true
+        const ultimateRoot = parentGuide.revision_of
+        console.warn('[v0] publishEligibleGuide: Nested revision branch detected; resolving to root', {
+          currentGuideId: guideId,
+          currentRevisionOf: rootGuideId,
+          parentRevisionOf: parentGuide.revision_of,
+          resolvedRoot: ultimateRoot,
+        })
+        rootGuideId = ultimateRoot
+      }
+    }
+
+    const archivedGuideIds: string[] = []
+
+    // Phase 10F: Handle revision family archiving for revisions only
+    if (isRevision) {
+      console.log('[v0] publishEligibleGuide root family resolution', {
+        currentGuideId: guideId,
+        currentRevisionOf: currentGuide.revision_of,
+        resolvedRootGuideId: rootGuideId,
+        nestedBranchDetected,
+      })
+
+      // Query root guide
+      const { data: rootGuide, error: rootError } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('id', rootGuideId)
+        .maybeSingle()
+
+      if (rootError || !rootGuide) {
+        return {
+          success: false,
+          error: 'Could not load root guide for revision family',
+          guideId,
+          networkId: context.networkId,
+          stage: 'load-root-guide',
+        }
+      }
+
+      // Query all revisions of root guide
+      const { data: revisionFamily, error: familyError } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('revision_of', rootGuideId)
+
+      if (familyError) {
+        return {
+          success: false,
+          error: 'Could not load revision family',
+          guideId,
+          networkId: context.networkId,
+          stage: 'load-revision-family',
+        }
+      }
+
+      // Combine root guide with revision family
+      const familyGuides = [rootGuide, ...(revisionFamily || [])]
+
+      console.log('[v0] publishEligibleGuide revision family loaded', {
+        rootGuideId,
+        currentGuideId: guideId,
+        familySize: familyGuides.length,
+        familyStatuses: familyGuides.map((g) => ({
+          id: g.id,
+          status: g.status,
+          revisionNumber: g.revision_number,
+        })),
+      })
+
+      // Store family guides info for later archive phase (after publish succeeds)
+      // This ensures we never archive until the selected guide is verified published
+      context.familyGuides = familyGuides
+    }
+
+/**
+ * Phase 10F: Internal helper to repair guide family published state
+ * 
+ * Archives all published guides in a revision family except the one to keep.
+ * This is an internal helper for debugging - not exported or used in production.
+ */
+async function repairGuideFamilyPublishedStateHelper(
+  rootGuideId: string,
+  keepGuideId: string
+): Promise<{
+  success: boolean
+  error?: string
+  rootGuideId: string
+  keepGuideId: string
+  archivedGuideIds: string[]
+  stage?: string
+}> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      success: false,
+      error: 'Supabase not configured',
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds: [],
+      stage: 'supabase-check',
+    }
+  }
+
+  try {
+    // Query root guide
+    const { data: rootGuide, error: rootError } = await supabase
+      .from('guides')
+      .select('id, status, revision_of, revision_number')
+      .eq('id', rootGuideId)
+      .maybeSingle()
+
+    if (rootError || !rootGuide) {
+      return {
+        success: false,
+        error: 'Could not load root guide',
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'load-root-guide',
+      }
+    }
+
+    // Query all revisions of root guide
+    const { data: revisionFamily, error: familyError } = await supabase
+      .from('guides')
+      .select('id, status, revision_of, revision_number')
+      .eq('revision_of', rootGuideId)
+
+    if (familyError) {
+      return {
+        success: false,
+        error: 'Could not load revision family',
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'load-revision-family',
+      }
+    }
+
+    // Combine family
+    const familyGuides = [rootGuide, ...(revisionFamily || [])]
+
+    // Find all published guides except the one to keep
+    const toArchive = familyGuides.filter(
+      (g) => g.status === 'published' && g.id !== keepGuideId
+    )
+
+    if (toArchive.length === 0) {
+      return {
+        success: true,
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'no-guides-to-archive',
+      }
+    }
+
+    const archivedGuideIds = toArchive.map((g) => g.id)
+
+    console.log('[v0] repairGuideFamilyPublishedState: Archiving published guides', {
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds,
+      familyDetails: familyGuides.map((g) => ({
+        id: g.id,
+        status: g.status,
+        revisionNumber: g.revision_number,
+      })),
+    })
+
+    // Archive the guides
+    const { error: archiveError } = await supabase
+      .from('guides')
+      .update({
+        status: 'archived',
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', archivedGuideIds)
+
+    if (archiveError) {
+      return {
+        success: false,
+        error: `Failed to archive guides: ${archiveError.message}`,
+        rootGuideId,
+        keepGuideId,
+        archivedGuideIds: [],
+        stage: 'archive-failed',
+      }
+    }
+
+    console.log('[v0] repairGuideFamilyPublishedState: Successfully archived', {
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds,
+    })
+
+    return {
+      success: true,
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds,
+      stage: 'complete',
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[v0] repairGuideFamilyPublishedState: Exception:', message)
+    return {
+      success: false,
+      error: message,
+      rootGuideId,
+      keepGuideId,
+      archivedGuideIds: [],
+      stage: 'exception',
+    }
+  }
+}
+
+    console.log('[v0] publishEligibleGuide: Publishing guide:', guideId, {
+      isRevision,
+      archivedCount: archivedGuideIds.length,
+    })
+
+    // Update guide status to 'published' and set published_at
+    const now = new Date().toISOString()
+    const { data: updateResult, error: updateError } = await supabase
+      .from('guides')
+      .update({
+        status: 'published',
+        published_at: now,
+        updated_at: now,
+      })
+      .eq('id', guideId)
+      .select('id, status, published_at')
+      .maybeSingle()
+
+    if (updateError) {
+      console.error('[v0] publishEligibleGuide: Update error:', updateError.message)
+      return {
+        success: false,
+        error: `Failed to publish guide: ${updateError.message}`,
+        guideId,
+        previousStatus: context.status,
+        networkId: context.networkId,
+        stage: 'update-guide-status',
+      }
+    }
+
+    // Verify the update persisted
+    if (!updateResult || updateResult.status !== 'published') {
+      console.error('[v0] publishEligibleGuide: Update returned but status not published:', updateResult?.status)
+      return {
+        success: false,
+        error: 'Publish update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-published-guide',
+      }
+    }
+
+    // Re-fetch to verify the change persisted to the database
+    const { data: verifiedGuide, error: verifyError } = await supabase
+      .from('guides')
+      .select('id, status, published_at')
+      .eq('id', guideId)
+      .maybeSingle()
+
+    if (verifyError || !verifiedGuide) {
+      console.error('[v0] publishEligibleGuide: Verification query failed:', verifyError?.message)
+      return {
+        success: false,
+        error: 'Could not verify guide status after publishing',
+        guideId,
+        previousStatus: context.status,
+        newStatus: updateResult?.status,
+        networkId: context.networkId,
+        stage: 'verify-published-guide',
+      }
+    }
+
+    if (verifiedGuide.status !== 'published') {
+      console.error('[v0] publishEligibleGuide: Verified status is not published:', verifiedGuide.status)
+      return {
+        success: false,
+        error: 'Publish update did not persist.',
+        guideId,
+        previousStatus: context.status,
+        newStatus: verifiedGuide.status,
+        networkId: context.networkId,
+        stage: 'verify-published-guide',
+      }
+    }
+
+    // Phase 10F: Final verification for revisions - ensure exactly one published guide in family
+    if (isRevision) {
+      // Query root guide final state
+      const { data: rootGuideFinal } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('id', rootGuideId)
+        .maybeSingle()
+
+      // Query all revisions final state
+      const { data: revisionFamilyFinal } = await supabase
+        .from('guides')
+        .select('id, status, revision_of, revision_number')
+        .eq('revision_of', rootGuideId)
+
+      const familyGuidesFinal = [rootGuideFinal, ...(revisionFamilyFinal || [])].filter(Boolean)
+      const publishedGuideIds = familyGuidesFinal
+        .filter((g) => g.status === 'published')
+        .map((g) => g.id)
+
+      console.log('[v0] publishEligibleGuide revision family after publish', {
+        rootGuideId,
+        currentGuideId: guideId,
+        familySize: familyGuidesFinal.length,
+        publishedCount: publishedGuideIds.length,
+        familyStatuses: familyGuidesFinal.map((g) => ({
+          id: g.id,
+          status: g.status,
+          revisionNumber: g.revision_number,
+        })),
+      })
+
+      if (publishedGuideIds.length !== 1) {
+        console.error('[v0] publishEligibleGuide: Verification failed - published count not exactly 1:', publishedGuideIds.length)
+        return {
+          success: false,
+          error: `Revision publish verification failed: expected exactly one current published version, found ${publishedGuideIds.length}`,
+          guideId,
+          networkId: context.networkId,
+          stage: 'verify-single-current-published',
+          debugInfo: {
+            rootGuideId,
+            currentGuideId: guideId,
+            publishedGuideIds,
+            archivedGuideIds,
+            familyStatuses: familyGuidesFinal.map((g) => ({
+              id: g.id,
+              status: g.status,
+              revisionNumber: g.revision_number,
+            })),
+          },
+        }
+      }
+
+      // Phase 10H: CRITICAL - verify the published guide is the one we intended to publish
+      if (publishedGuideIds[0] !== guideId) {
+        console.error('[v0] publishEligibleGuide: Verification failed - published guide is not the current guide:', {
+          expectedGuideId: guideId,
+          actualPublishedGuideId: publishedGuideIds[0],
+        })
+        return {
+          success: false,
+          error: `Revision publish verification failed: expected current guide to be published, but a different guide (${publishedGuideIds[0]}) is published instead`,
+          guideId,
+          networkId: context.networkId,
+          stage: 'verify-current-is-published',
+          debugInfo: {
+            rootGuideId,
+            currentGuideId: guideId,
+            expectedPublishedGuideId: guideId,
+            actualPublishedGuideId: publishedGuideIds[0],
+            familyStatuses: familyGuidesFinal.map((g) => ({
+              id: g.id,
+              status: g.status,
+              revisionNumber: g.revision_number,
+            })),
+          },
+        }
+      }
+
+      // Phase 10I: NOW (after selected guide is verified published), archive other published guides in family
+      if (context.familyGuides) {
+        const previousPublishedGuides = context.familyGuides.filter(
+          (g) => g.status === 'published' && g.id !== guideId
+        )
+
+        if (previousPublishedGuides.length > 0) {
+          const rawArchivedGuideIds = previousPublishedGuides.map((g) => g.id)
+
+          console.log('[v0] publishEligibleGuide archived others after selected publish', {
+            guideId,
+            archivedGuideIds: rawArchivedGuideIds,
+          })
+
+          // Archive all previous published guides
+          const { error: archiveError } = await supabase
+            .from('guides')
+            .update({
+              status: 'archived',
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', rawArchivedGuideIds)
+
+          if (archiveError) {
+            console.error('[v0] publishEligibleGuide: Archive error:', archiveError.message)
+            // NOTE: Selected guide is already published at this point
+            // If archive fails, return error but guide is safe (published)
+            return {
+              success: false,
+              error: `Guide published but failed to archive previous versions: ${archiveError.message}`,
+              guideId,
+              networkId: context.networkId,
+              stage: 'archive-after-publish-failed',
+              debugInfo: {
+                rootGuideId,
+                currentGuideId: guideId,
+                archivedGuideIds: rawArchivedGuideIds,
+              },
+            }
+          }
+
+          archivedGuideIds.push(...rawArchivedGuideIds)
+        }
+      }
+    }
+
+    console.log('[v0] publishEligibleGuide final truth', {
+      rootGuideId: isRevision ? rootGuideId : guideId,
+      guideId,
+      archivedGuideIds: archivedGuideIds.length > 0 ? archivedGuideIds : [],
+      verifiedStatus: verifiedGuide.status,
+      isRevision,
+    })
+
+    return {
+      success: true,
+      guideId,
+      isRevision,
+      revisionOf: currentGuide.revision_of,
+      revisionNumber: currentGuide.revision_number,
+      archivedGuideIds: archivedGuideIds.length > 0 ? archivedGuideIds : undefined,
+      previousStatus: context.status,
+      newStatus: 'published',
+      publishedAt: verifiedGuide.published_at,
+      networkId: context.networkId,
+      canPublish: true,
+      stage: 'complete',
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[v0] publishEligibleGuide: Exception:', message)
+    return {
+      success: false,
+      error: message,
+      guideId,
+      stage: 'exception',
+    }
   }
 }

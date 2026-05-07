@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,6 +28,9 @@ import { generateAlternateSectionContent, suggestMockForgeRules } from "@/lib/gu
 import { saveGuideDraft, deleteDraft, updateDraftStatus } from "@/lib/guideforge/guide-drafts-storage"
 import { updateGuideStatus } from "@/lib/guideforge/supabase-persistence"
 import { submitGuideForReview } from "@/lib/guideforge/supabase-guide-reviews"
+import { getCurrentUserNetworkAuthority } from "@/lib/guideforge/supabase-networks"
+import { createGuideRevisionDraft } from "@/lib/guideforge/supabase-guide-revisions"
+import { getGuideRevisionContext, loadOriginalGuideInfo, getRevisionDraftBannerText, formatRevisionNumber, type RevisionContext } from "@/lib/guideforge/revision-context"
 import { validateForgeRules, isValidationStale, type ForgeRulesCheckResult } from "@/lib/guideforge/forge-rules-validator"
 
 interface GuideEditorProps {
@@ -90,8 +93,24 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   
   // Phase 8: Review voting submission
   const [isSubmittingForReview, setIsSubmittingForReview] = useState(false)
+  const [submitReviewStatus, setSubmitReviewStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")
   const [submitReviewError, setSubmitReviewError] = useState<string | null>(null)
   const [refreshReviewPanel, setRefreshReviewPanel] = useState(0)
+  
+  // Phase 9B: Publish authority
+  const [canPublish, setCanPublish] = useState(false)
+  
+  // Phase 10A: Create revision action
+  const [isCreatingRevision, setIsCreatingRevision] = useState(false)
+  const [createRevisionStatus, setCreateRevisionStatus] = useState<"idle" | "creating" | "success" | "error">("idle")
+  const [createRevisionError, setCreateRevisionError] = useState<string | null>(null)
+
+  // Phase 10B: Revision context for displaying revision drafts
+  const [revisionContext, setRevisionContext] = useState<RevisionContext>({
+    isRevision: false,
+    revisionOf: null,
+    revisionNumber: normalizedGuide.revisionNumber ?? 1,
+  })
   
   // Autosave status tracking
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle")
@@ -117,7 +136,22 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const currentStep = editingStepId
     ? steps.find((s) => s.id === editingStepId)
     : undefined
+
+  // Derive whether save actually failed (not just autosaveStatus="failed" with null error)
+  const isCurrentSaveFailed = autosaveStatus === "failed" && saveError !== null
   
+  // Mock state tracking for draft/ready/published flow
+  const isDraft = guideStatus === "draft"
+  const isReady = guideStatus === "ready"
+  const isPublished = guideStatus === "published"
+  
+  // Mark guide as edited when user changes content
+  const markDirty = () => {
+    if (!userEditedRef.current) {
+      console.log("[v0] User marked guide dirty: first edit detected")
+      userEditedRef.current = true
+    }
+  }
   // Mark hydration complete on mount
   useEffect(() => {
     console.log("[v0] Guide editor hydrated: initial state loaded, autosave disabled until user edit")
@@ -125,9 +159,50 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     userEditedRef.current = false
   }, [])
 
+  // Phase 9B: Check publish authority on mount or networkId change
+  useEffect(() => {
+    const checkPublishAuthority = async () => {
+      try {
+        const authority = await getCurrentUserNetworkAuthority(networkId)
+        setCanPublish(authority.canPublishOverride === true)
+      } catch (err) {
+        setCanPublish(false)
+      }
+    }
+
+    if (networkId) {
+      checkPublishAuthority()
+    }
+  }, [networkId])
+
+  // Phase 10B: Load revision context on mount
+  useEffect(() => {
+    const loadRevisionContext = async () => {
+      // Extract initial context from current guide
+      const context = getGuideRevisionContext(normalizedGuide)
+      
+      // If this is a revision and we don't have original guide info, try to load it
+      if (context.isRevision && !context.originalGuide && context.revisionOf) {
+        const originalGuideInfo = await loadOriginalGuideInfo(context.revisionOf)
+        if (originalGuideInfo) {
+          context.originalGuide = originalGuideInfo
+        }
+      }
+      
+      setRevisionContext(context)
+    }
+    
+    loadRevisionContext()
+  }, [normalizedGuide.id, normalizedGuide.revisionOf, normalizedGuide.revisionNumber])
+
   // Autosave effect - debounced by 1500ms, only saves if snapshot changed
   // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
   useEffect(() => {
+    // Phase 9C: Skip autosave entirely for published guides
+    if (isPublished) {
+      return
+    }
+
     // Skip autosave on initial load before user has edited anything
     if (!hasHydratedRef.current || !userEditedRef.current) {
       console.log("[v0] Autosave skipped initial load: hydrated=", hasHydratedRef.current, "userEdited=", userEditedRef.current)
@@ -304,7 +379,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, requirementsText, steps, guideStatus])
+  }, [title, summary, requirementsText, steps, guideStatus, isPublished])
 
   // Initialize snapshot on mount
   useEffect(() => {
@@ -313,19 +388,6 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
     currentSnapshotRef.current = initialSnapshot
     hasHydratedRef.current = true
   }, [])
-
-  // Mark guide as edited when user changes content
-  const markDirty = () => {
-    if (!userEditedRef.current) {
-      console.log("[v0] User marked guide dirty: first edit detected")
-      userEditedRef.current = true
-    }
-  }
-  
-  // Mock state tracking for draft/ready/published flow
-  const isDraft = guideStatus === "draft"
-  const isReady = guideStatus === "ready"
-  const isPublished = guideStatus === "published"
 
   // Safe .find() with defensive chaining
   const handleAddSection = async () => {
@@ -532,32 +594,77 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   // Phase 8: Submit guide for review
   const handleSubmitForReview = async () => {
     setIsSubmittingForReview(true)
+    setSubmitReviewStatus("submitting")
     setSubmitReviewError(null)
 
     try {
       const result = await submitGuideForReview(normalizedGuide.id)
 
       if (result.success) {
-        console.log('[v0] Submit for review succeeded')
-        setGuideStatus('ready')
-        setAutosaveStatus('saved')
+        setGuideStatus("ready")
+        setSubmitReviewStatus("success")
+        setSubmitReviewError(null)
         
         // Trigger review panel refresh
         setRefreshReviewPanel(prev => prev + 1)
 
+        // Show success message for 3 seconds, then return to idle
         setTimeout(() => {
-          setAutosaveStatus('idle')
-        }, 2000)
+          setSubmitReviewStatus("idle")
+        }, 3000)
       } else {
-        setSubmitReviewError(result.error || 'Failed to submit for review')
-        setAutosaveStatus('failed')
+        console.error("[v0] Submit for Review failed:", result.error)
+        setSubmitReviewStatus("error")
+        setSubmitReviewError(result.error || "Failed to submit for review")
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      const message = err instanceof Error ? err.message : "Unknown error"
+      console.error("[v0] Submit for Review failed:", message)
+      setSubmitReviewStatus("error")
       setSubmitReviewError(message)
-      setAutosaveStatus('failed')
     } finally {
       setIsSubmittingForReview(false)
+    }
+  }
+
+  // Phase 10A: Create revision from published guide
+  const handleCreateRevision = async () => {
+    setIsCreatingRevision(true)
+    setCreateRevisionStatus("creating")
+    setCreateRevisionError(null)
+
+    try {
+      const result = await createGuideRevisionDraft(normalizedGuide.id)
+
+      if (result.success && result.revisionGuideId) {
+        const targetPath = `/builder/network/${networkId}/guide/${result.revisionGuideId}/edit`
+        
+        // Task B: Add temporary confirmation log
+        console.log("[v0] Create Revision success navigation", {
+          sourceGuideId: normalizedGuide.id,
+          revisionGuideId: result.revisionGuideId,
+          networkId: networkId,
+          targetPath,
+        })
+        
+        setCreateRevisionStatus("success")
+        
+        // Navigate to the new revision draft editor
+        setTimeout(() => {
+          router.push(targetPath)
+        }, 500)
+      } else {
+        console.error('[v0] Create revision failed:', result.error)
+        setCreateRevisionStatus("error")
+        setCreateRevisionError(result.error || "Failed to create revision")
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error"
+      console.error('[v0] Create revision error:', message)
+      setCreateRevisionStatus("error")
+      setCreateRevisionError(message)
+    } finally {
+      setIsCreatingRevision(false)
     }
   }
 
@@ -694,6 +801,49 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         )}
       </div>
 
+      {/* Submit for Review result toast */}
+      <div 
+        className={`fixed top-[88px] right-6 z-9998 transition-all duration-300 ${
+          submitReviewStatus === "idle" ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className={`rounded-lg shadow-lg p-3 flex items-center gap-2 text-sm font-medium ${
+          submitReviewStatus === "submitting"
+            ? "bg-blue-500 text-white"
+            : submitReviewStatus === "success"
+            ? "bg-emerald-500 text-white"
+            : submitReviewStatus === "error"
+            ? "bg-red-500 text-white"
+            : "bg-muted text-foreground"
+        }`}>
+          {submitReviewStatus === "submitting" && (
+            <>
+              <div className="inline-flex">
+                <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+              </div>
+              <span>Submitting for review...</span>
+            </>
+          )}
+          {submitReviewStatus === "success" && (
+            <>
+              <CheckCircle2 className="size-4" />
+              <span>Guide submitted for review.</span>
+            </>
+          )}
+          {submitReviewStatus === "error" && (
+            <>
+              <AlertCircle className="size-4" />
+              <span>Submit for Review failed</span>
+            </>
+          )}
+        </div>
+        {submitReviewStatus === "error" && submitReviewError && (
+          <div className="text-xs text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/20 p-2 rounded max-w-xs">
+            {submitReviewError}
+          </div>
+        )}
+      </div>
+
       {/* Sticky top action bar */}
       <div className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-3">
@@ -704,8 +854,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               </Link>
             </Button>
             <div>
-              <p className="text-xs text-muted-foreground">Guide Editor</p>
+              <p className="text-xs text-muted-foreground">
+                {revisionContext.isRevision ? 'Revision Draft' : 'Guide Editor'}
+              </p>
               <p className="font-semibold text-foreground truncate max-w-xs">{title || "Untitled"}</p>
+              {revisionContext.isRevision && revisionContext.originalGuide && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
+                  Revision of: {revisionContext.originalGuide.title}
+                </p>
+              )}
             </div>
           </div>
           
@@ -730,13 +887,35 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   Published
                 </Badge>
               )}
+              {/* Phase 10B: Revision badge */}
+              {revisionContext.isRevision && (
+                <Badge variant="outline" className="gap-1 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300">
+                  {formatRevisionNumber(revisionContext.revisionNumber)}
+                </Badge>
+              )}
             </div>
 
-            {/* Published guide warning */}
+            {/* Published guide protected message */}
             {isPublished && (
               <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
-                <span>Published guide. Editing changes will update the live guide.</span>
+                <span>Published guide — protected. Create a revision to propose changes.</span>
+              </div>
+            )}
+
+            {/* Phase 10B: Revision draft context banner */}
+            {revisionContext.isRevision && !isPublished && (
+              <div className="flex items-center gap-2 text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 px-3 py-1.5 rounded-full border border-purple-200 dark:border-purple-800/50 ml-2">
+                <AlertCircle className="size-3" aria-hidden="true" />
+                <span>{getRevisionDraftBannerText(revisionContext, guideStatus)}</span>
+              </div>
+            )}
+
+            {/* Phase 10D: Revision published success banner */}
+            {revisionContext.isRevision && isPublished && (
+              <div className="flex items-center gap-2 text-xs bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800/50 ml-2">
+                <CheckCircle2 className="size-3" aria-hidden="true" />
+                <span>{getRevisionDraftBannerText(revisionContext, guideStatus)}</span>
               </div>
             )}
 
@@ -795,12 +974,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Button
                     size="sm"
                     onClick={handleSubmitForReview}
-                    disabled={isSubmittingForReview || (autosaveStatus === "failed")}
+                    disabled={isSubmittingForReview || submitReviewStatus === "submitting" || isCurrentSaveFailed}
                     variant="default"
-                    title={autosaveStatus === "failed" ? "Fix the save error before submitting for review" : undefined}
+                    title={isCurrentSaveFailed ? "Fix the save error before submitting for review" : undefined}
                   >
                     <Send className="size-4 mr-1" aria-hidden="true" />
-                    {isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
+                    {submitReviewStatus === "submitting" || isSubmittingForReview ? 'Submitting...' : 'Submit for Review'}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={handleDelete}>
                     <Trash2 className="size-4" aria-hidden="true" />
@@ -808,7 +987,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 </div>
                 
                 {/* Helper text if save is failing */}
-                {autosaveStatus === "failed" && (
+                {isCurrentSaveFailed && (
                   <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
                     Fix the save error before submitting for review.
                   </p>
@@ -840,6 +1019,31 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={handleCreateRevision}
+                  disabled={isCreatingRevision || createRevisionStatus === "creating"}
+                >
+                  {createRevisionStatus === "creating" || isCreatingRevision ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent mr-1" aria-hidden="true" />
+                      Creating revision…
+                    </>
+                  ) : (
+                    "Create Revision"
+                  )}
+                </Button>
+                {createRevisionStatus === "error" && createRevisionError && (
+                  <div className="text-xs text-red-600 dark:text-red-400">
+                    {createRevisionError}
+                  </div>
+                )}
+                {createRevisionStatus === "success" && (
+                  <div className="text-xs text-green-600 dark:text-green-400">
+                    Revision created. Navigating...
+                  </div>
+                )}
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
@@ -905,12 +1109,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Title
               </label>
               <Input
+                disabled={isPublished}
                 value={title}
                 onChange={(e) => {
                   markDirty()
                   setTitle(e.target.value)
                 }}
-                className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Guide title"
               />
             </div>
@@ -920,13 +1125,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Summary (Short Description)
               </label>
               <Textarea
+                disabled={isPublished}
                 value={summary}
                 onChange={(e) => {
                   markDirty()
                   setSummary(e.target.value)
                 }}
                 placeholder="Brief summary of this guide. Shown on guide cards and list pages."
-                className="w-full h-20 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none mt-2"
+                className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="mt-2 text-xs text-muted-foreground">
                 This summary appears on guide cards and in search results. Keep it concise.
@@ -1080,9 +1286,29 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
         {/* Phase 8: Guide Review Panel */}
         <GuideReviewPanel 
-          guideId={normalizedGuide.id} 
+          guide={normalizedGuide}
           guideStatus={guideStatus}
+          canPublish={canPublish}
           onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}
+          onPublishSuccess={async () => {
+            // Phase 10I: On publish success, refetch guide from Supabase to verify status
+            console.log('[v0] guide-editor onPublishSuccess: Refetching guide after publish', { guideId: normalizedGuide.id })
+            const { data: refreshedGuide } = await supabase
+              .from('guides')
+              .select('*')
+              .eq('id', normalizedGuide.id)
+              .maybeSingle()
+            
+            if (refreshedGuide) {
+              setGuideStatus(refreshedGuide.status)
+              setGuide(refreshedGuide)
+              console.log('[v0] guide-editor onPublishSuccess: Refetched guide', { status: refreshedGuide.status })
+            } else {
+              console.warn('[v0] guide-editor onPublishSuccess: Could not refetch guide')
+              // Fallback: at least update local status
+              setGuideStatus('published')
+            }
+          }}
         />
 
         {/* Sections Editor */}
@@ -1158,7 +1384,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               })}
               
               {/* Add Section Button */}
-              <Card className="border-dashed border-border/50 px-4 py-6 flex items-center justify-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={handleAddSection}>
+              <Card 
+                className={`border-dashed border-border/50 px-4 py-6 flex items-center justify-center transition-colors ${
+                  isPublished 
+                    ? "opacity-50 cursor-not-allowed" 
+                    : "hover:bg-muted/50 cursor-pointer"
+                }`} 
+                onClick={!isPublished ? handleAddSection : undefined}
+              >
                 <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                   <Plus className="size-5" aria-hidden="true" />
                   <span className="text-sm font-medium">Add Section</span>

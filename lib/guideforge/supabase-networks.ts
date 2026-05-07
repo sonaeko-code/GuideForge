@@ -817,6 +817,9 @@ export async function getGuidesForNetworkCollections(
         authorId: g.author_id,
         reviewerId: g.reviewer_id,
         verificationStatus: g.verification_status,
+        // Phase 10A: Revision tracking fields
+        revisionOf: g.revision_of || null,
+        revisionNumber: g.revision_number ?? 1,
       }
     })
 
@@ -1901,19 +1904,72 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
       .maybeSingle()
 
     if (!memberData) {
-      console.log("[v0] User is not a member of this network")
+      // Check owner fallback: is this user the network owner?
+      const { data: networkData } = await supabase
+        .from("networks")
+        .select("owner_user_id")
+        .eq("id", networkId)
+        .maybeSingle()
+      
+      const isNetworkOwner = networkData?.owner_user_id === userId
+      
+      if (!isNetworkOwner) {
+        console.log("[v0] User is not a member of this network and not the owner")
+        return {
+          isSignedIn: true,
+          userId,
+          membership: null,
+          roleDefinition: null,
+          canonicalRole: null,
+          roleDisplayName: null,
+          canManageNetwork: false,
+          canManageMembers: false,
+          canSubmitGuides: false,
+          canVoteOnReviews: false,
+          canPublishOverride: false,
+        }
+      }
+      
+      // Owner fallback: treat as owner role
+      console.log("[v0] User is network owner, applying owner role")
+      
+      // Get owner role definition
+      const { data: ownerRoleData } = await supabase
+        .from("network_role_definitions")
+        .select("*")
+        .eq("network_id", networkId)
+        .eq("canonical_role", "owner")
+        .maybeSingle()
+      
+      if (!ownerRoleData) {
+        console.warn("[v0] Owner role definition not found for network")
+        return {
+          isSignedIn: true,
+          userId,
+          membership: null,
+          roleDefinition: null,
+          canonicalRole: "owner",
+          roleDisplayName: "Owner",
+          canManageNetwork: true,
+          canManageMembers: true,
+          canSubmitGuides: true,
+          canVoteOnReviews: true,
+          canPublishOverride: true,
+        }
+      }
+      
       return {
         isSignedIn: true,
         userId,
         membership: null,
-        roleDefinition: null,
-        canonicalRole: null,
-        roleDisplayName: null,
-        canManageNetwork: false,
-        canManageMembers: false,
-        canSubmitGuides: false,
-        canVoteOnReviews: false,
-        canPublishOverride: false,
+        roleDefinition: ownerRoleData,
+        canonicalRole: "owner",
+        roleDisplayName: "Owner",
+        canManageNetwork: true,
+        canManageMembers: ownerRoleData.can_manage_members || true,
+        canSubmitGuides: ownerRoleData.can_submit_guides || true,
+        canVoteOnReviews: ownerRoleData.can_vote_on_reviews || true,
+        canPublishOverride: ownerRoleData.can_publish_override || true,
       }
     }
 
