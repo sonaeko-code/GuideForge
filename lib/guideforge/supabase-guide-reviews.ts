@@ -1,5 +1,5 @@
 import { getSupabaseSession, isSupabaseConfigured, supabase } from './supabase-client'
-import { getCurrentUserNetworkMembership } from './supabase-networks'
+import { getCurrentUserNetworkMembership, getCurrentUserNetworkAuthority } from './supabase-networks'
 
 /**
  * Resolve guide network context by traversing collection → hub → network
@@ -182,16 +182,16 @@ export async function getGuideReviewSummary(guideId: string): Promise<{
       }
     })
 
-    // Check current user's voting permission
+    // Check current user's voting permission using the same authority resolver
     let currentUserVote: 'approve' | 'request_changes' | null = null
     let currentUserRole: string | null = null
     let canCurrentUserVote = false
 
     if (userId) {
-      const membership = await getCurrentUserNetworkMembership(context.networkId)
-      if (membership) {
-        currentUserRole = membership.canonicalRole
-        canCurrentUserVote = membership.can_vote_on_reviews === true
+      const authority = await getCurrentUserNetworkAuthority(context.networkId)
+      if (authority.isSignedIn && authority.canonicalRole) {
+        currentUserRole = authority.canonicalRole
+        canCurrentUserVote = authority.canVoteOnReviews === true
         
         // Find current user's vote
         const userVote = (votes || []).find((v) => v.voter_id === userId)
@@ -250,14 +250,14 @@ export async function castGuideReviewVote(
       return { success: false, error: 'Could not resolve guide network context. Guide may be missing collection or hub.' }
     }
 
-    // Check user's network authority
-    const membership = await getCurrentUserNetworkMembership(context.networkId)
-    if (!membership || !membership.can_vote_on_reviews) {
+    // Check user's network authority using the same resolver
+    const authority = await getCurrentUserNetworkAuthority(context.networkId)
+    if (!authority.isSignedIn || !authority.canVoteOnReviews) {
       return { success: false, error: 'You do not have permission to vote on guide reviews' }
     }
 
-    const voterRole = membership.canonicalRole
-    const weight = membership.weight || 0
+    const voterRole = authority.canonicalRole || 'member'
+    const weight = authority.roleDefinition?.review_weight || 0
 
     console.log('[v0] castGuideReviewVote: Casting vote for guide:', guideId, 'vote:', vote, 'weight:', weight)
 
@@ -366,16 +366,27 @@ export async function submitGuideForReview(
       }
     }
 
-    // Check user's network authority
-    const membership = await getCurrentUserNetworkMembership(context.networkId)
-    if (!membership || !membership.can_submit_guides) {
+    // Check user's network authority using the same resolver as the rest of the app
+    // This handles owner fallback + role definition lookup
+    const authority = await getCurrentUserNetworkAuthority(context.networkId)
+    
+    console.log('[v0] Submit permission lookup', {
+      userId,
+      networkId: context.networkId,
+      networkMember: authority.membership,
+      canonicalRole: authority.canonicalRole,
+      roleDefinition: authority.roleDefinition,
+      canSubmitGuides: authority.canSubmitGuides,
+    })
+
+    if (!authority.isSignedIn || !authority.canSubmitGuides) {
       return {
         success: false,
         error: 'You do not have permission to submit guides for review',
         guideId,
         previousStatus: context.status,
         networkId: context.networkId,
-        canSubmit: membership?.can_submit_guides || false,
+        canSubmit: authority.canSubmitGuides,
         stage: 'get-network-authority',
       }
     }
