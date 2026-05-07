@@ -123,9 +123,10 @@ export function formatRevisionNumber(revisionNumber: number): string {
 
 /**
  * Get revision draft banner text.
+ * Phase 10D: Shows different text based on whether revision is published.
  * Used in guide editor to show context about the revision.
  */
-export function getRevisionDraftBannerText(context: RevisionContext): string {
+export function getRevisionDraftBannerText(context: RevisionContext, guideStatus?: string): string {
   if (!context.isRevision) {
     return ""
   }
@@ -133,6 +134,12 @@ export function getRevisionDraftBannerText(context: RevisionContext): string {
   const revisionLabel = formatRevisionNumber(context.revisionNumber)
   const originalTitle = context.originalGuide?.title || "the original guide"
 
+  // If revision is published, show success message
+  if (guideStatus === 'published') {
+    return `${revisionLabel} of ${originalTitle} is now the current published version. Previous versions are preserved as history.`
+  }
+
+  // Draft/ready revision shows standard message
   return `${revisionLabel} of ${originalTitle}. The published guide remains unchanged until this revision is approved and published.`
 }
 
@@ -140,13 +147,18 @@ export function getRevisionDraftBannerText(context: RevisionContext): string {
  * Get revision review panel context text.
  * Used in guide review panel when reviewing a revision.
  */
-export function getRevisionReviewPanelText(context: RevisionContext): string {
+export function getRevisionReviewPanelText(context: RevisionContext, guideStatus?: string): string {
   if (!context.isRevision) {
     return ""
   }
 
   const revisionLabel = formatRevisionNumber(context.revisionNumber)
   const originalTitle = context.originalGuide?.title || "the original guide"
+
+  // If revision is published, show success message
+  if (guideStatus === 'published') {
+    return `This ${revisionLabel} is now the current published version of ${originalTitle}. Previous versions are preserved as history.`
+  }
 
   return `This review is for ${revisionLabel} of ${originalTitle}. This is a proposed update to an already published guide.`
 }

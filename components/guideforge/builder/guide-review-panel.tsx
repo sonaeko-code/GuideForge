@@ -156,7 +156,7 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
           {revisionContext.originalGuide && (
             <p className="text-xs text-purple-600 dark:text-purple-400">Original: {revisionContext.originalGuide.title}</p>
           )}
-          <p className="text-xs text-purple-600 dark:text-purple-400">{getRevisionReviewPanelText(revisionContext)}</p>
+          <p className="text-xs text-purple-600 dark:text-purple-400">{getRevisionReviewPanelText(revisionContext, guideStatus)}</p>
         </div>
       )}
 
@@ -290,16 +290,23 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
               ) : publishStatus === "success" ? (
                 <>
                   <Check className="size-3 mr-1" aria-hidden="true" />
-                  Guide published.
+                  {revisionContext.isRevision ? 'Revision published.' : 'Guide published.'}
                 </>
               ) : (
-                'Publish Guide'
+                revisionContext.isRevision ? 'Publish Revision' : 'Publish Guide'
               )}
             </Button>
             {publishStatus === "error" && publishError && (
               <div className="p-2 rounded text-xs bg-red-500/10 text-red-700 dark:text-red-300 flex items-start gap-2">
                 <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
                 <span>{publishError}</span>
+              </div>
+            )}
+            {/* Phase 10D: Revision publish success message */}
+            {publishStatus === "success" && revisionContext.isRevision && (
+              <div className="p-2 rounded text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 flex items-start gap-2">
+                <Check className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <span>This revision is now the current published version. Previous versions are preserved as history.</span>
               </div>
             )}
           </>

@@ -907,7 +907,15 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
             {revisionContext.isRevision && !isPublished && (
               <div className="flex items-center gap-2 text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 px-3 py-1.5 rounded-full border border-purple-200 dark:border-purple-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
-                <span>{getRevisionDraftBannerText(revisionContext)}</span>
+                <span>{getRevisionDraftBannerText(revisionContext, guideStatus)}</span>
+              </div>
+            )}
+
+            {/* Phase 10D: Revision published success banner */}
+            {revisionContext.isRevision && isPublished && (
+              <div className="flex items-center gap-2 text-xs bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800/50 ml-2">
+                <CheckCircle2 className="size-3" aria-hidden="true" />
+                <span>{getRevisionDraftBannerText(revisionContext, guideStatus)}</span>
               </div>
             )}
 
