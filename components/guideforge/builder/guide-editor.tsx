@@ -1069,12 +1069,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               </label>
               <Textarea
                 disabled={isPublished}
-                value={requirementsText}
+                value={summary}
                 onChange={(e) => {
                   markDirty()
-                  setRequirementsText(e.target.value)
+                  setSummary(e.target.value)
                 }}
-                placeholder="Add requirements here, one per line:&#10;• Level 30+&#10;• Completion of main questline"
+                placeholder="Brief summary of this guide. Shown on guide cards and list pages."
                 className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="mt-2 text-xs text-muted-foreground">

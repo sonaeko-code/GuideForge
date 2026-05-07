@@ -129,7 +129,7 @@ export async function createGuideRevisionDraft(
     // 1. Load published guide
     const { data: sourceGuide, error: loadError } = await supabase
       .from('guides')
-      .select('id, collection_id, title, slug, summary, type, difficulty, version, author_id, status, verification_status, published_at')
+      .select('id, collection_id, title, slug, summary, requirements, type, difficulty, version, author_id, status, verification_status, published_at')
       .eq('id', publishedGuideId)
       .maybeSingle()
 
@@ -224,6 +224,7 @@ export async function createGuideRevisionDraft(
         title: sourceGuide.title,
         slug: revisionSlug,
         summary: sourceGuide.summary,
+        requirements: sourceGuide.requirements,
         type: sourceGuide.type,
         difficulty: sourceGuide.difficulty,
         version: sourceGuide.version,
