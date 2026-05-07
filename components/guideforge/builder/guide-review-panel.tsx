@@ -86,11 +86,20 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
 
     const result = await publishEligibleGuide(guideId)
 
+    // Phase 10I: Do NOT update UI state until we verify Supabase confirms publish
     if (result.success) {
       setPublishStatus("success")
       setPublishError(null)
       
-      // Notify parent that publish succeeded
+      // Log publish result for debugging
+      console.log('[v0] publish UI result', {
+        success: result.success,
+        stage: result.stage,
+        guideId: result.guideId,
+        shouldUpdateLocalPublishedState: result.success,
+      })
+      
+      // Notify parent that publish succeeded - parent should refetch
       onPublishSuccess?.()
       
       // Show success for 2 seconds
@@ -100,6 +109,15 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
     } else {
       setPublishStatus("error")
       setPublishError(result.error || "Failed to publish guide")
+      
+      // Phase 10I: On failure, log the stage where it failed
+      console.log('[v0] publish UI result', {
+        success: result.success,
+        stage: result.stage,
+        guideId: result.guideId,
+        error: result.error,
+        shouldUpdateLocalPublishedState: false,
+      })
     }
 
     setIsPublishing(false)

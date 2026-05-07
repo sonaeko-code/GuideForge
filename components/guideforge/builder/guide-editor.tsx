@@ -1290,7 +1290,25 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           guideStatus={guideStatus}
           canPublish={canPublish}
           onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}
-          onPublishSuccess={() => setGuideStatus('published')}
+          onPublishSuccess={async () => {
+            // Phase 10I: On publish success, refetch guide from Supabase to verify status
+            console.log('[v0] guide-editor onPublishSuccess: Refetching guide after publish', { guideId: normalizedGuide.id })
+            const { data: refreshedGuide } = await supabase
+              .from('guides')
+              .select('*')
+              .eq('id', normalizedGuide.id)
+              .maybeSingle()
+            
+            if (refreshedGuide) {
+              setGuideStatus(refreshedGuide.status)
+              setGuide(refreshedGuide)
+              console.log('[v0] guide-editor onPublishSuccess: Refetched guide', { status: refreshedGuide.status })
+            } else {
+              console.warn('[v0] guide-editor onPublishSuccess: Could not refetch guide')
+              // Fallback: at least update local status
+              setGuideStatus('published')
+            }
+          }}
         />
 
         {/* Sections Editor */}

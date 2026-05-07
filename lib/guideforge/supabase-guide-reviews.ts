@@ -749,11 +749,11 @@ export async function publishEligibleGuide(
 
     // Phase 10F: Handle revision family archiving for revisions only
     if (isRevision) {
-      console.log('[v0] publishEligibleGuide revision family before archive', {
-        rootGuideId,
-        currentGuideId: guideId,
+      console.log('[v0] publishEligibleGuide order check', {
+        guideId,
         isRevision: true,
-        currentRevisionNumber: currentGuide.revision_number,
+        rootGuideId,
+        currentStatus: context.status,
       })
 
       // Query root guide
@@ -803,72 +803,10 @@ export async function publishEligibleGuide(
         })),
       })
 
-      // Find all published guides in the family (except current guide being published)
-      const previousPublishedGuides = familyGuides.filter(
-        (g) => g.status === 'published' && g.id !== guideId
-      )
-
-      if (previousPublishedGuides.length > 0) {
-        // Phase 10H: Archive safety check - ensure current guide never in archive list
-        const rawArchivedGuideIds = previousPublishedGuides.map((g) => g.id)
-        const archiveListIncludesCurrent = rawArchivedGuideIds.includes(guideId)
-
-        console.log('[v0] publishEligibleGuide archive safety check', {
-          guideId,
-          archivedGuideIds: rawArchivedGuideIds,
-          archiveIncludesCurrent: archiveListIncludesCurrent,
-        })
-
-        // Phase 10H: If current guide somehow ended up in archive list, fail before executing
-        if (archiveListIncludesCurrent) {
-          console.error('[v0] publishEligibleGuide: SAFETY FAILURE - Archive list includes current guide')
-          return {
-            success: false,
-            error: 'Archive list included current guide. Publishing aborted.',
-            guideId,
-            networkId: context.networkId,
-            stage: 'archive-safety-check',
-          }
-        }
-
-        archivedGuideIds.push(...rawArchivedGuideIds)
-
-        console.log('[v0] publishEligibleGuide archived previous versions', {
-          rootGuideId,
-          currentGuideId: guideId,
-          archivedGuideIds,
-          archivedGuideDetails: previousPublishedGuides.map((g) => ({
-            id: g.id,
-            revisionNumber: g.revision_number,
-          })),
-        })
-
-        // Archive all previous published guides
-        const { error: archiveError } = await supabase
-          .from('guides')
-          .update({
-            status: 'archived',
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', archivedGuideIds)
-
-        if (archiveError) {
-          console.error('[v0] publishEligibleGuide: Archive error:', archiveError.message)
-          return {
-            success: false,
-            error: `Failed to archive previous published versions: ${archiveError.message}`,
-            guideId,
-            networkId: context.networkId,
-            stage: 'archive-previous-published',
-            debugInfo: {
-              rootGuideId,
-              currentGuideId: guideId,
-              archivedGuideIds,
-            },
-          }
-        }
-      }
-}
+      // Store family guides info for later archive phase (after publish succeeds)
+      // This ensures we never archive until the selected guide is verified published
+      context.familyGuides = familyGuides
+    }
 
 /**
  * Phase 10F: Internal helper to repair guide family published state
@@ -1168,11 +1106,59 @@ async function repairGuideFamilyPublishedStateHelper(
           },
         }
       }
+
+      // Phase 10I: NOW (after selected guide is verified published), archive other published guides in family
+      if (context.familyGuides) {
+        const previousPublishedGuides = context.familyGuides.filter(
+          (g) => g.status === 'published' && g.id !== guideId
+        )
+
+        if (previousPublishedGuides.length > 0) {
+          const rawArchivedGuideIds = previousPublishedGuides.map((g) => g.id)
+
+          console.log('[v0] publishEligibleGuide archived others after selected publish', {
+            guideId,
+            archivedGuideIds: rawArchivedGuideIds,
+          })
+
+          // Archive all previous published guides
+          const { error: archiveError } = await supabase
+            .from('guides')
+            .update({
+              status: 'archived',
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', rawArchivedGuideIds)
+
+          if (archiveError) {
+            console.error('[v0] publishEligibleGuide: Archive error:', archiveError.message)
+            // NOTE: Selected guide is already published at this point
+            // If archive fails, return error but guide is safe (published)
+            return {
+              success: false,
+              error: `Guide published but failed to archive previous versions: ${archiveError.message}`,
+              guideId,
+              networkId: context.networkId,
+              stage: 'archive-after-publish-failed',
+              debugInfo: {
+                rootGuideId,
+                currentGuideId: guideId,
+                archivedGuideIds: rawArchivedGuideIds,
+              },
+            }
+          }
+
+          archivedGuideIds.push(...rawArchivedGuideIds)
+        }
+      }
     }
 
-    console.log('[v0] publishEligibleGuide: Guide published successfully, verified status:', verifiedGuide.status, {
+    console.log('[v0] publishEligibleGuide final truth', {
+      rootGuideId: isRevision ? rootGuideId : guideId,
+      guideId,
+      archivedGuideIds: archivedGuideIds.length > 0 ? archivedGuideIds : [],
+      verifiedStatus: verifiedGuide.status,
       isRevision,
-      archivedCount: archivedGuideIds.length,
     })
 
     return {
