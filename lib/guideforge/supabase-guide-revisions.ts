@@ -129,7 +129,7 @@ export async function createGuideRevisionDraft(
     // 1. Load published guide
     const { data: sourceGuide, error: loadError } = await supabase
       .from('guides')
-      .select('id, collection_id, title, slug, summary, requirements, type, difficulty, version, author_id, status, verification_status, published_at')
+      .select('id, collection_id, title, slug, summary, requirements, type, difficulty, version, author_id, status, verification_status, published_at, revision_of, revision_number')
       .eq('id', publishedGuideId)
       .maybeSingle()
 
@@ -189,16 +189,27 @@ export async function createGuideRevisionDraft(
       }
     }
 
-    // 6. Calculate next revision number
-    const { data: existingRevisions, error: revError } = await supabase
-      .from('guides')
-      .select('revision_number')
-      .eq('revision_of', publishedGuideId)
-      .order('revision_number', { ascending: false })
-      .limit(1)
+    // 6. Phase 10J: Resolve root guide ID
+    // If sourceGuide is already a revision, use its revision_of as root
+    // Otherwise, sourceGuide itself is the root
+    const rootGuideId = sourceGuide.revision_of ?? sourceGuide.id
 
-    if (revError) {
-      console.error('[v0] createGuideRevisionDraft: Failed to query existing revisions:', revError.message)
+    console.log('[v0] createGuideRevisionDraft root resolution', {
+      sourceGuideId: publishedGuideId,
+      sourceRevisionOf: sourceGuide.revision_of,
+      rootGuideId,
+    })
+
+    // 7. Phase 10J: Calculate next revision number from entire root family
+    // Query root guide + all revisions of root to find max revision_number
+    const { data: rootFamily, error: familyError } = await supabase
+      .from('guides')
+      .select('id, revision_number')
+      .or(`id.eq.${rootGuideId},revision_of.eq.${rootGuideId}`)
+      .order('revision_number', { ascending: false })
+
+    if (familyError) {
+      console.error('[v0] createGuideRevisionDraft: Failed to query root family:', familyError.message)
       return {
         success: false,
         error: 'Failed to calculate revision number',
@@ -207,13 +218,20 @@ export async function createGuideRevisionDraft(
       }
     }
 
-    const nextRevisionNumber = existingRevisions && existingRevisions.length > 0
-      ? existingRevisions[0].revision_number + 1
-      : 2
+    const maxRevisionNumber = rootFamily && rootFamily.length > 0
+      ? Math.max(...rootFamily.map(g => g.revision_number ?? 0))
+      : 1
+    
+    const nextRevisionNumber = maxRevisionNumber + 1
 
-    console.log('[v0] createGuideRevisionDraft: Next revision number:', nextRevisionNumber)
+    console.log('[v0] createGuideRevisionDraft: Next revision number:', {
+      rootGuideId,
+      maxRevisionNumber,
+      nextRevisionNumber,
+      familySize: rootFamily?.length,
+    })
 
-    // 7. Create new guide row
+    // 8. Create new guide row
     const revisionSlug = sourceGuide.slug + `-rev${nextRevisionNumber}`
     const now = new Date().toISOString()
 
@@ -233,7 +251,7 @@ export async function createGuideRevisionDraft(
         status: 'draft',
         verification_status: 'unverified',
         published_at: null,
-        revision_of: publishedGuideId,
+        revision_of: rootGuideId,
         revision_number: nextRevisionNumber,
         created_at: now,
         updated_at: now,

@@ -745,15 +745,40 @@ export async function publishEligibleGuide(
       rootGuideId = currentGuide.id
     }
 
+    // Phase 10J: Defensive branch detection
+    // If currentGuide.revision_of points to another guide that itself has revision_of,
+    // then currentGuide is part of a nested branch that shouldn't exist
+    let nestedBranchDetected = false
+    if (isRevision && rootGuideId) {
+      const { data: parentGuide, error: parentError } = await supabase
+        .from('guides')
+        .select('id, revision_of')
+        .eq('id', rootGuideId)
+        .maybeSingle()
+
+      if (!parentError && parentGuide && parentGuide.revision_of) {
+        // Parent guide itself is a revision - this is a nested branch!
+        nestedBranchDetected = true
+        const ultimateRoot = parentGuide.revision_of
+        console.warn('[v0] publishEligibleGuide: Nested revision branch detected; resolving to root', {
+          currentGuideId: guideId,
+          currentRevisionOf: rootGuideId,
+          parentRevisionOf: parentGuide.revision_of,
+          resolvedRoot: ultimateRoot,
+        })
+        rootGuideId = ultimateRoot
+      }
+    }
+
     const archivedGuideIds: string[] = []
 
     // Phase 10F: Handle revision family archiving for revisions only
     if (isRevision) {
-      console.log('[v0] publishEligibleGuide order check', {
-        guideId,
-        isRevision: true,
-        rootGuideId,
-        currentStatus: context.status,
+      console.log('[v0] publishEligibleGuide root family resolution', {
+        currentGuideId: guideId,
+        currentRevisionOf: currentGuide.revision_of,
+        resolvedRootGuideId: rootGuideId,
+        nestedBranchDetected,
       })
 
       // Query root guide
