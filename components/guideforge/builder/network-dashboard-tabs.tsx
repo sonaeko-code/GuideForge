@@ -415,7 +415,7 @@ export function NetworkDashboardTabs({
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">
-                Guides ({safeGuides.length})
+                Guides ({activeGuides.length})
               </h2>
               <div className="flex gap-2">
                 <Button size="sm" asChild>
@@ -436,7 +436,7 @@ export function NetworkDashboardTabs({
               {safePublished.length} published, {safeDrafts.length} draft
             </p>
 
-            {safeGuides.length === 0 ? (
+            {activeGuides.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
                 <p className="font-semibold text-foreground">No guides yet</p>
@@ -462,7 +462,7 @@ export function NetworkDashboardTabs({
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {safeGuides.map((guide: Guide) => (
+                {activeGuides.map((guide: Guide) => (
                   <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
@@ -482,6 +482,58 @@ export function NetworkDashboardTabs({
                     </div>
                   </Card>
                 ))}
+              </div>
+            )}
+
+            {/* Phase 11: Archived Versions section - collapsible disclosure */}
+            {archivedGuides.length > 0 && (
+              <div className="mt-8 border-t border-border/50 pt-6">
+                <details className="group">
+                  <summary className="cursor-pointer flex items-center justify-between hover:bg-muted/50 px-3 py-2 rounded-lg transition-colors">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      Archived Versions ({archivedGuides.length})
+                      <span className="inline-block group-open:rotate-90 transition-transform text-muted-foreground">
+                        ▶
+                      </span>
+                    </h3>
+                  </summary>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs text-muted-foreground px-3 mb-3">
+                      Previous versions are preserved for reference. Archived versions are read-only.
+                    </p>
+                    {archivedGuides.map((guide: Guide) => (
+                      <div key={guide.id} className="flex items-center gap-3 px-4 py-2 rounded-lg border border-border/30 hover:bg-muted/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-medium text-sm text-foreground truncate">{guide.title}</p>
+                            {guide.revisionNumber && (
+                              <Badge variant="outline" className="text-[10px] border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex-shrink-0">
+                                Rev #{guide.revisionNumber}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-[10px] border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 flex-shrink-0">
+                              Archived
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {guide.publishedAt && (
+                              <span>Published: {new Date(guide.publishedAt).toLocaleDateString()}</span>
+                            )}
+                            {guide.updatedAt && guide.publishedAt !== guide.updatedAt && (
+                              <span>Updated: {new Date(guide.updatedAt).toLocaleDateString()}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button size="sm" asChild variant="ghost" className="flex-shrink-0">
+                          <Link href={`/builder/network/${networkId}/guide/${guide.id}/preview`}>
+                            <Eye className="size-4 mr-1" aria-hidden="true" />
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             )}
           </div>
