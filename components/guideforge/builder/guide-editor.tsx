@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus, Loader2 } from "lucide-react"
+import { ArrowLeft, Eye, Send, Sparkles, CheckCircle2, RefreshCw, Save, Trash2, ChevronDown, ChevronRight, AlertCircle, Plus, Loader2, Archive } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -150,6 +150,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   const isDraft = guideStatus === "draft"
   const isReady = guideStatus === "ready"
   const isPublished = guideStatus === "published"
+  const isArchived = guideStatus === "archived"
   
   // Mark guide as edited when user changes content
   const markDirty = () => {
@@ -911,6 +912,12 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   Published
                 </Badge>
               )}
+              {isArchived && (
+                <Badge className="gap-1 bg-slate-500/10 text-slate-700 dark:text-slate-400">
+                  <Archive className="size-3" aria-hidden="true" />
+                  Archived
+                </Badge>
+              )}
               {/* Phase 10B: Revision badge */}
               {revisionContext.isRevision && (
                 <Badge variant="outline" className="gap-1 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300">
@@ -924,6 +931,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
                 <span>This published guide is read-only. Create a revision to make changes.</span>
+              </div>
+            )}
+
+            {/* Archived guide protected message */}
+            {isArchived && (
+              <div className="flex items-center gap-2 text-xs bg-slate-50 dark:bg-slate-950/20 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800/50 ml-2">
+                <AlertCircle className="size-3" aria-hidden="true" />
+                <span>This archived version is preserved for history and cannot be edited.</span>
               </div>
             )}
 
@@ -1068,9 +1083,17 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                     Revision created. Navigating...
                   </div>
                 )}
-                <Button size="sm" variant="ghost" onClick={handleDelete}>
-                  <Trash2 className="size-4" aria-hidden="true" />
+              </div>
+            )}
+
+            {/* Archived state actions - read-only, view only */}
+            {isArchived && (
+              <div className="flex gap-2 items-center">
+                <Button size="sm" variant="outline" onClick={handlePreview} disabled>
+                  <Eye className="size-4 mr-1" aria-hidden="true" />
+                  View
                 </Button>
+                <p className="text-xs text-muted-foreground">This archived version cannot be edited or modified.</p>
               </div>
             )}
 
@@ -1133,7 +1156,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Title
               </label>
               <Input
-                disabled={isPublished}
+                disabled={isPublished || isArchived}
                 value={title}
                 onChange={(e) => {
                   markDirty()
@@ -1149,7 +1172,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Summary (Short Description)
               </label>
               <Textarea
-                disabled={isPublished}
+                disabled={isPublished || isArchived}
                 value={summary}
                 onChange={(e) => {
                   markDirty()
@@ -1417,11 +1440,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               {/* Add Section Button */}
               <Card 
                 className={`border-dashed border-border/50 px-4 py-6 flex items-center justify-center transition-colors ${
-                  isPublished 
+                  isPublished || isArchived
                     ? "opacity-50 cursor-not-allowed" 
                     : "hover:bg-muted/50 cursor-pointer"
                 }`} 
-                onClick={!isPublished ? handleAddSection : undefined}
+                onClick={(!isPublished && !isArchived) ? handleAddSection : undefined}
               >
                 <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                   <Plus className="size-5" aria-hidden="true" />

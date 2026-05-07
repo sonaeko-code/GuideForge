@@ -37,9 +37,9 @@ export function GuideVersionHistory({ versions, networkId, isLoading }: GuideVer
   return (
     <div className="space-y-3 mt-6 border-t border-border pt-6">
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-3">Version History</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-2">Version History</h3>
         <p className="text-xs text-muted-foreground mb-4">
-          Archived versions of this guide. Previous published versions are preserved for reference.
+          All previously published versions of this guide are archived below for reference.
         </p>
       </div>
 
@@ -89,8 +89,8 @@ export function GuideVersionHistory({ versions, networkId, isLoading }: GuideVer
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground italic">
-        Version history shows archived revisions. You can view them but cannot edit them.
+      <p className="text-xs text-muted-foreground italic mt-3">
+        Archived versions are read-only. You can view them for reference but cannot edit or republish them.
       </p>
     </div>
   )
