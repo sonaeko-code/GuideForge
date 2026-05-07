@@ -330,15 +330,44 @@ export async function createGuideRevisionDraft(
       console.log('[v0] createGuideRevisionDraft: Copied', sourceSteps.length, 'steps')
     }
 
-    // 9. Verify revision was created
+    // 9. Verify revision was created correctly
+    // Phase 10K: Refetch inserted guide to verify against rootGuideId (not publishedGuideId)
     const { data: verifyGuide, error: verifyError } = await supabase
       .from('guides')
       .select('id, status, revision_of, revision_number')
       .eq('id', newGuide.id)
       .maybeSingle()
 
-    if (verifyError || !verifyGuide || verifyGuide.status !== 'draft' || verifyGuide.revision_of !== publishedGuideId) {
-      console.error('[v0] createGuideRevisionDraft: Verification failed')
+    // TEST LOG: Comprehensive verification details
+    console.log('[v0-TEST] createGuideRevisionDraft: Verification check', {
+      'publishedGuideId (sourceGuide.id)': publishedGuideId,
+      'sourceGuide.revision_of': sourceGuide.revision_of,
+      'rootGuideId (expected revision_of)': rootGuideId,
+      'nextRevisionNumber (expected)': nextRevisionNumber,
+      'verifyError': verifyError?.message,
+      'verifyGuide.id': verifyGuide?.id,
+      'verifyGuide.status': verifyGuide?.status,
+      'verifyGuide.revision_of (actual)': verifyGuide?.revision_of,
+      'verifyGuide.revision_number (actual)': verifyGuide?.revision_number,
+      'revision_of matches rootGuideId?': verifyGuide?.revision_of === rootGuideId,
+      'revision_number matches nextRevisionNumber?': verifyGuide?.revision_number === nextRevisionNumber,
+    })
+
+    // Phase 10K: Verify against rootGuideId, not publishedGuideId
+    if (
+      verifyError ||
+      !verifyGuide ||
+      verifyGuide.status !== 'draft' ||
+      verifyGuide.revision_of !== rootGuideId ||
+      verifyGuide.revision_number !== nextRevisionNumber
+    ) {
+      console.error('[v0] createGuideRevisionDraft: Verification failed', {
+        verifyError: verifyError?.message,
+        hasVerifyGuide: !!verifyGuide,
+        statusIsCorrect: verifyGuide?.status === 'draft',
+        revision_ofMatches: verifyGuide?.revision_of === rootGuideId,
+        revision_numberMatches: verifyGuide?.revision_number === nextRevisionNumber,
+      })
       return {
         success: false,
         error: 'Revision creation verification failed',
