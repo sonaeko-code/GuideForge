@@ -171,8 +171,13 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
         </div>
       </div>
 
-      {/* Voting UI */}
-      {canVote ? (
+      {/* Voting UI - Hidden for published guides */}
+      {guideStatus === 'published' ? (
+        <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-start gap-2">
+          <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
+          <span>This guide is published. Review votes are now locked.</span>
+        </div>
+      ) : canVote ? (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">Cast your vote</p>
           <div className="flex gap-2">
@@ -224,9 +229,10 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
         </div>
       )}
 
-      {/* Publish Button and Status */}
-      <div className="space-y-2">
-        {summary.publishEligibility.publishEligible && canPublish ? (
+      {/* Publish Button and Status - Hidden for published guides */}
+      {guideStatus !== 'published' && (
+        <div className="space-y-2">
+          {summary.publishEligibility.publishEligible && canPublish ? (
           <>
             <Button
               onClick={handlePublish}
@@ -265,7 +271,8 @@ export default function GuideReviewPanel({ guideId, guideStatus, canPublish, onV
             Only network owners/admins can publish eligible guides.
           </div>
         ) : null}
-      </div>
+        </div>
+      )}
 
       {/* Voter List */}
       {summary.totalVotes > 0 && (

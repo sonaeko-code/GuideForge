@@ -149,6 +149,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
   // Autosave effect - debounced by 1500ms, only saves if snapshot changed
   // Uses snapshot comparison to prevent unnecessary saves and indicator flicker
   useEffect(() => {
+    // Phase 9C: Skip autosave entirely for published guides
+    if (isPublished) {
+      return
+    }
+
     // Skip autosave on initial load before user has edited anything
     if (!hasHydratedRef.current || !userEditedRef.current) {
       console.log("[v0] Autosave skipped initial load: hydrated=", hasHydratedRef.current, "userEdited=", userEditedRef.current)
@@ -325,7 +330,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         clearTimeout(autosaveTimerRef.current)
       }
     }
-  }, [title, summary, requirementsText, steps, guideStatus])
+  }, [title, summary, requirementsText, steps, guideStatus, isPublished])
 
   // Initialize snapshot on mount
   useEffect(() => {
@@ -803,11 +808,11 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               )}
             </div>
 
-            {/* Published guide warning */}
+            {/* Published guide locked message */}
             {isPublished && (
               <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800/50 ml-2">
                 <AlertCircle className="size-3" aria-hidden="true" />
-                <span>Published guide. Editing changes will update the live guide.</span>
+                <span>Published guide — locked from editing.</span>
               </div>
             )}
 
@@ -911,6 +916,9 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                   <Eye className="size-4 mr-1" aria-hidden="true" />
                   Preview
                 </Button>
+                <Button size="sm" variant="outline" disabled title="Revision editing coming soon">
+                  <span>Create Revision — Soon</span>
+                </Button>
                 <Button size="sm" variant="ghost" onClick={handleDelete}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
@@ -976,12 +984,13 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Title
               </label>
               <Input
+                disabled={isPublished}
                 value={title}
                 onChange={(e) => {
                   markDirty()
                   setTitle(e.target.value)
                 }}
-                className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="mt-2 border border-border/50 bg-muted/40 text-2xl font-semibold rounded-md focus:bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Guide title"
               />
             </div>
@@ -991,13 +1000,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
                 Summary (Short Description)
               </label>
               <Textarea
-                value={summary}
+                disabled={isPublished}
+                value={requirementsText}
                 onChange={(e) => {
                   markDirty()
-                  setSummary(e.target.value)
+                  setRequirementsText(e.target.value)
                 }}
-                placeholder="Brief summary of this guide. Shown on guide cards and list pages."
-                className="w-full h-20 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none mt-2"
+                placeholder="Add requirements here, one per line:&#10;• Level 30+&#10;• Completion of main questline"
+                className="w-full h-24 p-2 text-sm rounded border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="mt-2 text-xs text-muted-foreground">
                 This summary appears on guide cards and in search results. Keep it concise.
@@ -1231,7 +1241,14 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               })}
               
               {/* Add Section Button */}
-              <Card className="border-dashed border-border/50 px-4 py-6 flex items-center justify-center hover:bg-muted/50 transition-colors cursor-pointer" onClick={handleAddSection}>
+              <Card 
+                className={`border-dashed border-border/50 px-4 py-6 flex items-center justify-center transition-colors ${
+                  isPublished 
+                    ? "opacity-50 cursor-not-allowed" 
+                    : "hover:bg-muted/50 cursor-pointer"
+                }`} 
+                onClick={!isPublished ? handleAddSection : undefined}
+              >
                 <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                   <Plus className="size-5" aria-hidden="true" />
                   <span className="text-sm font-medium">Add Section</span>
