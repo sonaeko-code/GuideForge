@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, Shield, AlertCircle, BookOpen, Calendar, FileText } from "lucide-react"
+import { ChevronRight, Clock, Shield, AlertCircle, BookOpen, Calendar, FileText, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { QuestLineHeader } from "@/components/questline/site-header"
 import { QuestLineFooter } from "@/components/questline/site-footer"
 import { MOCK_GUIDES, MOCK_HUBS, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 import { loadPublishedGuide, loadPublishedGuides } from "@/lib/guideforge/supabase-public"
-import { getHubBySlug, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
+import { getHubBySlug, getCollectionsByHubId, getNetworkBySlug } from "@/lib/guideforge/supabase-networks"
 
 export default async function PublicGuidePage({
   params,
@@ -19,7 +19,10 @@ export default async function PublicGuidePage({
     guideSlug: string
   }>
 }) {
-  const { hubSlug, guideSlug } = await params
+  const { networkSlug, hubSlug, guideSlug } = await params
+  
+  // Try to load network
+  let network = await getNetworkBySlug(networkSlug)
   
   // Try to load hub from Supabase first, then fallback to mock data
   let hub = await getHubBySlug(hubSlug)
@@ -45,7 +48,7 @@ export default async function PublicGuidePage({
               This guide doesn&apos;t exist yet, or it may have been moved or unpublished.
             </p>
             <Button asChild>
-              <Link href="/n/questline">Back to QuestLine</Link>
+              <Link href={`/n/${networkSlug}/${hubSlug}`}>Back to Hub</Link>
             </Button>
           </div>
         </main>
@@ -83,28 +86,34 @@ export default async function PublicGuidePage({
         <article>
           <header className="border-b border-border/60 bg-muted/20">
             <div className="mx-auto max-w-4xl px-4 md:px-6 pt-10 pb-12 md:pt-14 md:pb-16">
-              {/* Breadcrumb */}
-              <nav
-                aria-label="Breadcrumb"
-                className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto pb-1"
+            {/* Breadcrumb */}
+            <nav
+              aria-label="Breadcrumb"
+              className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto pb-1"
+            >
+              {network && (
+                <>
+                  <Link href={`/n/${networkSlug}`} className="hover:text-foreground whitespace-nowrap uppercase tracking-wider">
+                    {network.name}
+                  </Link>
+                  <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
+                </>
+              )}
+              <Link
+                href={`/n/${networkSlug}/${hub.slug}`}
+                className="hover:text-foreground whitespace-nowrap uppercase tracking-wider"
               >
-                <Link href="/n/questline" className="hover:text-foreground whitespace-nowrap uppercase tracking-wider">
-                  QuestLine
-                </Link>
-                <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
-                <Link
-                  href={`/n/questline/${hub.slug}`}
-                  className="hover:text-foreground whitespace-nowrap uppercase tracking-wider"
-                >
-                  {hub.name}
-                </Link>
-                {collection && (
-                  <>
-                    <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
-                    <span className="whitespace-nowrap uppercase tracking-wider">{collection.name}</span>
-                  </>
-                )}
-              </nav>
+                {hub.name}
+              </Link>
+              {collection && (
+                <>
+                  <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
+                  <span className="whitespace-nowrap uppercase tracking-wider">{collection.name}</span>
+                </>
+              )}
+              <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
+              <span className="whitespace-nowrap uppercase tracking-wider text-foreground font-semibold">{guide.title}</span>
+            </nav>
 
               {/* Eyebrow */}
               <div className="flex flex-wrap items-center gap-2 mb-4 text-xs uppercase tracking-[0.18em]">
@@ -129,12 +138,12 @@ export default async function PublicGuidePage({
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm border-t border-border/60 pt-5">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">By</span>
-                  <span className="font-semibold text-foreground">@{guide.author.handle}</span>
+                  <span className="font-semibold text-foreground">{guide.author.displayName || `@${guide.author.handle}`}</span>
                   {guide.reviewer && (
                     <>
                       <span className="text-muted-foreground/60">·</span>
                       <span className="text-muted-foreground">Reviewed by</span>
-                      <span className="font-semibold text-foreground">@{guide.reviewer.handle}</span>
+                      <span className="font-semibold text-foreground">{guide.reviewer.displayName || `@${guide.reviewer.handle}`}</span>
                     </>
                   )}
                 </div>
@@ -258,7 +267,6 @@ export default async function PublicGuidePage({
                   </p>
                 </section>
 
-                {/* Related guides */}
                 {relatedGuides.length > 0 && (
                   <section className="border-t border-border/60 pt-10 mt-12">
                     <p className="text-xs uppercase tracking-[0.18em] text-primary font-semibold mb-2">
@@ -269,7 +277,7 @@ export default async function PublicGuidePage({
                     </h2>
                     <div className="grid gap-4 md:grid-cols-3">
                       {relatedGuides.map((rg) => (
-                        <Link key={rg.id} href={`/n/questline/${hub.slug}/${rg.slug}`}>
+                        <Link key={rg.id} href={`/n/${networkSlug}/${hub.slug}/${rg.slug}`}>
                           <Card className="border-border/60 p-5 hover:bg-muted/40 transition-colors cursor-pointer h-full flex flex-col">
                             <p className="text-xs uppercase tracking-wider text-primary font-semibold mb-2">
                               {rg.type
