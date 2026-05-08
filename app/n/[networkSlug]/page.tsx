@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, BookOpen } from "lucide-react"
@@ -9,7 +10,7 @@ import { MediaPlaceholder } from "@/components/questline/media/media-placeholder
 import {
   getNetworkBySlug,
   getHubsByNetworkId,
-  getPublishedGuidesByNetworkId,
+  getCollectionsByHubId,
 } from "@/lib/guideforge/supabase-networks"
 import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
 import { QUESTLINE_NETWORK, getHubsByNetwork, MOCK_GUIDES } from "@/lib/guideforge/mock-data"
@@ -32,43 +33,34 @@ export default async function PublicNetworkPage({
   }
 
   if (!network) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <QuestLineHeader />
-        <main className="flex-1 flex items-center justify-center px-4 py-20">
-          <div className="text-center max-w-md">
-            <BookOpen className="size-12 text-muted-foreground mx-auto mb-4" aria-hidden="true" />
-            <h1 className="text-3xl font-bold mb-2">Network Not Found</h1>
-            <p className="text-muted-foreground mb-6">
-              This network doesn&apos;t exist or isn&apos;t published yet.
-            </p>
-            <Button asChild>
-              <Link href="/">Back to Home</Link>
-            </Button>
-          </div>
-        </main>
-        <QuestLineFooter />
-      </div>
-    )
+    notFound()
   }
 
-  // Load hubs
-  let hubs = await getHubsByNetworkId(network.id)
+  // Load hubs - safe with empty fallback
+  let hubs = []
+  if (network.id) {
+    hubs = await getHubsByNetworkId(network.id)
+  }
+  
   if (hubs.length === 0 && networkSlug === "questline") {
     hubs = getHubsByNetwork(network.id)
   }
 
-  // Load published guides and filter by network
+  // Load published guides - only published status shown
   const supabaseGuides = await loadPublishedGuides()
   const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : MOCK_GUIDES.filter(g => g.status === "published")
 
-  // Load collections - get from all hubs in network
+  // Load collections - get from all hubs in network with error handling
   const allCollections = []
   for (const hub of hubs) {
-    const hubCollections = await import("@/lib/guideforge/supabase-networks")
-      .then(m => m.getCollectionsByHubId(hub.id))
-      .catch(() => [])
-    allCollections.push(...hubCollections)
+    try {
+      const hubCollections = await getCollectionsByHubId(hub.id)
+      if (Array.isArray(hubCollections)) {
+        allCollections.push(...hubCollections)
+      }
+    } catch (err) {
+      console.warn(`[v0] Error loading collections for hub ${hub.id}:`, err)
+    }
   }
 
   // Sort and slice for featured sections
@@ -96,7 +88,7 @@ export default async function PublicNetworkPage({
               {network.name}
             </h1>
             <p className="max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              {network.description}
+              {network.description || "A guide network for learning and exploration."}
             </p>
           </div>
         </div>
@@ -118,7 +110,7 @@ export default async function PublicNetworkPage({
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {hubs.map((hub) => {
                 const hubGuides = allPublishedGuides.filter(g => g.hubId === hub.id)
-                const hubCollections = collections.filter(c => c.hubId === hub.id)
+                const hubCollections = allCollections.filter(c => c.hubId === hub.id)
                 return (
                   <Link key={hub.id} href={`/n/${networkSlug}/${hub.slug}`} className="group block">
                     <div className="rounded-lg border border-foreground/15 bg-background p-6 transition-colors hover:border-primary/40 hover:bg-muted/50 h-full flex flex-col">
@@ -126,7 +118,7 @@ export default async function PublicNetworkPage({
                         {hub.name}
                       </h3>
                       <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-                        {hub.description || hub.tagline}
+                        {hub.description || hub.tagline || "Explore this hub for guides and resources."}
                       </p>
                       <div className="mt-4 flex flex-col gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground border-t border-foreground/10 pt-3">
                         <div>{hubCollections.length} collection{hubCollections.length !== 1 ? "s" : ""}</div>
