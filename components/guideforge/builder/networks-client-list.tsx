@@ -271,9 +271,9 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
             )}
           </div>
 
-          {network.slug === 'questline' && (
+          {network.slug && (
             <Button asChild size="sm" variant="ghost" className="w-full gap-2">
-              <Link href="/n/questline">
+              <Link href={`/n/${network.slug}`}>
                 View Site
                 <ArrowRight className="size-3.5" aria-hidden="true" />
               </Link>
