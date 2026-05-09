@@ -27,9 +27,9 @@ export function GenerateNetworkSkeletonClient() {
     networkPurpose: "",
     tone: "helpful",
     referenceStyle: "questline",
-    numberOfHubs: 3,
-    collectionsPerHub: 3,
-    guideIdeasPerCollection: 3,
+    numberOfHubs: 2,
+    collectionsPerHub: 2,
+    guideIdeasPerCollection: 2,
     guideTypeEmphasis: ["guide"],
     optionalNotes: "",
   })
@@ -95,11 +95,18 @@ export function GenerateNetworkSkeletonClient() {
   // Otherwise, render the intake form
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Generate Network Skeleton</h1>
-        <p className="text-base text-muted-foreground">
-          Tell us about your network, and AI will generate a reviewable structure with hubs, collections, and guide ideas.
-        </p>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Generate Network Skeleton</h1>
+          <p className="text-base text-muted-foreground">
+            Tell us about your network, and AI will generate a reviewable structure with hubs, collections, and guide ideas.
+          </p>
+        </div>
+        <Card className="p-3 border-amber-500/20 bg-amber-500/5">
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            <strong>Coming soon:</strong> GuideForge will support generation of single guides, recipes, checklists, SOPs, troubleshooting flows, and embeddable guide widgets. This tool currently generates full network skeletons.
+          </p>
+        </Card>
       </div>
 
       <Card className="p-6 md:p-8">
@@ -196,6 +203,7 @@ export function GenerateNetworkSkeletonClient() {
           <div className="space-y-3 pb-6 border-b border-border">
             <h2 className="font-semibold text-foreground">Structure</h2>
             <p className="text-sm text-muted-foreground">Define the hierarchy and number of items</p>
+            <p className="text-xs text-muted-foreground italic">Start small. You can generate more guides later.</p>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
