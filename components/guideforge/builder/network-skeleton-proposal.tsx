@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronUp, Trash2, ArrowLeft, Loader2 } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -46,7 +46,16 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
       const result = await saveNetworkSkeleton(proposal)
 
       if (!result.success) {
-        throw new Error(result.error || "Save failed")
+        // Check if this was a partial creation (network created but hubs/collections failed)
+        if (result.partiallyCreated && result.networkId) {
+          setSaveError(
+            result.error ||
+            `Partial save: Network "${proposal.network.name}" (${result.networkId}) was created with ${result.hubsCreated} hub(s) and ${result.collectionsCreated} collection(s), but generation stopped at ${result.failedAt}. You can continue editing manually or delete and try again.`
+          )
+        } else {
+          setSaveError(result.error || "Save failed for unknown reason")
+        }
+        return
       }
 
       console.log("[v0] Network skeleton saved successfully:", result.networkId)
@@ -86,12 +95,28 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
         </p>
       </div>
 
+      {/* Error Display */}
+      {saveError && (
+        <Card className="border-red-500/30 bg-red-500/5 p-4">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+              Error saving network
+            </p>
+            <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-wrap">
+              {saveError}
+            </p>
+          </div>
+        </Card>
+      )}
+
       {/* Status Badge */}
-      <Card className="border-blue-500/30 bg-blue-500/5 p-4">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
-          <strong>Generated Proposal — Not Saved Yet</strong> • Review and customize before creating your network.
-        </p>
-      </Card>
+      {!saveError && (
+        <Card className="border-blue-500/30 bg-blue-500/5 p-4">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            <strong>Generated Proposal — Not Saved Yet</strong> • Review and customize before creating your network.
+          </p>
+        </Card>
+      )}
 
       {/* Network Overview */}
       <Card className="p-6">

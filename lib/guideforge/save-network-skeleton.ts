@@ -22,7 +22,8 @@ import {
 import {
   createAndSaveGuideDraft,
 } from "./create-and-save-guide-draft"
-import type { NetworkDraft } from "./types"
+import type { NetworkDraft, Hub } from "./types"
+import { supabase } from "./supabase-client"
 
 export interface SaveNetworkSkeletonResult {
   success: boolean
@@ -32,6 +33,30 @@ export interface SaveNetworkSkeletonResult {
   guidePlaceholdersCreated?: number
   error?: string
   failedAt?: "network" | "hub" | "collection" | "guide"
+  /** Indicates the network was created but hubs/collections failed */
+  partiallyCreated?: boolean
+}
+
+/**
+ * Clean up a partially created network by deleting it from Supabase.
+ * Safe operation: if delete fails, logs warning but doesn't throw.
+ */
+async function cleanupFailedNetwork(networkId: string): Promise<void> {
+  try {
+    console.log("[v0] Cleaning up failed network:", networkId)
+    const { error } = await supabase
+      .from("networks")
+      .delete()
+      .eq("id", networkId)
+
+    if (error) {
+      console.warn("[v0] Failed to cleanup network during rollback:", error.message)
+    } else {
+      console.log("[v0] Successfully cleaned up network:", networkId)
+    }
+  } catch (err) {
+    console.warn("[v0] Cleanup error:", err)
+  }
 }
 
 /**
@@ -43,6 +68,7 @@ export interface SaveNetworkSkeletonResult {
  * 3. Create collections
  * 4. Create guide placeholder drafts
  *
+ * If hub/collection creation fails, attempts to rollback the network.
  * If any step fails, returns error with failedAt indicator.
  */
 export async function saveNetworkSkeleton(
@@ -81,23 +107,31 @@ export async function saveNetworkSkeleton(
     for (const hub of proposal.hubs) {
       console.log("[v0] saveNetworkSkeleton: Creating hub:", hub.name)
 
-      const hubResult = await createHub(networkId, {
-        name: hub.name,
+      // Properly type the hub object to match Omit<Hub, "id" | "collectionIds">
+      const hubPayload: Omit<Hub, "id" | "collectionIds"> = {
+        networkId: networkId, // Not used by createHub but required by Hub type
         slug: hub.slug,
+        name: hub.name,
         description: hub.description,
-        tagline: hub.tagline,
         hubKind: "topic",
-        collectionIds: [],
-      } as any)
+        tagline: hub.tagline,
+      }
+
+      const hubResult = await createHub(networkId, hubPayload)
 
       if (hubResult.source !== "supabase" || !hubResult.hub.id) {
         console.error("[v0] saveNetworkSkeleton: Hub creation failed:", hubResult.error)
+        
+        // Attempt cleanup: delete the network to avoid partial orphaned state
+        await cleanupFailedNetwork(networkId)
+        
         return {
           success: false,
           networkId,
           hubsCreated,
-          error: hubResult.error || "Hub creation failed",
+          error: `Hub creation failed: ${hubResult.error || "Unknown error"}. Network has been cleaned up.`,
           failedAt: "hub",
+          partiallyCreated: false,
         }
       }
 
@@ -118,13 +152,17 @@ export async function saveNetworkSkeleton(
 
         if (collectionResult.source !== "supabase" || !collectionResult.collection.id) {
           console.error("[v0] saveNetworkSkeleton: Collection creation failed:", collectionResult.error)
+          
+          // For collection failures, network + hubs already exist but rest is incomplete
+          // Don't cleanup - user can manually continue or delete the partial network
           return {
             success: false,
             networkId,
             hubsCreated,
             collectionsCreated,
-            error: collectionResult.error || "Collection creation failed",
+            error: `Collection creation failed: ${collectionResult.error || "Unknown error"}. Network and ${hubsCreated} hub(s) were created. You can delete the network and try again, or manually continue editing.`,
             failedAt: "collection",
+            partiallyCreated: true,
           }
         }
 
