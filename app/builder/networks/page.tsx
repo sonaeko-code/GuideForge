@@ -114,9 +114,9 @@ export default async function NetworksDirectoryPage() {
               </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/builder/network/generate-skeleton">
+              <Link href="/builder/generate-asset">
                 <Wand2 className="mr-2 size-4" aria-hidden="true" />
-                Generate with AI
+                Generate Asset
               </Link>
             </Button>
             <Button asChild size="lg">

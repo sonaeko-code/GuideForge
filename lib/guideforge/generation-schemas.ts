@@ -285,3 +285,186 @@ export interface GenerationSession {
   status: "idle" | "generating" | "done" | "error"
   error?: string
 }
+
+// ---------- Structured Asset Types & Contracts ----------
+
+export type StructuredAssetType = "single_guide" | "recipe" | "checklist" | "sop" | "troubleshooting_flow"
+
+// Single Guide
+export interface GeneratedSingleGuide {
+  assetType: "single_guide"
+  title: string
+  summary: string
+  audience: string
+  difficulty: DifficultyLevel
+  requirements: string[]
+  warnings: string[]
+  steps: Array<{
+    title: string
+    body: string
+    successCondition: string | null
+    tip: string | null
+    warning: string | null
+  }>
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// Recipe
+export interface GeneratedRecipe {
+  assetType: "recipe"
+  title: string
+  summary: string
+  servings: string
+  prepTime: string | null
+  cookTime: string | null
+  ingredients: Array<{
+    name: string
+    amount: string | null
+    notes: string | null
+  }>
+  steps: Array<{
+    title: string
+    body: string
+    tip: string | null
+  }>
+  dietaryNotes: string[]
+  warnings: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// Checklist
+export interface GeneratedChecklist {
+  assetType: "checklist"
+  title: string
+  summary: string
+  sections: Array<{
+    title: string
+    items: Array<{
+      label: string
+      description: string | null
+      required: boolean
+    }>
+  }>
+  completionCriteria: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// SOP / Procedure
+export interface GeneratedSOP {
+  assetType: "sop"
+  title: string
+  purpose: string
+  scope: string
+  owner: string | null
+  requirements: string[]
+  procedureSteps: Array<{
+    title: string
+    body: string
+    responsibleRole: string | null
+    warning: string | null
+  }>
+  reviewNotes: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// Troubleshooting Flow
+export interface GeneratedTroubleshootingFlow {
+  assetType: "troubleshooting_flow"
+  title: string
+  symptom: string
+  summary: string
+  checks: Array<{
+    title: string
+    question: string
+    ifYes: string | null
+    ifNo: string | null
+  }>
+  likelyCauses: string[]
+  fixSteps: Array<{
+    title: string
+    body: string
+    escalateIfFailed: string | null
+  }>
+  warnings: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+export type GeneratedStructuredAsset =
+  | GeneratedSingleGuide
+  | GeneratedRecipe
+  | GeneratedChecklist
+  | GeneratedSOP
+  | GeneratedTroubleshootingFlow
+
+// Intake requests
+export interface SingleGuideIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  difficulty: DifficultyLevel
+  guideType: GuideType
+  numberOfSteps: number
+  hasWarnings: boolean
+  hasPrerequisites: boolean
+  optionalContext: string
+}
+
+export interface RecipeIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  cuisine: string
+  servings: string
+  prepTime: string
+  cookTime: string
+  dietaryNotes: string
+  optionalContext: string
+}
+
+export interface ChecklistIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  goal: string
+  numberOfSections: number
+  itemsPerSection: number
+  useCase: string
+  optionalContext: string
+}
+
+export interface SOPIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  owner: string
+  department: string
+  requiredTools: string
+  complianceNotes: string
+  reviewFrequency: string
+  optionalContext: string
+}
+
+export interface TroubleshootingFlowIntakeRequest {
+  title: string
+  audience: string
+  symptom: string
+  environment: string
+  likelyCauses: string
+  riskLevel: string
+  escalationPath: string
+  optionalContext: string
+}
