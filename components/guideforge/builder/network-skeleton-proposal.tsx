@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +18,37 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Validate proposal shape to catch malformed generated output
+  if (!proposal || !proposal.network) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+          Back
+        </Button>
+        <Card className="border-red-500/30 bg-red-500/5 p-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="size-5 text-red-600 shrink-0" aria-hidden="true" />
+              <h2 className="font-semibold text-red-700">Generated proposal was incomplete.</h2>
+            </div>
+            <p className="text-sm text-red-600">Please try again.</p>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // Ensure all required arrays exist and are arrays
+  const hubs = Array.isArray(proposal.hubs) ? proposal.hubs : []
+  const forgeRules = proposal.forgeRulesSuggestions || { global: [], networkSpecific: [] }
+  const forgeRulesGlobal = Array.isArray(forgeRules.global) ? forgeRules.global : []
+  const forgeRulesNetwork = Array.isArray(forgeRules.networkSpecific) ? forgeRules.networkSpecific : []
+  const guideDNA = proposal.guideDNASuggestions || { tone: "", layoutStyle: "", contentPriorities: [], badgeLanguage: "" }
+  const guideDNAPriorities = Array.isArray(guideDNA.contentPriorities) ? guideDNA.contentPriorities : []
+  const assumptions = Array.isArray(proposal.assumptions) ? proposal.assumptions : []
+  const missingInfo = Array.isArray(proposal.missingInfo) ? proposal.missingInfo : []
 
   const toggleHubExpanded = (hubSlug: string) => {
     setExpandedHubs((prev) => {
@@ -71,8 +102,14 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
     }
   }
 
-  const totalGuideIdeas = proposal.hubs.reduce(
-    (sum, hub) => sum + hub.collections.reduce((cSum, coll) => cSum + coll.guideIdeas.length, 0),
+  const totalGuideIdeas = hubs.reduce(
+    (sum, hub) => {
+      const hubCollections = Array.isArray(hub.collections) ? hub.collections : []
+      return sum + hubCollections.reduce((cSum, coll) => {
+        const guideIdeas = Array.isArray(coll.guideIdeas) ? coll.guideIdeas : []
+        return cSum + guideIdeas.length
+      }, 0)
+    },
     0
   )
 
@@ -127,12 +164,12 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4 pt-4 border-t border-border">
             <div>
               <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Hubs</dt>
-              <dd className="mt-1 text-2xl font-bold text-foreground">{proposal.hubs.length}</dd>
+              <dd className="mt-1 text-2xl font-bold text-foreground">{hubs.length}</dd>
             </div>
             <div>
               <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Collections</dt>
               <dd className="mt-1 text-2xl font-bold text-foreground">
-                {proposal.hubs.reduce((sum, h) => sum + h.collections.length, 0)}
+                {hubs.reduce((sum, h) => sum + (Array.isArray(h.collections) ? h.collections.length : 0), 0)}
               </dd>
             </div>
             <div>
@@ -151,7 +188,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
       <div className="space-y-3">
         <h2 className="font-semibold text-lg text-foreground">Hubs</h2>
         <div className="space-y-3">
-          {proposal.hubs.map((hub, hubIdx) => {
+          {hubs.map((hub, hubIdx) => {
             const isExpanded = expandedHubs.has(hub.slug)
             return (
               <Card key={hub.slug} className="p-4">
@@ -164,7 +201,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
                     <p className="text-sm text-muted-foreground line-clamp-1">{hub.description}</p>
                   </div>
                   <Badge variant="outline" className="shrink-0">
-                    {hub.collections.length} collections
+                    {(Array.isArray(hub.collections) ? hub.collections : []).length} collections
                   </Badge>
                   <div className="shrink-0">
                     {isExpanded ? (
@@ -178,7 +215,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
                 {/* Expanded: Collections */}
                 {isExpanded && (
                   <div className="mt-4 space-y-3 pt-4 border-t border-border">
-                    {hub.collections.map((collection) => {
+                    {(Array.isArray(hub.collections) ? hub.collections : []).map((collection) => {
                       const isCollExpanded = expandedCollections.has(collection.slug)
                       return (
                         <div key={collection.slug} className="rounded-lg border border-border bg-muted/50 p-3">
@@ -191,7 +228,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
                               <p className="text-xs text-muted-foreground line-clamp-1">{collection.description}</p>
                             </div>
                             <Badge variant="secondary" className="shrink-0">
-                              {collection.guideIdeas.length} guides
+                              {(Array.isArray(collection.guideIdeas) ? collection.guideIdeas : []).length} guides
                             </Badge>
                             <div className="shrink-0">
                               {isCollExpanded ? (
@@ -205,7 +242,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
                           {/* Guide Ideas */}
                           {isCollExpanded && (
                             <div className="mt-3 space-y-2 pt-3 border-t border-border">
-                              {collection.guideIdeas.map((guide) => (
+                              {(Array.isArray(collection.guideIdeas) ? collection.guideIdeas : []).map((guide) => (
                                 <div key={guide.slug} className="flex items-start justify-between gap-3 rounded-lg bg-background p-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-foreground line-clamp-1">{guide.title}</p>
@@ -246,7 +283,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
           <div>
             <h3 className="text-sm font-medium text-foreground mb-2">Global Rules</h3>
             <ul className="space-y-1">
-              {proposal.forgeRulesSuggestions.global.map((rule, idx) => (
+              {forgeRulesGlobal.map((rule, idx) => (
                 <li key={idx} className="text-sm text-muted-foreground">• {rule}</li>
               ))}
             </ul>
@@ -254,7 +291,7 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
           <div className="pt-3 border-t border-border">
             <h3 className="text-sm font-medium text-foreground mb-2">Network-Specific</h3>
             <ul className="space-y-1">
-              {proposal.forgeRulesSuggestions.networkSpecific.map((rule, idx) => (
+              {forgeRulesNetwork.map((rule, idx) => (
                 <li key={idx} className="text-sm text-muted-foreground">• {rule}</li>
               ))}
             </ul>
@@ -268,42 +305,46 @@ export function NetworkSkeletonProposal({ proposal, onBack }: NetworkSkeletonPro
         <dl className="space-y-3">
           <div>
             <dt className="text-sm font-medium text-foreground">Tone</dt>
-            <dd className="text-sm text-muted-foreground">{proposal.guideDNASuggestions.tone}</dd>
+            <dd className="text-sm text-muted-foreground">{guideDNA.tone || "Not specified"}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-foreground">Layout Style</dt>
-            <dd className="text-sm text-muted-foreground">{proposal.guideDNASuggestions.layoutStyle}</dd>
+            <dd className="text-sm text-muted-foreground">{guideDNA.layoutStyle || "Not specified"}</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-foreground">Content Priorities</dt>
             <dd className="space-y-1">
-              {proposal.guideDNASuggestions.contentPriorities.map((priority, idx) => (
-                <div key={idx} className="text-sm text-muted-foreground">• {priority}</div>
-              ))}
+              {guideDNAPriorities.length > 0 ? (
+                guideDNAPriorities.map((priority, idx) => (
+                  <div key={idx} className="text-sm text-muted-foreground">• {priority}</div>
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground italic">No priorities specified</div>
+              )}
             </dd>
           </div>
         </dl>
       </Card>
 
       {/* Assumptions & Missing Info */}
-      {(proposal.assumptions.length > 0 || proposal.missingInfo.length > 0) && (
+      {(assumptions.length > 0 || missingInfo.length > 0) && (
         <div className="grid gap-4 md:grid-cols-2">
-          {proposal.assumptions.length > 0 && (
+          {assumptions.length > 0 && (
             <Card className="p-6">
               <h2 className="font-semibold text-foreground mb-3">Assumptions</h2>
               <ul className="space-y-1">
-                {proposal.assumptions.map((assumption, idx) => (
+                {assumptions.map((assumption, idx) => (
                   <li key={idx} className="text-sm text-muted-foreground">• {assumption}</li>
                 ))}
               </ul>
             </Card>
           )}
 
-          {proposal.missingInfo.length > 0 && (
+          {missingInfo.length > 0 && (
             <Card className="p-6 border-amber-500/30 bg-amber-500/5">
               <h2 className="font-semibold text-foreground mb-3">Missing Information</h2>
               <ul className="space-y-1">
-                {proposal.missingInfo.map((info, idx) => (
+                {missingInfo.map((info, idx) => (
                   <li key={idx} className="text-sm text-amber-700 dark:text-amber-300">• {info}</li>
                 ))}
               </ul>
