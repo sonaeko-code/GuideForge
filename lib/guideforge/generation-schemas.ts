@@ -175,58 +175,100 @@ export interface GeneratedPatchPost {
   generatedBy: "mock" | "openai" | "claude" | "other"
 }
 
-// ---------- Generation Request ----------
+// ---------- Network Skeleton Generation Request ----------
 
 /**
- * Shape of data sent to the AI generator.
- * This is what the builder UI collects from the user.
+ * Shape of data for generating a complete network skeleton.
+ * Includes network, hubs, collections, guide ideas, and rules.
  */
-export interface GenerationRequest {
-  /** Free-form or structured prompt. */
-  prompt: string
-
-  /** Which guide type to generate. */
-  guideType: GuideType
-
-  /** Optional: target hub for gaming networks. */
-  targetHubId?: string
-
-  /** Optional: target collection. */
-  targetCollectionId?: string
-
-  /** Optional: difficulty preference. */
-  preferredDifficulty?: DifficultyLevel
-
-  /** Forge rules to apply as context. */
-  forgeRuleContext?: string
-
-  /** Model to use (for future OpenAI integration). */
-  model?: "gpt-4" | "gpt-4-turbo" | "gpt-3.5-turbo" | "claude-3"
-
-  /** Max tokens for generation. */
-  maxTokens?: number
+export interface NetworkSkeletonGenerationRequest {
+  // Network basics
+  networkTopic: string          // e.g. "RPG Game Builds", "Software Documentation"
+  intendedAudience: string      // e.g. "New players", "Developers"
+  networkPurpose: string        // e.g. "Help players master builds", "Onboard new contributors"
+  
+  // Style & tone
+  tone: string                  // e.g. "friendly", "technical", "narrative"
+  referenceStyle: string        // e.g. "questline", "minimal", "comprehensive"
+  
+  // Structure
+  numberOfHubs: number          // e.g. 3, 5
+  collectionsPerHub: number     // e.g. 2, 3
+  guideIdeasPerCollection: number // e.g. 3, 4
+  
+  // Preferences
+  guideTypeEmphasis: string[]   // e.g. ["character-build", "beginner-guide"]
+  optionalNotes: string         // User's custom notes/context
 }
 
-// ---------- Generation Response ----------
+// ---------- Network Skeleton Generation Response ----------
 
 /**
- * What the generator returns.
+ * AI-generated network skeleton proposal.
+ * Includes network, hubs, collections, guide ideas, and rule suggestions.
  */
-export interface GenerationResponse {
-  /** The generated guide. */
-  guide: GeneratedGuide
-
-  /** Optional: suggested related guides. */
-  relatedGuideIds?: string[]
-
-  /** Optional: warnings or notes about the generation. */
-  generationNotes?: string[]
-
-  /** Whether the generation succeeded. */
+export interface NetworkSkeletonGenerationResponse {
+  network: GeneratedNetworkSkeleton
+  hubs: GeneratedHubWithCollections[]
+  forgeRulesSuggestions: ForgeRulesSuggestions
+  guideDNASuggestions: GuideDNASuggestions
+  assumptions: string[]
+  missingInfo: string[]
   success: boolean
-
-  /** If failed, the error message. */
   error?: string
+}
+
+/**
+ * Extended GeneratedNetwork with additional skeleton fields.
+ */
+export interface GeneratedNetworkSkeleton extends GeneratedNetwork {
+  audience: string
+  tone: string
+}
+
+/**
+ * Hub with nested collections and guide ideas.
+ */
+export interface GeneratedHubWithCollections extends GeneratedHub {
+  collections: GeneratedCollectionWithGuides[]
+}
+
+/**
+ * Collection with guide ideas.
+ */
+export interface GeneratedCollectionWithGuides extends GeneratedCollection {
+  guideIdeas: GeneratedGuideIdea[]
+}
+
+/**
+ * Guide idea (not yet a full guide).
+ */
+export interface GeneratedGuideIdea {
+  title: string
+  slug: string
+  summary: string
+  audience: string
+  difficulty: DifficultyLevel
+  guideType: GuideType
+  tags: string[]
+}
+
+/**
+ * Forge Rules suggestions for the network.
+ */
+export interface ForgeRulesSuggestions {
+  global: string[]
+  networkSpecific: string[]
+}
+
+/**
+ * Guide DNA suggestions for the network.
+ */
+export interface GuideDNASuggestions {
+  tone: string
+  layoutStyle: string
+  contentPriorities: string[]
+  badgeLanguage: string
 }
 
 // ---------- Generation Session ----------

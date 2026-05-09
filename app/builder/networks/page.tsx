@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, Folder, ArrowRight } from "lucide-react"
+import { Plus, Folder, Wand2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
@@ -111,6 +111,12 @@ export default async function NetworksDirectoryPage() {
               <Link href="/builder/network/scaffold">
                 <Plus className="mr-2 size-4" aria-hidden="true" />
                 From Template
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/builder/network/generate-skeleton">
+                <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                Generate with AI
               </Link>
             </Button>
             <Button asChild size="lg">
