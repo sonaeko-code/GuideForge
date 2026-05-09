@@ -1,17 +1,17 @@
 /**
  * Save Structured Asset as Draft
  *
- * Converts generated structured assets into draft guides.
- * Uses existing createAndSaveGuideDraft helper.
+ * Two paths:
+ * 1. User provides network/hub/collection (via destination selector)
+ * 2. Error if no destination selected
  *
- * For MVP: Requires user to select a network/hub/collection before saving.
- * Future: Could auto-create a "Generated" collection for user if preferred.
+ * For MVP: Requires explicit destination selection.
+ * Future: Could support account-bound drafts with dedicated storage.
  */
 
 import type { GeneratedStructuredAsset } from "./generation-schemas"
 import type { GuideStep } from "./types"
 import { createAndSaveGuideDraft } from "./create-and-save-guide-draft"
-import { supabase } from "./supabase-client"
 
 export interface SaveStructuredAssetResult {
   success: boolean
@@ -20,12 +20,13 @@ export interface SaveStructuredAssetResult {
   hubId?: string
   collectionId?: string
   error?: string
-  requiresSelection?: string
+  requiresDestinationSelection?: boolean
 }
 
 /**
  * Convert structured asset into guide steps format.
- */function assetToGuideSteps(asset: GeneratedStructuredAsset): Partial<GuideStep>[] {
+ */
+function assetToGuideSteps(asset: GeneratedStructuredAsset): Partial<GuideStep>[] {
   switch (asset.assetType) {
     case "single_guide":
       return asset.steps.map((step, idx) => ({
@@ -36,9 +37,8 @@ export interface SaveStructuredAssetResult {
         warning: step.warning,
       }))
 
-    case "recipe":
+    case "recipe": {
       const recipeSteps: Partial<GuideStep>[] = []
-      // Ingredients section
       recipeSteps.push({
         order: 0,
         title: "Ingredients",
@@ -46,7 +46,6 @@ export interface SaveStructuredAssetResult {
           .map((ing) => `• ${ing.name}${ing.amount ? ` (${ing.amount})` : ""}${ing.notes ? ` - ${ing.notes}` : ""}`)
           .join("\n"),
       })
-      // Recipe steps
       asset.steps.forEach((step, idx) => {
         recipeSteps.push({
           order: idx + 1,
@@ -56,8 +55,9 @@ export interface SaveStructuredAssetResult {
         })
       })
       return recipeSteps
+    }
 
-    case "checklist":
+    case "checklist": {
       const checklistSteps: Partial<GuideStep>[] = []
       asset.sections.forEach((section, sIdx) => {
         checklistSteps.push({
@@ -72,8 +72,9 @@ export interface SaveStructuredAssetResult {
         })
       })
       return checklistSteps
+    }
 
-    case "sop":
+    case "sop": {
       const sopSteps: Partial<GuideStep>[] = []
       sopSteps.push({
         order: 0,
@@ -96,8 +97,9 @@ export interface SaveStructuredAssetResult {
         })
       })
       return sopSteps
+    }
 
-    case "troubleshooting_flow":
+    case "troubleshooting_flow": {
       const troubleshootSteps: Partial<GuideStep>[] = []
       troubleshootSteps.push({
         order: 0,
@@ -125,6 +127,7 @@ export interface SaveStructuredAssetResult {
         })
       })
       return troubleshootSteps
+    }
 
     default:
       return []
@@ -133,61 +136,22 @@ export interface SaveStructuredAssetResult {
 
 /**
  * Save structured asset as a draft guide.
- * For MVP, requires the user to select network/hub/collection.
- * This is a placeholder that shows what's needed.
+ * Requires explicit networkId/hubId/collectionId from destination selector.
  */
 export async function saveStructuredAssetAsDraft(
-  asset: GeneratedStructuredAsset
+  asset: GeneratedStructuredAsset,
+  networkId: string,
+  hubId: string,
+  collectionId: string
 ): Promise<SaveStructuredAssetResult> {
   try {
     console.log("[v0] saveStructuredAssetAsDraft: Starting save for", asset.assetType, asset.title)
 
-    // For MVP: User must select network/hub/collection before saving
-    // In a full implementation, we'd show a selection modal here
-    // For now, we'll return an error indicating what's needed
-
-    // Get user's first network/hub/collection as fallback
-    const { data: networks, error: nErr } = await supabase
-      .from("networks")
-      .select("id")
-      .limit(1)
-      .single()
-
-    if (nErr || !networks) {
+    if (!networkId || !hubId || !collectionId) {
       return {
         success: false,
-        error: "No network found. Please create a network first or select where to save this asset.",
-        requiresSelection: "create a network or select a destination",
-      }
-    }
-
-    const { data: hubs, error: hErr } = await supabase
-      .from("hubs")
-      .select("id")
-      .eq("network_id", networks.id)
-      .limit(1)
-      .single()
-
-    if (hErr || !hubs) {
-      return {
-        success: false,
-        error: "No hub found in your network. Please create a hub first.",
-        requiresSelection: "create a hub",
-      }
-    }
-
-    const { data: collections, error: cErr } = await supabase
-      .from("collections")
-      .select("id")
-      .eq("hub_id", hubs.id)
-      .limit(1)
-      .single()
-
-    if (cErr || !collections) {
-      return {
-        success: false,
-        error: "No collection found in this hub. Please create a collection first.",
-        requiresSelection: "create a collection",
+        error: "Network, hub, and collection are required. Please select a destination.",
+        requiresDestinationSelection: true,
       }
     }
 
@@ -209,9 +173,9 @@ export async function saveStructuredAssetAsDraft(
       summary: asset.summary,
       guideType: guideTypeMap[asset.assetType] as any,
       difficulty: asset.assetType === "single_guide" ? asset.difficulty : "intermediate",
-      networkId: networks.id,
-      hubId: hubs.id,
-      collectionId: collections.id,
+      networkId,
+      hubId,
+      collectionId,
       steps,
       warnings: "warnings" in asset ? asset.warnings : undefined,
       requirements:
@@ -232,9 +196,9 @@ export async function saveStructuredAssetAsDraft(
     return {
       success: true,
       guideId: result.id,
-      networkId: networks.id,
-      hubId: hubs.id,
-      collectionId: collections.id,
+      networkId,
+      hubId,
+      collectionId,
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error"

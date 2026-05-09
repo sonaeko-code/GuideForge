@@ -1,35 +1,117 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { GeneratedStructuredAsset } from "@/lib/guideforge/generation-schemas"
 import { saveStructuredAssetAsDraft } from "@/lib/guideforge/save-structured-asset"
+import { supabase } from "@/lib/guideforge/supabase-client"
 
 interface StructuredAssetProposalProps {
   asset: GeneratedStructuredAsset
   onBack: () => void
 }
 
+interface NetworkHubCollection {
+  networkId: string
+  networkName: string
+  hubId: string
+  hubName: string
+  collectionId: string
+  collectionName: string
+}
+
 export function StructuredAssetProposal({ asset, onBack }: StructuredAssetProposalProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [destinations, setDestinations] = useState<NetworkHubCollection[]>([])
+  const [selectedDestination, setSelectedDestination] = useState<string | null>(null)
+  const [isLoadingDestinations, setIsLoadingDestinations] = useState(true)
+
+  // Load available destinations on mount
+  useEffect(() => {
+    const loadDestinations = async () => {
+      setIsLoadingDestinations(true)
+      try {
+        // Get all networks
+        const { data: networks, error: nErr } = await supabase
+          .from("networks")
+          .select("id, name")
+
+        if (nErr || !networks || networks.length === 0) {
+          console.log("[v0] No networks found")
+          setDestinations([])
+          setIsLoadingDestinations(false)
+          return
+        }
+
+        // For each network, get hubs
+        const allDestinations: NetworkHubCollection[] = []
+
+        for (const network of networks) {
+          const { data: hubs, error: hErr } = await supabase
+            .from("hubs")
+            .select("id, name")
+            .eq("network_id", network.id)
+
+          if (!hErr && hubs) {
+            // For each hub, get collections
+            for (const hub of hubs) {
+              const { data: collections, error: cErr } = await supabase
+                .from("collections")
+                .select("id, name")
+                .eq("hub_id", hub.id)
+
+              if (!cErr && collections) {
+                for (const collection of collections) {
+                  allDestinations.push({
+                    networkId: network.id,
+                    networkName: network.name,
+                    hubId: hub.id,
+                    hubName: hub.name,
+                    collectionId: collection.id,
+                    collectionName: collection.name,
+                  })
+                }
+              }
+            }
+          }
+        }
+
+        setDestinations(allDestinations)
+        if (allDestinations.length > 0) {
+          setSelectedDestination(JSON.stringify(allDestinations[0]))
+        }
+      } catch (err) {
+        console.error("[v0] Failed to load destinations:", err)
+      } finally {
+        setIsLoadingDestinations(false)
+      }
+    }
+
+    loadDestinations()
+  }, [])
 
   const handleSave = async () => {
     setSaveError(null)
+
+    if (!selectedDestination) {
+      setSaveError("Please select a destination before saving.")
+      return
+    }
+
     setIsSaving(true)
 
     try {
-      const result = await saveStructuredAssetAsDraft(asset)
+      const dest = JSON.parse(selectedDestination) as NetworkHubCollection
+
+      const result = await saveStructuredAssetAsDraft(asset, dest.networkId, dest.hubId, dest.collectionId)
 
       if (!result.success) {
-        setSaveError(
-          result.error ||
-          `Save failed. ${result.requiresSelection ? `Please ${result.requiresSelection}.` : ""}`
-        )
+        setSaveError(result.error || "Failed to save draft")
         return
       }
 
@@ -344,6 +426,77 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       </Card>
 
       {/* Save Summary */}
+      {destinations.length > 0 ? (
+        <>
+          <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-foreground">Ready to save:</p>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                <li>• 1 {getAssetTypeName()}: {asset.title}</li>
+              </ul>
+              <p className="text-xs text-muted-foreground italic pt-2">
+                Nothing will be published automatically. This will be saved as a draft.
+              </p>
+            </div>
+          </Card>
+
+          {/* Destination Selection */}
+          <Card className="p-4">
+            <label className="block text-sm font-medium text-foreground mb-3">
+              Save to:
+            </label>
+            {isLoadingDestinations ? (
+              <p className="text-sm text-muted-foreground">Loading destinations...</p>
+            ) : (
+              <select
+                value={selectedDestination || ""}
+                onChange={(e) => setSelectedDestination(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm"
+              >
+                {destinations.map((dest, idx) => (
+                  <option key={idx} value={JSON.stringify(dest)}>
+                    {dest.networkName} / {dest.hubName} / {dest.collectionName}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Select the network, hub, and collection where you want to save this draft.
+            </p>
+          </Card>
+        </>
+      ) : (
+        <>
+          {/* Empty State: No networks/hubs/collections */}
+          <Card className="p-6 border-amber-500/30 bg-amber-500/5">
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                No place to save yet
+              </p>
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                To save this {getAssetTypeName()} as a draft, you need to create a network, hub, and collection first.
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 italic">
+                In the future, GuideForge will support account-bound draft assets. For now, drafts must belong to a network.
+              </p>
+              <div className="flex gap-2 pt-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/builder/network/generate-skeleton">
+                    Create Network
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/builder/generate-asset">
+                    Back to Asset Types
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Save Summary */}
       <Card className="p-4 border-blue-500/20 bg-blue-500/5">
         <div className="space-y-2">
           <p className="text-sm font-semibold text-foreground">Ready to save:</p>
@@ -358,15 +511,21 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
 
       {/* Actions */}
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={isSaving}>
+        <Button variant="outline" onClick={onBack} disabled={isSaving || isLoadingDestinations}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+        <Button 
+          onClick={handleSave} 
+          disabled={isSaving || isLoadingDestinations || destinations.length === 0} 
+          className="flex-1"
+        >
           {isSaving ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
               Saving...
             </>
+          ) : destinations.length === 0 ? (
+            "Create Network First"
           ) : (
             "Save as Draft"
           )}
