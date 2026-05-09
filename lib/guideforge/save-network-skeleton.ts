@@ -86,7 +86,9 @@ export async function saveNetworkSkeleton(
         slug: hub.slug,
         description: hub.description,
         tagline: hub.tagline,
-      })
+        hubKind: "topic",
+        collectionIds: [],
+      } as any)
 
       if (hubResult.source !== "supabase" || !hubResult.hub.id) {
         console.error("[v0] saveNetworkSkeleton: Hub creation failed:", hubResult.error)
@@ -111,6 +113,7 @@ export async function saveNetworkSkeleton(
           name: collection.name,
           slug: collection.slug,
           description: collection.description,
+          defaultGuideType: "guide",
         })
 
         if (collectionResult.source !== "supabase" || !collectionResult.collection.id) {
