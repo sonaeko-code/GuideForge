@@ -15,108 +15,164 @@ interface StructuredAssetProposalProps {
   onBack: () => void
 }
 
-interface NetworkHubCollection {
-  networkId: string
-  networkName: string
-  hubId: string
-  hubName: string
-  collectionId: string
-  collectionName: string
-}
-
 export function StructuredAssetProposal({ asset, onBack }: StructuredAssetProposalProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [destinations, setDestinations] = useState<NetworkHubCollection[]>([])
-  const [selectedDestination, setSelectedDestination] = useState<string | null>(null)
-  const [isLoadingDestinations, setIsLoadingDestinations] = useState(true)
+  
+  // Network/Hub/Collection selection state
+  const [networks, setNetworks] = useState<Array<{ id: string; name: string }>>([])
+  const [hubs, setHubs] = useState<Array<{ id: string; name: string; count: number }>>([])
+  const [collections, setCollections] = useState<Array<{ id: string; name: string; count: number }>>([])
+  
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null)
+  const [selectedHubId, setSelectedHubId] = useState<string | null>(null)
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
+  
+  const [isLoadingNetworks, setIsLoadingNetworks] = useState(true)
+  const [isLoadingHubs, setIsLoadingHubs] = useState(false)
+  const [isLoadingCollections, setIsLoadingCollections] = useState(false)
 
-  // Load available destinations on mount
+  // Load networks on mount
   useEffect(() => {
-    const loadDestinations = async () => {
-      setIsLoadingDestinations(true)
+    const loadNetworks = async () => {
+      setIsLoadingNetworks(true)
       try {
-        // Get all networks
-        const { data: networks, error: nErr } = await supabase
+        const { data: networkList, error } = await supabase
           .from("networks")
           .select("id, name")
 
-        if (nErr || !networks || networks.length === 0) {
-          console.log("[v0] No networks found")
-          setDestinations([])
-          setIsLoadingDestinations(false)
-          return
-        }
-
-        // For each network, get hubs
-        const allDestinations: NetworkHubCollection[] = []
-
-        for (const network of networks) {
-          const { data: hubs, error: hErr } = await supabase
-            .from("hubs")
-            .select("id, name")
-            .eq("network_id", network.id)
-
-          if (!hErr && hubs) {
-            // For each hub, get collections
-            for (const hub of hubs) {
-              const { data: collections, error: cErr } = await supabase
-                .from("collections")
-                .select("id, name")
-                .eq("hub_id", hub.id)
-
-              if (!cErr && collections) {
-                for (const collection of collections) {
-                  allDestinations.push({
-                    networkId: network.id,
-                    networkName: network.name,
-                    hubId: hub.id,
-                    hubName: hub.name,
-                    collectionId: collection.id,
-                    collectionName: collection.name,
-                  })
-                }
-              }
-            }
+        if (!error && networkList) {
+          setNetworks(networkList)
+          if (networkList.length > 0) {
+            setSelectedNetworkId(networkList[0].id)
           }
         }
-
-        setDestinations(allDestinations)
-        if (allDestinations.length > 0) {
-          setSelectedDestination(JSON.stringify(allDestinations[0]))
-        }
       } catch (err) {
-        console.error("[v0] Failed to load destinations:", err)
+        console.error("[v0] Failed to load networks:", err)
       } finally {
-        setIsLoadingDestinations(false)
+        setIsLoadingNetworks(false)
       }
     }
 
-    loadDestinations()
+    loadNetworks()
   }, [])
+
+  // Load hubs when network changes
+  useEffect(() => {
+    if (!selectedNetworkId) {
+      setHubs([])
+      setSelectedHubId(null)
+      return
+    }
+
+    const loadHubs = async () => {
+      setIsLoadingHubs(true)
+      setSelectedHubId(null)
+      try {
+        const { data: hubList, error } = await supabase
+          .from("hubs")
+          .select("id, name")
+          .eq("network_id", selectedNetworkId)
+
+        if (!error && hubList) {
+          // Get collection counts for each hub
+          const hubsWithCounts = await Promise.all(
+            hubList.map(async (hub) => {
+              const { count } = await supabase
+                .from("collections")
+                .select("id", { count: "exact" })
+                .eq("hub_id", hub.id)
+
+              return {
+                ...hub,
+                count: count || 0,
+              }
+            })
+          )
+
+          setHubs(hubsWithCounts)
+          if (hubsWithCounts.length > 0) {
+            setSelectedHubId(hubsWithCounts[0].id)
+          }
+        }
+      } catch (err) {
+        console.error("[v0] Failed to load hubs:", err)
+      } finally {
+        setIsLoadingHubs(false)
+      }
+    }
+
+    loadHubs()
+  }, [selectedNetworkId])
+
+  // Load collections when hub changes
+  useEffect(() => {
+    if (!selectedHubId) {
+      setCollections([])
+      setSelectedCollectionId(null)
+      return
+    }
+
+    const loadCollections = async () => {
+      setIsLoadingCollections(true)
+      setSelectedCollectionId(null)
+      try {
+        const { data: collectionList, error } = await supabase
+          .from("collections")
+          .select("id, name")
+          .eq("hub_id", selectedHubId)
+
+        if (!error && collectionList) {
+          // Get guide counts for each collection
+          const collectionsWithCounts = await Promise.all(
+            collectionList.map(async (coll) => {
+              const { count } = await supabase
+                .from("guides")
+                .select("id", { count: "exact" })
+                .eq("collection_id", coll.id)
+
+              return {
+                ...coll,
+                count: count || 0,
+              }
+            })
+          )
+
+          setCollections(collectionsWithCounts)
+          if (collectionsWithCounts.length > 0) {
+            setSelectedCollectionId(collectionsWithCounts[0].id)
+          }
+        }
+      } catch (err) {
+        console.error("[v0] Failed to load collections:", err)
+      } finally {
+        setIsLoadingCollections(false)
+      }
+    }
+
+    loadCollections()
+  }, [selectedHubId])
 
   const handleSave = async () => {
     setSaveError(null)
 
-    if (!selectedDestination) {
-      setSaveError("Please select a destination before saving.")
+    if (!selectedNetworkId || !selectedHubId || !selectedCollectionId) {
+      setSaveError("Please select a destination (network, hub, and collection) before saving.")
       return
     }
 
     setIsSaving(true)
 
     try {
-      const dest = JSON.parse(selectedDestination) as NetworkHubCollection
-
-      const result = await saveStructuredAssetAsDraft(asset, dest.networkId, dest.hubId, dest.collectionId)
+      const result = await saveStructuredAssetAsDraft(asset, selectedNetworkId, selectedHubId, selectedCollectionId)
 
       if (!result.success) {
         setSaveError(result.error || "Failed to save draft")
         return
       }
 
-      // Route to the guide editor
-      window.location.href = `/builder/network/${result.networkId}/hub/${result.hubId}/collection/${result.collectionId}/guide/${result.guideId}/edit`
+      // Route to the guide editor using correct path (networkId + guideId only)
+      window.location.href = `/builder/network/${result.networkId}/guide/${result.guideId}/edit`
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
       console.error("[v0] Save structured asset error:", err)
@@ -425,8 +481,8 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         </div>
       </Card>
 
-      {/* Save Summary */}
-      {destinations.length > 0 ? (
+      {/* Save Summary and Destination Selection */}
+      {networks.length > 0 ? (
         <>
           <Card className="p-4 border-blue-500/20 bg-blue-500/5">
             <div className="space-y-2">
@@ -440,49 +496,116 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
             </div>
           </Card>
 
-          {/* Destination Selection */}
-          <Card className="p-4">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Save to:
-            </label>
-            {isLoadingDestinations ? (
-              <p className="text-sm text-muted-foreground">Loading destinations...</p>
-            ) : (
+          {/* 3-Step Destination Selector */}
+          <Card className="p-4 space-y-4">
+            <div>
+              <label htmlFor="network" className="block text-sm font-medium text-foreground mb-2">
+                Step 1: Select Network
+              </label>
               <select
-                value={selectedDestination || ""}
-                onChange={(e) => setSelectedDestination(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm"
+                id="network"
+                value={selectedNetworkId || ""}
+                onChange={(e) => setSelectedNetworkId(e.target.value)}
+                disabled={isLoadingNetworks}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm disabled:opacity-50"
               >
-                {destinations.map((dest, idx) => (
-                  <option key={idx} value={JSON.stringify(dest)}>
-                    {dest.networkName} / {dest.hubName} / {dest.collectionName}
+                <option value="">Choose a network...</option>
+                {networks.map((net) => (
+                  <option key={net.id} value={net.id}>
+                    {net.name}
                   </option>
                 ))}
               </select>
+            </div>
+
+            {selectedNetworkId && (
+              <div>
+                <label htmlFor="hub" className="block text-sm font-medium text-foreground mb-2">
+                  Step 2: Select Hub
+                </label>
+                {isLoadingHubs ? (
+                  <p className="text-sm text-muted-foreground">Loading hubs...</p>
+                ) : hubs.length > 0 ? (
+                  <select
+                    id="hub"
+                    value={selectedHubId || ""}
+                    onChange={(e) => setSelectedHubId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm"
+                  >
+                    <option value="">Choose a hub...</option>
+                    {hubs.map((hub) => (
+                      <option key={hub.id} value={hub.id}>
+                        {hub.name} ({hub.count} {hub.count === 1 ? "collection" : "collections"})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                      This network needs a hub before you can save here.
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-2">
+                      <Link href={`/builder/network/${selectedNetworkId}`}>
+                        Create Hub
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
-            <p className="text-xs text-muted-foreground mt-2">
-              Select the network, hub, and collection where you want to save this draft.
-            </p>
+
+            {selectedHubId && (
+              <div>
+                <label htmlFor="collection" className="block text-sm font-medium text-foreground mb-2">
+                  Step 3: Select Collection
+                </label>
+                {isLoadingCollections ? (
+                  <p className="text-sm text-muted-foreground">Loading collections...</p>
+                ) : collections.length > 0 ? (
+                  <select
+                    id="collection"
+                    value={selectedCollectionId || ""}
+                    onChange={(e) => setSelectedCollectionId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm"
+                  >
+                    <option value="">Choose a collection...</option>
+                    {collections.map((coll) => (
+                      <option key={coll.id} value={coll.id}>
+                        {coll.name} ({coll.count} {coll.count === 1 ? "guide" : "guides"})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                      This hub needs a collection before you can save here.
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-2">
+                      <Link href={`/builder/network/${selectedNetworkId}`}>
+                        Create Collection
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </>
       ) : (
         <>
-          {/* Empty State: No networks/hubs/collections */}
+          {/* Empty State: No networks */}
           <Card className="p-6 border-amber-500/30 bg-amber-500/5">
             <div className="space-y-3">
               <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                No place to save yet
+                Create a network first to save this guide draft.
               </p>
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                To save this {getAssetTypeName()} as a draft, you need to create a network, hub, and collection first.
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 italic">
-                In the future, GuideForge will support account-bound draft assets. For now, drafts must belong to a network.
+                Generated drafts must belong to a network for now. Account-bound drafts are a planned feature.
               </p>
               <div className="flex gap-2 pt-2">
                 <Button asChild variant="outline" size="sm">
                   <Link href="/builder/network/generate-skeleton">
-                    Create Network
+                    Generate Network
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
@@ -496,27 +619,14 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         </>
       )}
 
-      {/* Save Summary */}
-      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-foreground">Ready to save:</p>
-          <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-            <li>• 1 {getAssetTypeName()}: {asset.title}</li>
-          </ul>
-          <p className="text-xs text-muted-foreground italic pt-2">
-            Nothing will be published automatically. This will be saved as a draft.
-          </p>
-        </div>
-      </Card>
-
       {/* Actions */}
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={isSaving || isLoadingDestinations}>
+        <Button variant="outline" onClick={onBack} disabled={isSaving || isLoadingNetworks}>
           Cancel
         </Button>
         <Button 
           onClick={handleSave} 
-          disabled={isSaving || isLoadingDestinations || destinations.length === 0} 
+          disabled={isSaving || isLoadingNetworks || isLoadingHubs || isLoadingCollections || !selectedCollectionId}
           className="flex-1"
         >
           {isSaving ? (
@@ -524,7 +634,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
               Saving...
             </>
-          ) : destinations.length === 0 ? (
+          ) : networks.length === 0 ? (
             "Create Network First"
           ) : (
             "Save as Draft"
