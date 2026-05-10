@@ -96,6 +96,61 @@ export function GenerateChecklistClient() {
     setError(null)
   }
 
+  /**
+   * Check AI route configuration without calling OpenAI.
+   * Developer-only diagnostic tool for debugging timeouts.
+   */
+  const handleCheckAiRouteConfig = async () => {
+    setError(null)
+    console.log("[v0] Developer: Checking AI route configuration...")
+    
+    try {
+      const response = await fetch("/api/guideforge/generate-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagnosticOnly: true }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] Diagnostic request failed:", errorData)
+        setError("Diagnostic request failed: " + response.statusText)
+        return
+      }
+      
+      const data = await response.json()
+      console.log("[v0] AI Route Config (diagnostic):", {
+        routeVersion: data.routeVersion,
+        model: data.model,
+        maxTokens: data.maxTokens,
+        maxRepairAttempts: data.maxRepairAttempts,
+        maxSectionsAiMvp: data.maxSectionsAiMvp,
+        maxItemsAiMvp: data.maxItemsAiMvp,
+        openaiRequestTimeoutMs: data.openaiRequestTimeoutMs,
+        runtime: data.runtime,
+        maxDuration: data.maxDuration,
+        timestamp: data.timestamp,
+      })
+      
+      setError(null)
+      alert(
+        `AI Route Config:\n\n` +
+        `Version: ${data.routeVersion}\n` +
+        `Model: ${data.model}\n` +
+        `Max Tokens: ${data.maxTokens}\n` +
+        `Repair Attempts: ${data.maxRepairAttempts}\n` +
+        `AI MVP Caps: ${data.maxSectionsAiMvp} sections, ${data.maxItemsAiMvp} items\n` +
+        `OpenAI Timeout: ${data.openaiRequestTimeoutMs}ms\n` +
+        `Max Duration: ${data.maxDuration}s\n` +
+        `Timestamp: ${data.timestamp}\n\n` +
+        `(See console for full details)`
+      )
+    } catch (err) {
+      console.error("[v0] Error checking AI route config:", err)
+      setError(err instanceof Error ? err.message : "Failed to check config")
+    }
+  }
+
   const handleGenerate = async () => {
     setError(null)
 
@@ -387,20 +442,35 @@ export function GenerateChecklistClient() {
           </Card>
         )}
 
-        {/* Submit */}
-        <Button size="lg" disabled={isGenerating} className="w-full">
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-              {provider === "mock" ? "Generating Mock Checklist..." : "Generating with AI..."}
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 size-4" aria-hidden="true" />
-              {provider === "mock" ? "Generate Mock Checklist" : "Generate AI Checklist"}
-            </>
+        {/* Submit and Debug */}
+        <div className="flex gap-2">
+          <Button size="lg" disabled={isGenerating} className="flex-1" onClick={handleGenerate}>
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                {provider === "mock" ? "Generating Mock Checklist..." : "Generating with AI..."}
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 size-4" aria-hidden="true" />
+                {provider === "mock" ? "Generate Mock Checklist" : "Generate AI Checklist"}
+              </>
+            )}
+          </Button>
+          
+          {/* Developer diagnostic button (only shown in AI mode) */}
+          {provider === "ai" && (
+            <Button 
+              size="lg" 
+              variant="outline" 
+              disabled={isGenerating}
+              onClick={handleCheckAiRouteConfig}
+              title="Check AI route configuration (no cost)"
+            >
+              ⚙️
+            </Button>
           )}
-        </Button>
+        </div>
       </form>
     </div>
   )

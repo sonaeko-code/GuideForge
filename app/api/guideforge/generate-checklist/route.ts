@@ -159,8 +159,126 @@ async function callOpenAI(apiKey: string, messages: any[], debugInfo: any = {}):
  */
 export async function POST(request: NextRequest) {
   const routeStartTime = Date.now()
+  const ROUTE_VERSION = "ai-checklist-fast-mvp-v1"
   
   try {
+    const body: ChecklistGenerationRequest = await request.json()
+    
+    // PHASE 1: Diagnostic-only mode (no OpenAI call, no cost)
+    if ((body as any).diagnosticOnly === true) {
+      console.log("[v0] API: Diagnostic-only mode requested")
+      
+      return NextResponse.json({
+        success: true,
+        diagnosticOnly: true,
+        routeVersion: ROUTE_VERSION,
+        model: DEFAULT_CHECKLIST_MODEL,
+        maxTokens: MAX_GENERATION_TOKENS,
+        maxRepairAttempts: MAX_REPAIR_ATTEMPTS,
+        maxSectionsAiMvp: MAX_SECTIONS_AI_MVP,
+        maxItemsAiMvp: MAX_ITEMS_AI_MVP,
+        openaiRequestTimeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+        runtime: "nodejs",
+        maxDuration: 50,
+        timestamp: new Date().toISOString(),
+      })
+    }
+    
+    // PHASE 4: Smoke test mode (minimal OpenAI call for connectivity check)
+    if ((body as any).smokeTest === true) {
+      console.log("[v0] API: Smoke test mode requested (minimal OpenAI call)")
+      
+      const apiKey = process.env.OPENAI_API_KEY?.trim()
+      if (!apiKey) {
+        return NextResponse.json(
+          { success: false, smokeTest: true, error: "OPENAI_API_KEY not configured" },
+          { status: 400 }
+        )
+      }
+      
+      const smokeStartTime = Date.now()
+      const controller = new AbortController()
+      const timeoutHandle = setTimeout(() => {
+        console.log("[v0] API: Smoke test timeout after 8s")
+        controller.abort()
+      }, 8000)
+      
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: DEFAULT_CHECKLIST_MODEL,
+            messages: [
+              {
+                role: "user",
+                content: 'Return only: {"ok":true}',
+              },
+            ],
+            max_tokens: 20,
+            response_format: { type: "json_object" },
+          }),
+          signal: controller.signal,
+        })
+        
+        clearTimeout(timeoutHandle)
+        
+        if (!response.ok) {
+          return NextResponse.json({
+            success: false,
+            smokeTest: true,
+            providerResponded: false,
+            statusCode: response.status,
+            elapsedMs: Date.now() - smokeStartTime,
+          }, { status: 500 })
+        }
+        
+        const data = await response.json()
+        return NextResponse.json({
+          success: true,
+          smokeTest: true,
+          providerResponded: true,
+          elapsedMs: Date.now() - smokeStartTime,
+        })
+      } catch (err) {
+        clearTimeout(timeoutHandle)
+        
+        if (err instanceof Error && err.name === "AbortError") {
+          return NextResponse.json({
+            success: false,
+            smokeTest: true,
+            providerResponded: false,
+            error: "OpenAI timeout",
+            elapsedMs: Date.now() - smokeStartTime,
+          }, { status: 504 })
+        }
+        
+        return NextResponse.json({
+          success: false,
+          smokeTest: true,
+          providerResponded: false,
+          error: err instanceof Error ? err.message : "Unknown error",
+          elapsedMs: Date.now() - smokeStartTime,
+        }, { status: 500 })
+      }
+    }
+    
+    // PHASE 3: Explicit route start logs
+    console.log("[v0] API: generateChecklist - Route start", {
+      routeVersion: ROUTE_VERSION,
+      model: DEFAULT_CHECKLIST_MODEL,
+      maxTokens: MAX_GENERATION_TOKENS,
+      maxRepairAttempts: MAX_REPAIR_ATTEMPTS,
+      maxSectionsAiMvp: MAX_SECTIONS_AI_MVP,
+      maxItemsAiMvp: MAX_ITEMS_AI_MVP,
+      openaiRequestTimeoutMs: OPENAI_REQUEST_TIMEOUT_MS,
+      runtime: "nodejs",
+      maxDuration: 50,
+    })
+    
     const apiKey = process.env.OPENAI_API_KEY?.trim()
 
     if (!apiKey) {
@@ -173,8 +291,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const body: ChecklistGenerationRequest = await request.json()
 
     // Validate intake request
     if (!body.title?.trim()) {
