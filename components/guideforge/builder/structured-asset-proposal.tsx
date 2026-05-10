@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -14,6 +15,7 @@ interface StructuredAssetProposalProps {
 }
 
 export function StructuredAssetProposal({ asset, onBack }: StructuredAssetProposalProps) {
+  const pathname = usePathname()
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [refinementNotes, setRefinementNotes] = useState("")
@@ -22,6 +24,21 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
   const [editSummary, setEditSummary] = useState(asset.summary)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingSummary, setIsEditingSummary] = useState(false)
+
+  // Store pending proposal in sessionStorage when signed out and trying to save
+  const storePendingProposal = () => {
+    try {
+      const pendingProposal = {
+        asset,
+        createdAt: new Date().toISOString(),
+        returnRoute: pathname,
+      }
+      sessionStorage.setItem('guideforge.pendingAssetProposal', JSON.stringify(pendingProposal))
+      console.log('[v0] Stored pending proposal to sessionStorage for route:', pathname)
+    } catch (err) {
+      console.warn('[v0] Failed to store pending proposal:', err instanceof Error ? err.message : String(err))
+    }
+  }
 
   const handleSave = async () => {
     setSaveError(null)
@@ -40,9 +57,19 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       if (!result.success) {
         setSaveError(result.error || "Failed to save asset draft")
         if (result.requiresAuth) {
-          // Auth error - handled below with sign in prompt
+          // Auth error - store proposal and redirect to login
+          storePendingProposal()
+          const returnTo = pathname || '/builder/generate-asset/checklist'
+          window.location.href = `/auth/login?returnTo=${encodeURIComponent(returnTo)}`
         }
         return
+      }
+
+      // Clear pending proposal from sessionStorage on successful save
+      try {
+        sessionStorage.removeItem('guideforge.pendingAssetProposal')
+      } catch (err) {
+        console.warn('[v0] Failed to clear pending proposal:', err)
       }
 
       // Route to asset workspace page
@@ -294,17 +321,17 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
 
       {/* Auth Error State */}
       {saveError?.includes("signed in") && (
-        <Card className="p-4 border-red-500/30 bg-red-500/5">
-          <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-2">Sign in to save</p>
-          <p className="text-sm text-red-800 dark:text-red-200 mb-4">
-            You need to be signed in to your GuideForge account to save drafts to your workspace.
+        <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Sign in to save this draft</p>
+          <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+            Sign in to your GuideForge account to save drafts to your workspace. We&apos;ll bring you back here afterward.
           </p>
           <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
-              <a href="/auth/login">Sign In</a>
+            <Button asChild variant="default" size="sm">
+              <a href={`/auth/login?returnTo=${encodeURIComponent(pathname || '/builder/generate-asset/checklist')}`}>Sign In & Continue</a>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <a href="/auth/signup">Create Account</a>
+              <a href={`/auth/signup?returnTo=${encodeURIComponent(pathname || '/builder/generate-asset/checklist')}`}>Create Account & Continue</a>
             </Button>
           </div>
         </Card>

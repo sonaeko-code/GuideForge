@@ -1,25 +1,42 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/guideforge/auth-context'
 
 /**
- * Auth callback page
+ * Auth callback page with returnTo support
  * Handles email confirmation redirects from Supabase
- * Waits for AuthProvider to detect session, then redirects to /builder/networks
+ * Supports returnTo query parameter to redirect back to original flow
  */
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isLoading } = useAuth()
   const [showTimeout, setShowTimeout] = useState(false)
 
+  // Get returnTo from query params and validate it
+  const getReturnTo = (): string | null => {
+    const returnTo = searchParams?.get('returnTo')
+    if (!returnTo) return null
+    
+    // Only allow internal paths starting with /
+    if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+      return returnTo
+    }
+    
+    return null
+  }
+
+  const returnTo = getReturnTo()
+
   useEffect(() => {
-    // If already authenticated (session loaded), redirect to builder
+    // If already authenticated (session loaded), redirect to builder or returnTo
     if (!isLoading && user) {
-      console.log('[v0] AuthCallback: User session detected, redirecting to builder')
-      router.push('/builder/networks')
+      const destination = returnTo || '/builder/networks'
+      console.log('[v0] AuthCallback: User session detected, redirecting to', destination)
+      router.push(destination)
       return
     }
 
@@ -32,7 +49,7 @@ export default function AuthCallbackPage() {
     }, 3000)
 
     return () => clearTimeout(timeoutId)
-  }, [user, isLoading, router])
+  }, [user, isLoading, router, returnTo])
 
   // Still loading - show signing in message
   if (isLoading || (user === null && !showTimeout)) {
@@ -73,4 +90,23 @@ export default function AuthCallbackPage() {
   }
 
   return null
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-foreground mb-2">Signing you in…</p>
+          <div className="flex justify-center gap-1">
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-100"></div>
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-200"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
+  )
 }

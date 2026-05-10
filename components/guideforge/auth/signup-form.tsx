@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowRight, Mail, Lock, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,11 +16,13 @@ import { SiteHeader } from '@/components/guideforge/site-header'
 import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
 
 /**
- * Signup form - Phase 2: Supabase Auth integration
+ * Signup form - Phase 2: Supabase Auth integration with returnTo support
  * Calls supabase.auth.signUp() on submit
+ * Supports returnTo query parameter for auth flow redirect
  */
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,6 +30,21 @@ export function SignupForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Get returnTo from query params and validate it
+  const getReturnTo = (): string | null => {
+    const returnTo = searchParams?.get('returnTo')
+    if (!returnTo) return null
+    
+    // Only allow internal paths starting with /
+    if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+      return returnTo
+    }
+    
+    return null
+  }
+
+  const returnTo = getReturnTo()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,6 +77,11 @@ export function SignupForm() {
       
       const trimmedDisplayName = displayName.trim()
       
+      // Build email redirect URL with returnTo if available
+      const emailRedirectUrl = returnTo 
+        ? `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
+        : `${window.location.origin}/auth/callback`
+      
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -70,7 +92,7 @@ export function SignupForm() {
             name: trimmedDisplayName,
             full_name: trimmedDisplayName,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: emailRedirectUrl,
         },
       })
 
@@ -111,8 +133,9 @@ export function SignupForm() {
         }
         
         setSuccessMessage('Account created! Redirecting...')
+        const destination = returnTo || '/builder/networks'
         setTimeout(() => {
-          router.push('/builder/networks')
+          router.push(destination)
         }, 1000)
       } else {
         console.log('[v0] SignupForm: Email confirmation required, profile bootstrap will happen after confirmation')
