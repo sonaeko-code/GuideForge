@@ -2,7 +2,7 @@ import Link from "next/link"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Folder, Plus, FileText } from "lucide-react"
+import { Folder, Plus, FileText, Wand2, Zap } from "lucide-react"
 import { LegacyDraftsSection } from "@/components/guideforge/builder/legacy-drafts-section"
 
 export default async function BuilderPage() {
@@ -11,61 +11,92 @@ export default async function BuilderPage() {
       <SiteHeader hideCta />
 
       <div className="mx-auto w-full max-w-6xl space-y-12 px-4 py-12 md:px-6 md:py-16">
-        <div className="space-y-2">
+        {/* Hero Section */}
+        <div className="space-y-3">
           <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            GuideForge Control Center
+            Creator Workspace
           </h1>
           <p className="text-lg text-muted-foreground">
-            Manage your networks. Guides live inside networks.
-          </p>
-          <p className="text-sm text-muted-foreground italic">
-            This is a temporary local prototype workspace until Supabase auth is connected.
+            Manage your guide networks and personal asset drafts.
           </p>
         </div>
 
-        {/* Primary Actions Grid */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
-            <div className="flex items-start justify-between">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        {/* Primary Actions: Workspace Access (2x2 grid) */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-foreground">Your Workspace</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* My Networks */}
+            <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Folder className="size-4" aria-hidden="true" />
               </div>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">All Networks</h3>
-              <p className="text-sm text-muted-foreground">
-                Open and manage created networks. Each network owns its own hubs, collections, and guides.
-              </p>
-            </div>
-            <Button asChild size="sm" variant="outline" className="w-full">
-              <Link href="/builder/networks">View Networks</Link>
-            </Button>
-          </Card>
+              <div>
+                <h3 className="font-semibold text-foreground">My Networks</h3>
+                <p className="text-sm text-muted-foreground">
+                  Guide networks with hubs, collections, and reviews.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="w-full mt-auto">
+                <Link href="/builder/networks">Open Networks</Link>
+              </Button>
+            </Card>
 
-          <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
-            <div className="flex items-start justify-between">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            {/* My Assets */}
+            <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                <FileText className="size-4" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">My Assets</h3>
+                <p className="text-sm text-muted-foreground">
+                  Private structured asset drafts in your workspace.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="w-full mt-auto">
+                <Link href="/builder/assets">Open Assets</Link>
+              </Button>
+            </Card>
+
+            {/* Generate Network */}
+            <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Plus className="size-4" aria-hidden="true" />
               </div>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Create Network</h3>
-              <p className="text-sm text-muted-foreground">
-                Start building a new guide network from scratch.
-              </p>
-            </div>
-            <Button asChild size="sm" className="w-full">
-              <Link href="/builder/network/new">Create Network</Link>
-            </Button>
-          </Card>
-        </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Generate Network</h3>
+                <p className="text-sm text-muted-foreground">
+                  Create a full network skeleton with structure.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="w-full mt-auto">
+                <Link href="/builder/network/new">Create Network</Link>
+              </Button>
+            </Card>
+
+            {/* Generate Asset */}
+            <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+                <Wand2 className="size-4" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Generate Asset</h3>
+                <p className="text-sm text-muted-foreground">
+                  Create a single structured asset draft.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="w-full mt-auto">
+                <Link href="/builder/generate-asset">Generate Asset</Link>
+              </Button>
+            </Card>
+          </div>
+        </section>
 
         {/* Legacy / Unassigned Drafts - only shows if any exist */}
         <section className="space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <h2 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                <FileText className="size-6" aria-hidden="true" />
+                <Zap className="size-6" aria-hidden="true" />
                 Legacy / Unassigned Drafts
               </h2>
               <p className="text-sm text-muted-foreground">

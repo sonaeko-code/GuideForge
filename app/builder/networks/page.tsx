@@ -21,12 +21,15 @@ export default async function NetworksDirectoryPage() {
         <SiteHeader hideCta />
         
         <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-          <div className="mb-8 flex justify-between items-center">
+          <div className="mb-8 flex justify-between items-center gap-4 flex-wrap">
             <Button asChild variant="ghost" size="sm">
               <Link href="/builder">
-                ← Back to Builder
+                ← Back to Workspace
               </Link>
             </Button>
+            <div className="text-xs text-muted-foreground">
+              Builder / My Networks
+            </div>
             <Button asChild variant="outline" size="sm">
               <Link href="/builder/assets">
                 <FileText className="mr-2 size-4" aria-hidden="true" />
@@ -103,10 +106,19 @@ export default async function NetworksDirectoryPage() {
       <SiteHeader hideCta />
       
       <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-        <div className="mb-10">
+        <div className="mb-10 flex justify-between items-center gap-4 flex-wrap">
           <Button asChild variant="ghost" size="sm">
             <Link href="/builder">
-              ← Back to Builder
+              ← Back to Workspace
+            </Link>
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Builder / My Networks
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/builder/assets">
+              <FileText className="mr-2 size-4" aria-hidden="true" />
+              My Assets
             </Link>
           </Button>
         </div>

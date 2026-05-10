@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { GuideMark } from "@/components/guideforge/brand/guide-mark"
 import { cn } from "@/lib/utils"
-import { Menu, X, LogOut, LogIn } from "lucide-react"
+import { Menu, X, LogOut, LogIn, Compass } from "lucide-react"
 import { useAuth } from "@/lib/guideforge/auth-context"
 
 interface SiteHeaderProps {
@@ -63,6 +63,12 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
           {isAuthenticated ? (
             <>
               <Button asChild variant="ghost" size="sm">
+                <Link href="/builder" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                  <Compass className="size-4" aria-hidden="true" />
+                  Workspace
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
                 <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
                   {user?.displayName || user?.email}
                 </Link>
@@ -89,8 +95,8 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
           )}
           {!hideCta && !isAuthenticated && (
             <div className="ml-2 pl-2 border-l border-border">
-              <Button asChild size="sm">
-                <Link href="/builder">Start building</Link>
+              <Button asChild size="sm" variant="default">
+                <Link href="/builder/generate-asset">Start Creating</Link>
               </Button>
             </div>
           )}
@@ -100,6 +106,11 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         <div className="flex items-center gap-2 md:hidden">
           {isAuthenticated ? (
             <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/builder" className="flex items-center gap-1 text-sm">
+                  <Compass className="size-4" aria-hidden="true" />
+                </Link>
+              </Button>
               <Button asChild variant="ghost" size="sm">
                 <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
                   {user?.displayName || user?.email}

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { Metadata } from "next"
 import Link from "next/link"
-import { ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { listMyAssetDrafts } from "@/lib/guideforge/asset-draft-helpers"
@@ -22,11 +22,23 @@ export default async function AssetsPage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/sign-in")
+    redirect("/auth/login")
   }
 
   // Fetch user's assets
-  const assets = await listMyAssetDrafts()
+  let assets = []
+  let setupError = null
+
+  try {
+    assets = await listMyAssetDrafts()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error"
+    if (msg.includes("asset_drafts") || msg.includes("PGRST103")) {
+      setupError = "Asset workspace storage is not set up yet. Run supabase/asset_drafts_schema.sql in Supabase SQL Editor."
+    } else {
+      setupError = msg
+    }
+  }
 
   const getAssetTypeName = (type: string): string => {
     const names: Record<string, string> = {
@@ -41,12 +53,20 @@ export default async function AssetsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
+      {/* Header Navigation */}
+      <div className="flex justify-between items-center gap-4 flex-wrap">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/builder/networks">
+          <Link href="/builder">
             <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Back to Networks
+            Back to Workspace
+          </Link>
+        </Button>
+        <div className="text-xs text-muted-foreground">
+          Builder / My Assets
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/builder/networks">
+            View Networks
           </Link>
         </Button>
       </div>
@@ -58,18 +78,36 @@ export default async function AssetsPage() {
         </p>
       </div>
 
+      {/* Setup Error */}
+      {setupError && (
+        <Card className="p-4 border-amber-500/30 bg-amber-500/5">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-amber-900 dark:text-amber-100">Setup Required</p>
+              <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">{setupError}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                After running the SQL, refresh this page.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Action Button */}
-      <div>
-        <Button asChild>
-          <Link href="/builder/generate-asset">
-            <Plus className="mr-2 size-4" aria-hidden="true" />
-            Generate New Asset
-          </Link>
-        </Button>
-      </div>
+      {!setupError && (
+        <div>
+          <Button asChild>
+            <Link href="/builder/generate-asset">
+              <Plus className="mr-2 size-4" aria-hidden="true" />
+              Generate New Asset
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Assets Grid */}
-      {assets.length > 0 ? (
+      {!setupError && assets.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
             <Button
@@ -99,10 +137,10 @@ export default async function AssetsPage() {
             </Button>
           ))}
         </div>
-      ) : (
+      ) : !setupError ? (
         <Card className="p-12 text-center">
           <div className="space-y-4">
-            <p className="text-lg font-semibold text-foreground">No assets yet</p>
+            <p className="text-lg font-semibold text-foreground">No asset drafts yet</p>
             <p className="text-muted-foreground">
               Create your first structured asset draft by generating one.
             </p>
@@ -114,7 +152,7 @@ export default async function AssetsPage() {
             </Button>
           </div>
         </Card>
-      )}
+      ) : null}
     </div>
   )
 }

@@ -3,10 +3,23 @@
  * 
  * Manage user's personal account-bound asset drafts.
  * These use auth.uid() for ownership.
+ * 
+ * NOTE: The asset_drafts table must be created first by running:
+ *   supabase/asset_drafts_schema.sql
+ * 
+ * If you see "Could not find the table 'public.asset_drafts'" errors:
+ * 1. Open Supabase SQL Editor
+ * 2. Copy and paste the entire contents of supabase/asset_drafts_schema.sql
+ * 3. Click "Run"
+ * 4. (Optional) Refresh Supabase schema cache if needed
  */
 
 import { supabase } from "./supabase-client"
 import type { AssetDraft, CreateAssetDraftInput, UpdateAssetDraftInput } from "./asset-draft-types"
+
+const ASSET_DRAFTS_TABLE = "asset_drafts"
+const SETUP_INSTRUCTION =
+  "Asset draft storage not set up. Run supabase/asset_drafts_schema.sql in Supabase SQL Editor."
 
 /**
  * Create and save an asset draft to user's workspace.
@@ -43,6 +56,13 @@ export async function createAssetDraft(input: CreateAssetDraftInput): Promise<{ 
 
     if (error) {
       console.error("[v0] createAssetDraft error:", error)
+      // Detect if table doesn't exist
+      if (error.message?.includes("asset_drafts") || error.code === "PGRST103") {
+        return {
+          id: "",
+          error: SETUP_INSTRUCTION,
+        }
+      }
       return {
         id: "",
         error: error.message,

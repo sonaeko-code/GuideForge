@@ -29,7 +29,7 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps) 
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/sign-in")
+    redirect("/auth/login")
   }
 
   // Fetch asset (RLS will ensure user owns it)
@@ -52,14 +52,17 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps) 
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
+      {/* Header Navigation */}
+      <div className="flex justify-between items-center gap-4 flex-wrap">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/builder/assets">
             <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Back to Assets
+            Back to My Assets
           </Link>
         </Button>
+        <div className="text-xs text-muted-foreground">
+          Builder / My Assets / Asset Detail
+        </div>
       </div>
 
       {/* Title and Metadata */}

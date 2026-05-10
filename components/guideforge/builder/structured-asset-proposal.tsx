@@ -197,10 +197,10 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
           </p>
           <div className="flex gap-2">
             <Button asChild variant="outline" size="sm">
-              <a href="/sign-in">Sign In</a>
+              <a href="/auth/login">Sign In</a>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <a href="/sign-up">Create Account</a>
+              <a href="/auth/signup">Create Account</a>
             </Button>
           </div>
         </Card>
