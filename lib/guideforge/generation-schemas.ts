@@ -175,58 +175,100 @@ export interface GeneratedPatchPost {
   generatedBy: "mock" | "openai" | "claude" | "other"
 }
 
-// ---------- Generation Request ----------
+// ---------- Network Skeleton Generation Request ----------
 
 /**
- * Shape of data sent to the AI generator.
- * This is what the builder UI collects from the user.
+ * Shape of data for generating a complete network skeleton.
+ * Includes network, hubs, collections, guide ideas, and rules.
  */
-export interface GenerationRequest {
-  /** Free-form or structured prompt. */
-  prompt: string
-
-  /** Which guide type to generate. */
-  guideType: GuideType
-
-  /** Optional: target hub for gaming networks. */
-  targetHubId?: string
-
-  /** Optional: target collection. */
-  targetCollectionId?: string
-
-  /** Optional: difficulty preference. */
-  preferredDifficulty?: DifficultyLevel
-
-  /** Forge rules to apply as context. */
-  forgeRuleContext?: string
-
-  /** Model to use (for future OpenAI integration). */
-  model?: "gpt-4" | "gpt-4-turbo" | "gpt-3.5-turbo" | "claude-3"
-
-  /** Max tokens for generation. */
-  maxTokens?: number
+export interface NetworkSkeletonGenerationRequest {
+  // Network basics
+  networkTopic: string          // e.g. "RPG Game Builds", "Software Documentation"
+  intendedAudience: string      // e.g. "New players", "Developers"
+  networkPurpose: string        // e.g. "Help players master builds", "Onboard new contributors"
+  
+  // Style & tone
+  tone: string                  // e.g. "friendly", "technical", "narrative"
+  referenceStyle: string        // e.g. "questline", "minimal", "comprehensive"
+  
+  // Structure
+  numberOfHubs: number          // e.g. 3, 5
+  collectionsPerHub: number     // e.g. 2, 3
+  guideIdeasPerCollection: number // e.g. 3, 4
+  
+  // Preferences
+  guideTypeEmphasis: string[]   // e.g. ["character-build", "beginner-guide"]
+  optionalNotes: string         // User's custom notes/context
 }
 
-// ---------- Generation Response ----------
+// ---------- Network Skeleton Generation Response ----------
 
 /**
- * What the generator returns.
+ * AI-generated network skeleton proposal.
+ * Includes network, hubs, collections, guide ideas, and rule suggestions.
  */
-export interface GenerationResponse {
-  /** The generated guide. */
-  guide: GeneratedGuide
-
-  /** Optional: suggested related guides. */
-  relatedGuideIds?: string[]
-
-  /** Optional: warnings or notes about the generation. */
-  generationNotes?: string[]
-
-  /** Whether the generation succeeded. */
+export interface NetworkSkeletonGenerationResponse {
+  network: GeneratedNetworkSkeleton
+  hubs: GeneratedHubWithCollections[]
+  forgeRulesSuggestions: ForgeRulesSuggestions
+  guideDNASuggestions: GuideDNASuggestions
+  assumptions: string[]
+  missingInfo: string[]
   success: boolean
-
-  /** If failed, the error message. */
   error?: string
+}
+
+/**
+ * Extended GeneratedNetwork with additional skeleton fields.
+ */
+export interface GeneratedNetworkSkeleton extends GeneratedNetwork {
+  audience: string
+  tone: string
+}
+
+/**
+ * Hub with nested collections and guide ideas.
+ */
+export interface GeneratedHubWithCollections extends GeneratedHub {
+  collections: GeneratedCollectionWithGuides[]
+}
+
+/**
+ * Collection with guide ideas.
+ */
+export interface GeneratedCollectionWithGuides extends GeneratedCollection {
+  guideIdeas: GeneratedGuideIdea[]
+}
+
+/**
+ * Guide idea (not yet a full guide).
+ */
+export interface GeneratedGuideIdea {
+  title: string
+  slug: string
+  summary: string
+  audience: string
+  difficulty: DifficultyLevel
+  guideType: GuideType
+  tags: string[]
+}
+
+/**
+ * Forge Rules suggestions for the network.
+ */
+export interface ForgeRulesSuggestions {
+  global: string[]
+  networkSpecific: string[]
+}
+
+/**
+ * Guide DNA suggestions for the network.
+ */
+export interface GuideDNASuggestions {
+  tone: string
+  layoutStyle: string
+  contentPriorities: string[]
+  badgeLanguage: string
 }
 
 // ---------- Generation Session ----------
@@ -242,4 +284,189 @@ export interface GenerationSession {
   response?: GenerationResponse
   status: "idle" | "generating" | "done" | "error"
   error?: string
+}
+
+// ---------- Structured Asset Types & Contracts ----------
+
+export type StructuredAssetType = "single_guide" | "recipe" | "checklist" | "sop" | "troubleshooting_flow"
+
+// Single Guide
+export interface GeneratedSingleGuide {
+  assetType: "single_guide"
+  title: string
+  summary: string
+  audience: string
+  difficulty: DifficultyLevel
+  requirements: string[]
+  warnings: string[]
+  steps: Array<{
+    title: string
+    body: string
+    successCondition: string | null
+    tip: string | null
+    warning: string | null
+  }>
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// Recipe
+export interface GeneratedRecipe {
+  assetType: "recipe"
+  title: string
+  summary: string
+  servings: string
+  prepTime: string | null
+  cookTime: string | null
+  ingredients: Array<{
+    name: string
+    amount: string | null
+    notes: string | null
+  }>
+  steps: Array<{
+    title: string
+    body: string
+    tip: string | null
+  }>
+  dietaryNotes: string[]
+  warnings: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// Checklist
+export interface GeneratedChecklist {
+  assetType: "checklist"
+  title: string
+  summary: string
+  sections: Array<{
+    title: string
+    items: Array<{
+      label: string
+      description: string | null
+      required: boolean
+    }>
+  }>
+  completionCriteria: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+  /** Source metadata - for tracking generation method (Phase 6) */
+  generatedBy?: "mock" | "openai" | "claude" | "other"
+}
+
+// SOP / Procedure
+export interface GeneratedSOP {
+  assetType: "sop"
+  title: string
+  purpose: string
+  scope: string
+  owner: string | null
+  requirements: string[]
+  procedureSteps: Array<{
+    title: string
+    body: string
+    responsibleRole: string | null
+    warning: string | null
+  }>
+  reviewNotes: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+// Troubleshooting Flow
+export interface GeneratedTroubleshootingFlow {
+  assetType: "troubleshooting_flow"
+  title: string
+  symptom: string
+  summary: string
+  checks: Array<{
+    title: string
+    question: string
+    ifYes: string | null
+    ifNo: string | null
+  }>
+  likelyCauses: string[]
+  fixSteps: Array<{
+    title: string
+    body: string
+    escalateIfFailed: string | null
+  }>
+  warnings: string[]
+  tags: string[]
+  assumptions: string[]
+  missingInfo: string[]
+}
+
+export type GeneratedStructuredAsset =
+  | GeneratedSingleGuide
+  | GeneratedRecipe
+  | GeneratedChecklist
+  | GeneratedSOP
+  | GeneratedTroubleshootingFlow
+
+// Intake requests
+export interface SingleGuideIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  difficulty: DifficultyLevel
+  guideType: GuideType
+  numberOfSteps: number
+  hasWarnings: boolean
+  hasPrerequisites: boolean
+  optionalContext: string
+}
+
+export interface RecipeIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  cuisine: string
+  servings: string
+  prepTime: string
+  cookTime: string
+  dietaryNotes: string
+  optionalContext: string
+}
+
+export interface ChecklistIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  goal: string
+  numberOfSections: number
+  itemsPerSection: number
+  useCase: string
+  optionalContext: string
+}
+
+export interface SOPIntakeRequest {
+  title: string
+  audience: string
+  purpose: string
+  tone: string
+  owner: string
+  department: string
+  requiredTools: string
+  complianceNotes: string
+  reviewFrequency: string
+  optionalContext: string
+}
+
+export interface TroubleshootingFlowIntakeRequest {
+  title: string
+  audience: string
+  symptom: string
+  environment: string
+  likelyCauses: string
+  riskLevel: string
+  escalationPath: string
+  optionalContext: string
 }

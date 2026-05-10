@@ -35,7 +35,7 @@ export function makeTempId(): string {
  * @param status - The raw status value
  * @returns Normalized status: "draft" | "ready" | "published"
  */
-export function normalizeGuideStatus(status: string | undefined | null): "draft" | "ready" | "published" {
+export function normalizeGuideStatus(status: string | undefined | null): "draft" | "ready" | "published" | "archived" {
   if (!status) return "draft"
   
   const normalized = status.toLowerCase().trim()
@@ -43,6 +43,7 @@ export function normalizeGuideStatus(status: string | undefined | null): "draft"
   if (normalized === "draft") return "draft"
   if (normalized === "ready" || normalized === "ready_to_publish") return "ready"
   if (normalized === "published" || normalized === "active") return "published"
+  if (normalized === "archived") return "archived"
   
   // Defensive: unknown status defaults to draft
   console.warn("[v0] normalizeGuideStatus: Unknown status value", { status, defaulted: "draft" })
@@ -54,9 +55,9 @@ export function normalizeGuideStatus(status: string | undefined | null): "draft"
  * Handles edge cases where status might be in-review, pending, or other transient states.
  * 
  * @param guide - The guide to normalize
- * @returns A normalized status string: "draft" | "ready" | "published"
+ * @returns A normalized status string: "draft" | "ready" | "published" | "archived"
  */
-export function getGuideDisplayStatus(guide: Guide | Partial<Guide>): "draft" | "ready" | "published" {
+export function getGuideDisplayStatus(guide: Guide | Partial<Guide>): "draft" | "ready" | "published" | "archived" {
   const status = guide.status as string
   return normalizeGuideStatus(status)
 }
@@ -82,9 +83,20 @@ export function isGuideMutable(guide: Guide | Partial<Guide>): boolean {
  */
 export function filterGuidesByStatus(
   guides: Guide[],
-  targetStatus: "draft" | "ready" | "published"
+  targetStatus: "draft" | "ready" | "published" | "archived"
 ): Guide[] {
   return guides.filter((g) => normalizeGuideStatus(g.status) === targetStatus)
+}
+
+/**
+ * Filters out archived guides.
+ * Used to exclude archived guides from active dashboard tabs.
+ * 
+ * @param guides - Array of guides to filter
+ * @returns Guides excluding archived status
+ */
+export function filterOutArchived(guides: Guide[]): Guide[] {
+  return guides.filter((g) => normalizeGuideStatus(g.status) !== "archived")
 }
 
 /**

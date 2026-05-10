@@ -1,14 +1,14 @@
 import { ChevronRight, Clock, Shield, AlertCircle, BookOpen, Calendar, FileText } from "lucide-react"
 import Link from "next/link"
+import { notFound } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { DifficultyBadge } from "@/components/guideforge/shared"
 import { QuestLineHeader } from "@/components/questline/site-header"
 import { QuestLineFooter } from "@/components/questline/site-footer"
 import { MOCK_GUIDES, MOCK_HUBS, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 import { loadPublishedGuide, loadPublishedGuides } from "@/lib/guideforge/supabase-public"
-import { getHubBySlug, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
+import { getHubBySlug, getCollectionsByHubId, getNetworkBySlug } from "@/lib/guideforge/supabase-networks"
 
 export default async function PublicGuidePage({
   params,
@@ -19,54 +19,64 @@ export default async function PublicGuidePage({
     guideSlug: string
   }>
 }) {
-  const { hubSlug, guideSlug } = await params
-  
+  const { networkSlug, hubSlug, guideSlug } = await params
+
+  // Try to load network
+  const network = await getNetworkBySlug(networkSlug)
+
   // Try to load hub from Supabase first, then fallback to mock data
   let hub = await getHubBySlug(hubSlug)
   if (!hub) {
     hub = MOCK_HUBS.find((h) => h.slug === hubSlug)
   }
-  
-  // Try to load from Supabase first, then fallback to mock data
+
+  // Try to load from Supabase first, then fallback to mock data.
+  // Both paths enforce status === "published" — never show drafts/ready/archived/revision drafts.
   let guide = await loadPublishedGuide(guideSlug)
   if (!guide) {
     guide = MOCK_GUIDES.find((g) => g.slug === guideSlug && g.status === "published")
   }
 
+  // Clean 404 if hub or guide is missing/unpublished
   if (!guide || !hub) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <QuestLineHeader />
-        <main className="flex-1 flex items-center justify-center px-4 py-20">
-          <div className="text-center max-w-md">
-            <FileText className="size-12 text-muted-foreground mx-auto mb-4" aria-hidden="true" />
-            <h1 className="text-3xl font-bold mb-2 font-serif">Guide Not Found</h1>
-            <p className="text-muted-foreground mb-6">
-              This guide doesn&apos;t exist yet, or it may have been moved or unpublished.
-            </p>
-            <Button asChild>
-              <Link href="/n/questline">Back to QuestLine</Link>
-            </Button>
-          </div>
-        </main>
-        <QuestLineFooter />
-      </div>
-    )
+    notFound()
   }
 
-  // Load collections, preferring Supabase
-  let collections = await getCollectionsByHubId(hub.id)
-  if (collections.length === 0) {
-    collections = getCollectionsByHub(hub.id)
+  // Load collections, preferring Supabase, with safe fallback
+  let collections: Awaited<ReturnType<typeof getCollectionsByHubId>> = []
+  try {
+    collections = await getCollectionsByHubId(hub.id)
+  } catch (err) {
+    console.warn(`[v0] Error loading collections for hub ${hub.id}:`, err)
+  }
+  if (!Array.isArray(collections) || collections.length === 0) {
+    collections = getCollectionsByHub(hub.id) || []
   }
   const collection = collections.find((c) => c.guideIds?.includes(guide.id))
 
-  // Find related guides (other published guides in same hub, excluding current)
+  // Find related published guides (same hub, excluding current).
+  // IMPORTANT: mock fallback is filtered to status === "published" explicitly, in addition
+  // to the per-row .status === "published" check on the result.
   const supabaseGuides = await loadPublishedGuides()
-  const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : MOCK_GUIDES
-  const relatedGuides = allPublishedGuides.filter(
-    (g) => g.hubId === hub.id && g.id !== guide.id && g.status === "published",
-  ).slice(0, 3)
+  const allPublishedGuides =
+    supabaseGuides.length > 0
+      ? supabaseGuides
+      : MOCK_GUIDES.filter((g) => g.status === "published")
+  let relatedGuides = allPublishedGuides
+    .filter(
+      (g) =>
+        g.hubId === hub.id &&
+        g.id !== guide.id &&
+        g.status === "published" &&
+        (!collection || g.collectionId === collection.id),
+    )
+    .slice(0, 3)
+  // If we don't have any same-collection siblings, fall back to other guides in the same hub
+  if (relatedGuides.length === 0) {
+    relatedGuides = allPublishedGuides
+      .filter((g) => g.hubId === hub.id && g.id !== guide.id && g.status === "published")
+      .slice(0, 3)
+  }
 
   // Map guide type to a display label
   const typeLabel = guide.type
@@ -83,28 +93,34 @@ export default async function PublicGuidePage({
         <article>
           <header className="border-b border-border/60 bg-muted/20">
             <div className="mx-auto max-w-4xl px-4 md:px-6 pt-10 pb-12 md:pt-14 md:pb-16">
-              {/* Breadcrumb */}
-              <nav
-                aria-label="Breadcrumb"
-                className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto pb-1"
+            {/* Breadcrumb */}
+            <nav
+              aria-label="Breadcrumb"
+              className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto pb-1"
+            >
+              {network && (
+                <>
+                  <Link href={`/n/${networkSlug}`} className="hover:text-foreground whitespace-nowrap uppercase tracking-wider">
+                    {network.name}
+                  </Link>
+                  <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
+                </>
+              )}
+              <Link
+                href={`/n/${networkSlug}/${hub.slug}`}
+                className="hover:text-foreground whitespace-nowrap uppercase tracking-wider"
               >
-                <Link href="/n/questline" className="hover:text-foreground whitespace-nowrap uppercase tracking-wider">
-                  QuestLine
-                </Link>
-                <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
-                <Link
-                  href={`/n/questline/${hub.slug}`}
-                  className="hover:text-foreground whitespace-nowrap uppercase tracking-wider"
-                >
-                  {hub.name}
-                </Link>
-                {collection && (
-                  <>
-                    <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
-                    <span className="whitespace-nowrap uppercase tracking-wider">{collection.name}</span>
-                  </>
-                )}
-              </nav>
+                {hub.name}
+              </Link>
+              {collection && (
+                <>
+                  <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
+                  <span className="whitespace-nowrap uppercase tracking-wider">{collection.name}</span>
+                </>
+              )}
+              <ChevronRight className="size-3 flex-shrink-0" aria-hidden="true" />
+              <span className="whitespace-nowrap uppercase tracking-wider text-foreground font-semibold">{guide.title}</span>
+            </nav>
 
               {/* Eyebrow */}
               <div className="flex flex-wrap items-center gap-2 mb-4 text-xs uppercase tracking-[0.18em]">
@@ -129,12 +145,12 @@ export default async function PublicGuidePage({
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm border-t border-border/60 pt-5">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">By</span>
-                  <span className="font-semibold text-foreground">@{guide.author.handle}</span>
+                  <span className="font-semibold text-foreground">{guide.author.displayName || `@${guide.author.handle}`}</span>
                   {guide.reviewer && (
                     <>
                       <span className="text-muted-foreground/60">·</span>
                       <span className="text-muted-foreground">Reviewed by</span>
-                      <span className="font-semibold text-foreground">@{guide.reviewer.handle}</span>
+                      <span className="font-semibold text-foreground">{guide.reviewer.displayName || `@${guide.reviewer.handle}`}</span>
                     </>
                   )}
                 </div>
@@ -176,7 +192,7 @@ export default async function PublicGuidePage({
               {/* Main content */}
               <div className="lg:col-span-8 lg:col-start-1 space-y-10">
                 {/* Requirements */}
-                {guide.requirements.length > 0 && (
+                {Array.isArray(guide.requirements) && guide.requirements.length > 0 && (
                   <section className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-6">
                     <h2 className="font-semibold text-foreground flex items-center gap-2 text-sm uppercase tracking-wider">
                       <BookOpen className="size-4 text-primary" aria-hidden="true" />
@@ -194,7 +210,7 @@ export default async function PublicGuidePage({
                 )}
 
                 {/* Warnings */}
-                {guide.warnings.length > 0 && (
+                {Array.isArray(guide.warnings) && guide.warnings.length > 0 && (
                   <section className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-6">
                     <div className="flex items-center gap-2">
                       <AlertCircle
@@ -217,23 +233,42 @@ export default async function PublicGuidePage({
                 )}
 
                 {/* Guide sections */}
-                <div className="space-y-12">
-                  {guide.steps.map((step, idx) => (
-                    <section key={step.id} id={`section-${step.kind}`} className="scroll-mt-24 space-y-4">
-                      <div className="flex items-baseline gap-3">
-                        <span className="font-mono text-xs font-bold text-primary uppercase tracking-wider">
-                          {String(idx + 1).padStart(2, "0")} —
-                        </span>
-                        <h2 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-foreground text-balance">
-                          {step.title}
-                        </h2>
-                      </div>
-                      <div className="prose prose-base max-w-none text-foreground leading-relaxed whitespace-pre-wrap font-serif">
-                        {step.body}
-                      </div>
-                    </section>
-                  ))}
-                </div>
+                {!Array.isArray(guide.steps) || guide.steps.length === 0 ? (
+                  <section className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-8 text-center">
+                    <FileText
+                      className="mx-auto mb-3 size-8 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <h2 className="font-serif text-xl font-bold text-foreground">
+                      No content yet
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      The author hasn&apos;t added any sections to this guide yet. Check back soon.
+                    </p>
+                  </section>
+                ) : (
+                  <div className="space-y-12">
+                    {guide.steps.map((step, idx) => (
+                      <section
+                        key={step.id}
+                        id={`section-${step.kind}`}
+                        className="scroll-mt-24 space-y-4"
+                      >
+                        <div className="flex items-baseline gap-3">
+                          <span className="font-mono text-xs font-bold text-primary uppercase tracking-wider">
+                            {String(idx + 1).padStart(2, "0")} —
+                          </span>
+                          <h2 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-foreground text-balance">
+                            {step.title}
+                          </h2>
+                        </div>
+                        <div className="prose prose-base max-w-none text-foreground leading-relaxed whitespace-pre-wrap font-serif">
+                          {step.body}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
 
                 {/* End of article footer */}
                 <section className="border-t-2 border-border pt-8 mt-16 space-y-3">
@@ -258,7 +293,6 @@ export default async function PublicGuidePage({
                   </p>
                 </section>
 
-                {/* Related guides */}
                 {relatedGuides.length > 0 && (
                   <section className="border-t border-border/60 pt-10 mt-12">
                     <p className="text-xs uppercase tracking-[0.18em] text-primary font-semibold mb-2">
@@ -269,7 +303,7 @@ export default async function PublicGuidePage({
                     </h2>
                     <div className="grid gap-4 md:grid-cols-3">
                       {relatedGuides.map((rg) => (
-                        <Link key={rg.id} href={`/n/questline/${hub.slug}/${rg.slug}`}>
+                        <Link key={rg.id} href={`/n/${networkSlug}/${hub.slug}/${rg.slug}`}>
                           <Card className="border-border/60 p-5 hover:bg-muted/40 transition-colors cursor-pointer h-full flex flex-col">
                             <p className="text-xs uppercase tracking-wider text-primary font-semibold mb-2">
                               {rg.type
@@ -296,7 +330,7 @@ export default async function PublicGuidePage({
               <aside className="lg:col-span-4 lg:col-start-9">
                 <div className="lg:sticky lg:top-24 space-y-6">
                   {/* TOC */}
-                  {guide.steps.length > 1 && (
+                  {Array.isArray(guide.steps) && guide.steps.length > 1 && (
                     <div className="rounded-lg border border-border/60 bg-muted/30 p-5">
                       <h3 className="font-semibold text-foreground text-xs uppercase tracking-[0.18em] mb-3">
                         In This Guide

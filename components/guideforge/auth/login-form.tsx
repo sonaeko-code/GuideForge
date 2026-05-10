@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowRight, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,15 +16,32 @@ import { SiteHeader } from '@/components/guideforge/site-header'
 import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
 
 /**
- * Login form - Phase 2: Supabase Auth integration
+ * Login form - Phase 2: Supabase Auth integration with returnTo support
  * Calls supabase.auth.signInWithPassword() on submit
+ * Supports returnTo query parameter for auth flow redirect
  */
 export function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Get returnTo from query params and validate it
+  const getReturnTo = (): string | null => {
+    const returnTo = searchParams?.get('returnTo')
+    if (!returnTo) return null
+    
+    // Only allow internal paths starting with /
+    if (typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+      return returnTo
+    }
+    
+    return null
+  }
+
+  const returnTo = getReturnTo()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,10 +77,15 @@ export function LoginForm() {
       }
 
       console.log('[v0] LoginForm: Login successful, user:', data.user.id)
+      console.log('[v0] LoginForm: returnTo query param =', returnTo)
       
       // Session is stored in Supabase and AuthProvider will pick it up via onAuthStateChange
-      // Redirect to builder
-      router.push('/builder/networks')
+      // Redirect to returnTo if available, otherwise to builder
+      const destination = returnTo || '/builder/networks'
+      console.log('[v0] LoginForm: Redirecting to destination =', destination)
+      
+      // Use window.location.href for reliable navigation (router.push may not work reliably during auth transition)
+      window.location.href = destination
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed'
       console.error('[v0] LoginForm error:', message)
@@ -142,7 +164,7 @@ export function LoginForm() {
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{' '}
-            <Link href="/auth/signup" className="text-primary font-semibold hover:underline">
+            <Link href={returnTo ? `/auth/signup?returnTo=${encodeURIComponent(returnTo)}` : '/auth/signup'} className="text-primary font-semibold hover:underline">
               Sign up
             </Link>
           </p>

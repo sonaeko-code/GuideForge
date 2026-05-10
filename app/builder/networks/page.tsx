@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, Folder, ArrowRight } from "lucide-react"
+import { Plus, Folder, Wand2, FileText, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
@@ -21,26 +21,43 @@ export default async function NetworksDirectoryPage() {
         <SiteHeader hideCta />
         
         <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-          <div className="mb-8">
+          <div className="mb-8 flex justify-between items-center gap-4 flex-wrap">
             <Button asChild variant="ghost" size="sm">
               <Link href="/builder">
-                ← Back to Builder
+                ← Back to Workspace
+              </Link>
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              Builder / My Networks
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/builder/assets">
+                <FileText className="mr-2 size-4" aria-hidden="true" />
+                My Assets
               </Link>
             </Button>
           </div>
 
-          <div className="rounded-lg border-2 border-dashed border-border bg-secondary/40 p-12 text-center">
+          <div className="rounded-lg border-2 border-dashed border-border bg-secondary/40 p-12">
             <Folder className="mx-auto size-12 text-muted-foreground mb-4" aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-foreground mb-2">No networks yet</h2>
-            <p className="text-muted-foreground mb-6">
-              Create your first network to get started.
+            <h2 className="text-lg font-semibold text-foreground mb-2 text-center">No networks yet</h2>
+            <p className="text-muted-foreground mb-6 text-center">
+              Create your first network or generate a single structured asset draft.
             </p>
-            <Button asChild>
-              <Link href="/builder/network/scaffold">
-                <Plus className="mr-2 size-4" aria-hidden="true" />
-                From Template
-              </Link>
-            </Button>
+            <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-4">
+              <Button asChild variant="outline">
+                <Link href="/builder/generate-asset">
+                  <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                  Generate Asset
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/builder/network/new">
+                  <Plus className="mr-2 size-4" aria-hidden="true" />
+                  Create Network
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </main>
@@ -89,10 +106,19 @@ export default async function NetworksDirectoryPage() {
       <SiteHeader hideCta />
       
       <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-        <div className="mb-10">
+        <div className="mb-10 flex justify-between items-center gap-4 flex-wrap">
           <Button asChild variant="ghost" size="sm">
             <Link href="/builder">
-              ← Back to Builder
+              ← Back to Workspace
+            </Link>
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Builder / My Networks
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/builder/assets">
+              <FileText className="mr-2 size-4" aria-hidden="true" />
+              My Assets
             </Link>
           </Button>
         </div>
@@ -111,6 +137,12 @@ export default async function NetworksDirectoryPage() {
               <Link href="/builder/network/scaffold">
                 <Plus className="mr-2 size-4" aria-hidden="true" />
                 From Template
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/builder/generate-asset">
+                <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                Generate Asset
               </Link>
             </Button>
             <Button asChild size="lg">

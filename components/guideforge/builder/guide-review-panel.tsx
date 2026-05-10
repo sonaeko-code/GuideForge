@@ -3,19 +3,34 @@
 import { useEffect, useState } from 'react'
 import { ThumbsUp, ThumbsDown, AlertCircle, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getGuideReviewSummary, castGuideReviewVote } from '@/lib/guideforge/supabase-guide-reviews'
+import { getGuideReviewSummary, castGuideReviewVote, publishEligibleGuide } from '@/lib/guideforge/supabase-guide-reviews'
+import { getGuideRevisionContext, loadOriginalGuideInfo, getRevisionReviewPanelText, type RevisionContext } from '@/lib/guideforge/revision-context'
+import type { Guide } from '@/lib/guideforge/types'
 
 interface GuideReviewPanelProps {
-  guideId: string
+  guide: Guide
   guideStatus: string
+  canPublish?: boolean
   onVoteSuccess?: () => void
+  onPublishSuccess?: () => void
 }
 
-export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }: GuideReviewPanelProps) {
+export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVoteSuccess, onPublishSuccess }: GuideReviewPanelProps) {
+  const guideId = guide.id
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getGuideReviewSummary>> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isVoting, setIsVoting] = useState(false)
   const [voteError, setVoteError] = useState<string | null>(null)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishStatus, setPublishStatus] = useState<"idle" | "publishing" | "success" | "error">("idle")
+  const [publishError, setPublishError] = useState<string | null>(null)
+
+  // Phase 10B: Revision context for displaying revision drafts
+  const [revisionContext, setRevisionContext] = useState<RevisionContext>({
+    isRevision: false,
+    revisionOf: null,
+    revisionNumber: guide.revisionNumber ?? 1,
+  })
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -27,6 +42,26 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
 
     loadSummary()
   }, [guideId, guideStatus])
+
+  // Phase 10B: Load revision context on mount
+  useEffect(() => {
+    const loadRevisionContext = async () => {
+      // Extract initial context from current guide
+      const context = getGuideRevisionContext(guide)
+      
+      // If this is a revision and we don't have original guide info, try to load it
+      if (context.isRevision && !context.originalGuide && context.revisionOf) {
+        const originalGuideInfo = await loadOriginalGuideInfo(context.revisionOf)
+        if (originalGuideInfo) {
+          context.originalGuide = originalGuideInfo
+        }
+      }
+      
+      setRevisionContext(context)
+    }
+    
+    loadRevisionContext()
+  }, [guide.id, guide.revisionOf, guide.revisionNumber])
 
   const handleVote = async (vote: 'approve' | 'request_changes') => {
     setIsVoting(true)
@@ -42,6 +77,50 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
     }
 
     setIsVoting(false)
+  }
+
+  const handlePublish = async () => {
+    setIsPublishing(true)
+    setPublishStatus("publishing")
+    setPublishError(null)
+
+    const result = await publishEligibleGuide(guideId)
+
+    // Phase 10I: Do NOT update UI state until we verify Supabase confirms publish
+    if (result.success) {
+      setPublishStatus("success")
+      setPublishError(null)
+      
+      // Log publish result for debugging
+      console.log('[v0] publish UI result', {
+        success: result.success,
+        stage: result.stage,
+        guideId: result.guideId,
+        shouldUpdateLocalPublishedState: result.success,
+      })
+      
+      // Notify parent that publish succeeded - parent should refetch
+      onPublishSuccess?.()
+      
+      // Show success for 2 seconds
+      setTimeout(() => {
+        setPublishStatus("idle")
+      }, 2000)
+    } else {
+      setPublishStatus("error")
+      setPublishError(result.error || "Failed to publish guide")
+      
+      // Phase 10I: On failure, log the stage where it failed
+      console.log('[v0] publish UI result', {
+        success: result.success,
+        stage: result.stage,
+        guideId: result.guideId,
+        error: result.error,
+        shouldUpdateLocalPublishedState: false,
+      })
+    }
+
+    setIsPublishing(false)
   }
 
   // Only show panel if status is ready (even with 0 votes)
@@ -88,6 +167,17 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
         </div>
       </div>
 
+      {/* Phase 10B: Revision context for review panel */}
+      {revisionContext.isRevision && (
+        <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/50 space-y-1">
+          <p className="text-xs font-medium text-purple-700 dark:text-purple-300">Reviewing Revision #{revisionContext.revisionNumber}</p>
+          {revisionContext.originalGuide && (
+            <p className="text-xs text-purple-600 dark:text-purple-400">Original: {revisionContext.originalGuide.title}</p>
+          )}
+          <p className="text-xs text-purple-600 dark:text-purple-400">{getRevisionReviewPanelText(revisionContext, guideStatus)}</p>
+        </div>
+      )}
+
       {/* Vote Summary */}
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 rounded-lg bg-background border border-border/30">
@@ -109,8 +199,44 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
         </div>
       </div>
 
-      {/* Voting UI */}
-      {canVote ? (
+      {/* Publish Eligibility */}
+      <div className="space-y-2">
+        <div className="flex items-start justify-between">
+          <h4 className="text-xs font-semibold text-foreground">Publish Eligibility</h4>
+          <div className={`px-2 py-1 rounded text-xs font-medium ${
+            summary.publishEligibility.publishEligible
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+              : summary.publishEligibility.needsChanges
+              ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
+              : 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+          }`}>
+            {summary.publishEligibility.label}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">{summary.publishEligibility.helperText}</p>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="p-2 rounded bg-background border border-border/30">
+            <div className="text-muted-foreground">Approve</div>
+            <div className="font-semibold text-foreground">{summary.publishEligibility.approveWeight}</div>
+          </div>
+          <div className="p-2 rounded bg-background border border-border/30">
+            <div className="text-muted-foreground">Changes</div>
+            <div className="font-semibold text-foreground">{summary.publishEligibility.requestChangesWeight}</div>
+          </div>
+          <div className="p-2 rounded bg-background border border-border/30">
+            <div className="text-muted-foreground">Net</div>
+            <div className="font-semibold text-foreground">{summary.publishEligibility.netApprovalWeight}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Voting UI - Hidden for published guides */}
+      {guideStatus === 'published' ? (
+        <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-start gap-2">
+          <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
+          <span>This published guide is protected. Review votes are now read-only.</span>
+        </div>
+      ) : canVote ? (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">Cast your vote</p>
           <div className="flex gap-2">
@@ -158,11 +284,59 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
         </div>
       ) : (
         <div className="p-2 rounded text-xs bg-muted/50 text-muted-foreground">
-          {guideStatus === 'ready' ? (
-            <>You need reviewer access or higher to vote on guide reviews.</>
-          ) : (
-            <>Guide is not ready for review.</>
-          )}
+          You can view review status, but your current role cannot vote.
+        </div>
+      )}
+
+      {/* Publish Button and Status - Hidden for published guides */}
+      {guideStatus !== 'published' && (
+        <div className="space-y-2">
+          {summary.publishEligibility.publishEligible && canPublish ? (
+          <>
+            <Button
+              onClick={handlePublish}
+              disabled={isPublishing || publishStatus === "publishing"}
+              variant="default"
+              size="sm"
+              className="w-full h-9 text-xs"
+            >
+              {publishStatus === "publishing" || isPublishing ? (
+                <>
+                  <Loader2 className="size-3 animate-spin mr-1" aria-hidden="true" />
+                  Publishing...
+                </>
+              ) : publishStatus === "success" ? (
+                <>
+                  <Check className="size-3 mr-1" aria-hidden="true" />
+                  {revisionContext.isRevision ? 'Revision published.' : 'Guide published.'}
+                </>
+              ) : (
+                revisionContext.isRevision ? 'Publish Revision' : 'Publish Guide'
+              )}
+            </Button>
+            {publishStatus === "error" && publishError && (
+              <div className="p-2 rounded text-xs bg-red-500/10 text-red-700 dark:text-red-300 flex items-start gap-2">
+                <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <span>{publishError}</span>
+              </div>
+            )}
+            {/* Phase 10D: Revision publish success message */}
+            {publishStatus === "success" && revisionContext.isRevision && (
+              <div className="p-2 rounded text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 flex items-start gap-2">
+                <Check className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <span>This revision is now the current published version. Previous versions are preserved as history.</span>
+              </div>
+            )}
+          </>
+        ) : !summary.publishEligibility.publishEligible ? (
+          <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300">
+            Publish becomes available when this guide is eligible.
+          </div>
+        ) : !canPublish ? (
+          <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300">
+            Only network owners/admins can publish eligible guides.
+          </div>
+        ) : null}
         </div>
       )}
 
@@ -196,7 +370,7 @@ export default function GuideReviewPanel({ guideId, guideStatus, onVoteSuccess }
       {/* Threshold note */}
       <div className="p-2 rounded text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 flex items-start gap-2 border border-blue-500/20">
         <AlertCircle className="size-3 mt-0.5 flex-shrink-0" aria-hidden="true" />
-        <span>Review thresholds are not enforced yet.</span>
+        <span>Publishing thresholds are visible but not enforced yet.</span>
       </div>
     </div>
   )

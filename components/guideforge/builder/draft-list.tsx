@@ -153,6 +153,12 @@ function GuideCard({ draft, networkId, draftSource, onDelete }: any) {
               <BookMarked className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
               <span className="truncate">{draft.title || "Untitled"}</span>
             </h3>
+            {/* Phase 10C: Revision badge on draft card */}
+            {draft.revisionOf && (
+              <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                Rev #{draft.revisionNumber || 1}
+              </Badge>
+            )}
             <Badge variant="outline" className="text-[10px] font-mono text-muted-foreground border-dashed flex-shrink-0">
               {draftSource === "supabase" ? (
                 <><Database className="size-2.5 mr-1" />Supabase</>
@@ -161,6 +167,10 @@ function GuideCard({ draft, networkId, draftSource, onDelete }: any) {
               )}
             </Badge>
           </div>
+          {/* Phase 10C: Revision context helper text on draft */}
+          {draft.revisionOf && (
+            <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <StatusBadge status={draft.status} />
             {draft.difficulty && <DifficultyBadge difficulty={draft.difficulty} />}

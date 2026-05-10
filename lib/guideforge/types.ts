@@ -251,6 +251,10 @@ export interface Guide {
   /** Timestamp of last Forge Rules check (for staleness detection). */
   forgeRulesCheckTimestamp?: number
 
+  /** Phase 10A: Revision tracking */
+  revisionOf?: string | null
+  revisionNumber?: number
+
   createdAt: string
   updatedAt: string
   publishedAt?: string

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { SignupForm } from '@/components/guideforge/auth/signup-form'
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 }
 
 export default function SignupPage() {
-  return <SignupForm />
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignupForm />
+    </Suspense>
+  )
 }

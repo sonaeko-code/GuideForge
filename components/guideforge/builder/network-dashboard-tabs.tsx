@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
-import { normalizeGuideStatus, filterGuidesByStatus } from "@/lib/guideforge/utils"
+import { normalizeGuideStatus, filterGuidesByStatus, filterOutArchived } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
@@ -69,18 +69,65 @@ export function NetworkDashboardTabs({
   const safeCollections = Array.isArray(collections) ? collections : []
   const safeGuides = Array.isArray(guides) ? guides : []
   
-  // Use normalized status filtering for all guides
-  const safeDrafts = filterGuidesByStatus(safeGuides, "draft")
-  const safeReady = filterGuidesByStatus(safeGuides, "ready")
-  const safePublished = filterGuidesByStatus(safeGuides, "published")
+  // Helper to get hub/collection names for a guide
+  const getHierarchyNames = (guide: Guide) => {
+    const hub = safeHubs.find(h => h.id === guide.hubId)
+    const collection = safeCollections.find(c => c.id === guide.collectionId)
+    return {
+      hubName: hub?.name || "Unknown Hub",
+      collectionName: collection?.name || "Uncategorized"
+    }
+  }
 
-  // Guides tab filtering
+  // Phase 10E: Debug dashboard data source
+  console.log("[v0] Dashboard guide source", {
+    source: "supabase (page-level fetch)",
+    total: safeGuides.length,
+    statuses: safeGuides.map(g => ({
+      id: g.id,
+      title: g.title,
+      status: g.status,
+      revisionOf: g.revisionOf,
+      revisionNumber: g.revisionNumber,
+    })),
+  })
+  
+  // Phase 10G: Exclude archived from active tabs, but count them separately
+  const activeGuides = filterOutArchived(safeGuides)
+  const archivedGuides = filterGuidesByStatus(safeGuides, "archived")
+  
+  // Use normalized status filtering for active guides only
+  const safeDrafts = filterGuidesByStatus(activeGuides, "draft")
+  const safeReady = filterGuidesByStatus(activeGuides, "ready")
+  const safePublished = filterGuidesByStatus(activeGuides, "published")
+  
+  // Phase 10G: Enhanced debug logs with archived count
+  console.log("[v0] Dashboard filtered counts", {
+    totalLoaded: safeGuides.length,
+    drafts: safeDrafts.length,
+    ready: safeReady.length,
+    published: safePublished.length,
+    archived: archivedGuides.length,
+    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
+  })
+
+  // Phase 10H: Debug logs showing what's visible in each tab
+  console.log("[v0] Dashboard active counts", {
+    totalLoaded: safeGuides.length,
+    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
+    drafts: safeDrafts.length,
+    ready: safeReady.length,
+    published: safePublished.length,
+    archived: archivedGuides.length,
+  })
+
+  // Phase 10G: Guides tab filtering - exclude archived
   const filteredCollection = initialCollectionId
     ? safeCollections.find((c: NormalizedCollection) => c.id === initialCollectionId)
     : null
   const filteredGuides = initialCollectionId
-    ? safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId)
-    : safeGuides
+    ? filterOutArchived(safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId))
+    : filterOutArchived(safeGuides)
   
   console.log("[v0] Guides tab rendering:", {
     totalGuides: safeGuides.length,
@@ -107,7 +154,7 @@ export function NetworkDashboardTabs({
           </span>
         </TabsTrigger>
         <TabsTrigger value="ready">
-          Ready
+          Pending Review
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
             {safeReady.length}
           </span>
@@ -121,7 +168,7 @@ export function NetworkDashboardTabs({
         <TabsTrigger value="guides">
           Guides
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
-            {safeGuides.length}
+            {filteredGuides.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="hubs">
@@ -157,17 +204,31 @@ export function NetworkDashboardTabs({
           </Button>
         </div>
 
+        {/* Phase 10H: Debug log for visible guides in drafts tab */}
+        {safeDrafts.length > 0 && (
+          console.log("[v0] Dashboard visible guide ids - drafts", {
+            tab: "drafts",
+            visibleGuideIds: safeDrafts.map(g => ({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              revisionOf: g.revisionOf,
+              revisionNumber: g.revisionNumber,
+            })),
+          })
+        )}
+
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
       </TabsContent>
 
-      {/* Ready tab */}
-      <TabsContent value="ready" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Ready to Publish</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Guides validated and ready for publishing.
-            </p>
+  {/* Ready tab */}
+  <TabsContent value="ready" className="space-y-4">
+  <div className="flex items-center justify-between">
+  <div>
+  <h2 className="text-lg font-semibold text-foreground">Pending Review</h2>
+  <p className="mt-1 text-sm text-muted-foreground">
+  Guides submitted for review and awaiting publication.
+  </p>
           </div>
         </div>
 
@@ -180,20 +241,40 @@ export function NetworkDashboardTabs({
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {safeReady.map((guide: Guide) => (
-              <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
-                <div className="space-y-2 flex-1">
-                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
-                  <p className="text-xs text-muted-foreground">
+              <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
+                    {/* Phase 10C: Revision badge on card */}
+                    {guide.revisionOf && (
+                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
+                  {/* Phase 10C: Revision context helper text */}
+                  {guide.revisionOf && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
+                  )}
+                  {/* Hierarchy context */}
+                  {!guide.revisionOf && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge status={guide.status} />
+                    {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
+                    {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
-                  <StatusBadge status={guide.status} />
-                  {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
-                  {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                  <Button size="sm" asChild variant="ghost" className="ml-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button size="sm" asChild variant="outline">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                       Edit
                     </Link>
@@ -213,6 +294,20 @@ export function NetworkDashboardTabs({
           </h2>
         </div>
 
+        {/* Phase 10H: Debug log for visible guides in published tab */}
+        {safePublished.length > 0 && (
+          console.log("[v0] Dashboard visible guide ids - published", {
+            tab: "published",
+            visibleGuideIds: safePublished.map(g => ({
+              id: g.id,
+              title: g.title,
+              status: g.status,
+              revisionOf: g.revisionOf,
+              revisionNumber: g.revisionNumber,
+            })),
+          })
+        )}
+
         {safePublished.length === 0 ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
             <Eye className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
@@ -222,22 +317,42 @@ export function NetworkDashboardTabs({
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {safePublished.map((guide: Guide) => (
-              <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
-                <div className="space-y-2 flex-1">
-                  <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
-                  <p className="text-xs text-muted-foreground">
+              <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
+                    {/* Phase 10D/10E: Badge for published guides */}
+                    {!guide.revisionOf ? (
+                      <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                        Original
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
                     {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
+                  {/* Hierarchy context for original published guides */}
+                  {!guide.revisionOf && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge status={guide.status} />
+                    {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
+                    {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
-                  <StatusBadge status={guide.status} />
-                  {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
-                  {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                  <Button size="sm" asChild variant="ghost" className="ml-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button size="sm" asChild variant="outline">
                     <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
-                      Edit
+                      Open
                     </Link>
                   </Button>
                 </div>
@@ -296,18 +411,18 @@ export function NetworkDashboardTabs({
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {filteredGuides.map((guide: Guide) => (
-                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
+                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                       <p className="text-xs text-muted-foreground">
                         {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
                       <StatusBadge status={guide.status} />
-                      {guide.type && <Badge variant="outline" className="text-xs capitalize">{guide.type.replace("-", " ")}</Badge>}
+                      {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
                       {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                      <Button size="sm" asChild variant="ghost" className="ml-auto">
+                      <Button size="sm" asChild variant="outline" className="ml-auto">
                         <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                           Edit
                         </Link>
@@ -322,7 +437,7 @@ export function NetworkDashboardTabs({
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">
-                Guides ({safeGuides.length})
+                Guides ({activeGuides.length})
               </h2>
               <div className="flex gap-2">
                 <Button size="sm" asChild>
@@ -343,7 +458,7 @@ export function NetworkDashboardTabs({
               {safePublished.length} published, {safeDrafts.length} draft
             </p>
 
-            {safeGuides.length === 0 ? (
+            {activeGuides.length === 0 ? (
               <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
                 <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
                 <p className="font-semibold text-foreground">No guides yet</p>
@@ -369,18 +484,25 @@ export function NetworkDashboardTabs({
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {safeGuides.map((guide: Guide) => (
-                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col">
+                {activeGuides.map((guide: Guide) => (
+                  <Card key={guide.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                     <div className="space-y-2 flex-1">
                       <h4 className="font-semibold text-foreground line-clamp-2">{guide.title}</h4>
                       <p className="text-xs text-muted-foreground">
                         {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
                       </p>
+                      {/* Hierarchy context */}
+                      {!guide.revisionOf && (
+                        <p className="text-xs text-muted-foreground">
+                          {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                        </p>
+                      )}
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
                       <StatusBadge status={guide.status} />
+                      {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
                       {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
-                      <Button size="sm" asChild variant="ghost" className="ml-auto">
+                      <Button size="sm" asChild variant="outline" className="ml-auto">
                         <Link href={`/builder/network/${networkId}/guide/${guide.id}/edit`}>
                           Edit
                         </Link>
@@ -388,6 +510,58 @@ export function NetworkDashboardTabs({
                     </div>
                   </Card>
                 ))}
+              </div>
+            )}
+
+            {/* Phase 11: Archived Versions section - collapsible disclosure */}
+            {archivedGuides.length > 0 && (
+              <div className="mt-8 border-t border-border/50 pt-6">
+                <details className="group">
+                  <summary className="cursor-pointer flex items-center justify-between hover:bg-muted/50 px-3 py-2 rounded-lg transition-colors">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      Archived Versions ({archivedGuides.length})
+                      <span className="inline-block group-open:rotate-90 transition-transform text-muted-foreground">
+                        ▶
+                      </span>
+                    </h3>
+                  </summary>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs text-muted-foreground px-3 mb-3">
+                      Previous versions are preserved for reference. Archived versions are read-only.
+                    </p>
+                    {archivedGuides.map((guide: Guide) => (
+                      <div key={guide.id} className="flex items-center gap-3 px-4 py-2 rounded-lg border border-border/30 hover:bg-muted/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-medium text-sm text-foreground truncate">{guide.title}</p>
+                            {guide.revisionNumber && (
+                              <Badge variant="outline" className="text-[10px] border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex-shrink-0">
+                                Rev #{guide.revisionNumber}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-[10px] border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 flex-shrink-0">
+                              Archived
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {guide.publishedAt && (
+                              <span>Published: {new Date(guide.publishedAt).toLocaleDateString()}</span>
+                            )}
+                            {guide.updatedAt && guide.publishedAt !== guide.updatedAt && (
+                              <span>Updated: {new Date(guide.updatedAt).toLocaleDateString()}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button size="sm" asChild variant="ghost" className="flex-shrink-0">
+                          <Link href={`/builder/network/${networkId}/guide/${guide.id}/preview`}>
+                            <Eye className="size-4 mr-1" aria-hidden="true" />
+                            View
+                          </Link>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             )}
           </div>
@@ -429,19 +603,26 @@ export function NetworkDashboardTabs({
               ).length
 
               return (
-                <Card key={hub.id} className="border-border/50 px-4 py-3 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1">
+                <Card key={hub.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2 flex-1">
+                    <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-foreground flex items-center gap-2">
-                        <Gamepad2 className="size-4 text-primary" aria-hidden="true" />
-                        {hub.name}
+                        <Gamepad2 className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                        <span className="truncate">{hub.name}</span>
                       </h4>
                       <p className="text-xs text-muted-foreground mt-1">{hub.description}</p>
                     </div>
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
-                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-border/50">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
+                    </p>
+                    <Button size="sm" asChild variant="outline">
+                      <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
+                        View
+                      </Link>
+                    </Button>
+                  </div>
                 </Card>
               )
             })}
@@ -502,28 +683,26 @@ export function NetworkDashboardTabs({
                         
                         if (hubIdValid && colIdValid) {
                           return (
-                            <Card key={col.id} className="border-border/50 px-4 py-4 flex flex-col">
+                            <Card key={col.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                               <div className="space-y-2 flex-1">
                                 <div className="flex items-start justify-between gap-2">
-                                  <h4 className="flex items-center gap-2 font-semibold text-foreground">
-                                    <FolderOpen className="size-4 text-primary" aria-hidden="true" />
-                                    {col.name}
+                                  <h4 className="flex items-center gap-2 font-semibold text-foreground truncate">
+                                    <FolderOpen className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                                    <span className="truncate">{col.name}</span>
                                   </h4>
-                                  <Badge variant="secondary" className="shrink-0 text-xs">
-                                    Hub: {col.hubName || hub.name}
-                                  </Badge>
                                 </div>
-                                <p className="text-sm text-muted-foreground">{col.description}</p>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  {collectionGuideCount} guide{collectionGuideCount !== 1 ? "s" : ""}
+                                <p className="text-xs text-muted-foreground">
+                                  {col.description || "No description yet"}
                                 </p>
                               </div>
-                              <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">
-                                <Button size="sm" asChild variant="ghost" onClick={() => {
-                                  setActiveTab("guides")
-                                  router.push(`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`)
-                                }}>
-                                  Manage Guides
+                              <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
+                                </p>
+                                <Button size="sm" asChild variant="outline">
+                                  <Link href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}>
+                                    View
+                                  </Link>
                                 </Button>
                               </div>
                             </Card>
