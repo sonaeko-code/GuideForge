@@ -154,6 +154,15 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
           )}
         </div>
 
+        {/* Mock Preview Clarification Notice */}
+        {asset.generatedBy === "mock" && (
+          <Card className="p-3 border-amber-500/20 bg-amber-500/5">
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              <span className="font-semibold">Mock Preview:</span> This uses deterministic sample content for testing. Click <strong>AI Generate</strong> to create real contextual content.
+            </p>
+          </Card>
+        )}
+
         {/* Editable Summary */}
         <div>
           {isEditingSummary ? (

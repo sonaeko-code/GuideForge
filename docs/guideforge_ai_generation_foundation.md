@@ -84,20 +84,111 @@ app/api/guideforge/
 User fills form
      ↓
 [Mock or AI Provider selected]
-     ├→ Mock: Client-side generation
-     │        + 1000ms delay
-     │        + Deterministic output
-     │        + No API key needed
-     │        + Quality-compliant placeholder content
+     ├→ Mock Preview: Client-side generation
+     │               + 1000ms delay (simulates network latency)
+     │               + Context-aware demo content
+     │               + No API key needed
+     │               + Shows "Mock Preview" badge
+     │               + Tests save/edit/workspace flow (NOT AI quality)
      │
-     └→ AI: POST /api/guideforge/generate-checklist
-             ↓
-          [Validate OPENAI_API_KEY exists]
-             ├→ Missing: Return "AI generation is not configured"
-             ├→ Found: Continue
-             ↓
-          [Call OpenAI API with prompt]
-             ↓
+     └→ AI Generate: POST /api/guideforge/generate-checklist
+                     ↓
+                  [Validate OPENAI_API_KEY exists]
+                     ├→ Missing: Return "AI generation is not configured"
+                     ├→ Found: Continue
+                     ↓
+                  [Call OpenAI API with prompt]
+                     ↓
+                  [Parse JSON response]
+                     ├→ Invalid JSON: Show error and return
+                     ├→ Valid JSON: Continue
+                     ↓
+                  [Validate schema]
+                     ├→ Invalid: Attempt ONE repair pass
+                     │           ├→ Repair passes: Continue to quality check
+                     │           └→ Repair fails: Return error
+                     ├→ Valid: Continue to quality check
+                     ↓
+                  [Validate content quality]
+                     ├→ Invalid: Attempt ONE repair pass
+                     │           ├→ Repair passes: Return repaired asset
+                     │           └→ Repair fails: Return error
+                     ├→ Valid: Return asset with "AI Generated" badge
+     ↓
+[Validate in client]
+     ├→ Valid: Show proposal review
+     └→ Invalid: Show error, allow retry
+     ↓
+User edits title/summary (optional)
+     ↓
+User clicks "Save to Workspace"
+     ↓
+Save to public.asset_drafts (private, draft status)
+     ↓
+User can now view/edit/delete from /builder/assets
+```
+
+## Testing AI Quality vs Mock Behavior
+
+### Important Distinction
+
+- **Mock Preview tests the save/edit/workspace flow** — It is NOT a test of AI output quality
+- **AI Generate tests real contextual content quality** — This is the real AI test
+- **A saved asset with "Mock Preview" badge is not proof of AI quality**
+- **A saved asset with "AI Generated" badge demonstrates real AI contextual generation**
+
+### Mock Preview vs AI Generate
+
+#### Mock Preview
+- ✓ Generates context-aware demo content based on user input
+- ✓ Shows "Mock Preview" badge to indicate sample content
+- ✓ Tests whether save/edit/delete workflows work
+- ✓ Tests whether generatedBy metadata persists
+- ✓ Does NOT test AI quality or contextual understanding
+- ✓ Does NOT test API configuration or key validity
+- ✓ Uses domain detection to create relevant sections/items (game launch, QA, deployment, backup, community, monitoring)
+- ✓ Falls back to universal sections if domain cannot be inferred
+
+#### AI Generate (with OPENAI_API_KEY)
+- ✓ Calls real OpenAI API
+- ✓ Shows "AI Generated" badge to indicate real AI content
+- ✓ Tests AI model understanding of context
+- ✓ Tests quality validation and repair loop
+- ✓ Tests API key configuration and OpenAI service availability
+- ✓ Validates schema and content quality
+- ✓ Returns user-friendly errors if API is misconfigured or unavailable
+
+### Test Workflow
+
+1. **First, test save/edit flow with Mock Preview:**
+   ```
+   - Generate checklist with Mock Preview
+   - Verify "Mock Preview" badge shows
+   - Edit title/summary
+   - Save to workspace
+   - Verify asset detail page shows "Mock Preview" badge
+   - Verify edit/delete still works
+   ✓ This tests the UX, not AI quality
+   ```
+
+2. **Then, test AI quality with AI Generate (requires OPENAI_API_KEY):**
+   ```
+   - Switch to AI Generate tab
+   - Generate checklist with specific context
+   - Verify "AI Generated" badge shows
+   - Check content is contextual and specific (not placeholder "Item 1" style)
+   - Verify it's different from Mock Preview output
+   - Save to workspace
+   - Verify asset detail page shows "AI Generated" badge
+   ✓ This tests real AI contextual understanding
+   ```
+
+3. **Compare outputs:**
+   - Mock Preview: Context-aware but templated demo content
+   - AI Generate: Real AI interpretation of user's specific requirements
+
+## Content Quality Validation
+
           [Parse JSON response]
              ├→ Invalid JSON: Show "AI returned invalid JSON" and return error
              ├→ Valid JSON: Continue
