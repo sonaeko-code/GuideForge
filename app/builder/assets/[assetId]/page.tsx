@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Trash2, AlertCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
-import { getAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
+import { getAssetDraft, updateAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 
 interface AssetDetailPageProps {
@@ -92,13 +92,34 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
     setSaveMessage(null)
     
     try {
-      // Update asset in database (placeholder - would need actual update function)
-      // For now, just update local state
+      // Update payload to reflect new title/summary if they exist in payload structure
+      const updatedPayload = {
+        ...asset.payload,
+        title: editTitle,
+        summary: editSummary,
+      }
+
+      // Call updateAssetDraft helper to persist to Supabase
+      const result = await updateAssetDraft(asset.id, {
+        title: editTitle,
+        summary: editSummary,
+      })
+
+      if (!result.success) {
+        setSaveMessage({
+          type: 'error',
+          text: result.error || 'Failed to save changes'
+        })
+        return
+      }
+
+      // Update local state with new values
       const updatedAsset = {
         ...asset,
         title: editTitle,
         summary: editSummary,
-        updated_at: new Date().toISOString(),
+        payload: updatedPayload,
+        updatedAt: new Date().toISOString(),
       }
       setAsset(updatedAsset)
       setIsEditMode(false)
@@ -107,9 +128,11 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       // Clear message after 3 seconds
       setTimeout(() => setSaveMessage(null), 3000)
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to save changes'
+      console.error("[v0] handleSaveChanges error:", err)
       setSaveMessage({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Failed to save changes'
+        text: msg
       })
     } finally {
       setIsSaving(false)
