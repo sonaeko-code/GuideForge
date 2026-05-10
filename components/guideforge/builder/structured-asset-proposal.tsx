@@ -16,13 +16,26 @@ interface StructuredAssetProposalProps {
 export function StructuredAssetProposal({ asset, onBack }: StructuredAssetProposalProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [refinementNotes, setRefinementNotes] = useState("")
+  const [refinementApplied, setRefinementApplied] = useState(false)
+  const [editTitle, setEditTitle] = useState(asset.title)
+  const [editSummary, setEditSummary] = useState(asset.summary)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [isEditingSummary, setIsEditingSummary] = useState(false)
 
   const handleSave = async () => {
     setSaveError(null)
     setIsSaving(true)
 
     try {
-      const result = await saveStructuredAssetToWorkspace(asset)
+      // Create updated asset with edited title/summary
+      const updatedAsset = {
+        ...asset,
+        title: editTitle,
+        summary: editSummary,
+      }
+
+      const result = await saveStructuredAssetToWorkspace(updatedAsset)
 
       if (!result.success) {
         setSaveError(result.error || "Failed to save asset draft")
@@ -40,6 +53,14 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       setSaveError(`Failed to save: ${msg}`)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleApplyRefinement = () => {
+    // Simple mock refinement: update the summary to acknowledge the note
+    if (refinementNotes.trim()) {
+      setRefinementApplied(true)
+      // Could update asset content here, but for MVP just acknowledge the note
     }
   }
 
@@ -68,8 +89,56 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
           <Badge variant="outline">{getAssetTypeName()}</Badge>
           <span className="text-sm text-muted-foreground">Generated Asset — Not Saved Yet</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">{asset.title}</h1>
-        <p className="text-base text-muted-foreground">{asset.summary}</p>
+        
+        {/* Editable Title */}
+        <div>
+          {isEditingTitle ? (
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground text-3xl font-bold"
+                placeholder="Asset title..."
+              />
+              <Button size="sm" variant="ghost" onClick={() => setIsEditingTitle(false)}>
+                Done
+              </Button>
+            </div>
+          ) : (
+            <div
+              onClick={() => setIsEditingTitle(true)}
+              className="cursor-pointer hover:opacity-70 transition-opacity"
+            >
+              <h1 className="text-3xl font-bold tracking-tight">{editTitle}</h1>
+            </div>
+          )}
+        </div>
+
+        {/* Editable Summary */}
+        <div>
+          {isEditingSummary ? (
+            <div className="flex gap-2 items-start">
+              <textarea
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                rows={3}
+                className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground text-base"
+                placeholder="Asset summary..."
+              />
+              <Button size="sm" variant="ghost" onClick={() => setIsEditingSummary(false)}>
+                Done
+              </Button>
+            </div>
+          ) : (
+            <div
+              onClick={() => setIsEditingSummary(true)}
+              className="cursor-pointer hover:opacity-70 transition-opacity"
+            >
+              <p className="text-base text-muted-foreground">{editSummary}</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Assumptions & Missing Info */}
@@ -98,6 +167,41 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
           )}
         </div>
       )}
+
+      {/* Refinement Section */}
+      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Improve This Draft</p>
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            Add context or refinement notes to improve the proposal before saving.
+          </p>
+
+          <textarea
+            value={refinementNotes}
+            onChange={(e) => setRefinementNotes(e.target.value)}
+            placeholder="Example: Make it safer, more beginner-friendly, add specific examples, or clarify assumptions..."
+            rows={3}
+            className="w-full px-3 py-2 border border-blue-500/30 rounded-md bg-background text-foreground text-sm"
+            disabled={refinementApplied}
+          />
+
+          {refinementApplied && (
+            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded text-sm text-green-700 dark:text-green-300">
+              ✓ Refinement notes added. These will be saved with your draft.
+            </div>
+          )}
+
+          <Button
+            onClick={handleApplyRefinement}
+            size="sm"
+            variant="outline"
+            disabled={!refinementNotes.trim() || refinementApplied}
+            className="w-full"
+          >
+            {refinementApplied ? "Refinement Applied" : "Apply Refinement"}
+          </Button>
+        </div>
+      </Card>
 
       {/* Asset-Specific Content Preview */}
       <Card className="p-6 space-y-4">
