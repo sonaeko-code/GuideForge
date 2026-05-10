@@ -23,35 +23,82 @@ export const maxDuration = 30
  * Call OpenAI API to generate or repair checklist
  */
 async function callOpenAI(apiKey: string, messages: any[]): Promise<string | null> {
-  const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: DEFAULT_CHECKLIST_MODEL,
-      messages,
-      temperature: GENERATION_TEMPERATURE,
-      max_tokens: MAX_GENERATION_TOKENS,
-      response_format: { type: "json_object" },
-    }),
-  })
+  let openaiResponse: Response | null = null
+  
+  try {
+    console.log("[v0] API: Calling OpenAI with model:", DEFAULT_CHECKLIST_MODEL)
+    
+    openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: DEFAULT_CHECKLIST_MODEL,
+        messages,
+        temperature: GENERATION_TEMPERATURE,
+        max_tokens: MAX_GENERATION_TOKENS,
+        response_format: { type: "json_object" },
+      }),
+    })
 
-  if (!openaiResponse.ok) {
-    const error = await openaiResponse.json()
-    console.error("[v0] OpenAI API error:", error)
-    throw new Error(`OpenAI API error: ${error.error?.message || "Unknown error"}`)
+    // Handle non-2xx responses safely
+    if (!openaiResponse.ok) {
+      let errorDetail = "Unknown error"
+      
+      try {
+        // Try to parse as JSON first (OpenAI error response)
+        const errorJson = await openaiResponse.json()
+        errorDetail = errorJson.error?.message || JSON.stringify(errorJson)
+      } catch (_) {
+        // If JSON parse fails, try text (HTML error page, etc.)
+        try {
+          const errorText = await openaiResponse.text()
+          errorDetail = errorText.substring(0, 200)
+        } catch (_) {
+          errorDetail = `HTTP ${openaiResponse.status}: ${openaiResponse.statusText}`
+        }
+      }
+
+      const isAuthError = openaiResponse.status === 401 || errorDetail.includes("authentication") || errorDetail.includes("invalid_api_key")
+      const isQuotaError = openaiResponse.status === 429 || errorDetail.includes("rate") || errorDetail.includes("quota")
+      
+      console.error("[v0] OpenAI API error:", {
+        status: openaiResponse.status,
+        statusText: openaiResponse.statusText,
+        detail: errorDetail.substring(0, 200),
+        isAuth: isAuthError,
+        isQuota: isQuotaError,
+      })
+
+      if (isAuthError) {
+        throw new Error("AUTH_ERROR")
+      } else if (isQuotaError) {
+        throw new Error("QUOTA_ERROR")
+      } else {
+        throw new Error(`OPENAI_ERROR: ${errorDetail}`)
+      }
+    }
+
+    // Parse successful response
+    const openaiData = await openaiResponse.json()
+    const content = openaiData.choices[0]?.message?.content
+
+    if (!content) {
+      console.error("[v0] OpenAI returned empty content in response")
+      throw new Error("EMPTY_RESPONSE")
+    }
+
+    console.log("[v0] API: OpenAI returned content (" + content.length + " chars)")
+    return content
+  } catch (err) {
+    // Re-throw with categorized error types for the caller to handle
+    if (err instanceof Error) {
+      throw err
+    }
+    throw new Error("UNKNOWN_ERROR")
   }
-
-  const openaiData = await openaiResponse.json()
-  const content = openaiData.choices[0]?.message?.content
-
-  if (!content) {
-    throw new Error("OpenAI returned empty response")
-  }
-
-  return content
 }
 
 /**
@@ -170,29 +217,112 @@ export async function POST(request: NextRequest) {
         },
       ])
     } catch (err) {
-      console.error("[v0] OpenAI API call failed:", err instanceof Error ? err.message : String(err))
-      return NextResponse.json(
-        {
-          success: false,
-          error: "AI generation failed. Please try again.",
-        },
-        { status: 500 }
-      )
+      const errorMsg = err instanceof Error ? err.message : "Unknown error"
+      console.error("[v0] OpenAI API call failed:", errorMsg)
+      
+      // Provide user-friendly error messages based on error type
+      if (errorMsg === "AUTH_ERROR") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI generation authentication failed. Check OPENAI_API_KEY.",
+          },
+          { status: 401 }
+        )
+      } else if (errorMsg === "QUOTA_ERROR") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI generation is temporarily unavailable. Check API usage or billing.",
+          },
+          { status: 429 }
+        )
+      } else if (errorMsg === "EMPTY_RESPONSE") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI returned an incomplete response. Please try again.",
+          },
+          { status: 500 }
+        )
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI generation failed. Please try again.",
+          },
+          { status: 500 }
+        )
+      }
     }
 
     // Parse AI response
     let asset: GeneratedChecklist
     try {
       asset = JSON.parse(content)
-    } catch (err) {
-      console.error("[v0] Failed to parse OpenAI response as JSON:", content.substring(0, 200))
-      return NextResponse.json(
-        {
-          success: false,
-          error: "AI returned invalid JSON. Please try again or use Mock Preview.",
-        },
-        { status: 500 }
-      )
+    } catch (parseErr) {
+      console.error("[v0] Failed to parse OpenAI response as JSON, attempting repair...")
+      console.error("[v0] Raw content:", content.substring(0, 300))
+
+      // If parsing fails, try repair pass
+      if (MAX_REPAIR_ATTEMPTS > 0) {
+        try {
+          // Build repair prompt with the raw content that failed to parse
+          const repairPrompt = buildChecklistRepairPrompt(body, { raw: content }, ["JSON parsing failed"])
+          const repairContent = await callOpenAI(apiKey, [
+            {
+              role: "system",
+              content: "You are a JSON repair specialist. Fix the following content to return valid JSON only.",
+            },
+            {
+              role: "user",
+              content: repairPrompt,
+            },
+          ])
+
+          if (repairContent) {
+            try {
+              asset = JSON.parse(repairContent)
+              console.log("[v0] JSON repair succeeded!")
+              // Continue to validation below
+            } catch (repairParseErr) {
+              console.error("[v0] JSON repair parsing also failed")
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "AI returned an incomplete checklist. Please try again or use Mock Preview.",
+                },
+                { status: 500 }
+              )
+            }
+          } else {
+            return NextResponse.json(
+              {
+                success: false,
+                error: "AI returned an incomplete checklist. Please try again or use Mock Preview.",
+              },
+              { status: 500 }
+            )
+          }
+        } catch (repairErr) {
+          console.error("[v0] JSON repair attempt failed:", repairErr instanceof Error ? repairErr.message : String(repairErr))
+          return NextResponse.json(
+            {
+              success: false,
+              error: "AI returned invalid JSON. Please try again or use Mock Preview.",
+            },
+            { status: 500 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI returned invalid JSON. Please try again or use Mock Preview.",
+          },
+          { status: 500 }
+        )
+      }
     }
 
     // Validate output

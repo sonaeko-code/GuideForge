@@ -54,17 +54,23 @@ export async function generateChecklist(
         body: JSON.stringify(request),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
+      // Always try to parse response as JSON
+      let data: any
+      try {
+        const text = await response.text()
+        data = JSON.parse(text)
+      } catch (parseErr) {
+        console.error("[v0] generateChecklist: Failed to parse API response as JSON")
+        console.error("[v0] First 200 chars of response:", response.text?.substring(0, 200) || "[no text]")
         return {
           success: false,
-          error: error.error || "AI generation failed",
+          error: "AI generation failed. The server returned an invalid response.",
           provider: "ai",
         }
       }
 
-      const data = await response.json()
-      if (!data.success) {
+      // Check for error response
+      if (!response.ok || !data.success) {
         return {
           success: false,
           error: data.error || "AI generation failed",
