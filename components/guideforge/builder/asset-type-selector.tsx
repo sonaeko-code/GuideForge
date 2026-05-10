@@ -65,43 +65,48 @@ export function AssetTypeSelector() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2">
         {assetTypes.map((assetType) => {
           const isAvailable = assetType.status === "available"
           return isAvailable ? (
-            <Button
+            <Link
               key={assetType.id}
-              asChild
-              variant="outline"
-              className="h-full min-h-48 justify-start p-6 text-left hover:bg-accent transition-colors flex flex-col items-start"
+              href={`/builder/generate-asset/${assetType.id}`}
+              className="block h-full"
             >
-              <Link href={`/builder/generate-asset/${assetType.id}`}>
-                <div className="space-y-3 w-full h-full flex flex-col">
-                  <div>
+              <Card className="h-full min-h-48 border border-border/50 hover:border-primary/50 transition-colors cursor-pointer hover:bg-accent/50">
+                <div className="h-full p-6 flex flex-col">
+                  <div className="flex-shrink-0">
                     <h2 className="font-semibold text-foreground text-lg">{assetType.title}</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground flex-1">{assetType.description}</p>
-                  <div className="pt-2 mt-auto">
+                  <p className="text-sm text-muted-foreground mt-3 flex-1 overflow-hidden break-words whitespace-normal">
+                    {assetType.description}
+                  </p>
+                  <div className="pt-3 mt-auto flex-shrink-0">
                     <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
                       Available
                     </Badge>
                   </div>
                 </div>
-              </Link>
-            </Button>
+              </Card>
+            </Link>
           ) : (
-            <div
+            <Card
               key={assetType.id}
-              className="border border-border/50 rounded-lg p-6 bg-muted/30 h-full min-h-48 flex flex-col justify-between cursor-not-allowed"
+              className="h-full min-h-48 border border-border/50 bg-muted/30 cursor-not-allowed"
             >
-              <div className="space-y-3">
-                <h2 className="font-semibold text-foreground/70 text-lg">{assetType.title}</h2>
-                <p className="text-sm text-muted-foreground/80">{assetType.description}</p>
+              <div className="h-full p-6 flex flex-col">
+                <div className="flex-shrink-0">
+                  <h2 className="font-semibold text-foreground/70 text-lg">{assetType.title}</h2>
+                </div>
+                <p className="text-sm text-muted-foreground/80 mt-3 flex-1 overflow-hidden break-words whitespace-normal">
+                  {assetType.description}
+                </p>
+                <div className="pt-3 mt-auto flex-shrink-0">
+                  <Badge variant="secondary" className="text-xs">Coming soon</Badge>
+                </div>
               </div>
-              <div className="pt-4 mt-auto">
-                <Badge variant="secondary" className="text-xs">Coming soon</Badge>
-              </div>
-            </div>
+            </Card>
           )
         })}
       </div>

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, AlertCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Plus, AlertCircle, Loader2, Trash2, Eye, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
 import { listMyAssetDrafts } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
@@ -56,127 +57,137 @@ export default function AssetsPage() {
   // Show sign-in required state if not authenticated
   if (!isLoading && !isAuthenticated) {
     return (
-      <div className="space-y-8">
-        <div className="flex justify-between items-center gap-4 flex-wrap">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/builder">
-              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-              Back to Workspace
-            </Link>
-          </Button>
-          <div className="text-xs text-muted-foreground">
-            Builder / My Assets
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
-          <p className="text-base text-muted-foreground">
-            Your personal asset drafts saved to your workspace. These are private and only visible to you.
-          </p>
-        </div>
-
-        <Card className="p-6 border-border/50">
-          <div className="space-y-4 text-center">
-            <p className="font-semibold text-foreground">Sign in to access your assets</p>
-            <p className="text-sm text-muted-foreground">
-              Your asset drafts are stored securely and only visible to you when signed in.
-            </p>
-            <div className="flex gap-2 justify-center">
-              <Button asChild variant="outline">
-                <Link href="/auth/login">Sign In</Link>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-8 md:py-16">
+          <div className="space-y-8">
+            <div className="flex justify-between items-center gap-4 flex-wrap">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/builder">
+                  <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                  Back to Workspace
+                </Link>
               </Button>
-              <Button asChild>
-                <Link href="/auth/signup">Create Account</Link>
-              </Button>
+              <div className="text-xs text-muted-foreground">
+                Builder / My Assets
+              </div>
             </div>
+
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
+              <p className="text-base text-muted-foreground">
+                Your personal asset drafts saved to your workspace. These are private and only visible to you.
+              </p>
+            </div>
+
+            <Card className="p-6 border-border/50">
+              <div className="space-y-4 text-center">
+                <p className="font-semibold text-foreground">Sign in to access your assets</p>
+                <p className="text-sm text-muted-foreground">
+                  Your asset drafts are stored securely and only visible to you when signed in.
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button asChild variant="outline">
+                    <Link href="/auth/login">Sign In</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/auth/signup">Create Account</Link>
+                  </Button>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
+        </div>
+      </main>
     )
   }
 
   // Show loading state while auth is initializing
   if (isLoading) {
     return (
-      <div className="space-y-8">
-        <div className="flex justify-between items-center gap-4 flex-wrap">
-          <Button variant="ghost" size="sm" disabled>
-            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Back to Workspace
-          </Button>
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
-        </div>
-        <Card className="p-12 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
-            <p className="text-muted-foreground">Loading your workspace...</p>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-8 md:py-16">
+          <div className="space-y-8">
+            <div className="flex justify-between items-center gap-4 flex-wrap">
+              <Button variant="ghost" size="sm" disabled>
+                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                Back to Workspace
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
+            </div>
+            <Card className="p-12 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+                <p className="text-muted-foreground">Loading your workspace...</p>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
+        </div>
+      </main>
     )
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header Navigation */}
-      <div className="flex justify-between items-center gap-4 flex-wrap">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/builder">
-            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Back to Workspace
-          </Link>
-        </Button>
-        <div className="text-xs text-muted-foreground">
-          Builder / My Assets
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/builder/networks">
-            View Networks
-          </Link>
-        </Button>
-      </div>
-
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
-        <p className="text-base text-muted-foreground">
-          Your personal asset drafts saved to your workspace. These are private and only visible to you.
-        </p>
-      </div>
-
-      {/* Setup Error */}
-      {setupError && (
-        <Card className="p-4 border-amber-500/30 bg-amber-500/5">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-            <div>
-              <p className="font-semibold text-amber-900 dark:text-amber-100">Setup Required</p>
-              <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">{setupError}</p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
-                After running the SQL, refresh this page.
-              </p>
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-8 md:py-16">
+        <div className="space-y-8">
+          {/* Header Navigation */}
+          <div className="flex justify-between items-center gap-4 flex-wrap">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/builder">
+                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                Back to Workspace
+              </Link>
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              Builder / My Assets
             </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/builder/networks">
+                View Networks
+              </Link>
+            </Button>
           </div>
-        </Card>
-      )}
 
-      {/* Fetching state */}
-      {isFetching && (
-        <Card className="p-12 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
-            <p className="text-muted-foreground">Loading your assets...</p>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
+            <p className="text-base text-muted-foreground">
+              Your personal asset drafts saved to your workspace. These are private and only visible to you.
+            </p>
           </div>
-        </Card>
-      )}
 
-      {/* Action Button */}
-      {!setupError && !isFetching && (
-        <div>
-          <Button asChild>
-            <Link href="/builder/generate-asset">
+          {/* Setup Error */}
+          {setupError && (
+            <Card className="p-4 border-amber-500/30 bg-amber-500/5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-amber-900 dark:text-amber-100">Setup Required</p>
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">{setupError}</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                    After running the SQL, refresh this page.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Fetching state */}
+          {isFetching && (
+            <Card className="p-12 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+                <p className="text-muted-foreground">Loading your assets...</p>
+              </div>
+            </Card>
+          )}
+
+          {/* Action Button */}
+          {!setupError && !isFetching && (
+            <div>
+              <Button asChild>
+                <Link href="/builder/generate-asset">
               <Plus className="mr-2 size-4" aria-hidden="true" />
               Generate New Asset
             </Link>
@@ -188,31 +199,41 @@ export default function AssetsPage() {
       {!setupError && !isFetching && assets.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
-            <Button
+            <Card
               key={asset.id}
-              asChild
-              variant="outline"
-              className="h-auto justify-start p-4 text-left hover:bg-accent"
+              className="p-4 border-border/50 hover:border-primary/50 transition-colors flex flex-col"
             >
-              <Link href={`/builder/assets/${asset.id}`}>
-                <div className="w-full space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-foreground line-clamp-2">{asset.title}</h3>
-                    </div>
+              <div className="space-y-3 flex-1">
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <Badge variant="outline" className="text-xs">{getAssetTypeName(asset.assetType)}</Badge>
+                    <span className="text-xs text-muted-foreground">{new Date(asset.createdAt).toLocaleDateString()}</span>
                   </div>
-                  {asset.summary && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{asset.summary}</p>
-                  )}
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-muted-foreground">{getAssetTypeName(asset.assetType)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(asset.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
+                  <h3 className="font-semibold text-foreground line-clamp-2">{asset.title}</h3>
                 </div>
-              </Link>
-            </Button>
+                {asset.summary && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">{asset.summary}</p>
+                )}
+              </div>
+              
+              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                <Button asChild variant="outline" size="sm" className="flex-1">
+                  <Link href={`/builder/assets/${asset.id}`}>
+                    <Eye className="mr-2 size-4" aria-hidden="true" />
+                    View
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm" className="flex-1">
+                  <Link href={`/builder/assets/${asset.id}?edit=true`}>
+                    <Edit className="mr-2 size-4" aria-hidden="true" />
+                    Edit
+                  </Link>
+                </Button>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              </div>
+            </Card>
           ))}
         </div>
       ) : !setupError && !isFetching ? (
@@ -231,6 +252,8 @@ export default function AssetsPage() {
           </div>
         </Card>
       ) : null}
-    </div>
+        </div>
+      </div>
+    </main>
   )
 }

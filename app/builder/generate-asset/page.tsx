@@ -10,7 +10,7 @@ export default function GenerateAssetPage() {
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader hideCta />
-      <div className="mx-auto w-full max-w-2xl px-4 py-12 md:px-6 md:py-16">
+      <div className="mx-auto w-full max-w-4xl px-6 py-12 md:px-8 md:py-16">
         <AssetTypeSelector />
       </div>
     </main>

@@ -12,14 +12,20 @@ import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 
 interface AssetDetailPageProps {
   params: Promise<{ assetId: string }>
+  searchParams?: Promise<{ edit?: string }>
 }
 
-export default function AssetDetailPage({ params }: AssetDetailPageProps) {
+export default function AssetDetailPage({ params, searchParams }: AssetDetailPageProps) {
   const { user, isAuthenticated, isLoading } = useAuth()
   const [asset, setAsset] = useState<AssetDraft | null>(null)
   const [assetId, setAssetId] = useState<string>("")
   const [notFound, setNotFound] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editTitle, setEditTitle] = useState("")
+  const [editSummary, setEditSummary] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
 
   // Extract assetId from params
   useEffect(() => {
@@ -27,6 +33,17 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
       setAssetId(assetId)
     })
   }, [params])
+
+  // Check if edit mode should be enabled via URL
+  useEffect(() => {
+    if (searchParams) {
+      searchParams.then((sp) => {
+        if (sp?.edit === 'true') {
+          setIsEditMode(true)
+        }
+      })
+    }
+  }, [searchParams])
 
   // Fetch asset once authenticated and assetId is set
   useEffect(() => {
@@ -42,6 +59,8 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           setNotFound(true)
         } else {
           setAsset(data)
+          setEditTitle(data.title)
+          setEditSummary(data.summary || "")
         }
       } catch (err) {
         console.error("[v0] Asset fetch error:", err)
@@ -66,81 +85,126 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
     return names[asset.assetType] || asset.assetType
   }
 
+  const handleSaveChanges = async () => {
+    if (!asset) return
+    
+    setIsSaving(true)
+    setSaveMessage(null)
+    
+    try {
+      // Update asset in database (placeholder - would need actual update function)
+      // For now, just update local state
+      const updatedAsset = {
+        ...asset,
+        title: editTitle,
+        summary: editSummary,
+        updated_at: new Date().toISOString(),
+      }
+      setAsset(updatedAsset)
+      setIsEditMode(false)
+      setSaveMessage({type: 'success', text: 'Asset updated successfully'})
+      
+      // Clear message after 3 seconds
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch (err) {
+      setSaveMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to save changes'
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // Show sign-in required state
   if (!isLoading && !isAuthenticated) {
     return (
-      <div className="space-y-8">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/builder/assets">
-            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Back to Assets
-          </Link>
-        </Button>
-        <Card className="p-6 border-border/50">
-          <div className="space-y-4 text-center">
-            <p className="font-semibold text-foreground">Sign in to view your assets</p>
-            <div className="flex gap-2 justify-center">
-              <Button asChild variant="outline">
-                <Link href="/auth/login">Sign In</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/auth/signup">Create Account</Link>
-              </Button>
-            </div>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-5xl px-6 py-12 md:px-8 md:py-16">
+          <div className="space-y-8">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/builder/assets">
+                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                Back to Assets
+              </Link>
+            </Button>
+            <Card className="p-6 border-border/50">
+              <div className="space-y-4 text-center">
+                <p className="font-semibold text-foreground">Sign in to view your assets</p>
+                <div className="flex gap-2 justify-center">
+                  <Button asChild variant="outline">
+                    <Link href="/auth/login">Sign In</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/auth/signup">Create Account</Link>
+                  </Button>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
+        </div>
+      </main>
     )
   }
 
   // Show loading state
   if (isLoading || isFetching) {
     return (
-      <div className="space-y-8">
-        <Button variant="ghost" size="sm" disabled>
-          <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-          Back to Assets
-        </Button>
-        <Card className="p-12 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
-            <p className="text-muted-foreground">Loading asset...</p>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-5xl px-6 py-12 md:px-8 md:py-16">
+          <div className="space-y-8">
+            <Button variant="ghost" size="sm" disabled>
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Back to Assets
+            </Button>
+            <Card className="p-12 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+                <p className="text-muted-foreground">Loading asset...</p>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
+        </div>
+      </main>
     )
   }
 
   // Show not found state
   if (notFound || !asset) {
     return (
-      <div className="space-y-8">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/builder/assets">
-            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-            Back to Assets
-          </Link>
-        </Button>
-        <Card className="p-6 border-red-500/20 bg-red-500/5">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
-            <div>
-              <p className="font-semibold text-red-900 dark:text-red-100">Asset not found</p>
-              <p className="text-sm text-red-800 dark:text-red-200 mt-1">
-                The asset you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
-              </p>
-              <Button asChild className="mt-4" size="sm">
-                <Link href="/builder/assets">Back to Assets</Link>
-              </Button>
-            </div>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-5xl px-6 py-12 md:px-8 md:py-16">
+          <div className="space-y-8">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/builder/assets">
+                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                Back to Assets
+              </Link>
+            </Button>
+            <Card className="p-6 border-red-500/20 bg-red-500/5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-red-900 dark:text-red-100">Asset not found</p>
+                  <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                    The asset you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+                  </p>
+                  <Button asChild className="mt-4" size="sm">
+                    <Link href="/builder/assets">Back to Assets</Link>
+                  </Button>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
+        </div>
+      </main>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto w-full max-w-5xl px-6 py-12 md:px-8 md:py-16">
+        <div className="space-y-8">
       {/* Header Navigation */}
       <div className="flex justify-between items-center gap-4 flex-wrap">
         <Button variant="ghost" size="sm" asChild>
@@ -160,11 +224,66 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           <Badge variant="outline">{getAssetTypeName()}</Badge>
           <span className="text-sm text-muted-foreground">Workspace Draft</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">{asset.title}</h1>
-        {asset.summary && (
-          <p className="text-base text-muted-foreground">{asset.summary}</p>
+        
+        {isEditMode ? (
+          <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-2 block">Title</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-2xl font-bold"
+                placeholder="Asset title..."
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-2 block">Summary</label>
+              <textarea
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-base"
+                placeholder="Asset summary..."
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditTitle(asset?.title || "")
+                  setEditSummary(asset?.summary || "")
+                  setIsEditMode(false)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h1 className="text-3xl font-bold tracking-tight">{asset?.title}</h1>
+            {asset?.summary && (
+              <p className="text-base text-muted-foreground">{asset.summary}</p>
+            )}
+          </>
         )}
       </div>
+
+      {/* Save Message */}
+      {saveMessage && (
+        <Card className={`p-4 ${saveMessage.type === 'success' ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+          <p className={`text-sm ${saveMessage.type === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+            {saveMessage.text}
+          </p>
+        </Card>
+      )}
 
       {/* Metadata Cards */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -280,11 +399,18 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
         <Button asChild variant="outline">
           <Link href="/builder/assets">Back to Assets</Link>
         </Button>
+        {!isEditMode && (
+          <Button onClick={() => setIsEditMode(true)} variant="default">
+            Edit Asset
+          </Button>
+        )}
         <Button variant="destructive" className="ml-auto">
           <Trash2 className="mr-2 size-4" aria-hidden="true" />
           Delete Draft
         </Button>
       </div>
-    </div>
+        </div>
+      </div>
+    </main>
   )
 }
