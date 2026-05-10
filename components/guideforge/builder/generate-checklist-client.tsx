@@ -2,15 +2,17 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2, Sparkles } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ChecklistIntakeRequest, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
-import { generateChecklistMock } from "@/lib/guideforge/mock-asset-generator"
+import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
+import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 
 export function GenerateChecklistClient() {
@@ -29,6 +31,7 @@ export function GenerateChecklistClient() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [proposal, setProposal] = useState<GeneratedChecklist | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [provider, setProvider] = useState<GenerationProvider>("mock")
 
   const handleFieldChange = (field: keyof ChecklistIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
@@ -57,7 +60,7 @@ export function GenerateChecklistClient() {
 
     setIsGenerating(true)
     try {
-      const response = await generateChecklistMock(formState)
+      const response = await generateChecklist(formState, provider)
       if (!response.success) {
         throw new Error(response.error || "Generation failed")
       }
@@ -95,6 +98,30 @@ export function GenerateChecklistClient() {
           </p>
         </Card>
       </div>
+
+      <Tabs defaultValue="mock" onValueChange={(v) => setProvider(v as GenerationProvider)} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="mock">
+            <Sparkles className="mr-2 size-4" aria-hidden="true" />
+            Mock Preview
+          </TabsTrigger>
+          <TabsTrigger value="ai">
+            <Zap className="mr-2 size-4" aria-hidden="true" />
+            AI Generate
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="mock" className="space-y-1">
+          <p className="text-xs text-muted-foreground mt-2">Fast mock generation for testing the workflow.</p>
+        </TabsContent>
+
+        <TabsContent value="ai" className="space-y-1">
+          <p className="text-xs text-muted-foreground mt-2">Real AI generation using advanced models.</p>
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Requires OPENAI_API_KEY configured. If not available, falls back to mock.
+          </p>
+        </TabsContent>
+      </Tabs>
 
       <form
         onSubmit={(e) => {
@@ -223,17 +250,26 @@ export function GenerateChecklistClient() {
           />
         </div>
 
+        {/* Helper Copy */}
+        {provider === "ai" && (
+          <Card className="p-3 border-amber-500/20 bg-amber-500/5">
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Larger generations (8+ sections, 12+ items per section) may take longer. Typical generation: 5-10 seconds.
+            </p>
+          </Card>
+        )}
+
         {/* Submit */}
         <Button size="lg" disabled={isGenerating} className="w-full">
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-              Generating...
+              {provider === "mock" ? "Generating Preview..." : "Generating with AI…"}
             </>
           ) : (
             <>
               <Sparkles className="mr-2 size-4" aria-hidden="true" />
-              Generate Checklist
+              Generate Checklist Proposal
             </>
           )}
         </Button>
