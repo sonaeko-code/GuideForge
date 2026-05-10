@@ -105,7 +105,13 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
         editPayload.summary = editSummary
       }
 
-      // Validate steps have required fields
+      // For Checklist, update payload fields
+      if (asset.assetType === "checklist" && editPayload) {
+        editPayload.title = editTitle
+        editPayload.summary = editSummary
+      }
+
+      // Validate steps have required fields (Single Guide)
       if (asset.assetType === "single_guide" && editPayload?.steps) {
         for (const step of editPayload.steps) {
           if (!step.title?.trim() || !step.body?.trim()) {
@@ -119,12 +125,36 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
         }
       }
 
+      // Validate sections and items have required fields (Checklist)
+      if (asset.assetType === "checklist" && editPayload?.sections) {
+        for (const section of editPayload.sections) {
+          if (!section.title?.trim()) {
+            setSaveMessage({
+              type: 'error',
+              text: 'All section titles must be non-empty'
+            })
+            setIsSaving(false)
+            return
+          }
+          for (const item of section.items) {
+            if (!item.label?.trim()) {
+              setSaveMessage({
+                type: 'error',
+                text: 'All item labels must be non-empty'
+              })
+              setIsSaving(false)
+              return
+            }
+          }
+        }
+      }
+
       // Call updateAssetDraft helper to persist to Supabase
       const result = await updateAssetDraft(asset.id, {
         title: editTitle,
         summary: editSummary,
         payload: editPayload, // Include full payload with edits
-      } as any) // Type override since UpdateAssetDraftInput doesn't include payload yet
+      } as any)
 
       if (!result.success) {
         setSaveMessage({
@@ -410,6 +440,96 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               </>
             )}
 
+            {/* Checklist: Edit Sections & Items */}
+            {asset?.assetType === "checklist" && editPayload && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Completion Criteria (one per line)</label>
+                  <textarea
+                    value={editPayload.completionCriteria?.join('\n') || ''}
+                    onChange={(e) => {
+                      setEditPayload({
+                        ...editPayload,
+                        completionCriteria: e.target.value.split('\n').filter(c => c.trim()),
+                      })
+                    }}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
+                    placeholder="Enter one completion criterion per line..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Assumptions (one per line)</label>
+                  <textarea
+                    value={editPayload.assumptions?.join('\n') || ''}
+                    onChange={(e) => {
+                      setEditPayload({
+                        ...editPayload,
+                        assumptions: e.target.value.split('\n').filter(a => a.trim()),
+                      })
+                    }}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
+                    placeholder="Enter one assumption per line..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Sections</label>
+                  <div className="space-y-4">
+                    {editPayload.sections?.map((section: any, sIdx: number) => (
+                      <Card key={sIdx} className="p-3 border-blue-500/30">
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={section.title}
+                            onChange={(e) => {
+                              const newSections = [...editPayload.sections]
+                              newSections[sIdx].title = e.target.value
+                              setEditPayload({ ...editPayload, sections: newSections })
+                            }}
+                            className="w-full px-2 py-1 border border-border rounded text-sm font-semibold bg-background"
+                            placeholder={`Section ${sIdx + 1} title...`}
+                          />
+                          <div className="space-y-2 ml-2">
+                            {section.items?.map((item: any, iIdx: number) => (
+                              <div key={iIdx} className="space-y-1 p-2 bg-muted/20 rounded">
+                                <input
+                                  type="text"
+                                  value={item.label}
+                                  onChange={(e) => {
+                                    const newSections = [...editPayload.sections]
+                                    newSections[sIdx].items[iIdx].label = e.target.value
+                                    setEditPayload({ ...editPayload, sections: newSections })
+                                  }}
+                                  className="w-full px-1 py-1 border border-border rounded text-xs bg-background"
+                                  placeholder="Item label..."
+                                />
+                                {item.description && (
+                                  <input
+                                    type="text"
+                                    value={item.description}
+                                    onChange={(e) => {
+                                      const newSections = [...editPayload.sections]
+                                      newSections[sIdx].items[iIdx].description = e.target.value
+                                      setEditPayload({ ...editPayload, sections: newSections })
+                                    }}
+                                    className="w-full px-1 py-1 border border-border rounded text-xs bg-background text-muted-foreground"
+                                    placeholder="Item description (optional)..."
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="flex gap-2 justify-end pt-2 border-t border-border">
               <Button
                 variant="outline"
@@ -565,20 +685,51 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           )}
 
           {asset.assetType === "checklist" && (
-            <div className="space-y-4">
-              {asset.payload.sections.slice(0, 3).map((section, idx) => (
-                <div key={idx}>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">{section.title}</h3>
+            <div className="space-y-6">
+              {asset.payload.completionCriteria && asset.payload.completionCriteria.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Completion Criteria</h3>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    {section.items.map((item, iIdx) => (
-                      <li key={iIdx}>
-                        ☐ {item.label}
-                        {item.required && ' (Required)'}
-                      </li>
+                    {asset.payload.completionCriteria.map((criterion, idx) => (
+                      <li key={idx}>✓ {criterion}</li>
                     ))}
                   </ul>
                 </div>
-              ))}
+              )}
+
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">Sections ({asset.payload.sections.length})</h3>
+                <div className="space-y-4">
+                  {asset.payload.sections.map((section, sIdx) => (
+                    <div key={sIdx} className="border-l-2 border-blue-500/30 pl-4">
+                      <h4 className="text-sm font-semibold text-foreground mb-2">{section.title}</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        {section.items.map((item, iIdx) => (
+                          <li key={iIdx} className="flex items-start gap-2">
+                            <span>☐</span>
+                            <span>
+                              {item.label}
+                              {item.required && ' (Required)'}
+                              {item.description && ` - ${item.description}`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {asset.payload.assumptions && asset.payload.assumptions.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Assumptions</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {asset.payload.assumptions.map((assumption, idx) => (
+                      <li key={idx}>• {assumption}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

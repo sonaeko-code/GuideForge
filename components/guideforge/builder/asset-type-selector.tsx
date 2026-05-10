@@ -31,7 +31,7 @@ export function AssetTypeSelector() {
       id: "checklist",
       title: "Checklist",
       description: "A structured checklist grouped by sections with completion items and requirements.",
-      status: "coming-soon",
+      status: "available",
     },
     {
       id: "sop",
