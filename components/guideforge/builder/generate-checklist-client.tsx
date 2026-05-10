@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ChecklistIntakeRequest, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
@@ -99,30 +98,6 @@ export function GenerateChecklistClient() {
         </Card>
       </div>
 
-      <Tabs defaultValue="mock" onValueChange={(v) => setProvider(v as GenerationProvider)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="mock">
-            <Sparkles className="mr-2 size-4" aria-hidden="true" />
-            Mock Preview
-          </TabsTrigger>
-          <TabsTrigger value="ai">
-            <Zap className="mr-2 size-4" aria-hidden="true" />
-            AI Generate
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="mock" className="space-y-1">
-          <p className="text-xs text-muted-foreground mt-2">Fast mock generation for testing the workflow.</p>
-        </TabsContent>
-
-        <TabsContent value="ai" className="space-y-1">
-          <p className="text-xs text-muted-foreground mt-2">Real AI generation using advanced models.</p>
-          <p className="text-xs text-amber-700 dark:text-amber-300">
-            Requires OPENAI_API_KEY configured. If not available, falls back to mock.
-          </p>
-        </TabsContent>
-      </Tabs>
-
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -135,6 +110,58 @@ export function GenerateChecklistClient() {
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </Card>
         )}
+
+        {/* Generation Mode Selection */}
+        <div className="space-y-3 rounded-lg border-2 border-primary/20 bg-primary/5 p-4">
+          <h2 className="font-semibold text-foreground">Generation Mode</h2>
+          <p className="text-xs text-muted-foreground">Choose how you'd like your checklist generated:</p>
+          
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setProvider("mock")}
+              className={`rounded-lg border-2 p-3 text-left transition-all ${
+                provider === "mock"
+                  ? "border-primary bg-primary/10 shadow-md"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Sparkles className={`mt-0.5 size-4 shrink-0 ${provider === "mock" ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-sm">Mock Preview</p>
+                  <p className="text-xs text-muted-foreground">Fast generation for testing (~1 second)</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setProvider("ai")}
+              className={`rounded-lg border-2 p-3 text-left transition-all ${
+                provider === "ai"
+                  ? "border-primary bg-primary/10 shadow-md"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Zap className={`mt-0.5 size-4 shrink-0 ${provider === "ai" ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-sm">AI Generate</p>
+                  <p className="text-xs text-muted-foreground">Real AI powered (~5-10 seconds)</p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {provider === "ai" && (
+            <Card className="border-amber-500/30 bg-amber-500/5 p-2">
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Requires OPENAI_API_KEY. If not configured, generation will fail with a clear error.
+              </p>
+            </Card>
+          )}
+        </div>
 
         {/* Basic Info */}
         <div className="space-y-4">
@@ -264,12 +291,12 @@ export function GenerateChecklistClient() {
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-              {provider === "mock" ? "Generating Preview..." : "Generating with AI…"}
+              {provider === "mock" ? "Generating Mock Checklist..." : "Generating with AI..."}
             </>
           ) : (
             <>
               <Sparkles className="mr-2 size-4" aria-hidden="true" />
-              Generate Checklist Proposal
+              {provider === "mock" ? "Generate Mock Checklist" : "Generate AI Checklist"}
             </>
           )}
         </Button>
