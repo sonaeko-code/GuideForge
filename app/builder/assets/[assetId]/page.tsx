@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, AlertCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
-import { getAssetDraft, updateAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
+import { getAssetDraft, updateAssetDraft, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
+import type { GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 
 interface AssetDetailPageProps {
   params: Promise<{ assetId: string }>
@@ -16,6 +18,7 @@ interface AssetDetailPageProps {
 }
 
 export default function AssetDetailPage({ params, searchParams }: AssetDetailPageProps) {
+  const router = useRouter()
   const { user, isAuthenticated, isLoading } = useAuth()
   const [asset, setAsset] = useState<AssetDraft | null>(null)
   const [assetId, setAssetId] = useState<string>("")
@@ -26,6 +29,9 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
   const [editSummary, setEditSummary] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [editPayload, setEditPayload] = useState<any>(null)
 
   // Extract assetId from params
   useEffect(() => {
@@ -61,6 +67,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           setAsset(data)
           setEditTitle(data.title)
           setEditSummary(data.summary || "")
+          setEditPayload(JSON.parse(JSON.stringify(data.payload))) // Deep copy
         }
       } catch (err) {
         console.error("[v0] Asset fetch error:", err)
@@ -92,18 +99,32 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
     setSaveMessage(null)
     
     try {
-      // Update payload to reflect new title/summary if they exist in payload structure
-      const updatedPayload = {
-        ...asset.payload,
-        title: editTitle,
-        summary: editSummary,
+      // For Single Guide, update payload fields
+      if (asset.assetType === "single_guide" && editPayload) {
+        editPayload.title = editTitle
+        editPayload.summary = editSummary
+      }
+
+      // Validate steps have required fields
+      if (asset.assetType === "single_guide" && editPayload?.steps) {
+        for (const step of editPayload.steps) {
+          if (!step.title?.trim() || !step.body?.trim()) {
+            setSaveMessage({
+              type: 'error',
+              text: 'All steps must have a title and body'
+            })
+            setIsSaving(false)
+            return
+          }
+        }
       }
 
       // Call updateAssetDraft helper to persist to Supabase
       const result = await updateAssetDraft(asset.id, {
         title: editTitle,
         summary: editSummary,
-      })
+        payload: editPayload, // Include full payload with edits
+      } as any) // Type override since UpdateAssetDraftInput doesn't include payload yet
 
       if (!result.success) {
         setSaveMessage({
@@ -118,7 +139,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
         ...asset,
         title: editTitle,
         summary: editSummary,
-        payload: updatedPayload,
+        payload: editPayload,
         updatedAt: new Date().toISOString(),
       }
       setAsset(updatedAsset)
@@ -136,6 +157,37 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!asset) return
+    
+    setIsDeleting(true)
+    try {
+      const result = await deleteAssetDraft(asset.id)
+      
+      if (!result.success) {
+        setSaveMessage({
+          type: 'error',
+          text: result.error || 'Failed to delete asset'
+        })
+        setIsDeleting(false)
+        setShowDeleteConfirm(false)
+        return
+      }
+
+      // Redirect to assets list
+      router.push('/builder/assets')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete'
+      console.error("[v0] handleDeleteConfirm error:", err)
+      setSaveMessage({
+        type: 'error',
+        text: msg
+      })
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -270,12 +322,101 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
                 placeholder="Asset summary..."
               />
             </div>
-            <div className="flex gap-2 justify-end">
+
+            {/* Single Guide: Edit Requirements */}
+            {asset?.assetType === "single_guide" && editPayload && (
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Requirements (one per line)</label>
+                  <textarea
+                    value={editPayload.requirements?.join('\n') || ''}
+                    onChange={(e) => {
+                      setEditPayload({
+                        ...editPayload,
+                        requirements: e.target.value.split('\n').filter(r => r.trim()),
+                      })
+                    }}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
+                    placeholder="Enter one requirement per line..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Warnings (one per line)</label>
+                  <textarea
+                    value={editPayload.warnings?.join('\n') || ''}
+                    onChange={(e) => {
+                      setEditPayload({
+                        ...editPayload,
+                        warnings: e.target.value.split('\n').filter(w => w.trim()),
+                      })
+                    }}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
+                    placeholder="Enter one warning per line..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Assumptions (one per line)</label>
+                  <textarea
+                    value={editPayload.assumptions?.join('\n') || ''}
+                    onChange={(e) => {
+                      setEditPayload({
+                        ...editPayload,
+                        assumptions: e.target.value.split('\n').filter(a => a.trim()),
+                      })
+                    }}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
+                    placeholder="Enter one assumption per line..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Steps</label>
+                  <div className="space-y-4">
+                    {editPayload.steps?.map((step: any, idx: number) => (
+                      <Card key={idx} className="p-3 border-blue-500/30">
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={step.title}
+                            onChange={(e) => {
+                              const newSteps = [...editPayload.steps]
+                              newSteps[idx].title = e.target.value
+                              setEditPayload({ ...editPayload, steps: newSteps })
+                            }}
+                            className="w-full px-2 py-1 border border-border rounded text-sm font-semibold bg-background"
+                            placeholder={`Step ${idx + 1} title...`}
+                          />
+                          <textarea
+                            value={step.body}
+                            onChange={(e) => {
+                              const newSteps = [...editPayload.steps]
+                              newSteps[idx].body = e.target.value
+                              setEditPayload({ ...editPayload, steps: newSteps })
+                            }}
+                            rows={2}
+                            className="w-full px-2 py-1 border border-border rounded text-xs bg-background"
+                            placeholder="Step description..."
+                          />
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => {
                   setEditTitle(asset?.title || "")
                   setEditSummary(asset?.summary || "")
+                  setEditPayload(JSON.parse(JSON.stringify(asset?.payload)))
                   setIsEditMode(false)
                 }}
               >
@@ -305,6 +446,39 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           <p className={`text-sm ${saveMessage.type === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
             {saveMessage.text}
           </p>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <Card className="p-6 border-red-500/30 bg-red-500/5">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <div>
+                <h3 className="font-semibold text-red-900 dark:text-red-100">Delete this asset draft?</h3>
+                <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                  This cannot be undone. The draft and all its content will be permanently deleted.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end pt-4 border-t border-red-500/20">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete Draft"}
+              </Button>
+            </div>
+          </div>
         </Card>
       )}
 
@@ -427,10 +601,16 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             Edit Asset
           </Button>
         )}
-        <Button variant="destructive" className="ml-auto">
-          <Trash2 className="mr-2 size-4" aria-hidden="true" />
-          Delete Draft
-        </Button>
+        {!showDeleteConfirm && (
+          <Button
+            variant="destructive"
+            className="ml-auto"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="mr-2 size-4" aria-hidden="true" />
+            Delete Draft
+          </Button>
+        )}
       </div>
         </div>
       </div>

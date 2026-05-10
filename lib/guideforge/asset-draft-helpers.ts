@@ -168,7 +168,10 @@ export async function listMyAssetDrafts(): Promise<AssetDraft[]> {
 /**
  * Update an asset draft.
  */
-export async function updateAssetDraft(assetId: string, input: UpdateAssetDraftInput): Promise<{ success: boolean; error?: string }> {
+export async function updateAssetDraft(
+  assetId: string,
+  input: UpdateAssetDraftInput & { payload?: any }
+): Promise<{ success: boolean; error?: string }> {
   try {
     const updates: any = {}
     
@@ -178,6 +181,7 @@ export async function updateAssetDraft(assetId: string, input: UpdateAssetDraftI
     if (input.attachedNetworkId !== undefined) updates.attached_network_id = input.attachedNetworkId
     if (input.attachedHubId !== undefined) updates.attached_hub_id = input.attachedHubId
     if (input.attachedCollectionId !== undefined) updates.attached_collection_id = input.attachedCollectionId
+    if (input.payload !== undefined) updates.payload = input.payload
 
     const { error } = await supabase
       .from("asset_drafts")

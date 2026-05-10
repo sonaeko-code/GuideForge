@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
-import { listMyAssetDrafts } from "@/lib/guideforge/asset-draft-helpers"
+import { listMyAssetDrafts, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 
 export default function AssetsPage() {
@@ -15,6 +15,8 @@ export default function AssetsPage() {
   const [assets, setAssets] = useState<AssetDraft[]>([])
   const [setupError, setSetupError] = useState<string | null>(null)
   const [isFetching, setIsFetching] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) {
@@ -52,6 +54,21 @@ export default function AssetsPage() {
       troubleshooting_flow: "Troubleshooting Flow",
     }
     return names[type] || type
+  }
+
+  const handleDeleteAsset = async (assetId: string) => {
+    setIsDeleting(true)
+    try {
+      const result = await deleteAssetDraft(assetId)
+      if (result.success) {
+        setAssets(assets.filter(a => a.id !== assetId))
+        setDeleteConfirm(null)
+      }
+    } catch (err) {
+      console.error("[v0] Delete error:", err)
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   // Show sign-in required state if not authenticated
@@ -199,41 +216,78 @@ export default function AssetsPage() {
       {!setupError && !isFetching && assets.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
-            <Card
-              key={asset.id}
-              className="p-4 border-border/50 hover:border-primary/50 transition-colors flex flex-col"
-            >
-              <div className="space-y-3 flex-1">
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs">{getAssetTypeName(asset.assetType)}</Badge>
-                    <span className="text-xs text-muted-foreground">{new Date(asset.createdAt).toLocaleDateString()}</span>
+            <div key={asset.id}>
+              {deleteConfirm === asset.id ? (
+                <Card className="p-4 border-red-500/30 bg-red-500/5 h-full flex flex-col">
+                  <div className="space-y-3 flex-1">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="size-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-900 dark:text-red-100">Delete "{asset.title}"?</p>
+                        <p className="text-xs text-red-800 dark:text-red-200 mt-1">This cannot be undone.</p>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-foreground line-clamp-2">{asset.title}</h3>
-                </div>
-                {asset.summary && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">{asset.summary}</p>
-                )}
-              </div>
-              
-              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-                <Button asChild variant="outline" size="sm" className="flex-1">
-                  <Link href={`/builder/assets/${asset.id}`}>
-                    <Eye className="mr-2 size-4" aria-hidden="true" />
-                    View
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="sm" className="flex-1">
-                  <Link href={`/builder/assets/${asset.id}?edit=true`}>
-                    <Edit className="mr-2 size-4" aria-hidden="true" />
-                    Edit
-                  </Link>
-                </Button>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </Button>
-              </div>
-            </Card>
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-red-500/20">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setDeleteConfirm(null)}
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleDeleteAsset(asset.id)}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-4 border-border/50 hover:border-primary/50 transition-colors flex flex-col h-full">
+                  <div className="space-y-3 flex-1">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <Badge variant="outline" className="text-xs">{getAssetTypeName(asset.assetType)}</Badge>
+                        <span className="text-xs text-muted-foreground">{new Date(asset.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <h3 className="font-semibold text-foreground line-clamp-2">{asset.title}</h3>
+                    </div>
+                    {asset.summary && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{asset.summary}</p>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                    <Button asChild variant="outline" size="sm" className="flex-1">
+                      <Link href={`/builder/assets/${asset.id}`}>
+                        <Eye className="mr-2 size-4" aria-hidden="true" />
+                        View
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="flex-1">
+                      <Link href={`/builder/assets/${asset.id}?edit=true`}>
+                        <Edit className="mr-2 size-4" aria-hidden="true" />
+                        Edit
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteConfirm(asset.id)}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </Card>
+              )}
+            </div>
           ))}
         </div>
       ) : !setupError && !isFetching ? (
