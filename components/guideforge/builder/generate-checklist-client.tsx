@@ -348,7 +348,7 @@ export function GenerateChecklistClient() {
                 value={formState.numberOfSections}
                 onChange={(e) => handleFieldChange("numberOfSections", Math.min(8, Math.max(1, parseInt(e.target.value) || 1)))}
               />
-              <p className="text-xs text-muted-foreground">Max 8 sections</p>
+              <p className="text-xs text-muted-foreground">Max 8 sections {provider === "ai" ? "(AI capped at 4 for MVP speed)" : ""}</p>
             </div>
 
             <div className="space-y-2">
@@ -361,7 +361,7 @@ export function GenerateChecklistClient() {
                 value={formState.itemsPerSection}
                 onChange={(e) => handleFieldChange("itemsPerSection", Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
               />
-              <p className="text-xs text-muted-foreground">Max 12 items per section</p>
+              <p className="text-xs text-muted-foreground">Max 12 items per section {provider === "ai" ? "(AI capped at 5 for MVP speed)" : ""}</p>
             </div>
           </div>
         </div>

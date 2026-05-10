@@ -84,6 +84,15 @@ export async function generateChecklist(
 
       // Check for error response
       if (!response.ok || !data.success) {
+        // Special handling for 504 and timeout responses
+        if (response.status === 504 || (typeof data.error === "string" && (data.error.includes("timeout") || data.error.includes("FUNCTION_INVOCATION_TIMEOUT")))) {
+          return {
+            success: false,
+            error: "AI generation timed out before the server could respond. Try again, or use Mock Preview while we tune the AI route.",
+            provider: "ai",
+          }
+        }
+        
         return {
           success: false,
           error: data.error || "AI generation failed",
