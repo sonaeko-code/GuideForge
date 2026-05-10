@@ -119,8 +119,13 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
 
       {/* Header */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline">{getAssetTypeName()}</Badge>
+          {asset.generatedBy && (
+            <Badge variant="secondary" className="text-xs">
+              {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+            </Badge>
+          )}
           <span className="text-sm text-muted-foreground">Generated Asset — Not Saved Yet</span>
         </div>
         

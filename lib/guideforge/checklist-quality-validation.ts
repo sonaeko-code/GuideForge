@@ -17,6 +17,14 @@ const GENERIC_PATTERNS = {
   itemLabel: /^item \d+/i,
   itemDescription: /^(complete this task|follow this|this is item|do the task|placeholder|todo|example|item \d+)/i,
   singleChar: /^[a-z]$/i,
+  // Additional generic item labels to reject
+  genericItemLabels: [
+    /^review requirements$/i,
+    /^verify details$/i,
+    /^complete setup$/i,
+    /^confirm configuration$/i,
+    /^validate integration$/i,
+  ],
 }
 
 /**
@@ -24,6 +32,8 @@ const GENERIC_PATTERNS = {
  */
 export function validateChecklistQuality(asset: GeneratedChecklist): QualityValidationResult {
   const errors: string[] = []
+  let totalItems = 0
+  let genericItemCount = 0
 
   // Check section titles
   asset.sections.forEach((section, sIdx) => {
@@ -55,11 +65,25 @@ export function validateChecklistQuality(asset: GeneratedChecklist): QualityVali
       const label = item.label.trim()
       const desc = item.description?.trim() || ""
 
+      totalItems++
+
       // Generic item label patterns
       if (GENERIC_PATTERNS.itemLabel.test(label)) {
         errors.push(
           `section[${sIdx}].items[${iIdx}].label is too generic: "${label}". Use specific, actionable labels.`
         )
+        genericItemCount++
+      }
+
+      // Check against common generic item labels
+      for (const pattern of GENERIC_PATTERNS.genericItemLabels) {
+        if (pattern.test(label)) {
+          errors.push(
+            `section[${sIdx}].items[${iIdx}].label is too generic: "${label}". Use specific, actionable labels.`
+          )
+          genericItemCount++
+          break
+        }
       }
 
       // Item label too short
@@ -76,6 +100,13 @@ export function validateChecklistQuality(asset: GeneratedChecklist): QualityVali
         )
       }
 
+      // Description that only repeats section name
+      if (desc && desc.toLowerCase().includes(title.toLowerCase()) && label.toLowerCase() === desc.toLowerCase()) {
+        errors.push(
+          `section[${sIdx}].items[${iIdx}] description should not just repeat the section title.`
+        )
+      }
+
       // Check for repeated similar labels in same section
       const sameLabels = section.items.filter((i) => i.label.trim() === label)
       if (sameLabels.length > 1) {
@@ -86,16 +117,30 @@ export function validateChecklistQuality(asset: GeneratedChecklist): QualityVali
     })
   })
 
+  // Check for excessive generic items (more than 30%)
+  if (totalItems > 0 && genericItemCount / totalItems > 0.3) {
+    errors.push(
+      `Too many generic item labels (${genericItemCount}/${totalItems}). More than 30% are placeholder/common patterns.`
+    )
+  }
+
   // Check summary
   const summary = asset.summary.trim()
-  if (summary.startsWith("A comprehensive checklist for")) {
-    // This pattern is allowed but should be checked for grammatical correctness
-    // Only reject if it looks malformed
-    if (summary.includes("..") || summary.includes("//")) {
-      errors.push(
-        `summary has formatting issues: "${summary.substring(0, 60)}..."`
-      )
-    }
+  
+  // Summary that starts with "This checklist helps [audience] make sure [goal]" pattern
+  if (
+    summary.match(/^This checklist helps .+ make sure .+\. For .+\. Tone: .+\.?$/i) ||
+    summary.match(/^A comprehensive checklist for .+\. Use this for .+\.$/i)
+  ) {
+    errors.push(
+      `Summary appears to be a generic template: "${summary}". Provide natural, specific summary.`
+    )
+  }
+
+  if (summary.includes("..") || summary.includes("//")) {
+    errors.push(
+      `summary has formatting issues: "${summary.substring(0, 60)}..."`
+    )
   }
 
   // Check for double periods

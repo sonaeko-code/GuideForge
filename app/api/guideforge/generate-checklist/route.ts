@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
               {
                 success: false,
-                error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+                error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
               },
               { status: 500 }
             )
@@ -386,7 +386,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
               {
                 success: false,
-                error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+                error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
               },
               { status: 500 }
             )
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
               {
                 success: false,
-                error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+                error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
               },
               { status: 500 }
             )
@@ -417,7 +417,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+          error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
         },
         { status: 500 }
       )
