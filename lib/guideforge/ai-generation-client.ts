@@ -61,7 +61,10 @@ export async function generateChecklist(
         data = JSON.parse(text)
       } catch (parseErr) {
         console.error("[v0] generateChecklist: Failed to parse API response as JSON")
-        console.error("[v0] First 200 chars of response:", response.text?.substring(0, 200) || "[no text]")
+        // Use text variable instead of response.text method
+        const text = await response.text()
+        const debugText = typeof text === "string" ? text.substring(0, 200) : String(text).substring(0, 200)
+        console.error("[v0] First 200 chars of response:", debugText || "[no text]")
         return {
           success: false,
           error: "AI generation failed. The server returned an invalid response.",

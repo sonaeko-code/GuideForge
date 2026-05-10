@@ -95,8 +95,10 @@ export function validateChecklistQuality(asset: GeneratedChecklist): QualityVali
 
       // Generic item description
       if (desc && GENERIC_PATTERNS.itemDescription.test(desc)) {
+        // Safely truncate description for logging
+        const descPreview = (typeof desc === "string" ? desc : String(desc)).substring(0, 40)
         errors.push(
-          `section[${sIdx}].items[${iIdx}].description is too generic: "${desc.substring(0, 40)}...". Use specific details.`
+          `section[${sIdx}].items[${iIdx}].description is too generic: "${descPreview}...". Use specific details.`
         )
       }
 
@@ -138,8 +140,10 @@ export function validateChecklistQuality(asset: GeneratedChecklist): QualityVali
   }
 
   if (summary.includes("..") || summary.includes("//")) {
+    // Safely truncate summary for logging
+    const summaryPreview = (typeof summary === "string" ? summary : String(summary)).substring(0, 60)
     errors.push(
-      `summary has formatting issues: "${summary.substring(0, 60)}..."`
+      `summary has formatting issues: "${summaryPreview}..."`
     )
   }
 

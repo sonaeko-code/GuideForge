@@ -56,7 +56,8 @@ async function callOpenAI(apiKey: string, messages: any[]): Promise<string | nul
         // If JSON parse fails, try text (HTML error page, etc.)
         try {
           const errorText = await openaiResponse.text()
-          errorDetail = errorText.substring(0, 200)
+          // Ensure errorText is a string before calling substring
+          errorDetail = (typeof errorText === "string" ? errorText : String(errorText)).substring(0, 200)
         } catch (_) {
           errorDetail = `HTTP ${openaiResponse.status}: ${openaiResponse.statusText}`
         }
@@ -65,10 +66,13 @@ async function callOpenAI(apiKey: string, messages: any[]): Promise<string | nul
       const isAuthError = openaiResponse.status === 401 || errorDetail.includes("authentication") || errorDetail.includes("invalid_api_key")
       const isQuotaError = openaiResponse.status === 429 || errorDetail.includes("rate") || errorDetail.includes("quota")
       
+      // Ensure errorDetail is a string before calling substring
+      const errorDetailSafe = (typeof errorDetail === "string" ? errorDetail : String(errorDetail)).substring(0, 200)
+      
       console.error("[v0] OpenAI API error:", {
         status: openaiResponse.status,
         statusText: openaiResponse.statusText,
-        detail: errorDetail.substring(0, 200),
+        detail: errorDetailSafe,
         isAuth: isAuthError,
         isQuota: isQuotaError,
       })
@@ -263,7 +267,9 @@ export async function POST(request: NextRequest) {
       asset = JSON.parse(content)
     } catch (parseErr) {
       console.error("[v0] Failed to parse OpenAI response as JSON, attempting repair...")
-      console.error("[v0] Raw content:", content.substring(0, 300))
+      // Safely log first 300 chars of content
+      const debugContent = (typeof content === "string" ? content : String(content)).substring(0, 300)
+      console.error("[v0] Raw content:", debugContent)
 
       // If parsing fails, try repair pass
       if (MAX_REPAIR_ATTEMPTS > 0) {
