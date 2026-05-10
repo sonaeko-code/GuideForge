@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { ChecklistGenerationRequest } from "@/lib/guideforge/ai-generation-types"
 import type { GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import { validateGeneratedChecklist } from "@/lib/guideforge/ai-generation-validation"
+import { validateChecklistQuality } from "@/lib/guideforge/checklist-quality-validation"
 import { buildChecklistPrompt, buildChecklistRepairPrompt } from "@/lib/guideforge/ai-prompts"
 import { DEFAULT_CHECKLIST_MODEL, GENERATION_TEMPERATURE, MAX_GENERATION_TOKENS, MAX_REPAIR_ATTEMPTS } from "@/lib/guideforge/ai-generation-config"
 
@@ -325,16 +326,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate output
+    // Validate output (schema first, then quality)
     const validation = validateGeneratedChecklist(asset)
     if (!validation.valid) {
-      console.log("[v0] API: Initial validation failed, attempting repair...")
-      console.log("[v0] Validation errors:", validation.errors)
+      console.log("[v0] API: Schema validation failed, attempting repair...")
+      console.log("[v0] Schema errors:", validation.errors)
 
-      // Attempt one repair
+      // Attempt one repair for schema errors
       if (MAX_REPAIR_ATTEMPTS > 0) {
         const repairedAsset = await attemptRepair(apiKey, body, asset, validation.errors)
         if (repairedAsset) {
+          // Check quality after repair
+          const qualityCheck = validateChecklistQuality(repairedAsset)
+          if (!qualityCheck.valid) {
+            console.log("[v0] API: Repair succeeded schema but failed quality check")
+            return NextResponse.json(
+              {
+                success: false,
+                error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+              },
+              { status: 500 }
+            )
+          }
           console.log("[v0] API: generateChecklist - Success after repair!")
           repairedAsset.generatedBy = "openai"
           return NextResponse.json({
@@ -346,7 +359,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Repair failed or not attempted
-      console.error("[v0] Generated asset failed validation (no successful repair):", validation.errors)
+      console.error("[v0] Generated asset failed schema validation (no successful repair):", validation.errors)
       return NextResponse.json(
         {
           success: false,
@@ -356,9 +369,63 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Schema passed, now check quality
+    const qualityCheck = validateChecklistQuality(asset)
+    if (!qualityCheck.valid) {
+      console.log("[v0] API: Schema passed but quality validation failed, attempting repair...")
+      console.log("[v0] Quality errors:", qualityCheck.errors)
+
+      // Attempt one repair for quality issues
+      if (MAX_REPAIR_ATTEMPTS > 0) {
+        const repairedAsset = await attemptRepair(apiKey, body, asset, qualityCheck.errors)
+        if (repairedAsset) {
+          // Verify repair passes both schema and quality
+          const schemaCheck = validateGeneratedChecklist(repairedAsset)
+          if (!schemaCheck.valid) {
+            console.log("[v0] API: Quality repair failed schema check")
+            return NextResponse.json(
+              {
+                success: false,
+                error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+              },
+              { status: 500 }
+            )
+          }
+          const finalQualityCheck = validateChecklistQuality(repairedAsset)
+          if (!finalQualityCheck.valid) {
+            console.log("[v0] API: Quality repair still has quality issues")
+            return NextResponse.json(
+              {
+                success: false,
+                error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+              },
+              { status: 500 }
+            )
+          }
+          console.log("[v0] API: generateChecklist - Success after quality repair!")
+          repairedAsset.generatedBy = "openai"
+          return NextResponse.json({
+            success: true,
+            asset: repairedAsset,
+            repaired: true,
+          })
+        }
+      }
+
+      // Quality repair failed or not attempted
+      console.error("[v0] Generated asset failed quality validation (no successful repair):", qualityCheck.errors)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview.",
+        },
+        { status: 500 }
+      )
+    }
+
     console.log("[v0] API: generateChecklist - Success!")
     
-    // Add source metadata (Phase 6)
+    // Add source metadata
     asset.generatedBy = "openai"
     
     return NextResponse.json({

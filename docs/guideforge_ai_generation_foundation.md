@@ -65,16 +65,17 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ```
 lib/guideforge/
-├── ai-generation-types.ts       # Type definitions and interfaces
-├── ai-generation-client.ts      # Unified client API
-├── ai-generation-validation.ts  # Validation rules for each asset type
-├── ai-generation-config.ts      # Model configuration (NEW)
-├── ai-prompts.ts                # Prompt contracts for AI
-└── mock-asset-generator.ts      # Existing mock generation (preserved)
+├── ai-generation-types.ts           # Type definitions and interfaces
+├── ai-generation-client.ts          # Unified client API
+├── ai-generation-validation.ts      # Schema validation for all asset types
+├── checklist-quality-validation.ts  # Quality validation specific to checklists (NEW)
+├── ai-generation-config.ts          # Model configuration
+├── ai-prompts.ts                    # Prompt contracts for AI
+└── mock-asset-generator.ts          # Existing mock generation (preserved)
 
 app/api/guideforge/
 └── generate-checklist/
-    └── route.ts                 # Server-side API for AI generation (with repair)
+    └── route.ts                     # Server-side API for AI generation (with repair)
 ```
 
 ### Generation Flow
@@ -87,6 +88,7 @@ User fills form
      │        + 1000ms delay
      │        + Deterministic output
      │        + No API key needed
+     │        + Quality-compliant placeholder content
      │
      └→ AI: POST /api/guideforge/generate-checklist
              ↓
@@ -101,11 +103,16 @@ User fills form
              ├→ Valid JSON: Continue
              ↓
           [Validate schema]
+             ├→ Invalid: Attempt ONE repair pass (include schema errors in repair prompt)
+             │           ├→ Repair passes schema: Continue to quality check
+             │           └→ Repair fails schema: Return error
+             ├→ Valid: Continue to quality check
+             ↓
+          [Validate content quality]
+             ├→ Invalid: Attempt ONE repair pass (include quality errors in repair prompt)
+             │           ├→ Repair passes schema & quality: Return repaired asset
+             │           └→ Repair fails: Return "Quality rules failed" error
              ├→ Valid: Return asset
-             ├→ Invalid: Attempt ONE repair pass
-             │           ├→ Repair valid: Return repaired asset
-             │           └→ Repair invalid: Return "AI returned incomplete checklist" error
-             └→ No attempts left: Return error
      ↓
 [Validate in client]
      ├→ Valid: Show proposal review
@@ -344,6 +351,61 @@ Sections: 3-4
 Items per section: 5-7
 ```
 Expected: Channel review, member behavior, rules, escalation sections
+
+## Content Quality Validation
+
+GuideForge validates more than just schema correctness. AI-generated checklists must also meet quality standards:
+
+### Quality Requirements
+1. **Section titles** must be meaningful (minimum 3 characters), not "Section 1", "P", "r", "e", "p", or single letters
+2. **Item labels** must be specific (minimum 5 characters), not "Item 1", "Item 2", or "Complete this task"
+3. **Item descriptions** must be useful, not generic placeholders like "This is item X" or "Follow this carefully"
+4. **Summaries** must be grammatically correct and avoid awkward patterns
+
+### What Gets Rejected
+Checklists that contain:
+- Single-character section titles (e.g., "P", "r", "e", "p")
+- Generic patterns like "Section 1", "Item 1 in section 1"
+- Placeholder text: "TODO", "Example item", "[fill in]"
+- Generic descriptions: "Complete this task for section", "This is item X"
+- Duplicate items in the same section
+- Double periods or formatting errors in summary
+
+If a checklist fails quality validation, the system attempts ONE repair pass with the AI, providing error details so the AI can generate better content. If repair also fails, user sees: "AI generated a checklist, but it did not meet GuideForge quality rules. Please try again or use Mock Preview."
+
+### Known-Good Quality Test
+Use this real test case to verify quality validation is working:
+
+```
+Input:
+Title: Pre-launch checklist for an indie survival game update
+Audience: Indie game developer
+Purpose: Make sure a Steam early access patch is ready before release
+Goal: Catch issues before launch and prepare rollback if needed
+Use case: Steam early access patch launch
+Additional context: QA, backups, patch notes, community announcement, monitoring, rollback planning
+
+Expected output characteristics:
+- Sections like: "QA & Regression Testing", "Build Backup & Rollback Preparation", "Patch Notes & Store Page", "Community Communication", "Launch Monitoring"
+- NOT sections like: "P", "r", "e", "p", "Section 1", "Section 2"
+- Items like: "Verify all critical bugs are resolved", "Back up the current live build", "Schedule community announcement posts"
+- NOT items like: "Item 1 in section 1", "Complete this task for section 1", "Item 2 in section 2"
+- Summary like: "This checklist helps indie developers prepare a Steam Early Access patch launch by covering QA, backups, patch notes, community messaging, and rollback planning."
+- NOT summary like: "A comprehensive checklist for Catch issues before launch and prepare rollback if needed.. Use this for Steam early access patch launch."
+
+Quality validation will REJECT:
+✗ Any section title that is 1 character (P, r, e, p)
+✗ Section titles matching /^Section \d+/i
+✗ Item labels matching /^Item \d+/
+✗ Item descriptions with generic phrases like "Complete this task for section"
+✗ Summaries with ".." (double periods)
+
+Quality validation will ACCEPT:
+✓ Domain-specific section titles of 3+ characters
+✓ Actionable item labels of 5+ characters, starting with verbs
+✓ Specific, useful descriptions
+✓ Grammatically correct summaries
+```
 
 ## Security & Safety
 

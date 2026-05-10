@@ -136,11 +136,13 @@ export async function generateChecklistMock(
   await new Promise((resolve) => setTimeout(resolve, 1000))
 
   try {
+    // Fixed: Use proper string split instead of character indexing
+    const sectionNames = "Preparation,Setup,Execution,Verification,Cleanup".split(",")
     const sections = Array.from({ length: Math.max(2, request.numberOfSections) }).map((_, sIdx) => ({
-      title: `Section ${sIdx + 1}: ${"Preparation,Setup,Execution,Verification,Cleanup"[sIdx] || "Additional"}`,
+      title: `${sectionNames[sIdx] || "Additional Tasks"}`,
       items: Array.from({ length: Math.max(2, request.itemsPerSection) }).map((_, iIdx) => ({
-        label: `Item ${iIdx + 1} in section ${sIdx + 1}`,
-        description: `Complete this task for section ${sIdx + 1}.`,
+        label: `${["Review", "Verify", "Complete", "Confirm", "Validate", "Check", "Test", "Prepare", "Plan", "Execute"][iIdx % 10]} ${["requirements", "details", "setup", "configuration", "integration", "testing", "deployment", "documentation", "dependencies", "status"][iIdx % 10]}`,
+        description: iIdx === 0 ? `Start with this essential task for ${sectionNames[sIdx]}` : null,
         required: iIdx === 0 || iIdx === Math.floor(request.itemsPerSection / 2),
       })),
     }))
@@ -148,7 +150,7 @@ export async function generateChecklistMock(
     const asset: GeneratedChecklist = {
       assetType: "checklist",
       title: request.title,
-      summary: `A comprehensive checklist for ${request.goal}. Use this for ${request.useCase}.`,
+      summary: `This checklist helps ${request.audience} ${request.purpose.toLowerCase()}. For ${request.useCase}. Tone: ${request.tone}.`,
       sections,
       completionCriteria: [
         "All required items completed",
