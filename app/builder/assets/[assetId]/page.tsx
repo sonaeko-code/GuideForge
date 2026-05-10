@@ -1,45 +1,61 @@
-import { redirect } from "next/navigation"
-import { Metadata } from "next"
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Trash2 } from "lucide-react"
+import { ArrowLeft, Trash2, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/guideforge/auth-context"
 import { getAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
-import { supabase } from "@/lib/guideforge/supabase-client"
-
-// Dynamic page - requires auth
-export const dynamic = "force-dynamic"
-
-export const metadata: Metadata = {
-  title: "Asset Draft | GuideForge Builder",
-  description: "Review and edit your asset draft",
-}
+import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 
 interface AssetDetailPageProps {
   params: Promise<{ assetId: string }>
 }
 
-export default async function AssetDetailPage({ params }: AssetDetailPageProps) {
-  const { assetId } = await params
+export default function AssetDetailPage({ params }: AssetDetailPageProps) {
+  const { user, isAuthenticated, isLoading } = useAuth()
+  const [asset, setAsset] = useState<AssetDraft | null>(null)
+  const [assetId, setAssetId] = useState<string>("")
+  const [notFound, setNotFound] = useState(false)
+  const [isFetching, setIsFetching] = useState(false)
 
-  // Check auth
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Extract assetId from params
+  useEffect(() => {
+    params.then(({ assetId }) => {
+      setAssetId(assetId)
+    })
+  }, [params])
 
-  if (!user) {
-    redirect("/auth/login")
-  }
+  // Fetch asset once authenticated and assetId is set
+  useEffect(() => {
+    if (!isAuthenticated || isLoading || !assetId) {
+      return
+    }
 
-  // Fetch asset (RLS will ensure user owns it)
-  const asset = await getAssetDraft(assetId)
+    const fetchAsset = async () => {
+      setIsFetching(true)
+      try {
+        const data = await getAssetDraft(assetId)
+        if (!data) {
+          setNotFound(true)
+        } else {
+          setAsset(data)
+        }
+      } catch (err) {
+        console.error("[v0] Asset fetch error:", err)
+        setNotFound(true)
+      } finally {
+        setIsFetching(false)
+      }
+    }
 
-  if (!asset) {
-    redirect("/builder/assets?error=not-found")
-  }
+    fetchAsset()
+  }, [isAuthenticated, isLoading, assetId])
 
   const getAssetTypeName = (): string => {
+    if (!asset) return ""
     const names: Record<string, string> = {
       single_guide: "Guide",
       recipe: "Recipe",
@@ -48,6 +64,79 @@ export default async function AssetDetailPage({ params }: AssetDetailPageProps) 
       troubleshooting_flow: "Troubleshooting Flow",
     }
     return names[asset.assetType] || asset.assetType
+  }
+
+  // Show sign-in required state
+  if (!isLoading && !isAuthenticated) {
+    return (
+      <div className="space-y-8">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/builder/assets">
+            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+            Back to Assets
+          </Link>
+        </Button>
+        <Card className="p-6 border-border/50">
+          <div className="space-y-4 text-center">
+            <p className="font-semibold text-foreground">Sign in to view your assets</p>
+            <div className="flex gap-2 justify-center">
+              <Button asChild variant="outline">
+                <Link href="/auth/login">Sign In</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/auth/signup">Create Account</Link>
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show loading state
+  if (isLoading || isFetching) {
+    return (
+      <div className="space-y-8">
+        <Button variant="ghost" size="sm" disabled>
+          <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+          Back to Assets
+        </Button>
+        <Card className="p-12 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+            <p className="text-muted-foreground">Loading asset...</p>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show not found state
+  if (notFound || !asset) {
+    return (
+      <div className="space-y-8">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/builder/assets">
+            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+            Back to Assets
+          </Link>
+        </Button>
+        <Card className="p-6 border-red-500/20 bg-red-500/5">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-red-900 dark:text-red-100">Asset not found</p>
+              <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                The asset you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+              </p>
+              <Button asChild className="mt-4" size="sm">
+                <Link href="/builder/assets">Back to Assets</Link>
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (

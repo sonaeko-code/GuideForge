@@ -25,13 +25,13 @@ export default async function BuilderPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold text-foreground">Your Workspace</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* My Networks */}
+            {/* All Networks */}
             <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
               <div className="flex size-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Folder className="size-4" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">My Networks</h3>
+                <h3 className="font-semibold text-foreground">All Networks</h3>
                 <p className="text-sm text-muted-foreground">
                   Guide networks with hubs, collections, and reviews.
                 </p>
