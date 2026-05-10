@@ -65,6 +65,42 @@ ${CHECKLIST_SCHEMA}
 Generate a well-structured, practical checklist that matches this schema exactly.`
 }
 
+export function buildChecklistRepairPrompt(
+  request: ChecklistGenerationRequest,
+  invalidOutput: any,
+  validationErrors: string[]
+): string {
+  return `You are a JSON repair specialist. Fix the following broken GuideForge checklist JSON output.
+
+ORIGINAL REQUEST:
+- Title: ${request.title}
+- Audience: ${request.audience}
+- Goal: ${request.goal}
+- Purpose: ${request.purpose}
+- Tone: ${request.tone}
+
+BROKEN OUTPUT:
+${JSON.stringify(invalidOutput, null, 2)}
+
+VALIDATION ERRORS:
+${validationErrors.map((e) => `- ${e}`).join("\n")}
+
+REQUIRED SCHEMA (fix to match exactly):
+${CHECKLIST_SCHEMA}
+
+REPAIR RULES:
+1. Fix all validation errors listed above
+2. Ensure assetType is "checklist"
+3. Ensure title and summary are non-empty strings
+4. Ensure sections array has 1-8 sections, each with 1-12 items
+5. Each item must have label (non-empty), description (string or null), and required (boolean)
+6. Ensure completionCriteria, tags, assumptions, missingInfo are all arrays
+7. Return ONLY valid JSON, no explanations or markdown
+8. If content is completely broken, generate a new practical checklist based on the original request
+
+Return fixed JSON only.`
+}
+
 /**
  * Example response that validates - for reference/testing.
  */

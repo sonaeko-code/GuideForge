@@ -353,6 +353,8 @@ export interface GeneratedChecklist {
   tags: string[]
   assumptions: string[]
   missingInfo: string[]
+  /** Source metadata - for tracking generation method (Phase 6) */
+  generatedBy?: "mock" | "openai" | "claude" | "other"
 }
 
 // SOP / Procedure

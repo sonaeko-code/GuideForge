@@ -162,6 +162,7 @@ export async function generateChecklistMock(
         `Audience: ${request.audience}`,
       ],
       missingInfo: [],
+      generatedBy: "mock",
     }
 
     return { success: true, asset }

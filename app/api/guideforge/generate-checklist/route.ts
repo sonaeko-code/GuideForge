@@ -6,16 +6,106 @@
  * Server-side endpoint for AI generation.
  * Uses OPENAI_API_KEY (server-only).
  * Validates output before returning.
+ * Attempts one repair pass if output is malformed.
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import type { ChecklistGenerationRequest } from "@/lib/guideforge/ai-generation-types"
 import type { GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import { validateGeneratedChecklist } from "@/lib/guideforge/ai-generation-validation"
-import { buildChecklistPrompt } from "@/lib/guideforge/ai-prompts"
+import { buildChecklistPrompt, buildChecklistRepairPrompt } from "@/lib/guideforge/ai-prompts"
+import { DEFAULT_CHECKLIST_MODEL, GENERATION_TEMPERATURE, MAX_GENERATION_TOKENS, MAX_REPAIR_ATTEMPTS } from "@/lib/guideforge/ai-generation-config"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
+
+/**
+ * Call OpenAI API to generate or repair checklist
+ */
+async function callOpenAI(apiKey: string, messages: any[]): Promise<string | null> {
+  const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: DEFAULT_CHECKLIST_MODEL,
+      messages,
+      temperature: GENERATION_TEMPERATURE,
+      max_tokens: MAX_GENERATION_TOKENS,
+      response_format: { type: "json_object" },
+    }),
+  })
+
+  if (!openaiResponse.ok) {
+    const error = await openaiResponse.json()
+    console.error("[v0] OpenAI API error:", error)
+    throw new Error(`OpenAI API error: ${error.error?.message || "Unknown error"}`)
+  }
+
+  const openaiData = await openaiResponse.json()
+  const content = openaiData.choices[0]?.message?.content
+
+  if (!content) {
+    throw new Error("OpenAI returned empty response")
+  }
+
+  return content
+}
+
+/**
+ * Attempt to repair invalid output
+ */
+async function attemptRepair(
+  apiKey: string,
+  body: ChecklistGenerationRequest,
+  invalidOutput: any,
+  validationErrors: string[]
+): Promise<GeneratedChecklist | null> {
+  console.log("[v0] API: Attempting repair of invalid AI output...")
+
+  try {
+    const repairPrompt = buildChecklistRepairPrompt(body, invalidOutput, validationErrors)
+
+    const repairContent = await callOpenAI(apiKey, [
+      {
+        role: "system",
+        content:
+          "You are a JSON repair specialist. Your job is to fix broken JSON output to match the GuideForge schema. Return valid JSON only.",
+      },
+      {
+        role: "user",
+        content: repairPrompt,
+      },
+    ])
+
+    if (!repairContent) {
+      console.log("[v0] API: Repair returned empty content")
+      return null
+    }
+
+    let repairedAsset: GeneratedChecklist
+    try {
+      repairedAsset = JSON.parse(repairContent)
+    } catch (err) {
+      console.log("[v0] API: Repair JSON parsing failed")
+      return null
+    }
+
+    const repairValidation = validateGeneratedChecklist(repairedAsset)
+    if (repairValidation.valid) {
+      console.log("[v0] API: Repair successful!")
+      return repairedAsset
+    } else {
+      console.log("[v0] API: Repaired output still invalid:", repairValidation.errors)
+      return null
+    }
+  } catch (err) {
+    console.error("[v0] API: Repair attempt failed:", err instanceof Error ? err.message : String(err))
+    return null
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,50 +156,26 @@ export async function POST(request: NextRequest) {
     const prompt = buildChecklistPrompt(body)
 
     // Call OpenAI API
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4-turbo",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: "json_object" },
-      }),
-    })
-
-    if (!openaiResponse.ok) {
-      const error = await openaiResponse.json()
-      console.error("[v0] OpenAI API error:", error)
+    let content: string
+    try {
+      content = await callOpenAI(apiKey, [
+        {
+          role: "system",
+          content:
+            "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ])
+    } catch (err) {
+      console.error("[v0] OpenAI API call failed:", err instanceof Error ? err.message : String(err))
       return NextResponse.json(
         {
           success: false,
-          error: `OpenAI API error: ${error.error?.message || "Unknown error"}`,
+          error: "AI generation failed. Please try again.",
         },
-        { status: 500 }
-      )
-    }
-
-    const openaiData = await openaiResponse.json()
-    const content = openaiData.choices[0]?.message?.content
-
-    if (!content) {
-      console.error("[v0] OpenAI returned no content")
-      return NextResponse.json(
-        { success: false, error: "OpenAI returned empty response" },
         { status: 500 }
       )
     }
@@ -119,11 +185,11 @@ export async function POST(request: NextRequest) {
     try {
       asset = JSON.parse(content)
     } catch (err) {
-      console.error("[v0] Failed to parse OpenAI response as JSON:", content)
+      console.error("[v0] Failed to parse OpenAI response as JSON:", content.substring(0, 200))
       return NextResponse.json(
         {
           success: false,
-          error: "Generated content was not valid JSON",
+          error: "AI returned invalid JSON. Please try again or use Mock Preview.",
         },
         { status: 500 }
       )
@@ -132,20 +198,43 @@ export async function POST(request: NextRequest) {
     // Validate output
     const validation = validateGeneratedChecklist(asset)
     if (!validation.valid) {
-      console.error("[v0] Generated asset failed validation:", validation.errors)
+      console.log("[v0] API: Initial validation failed, attempting repair...")
+      console.log("[v0] Validation errors:", validation.errors)
+
+      // Attempt one repair
+      if (MAX_REPAIR_ATTEMPTS > 0) {
+        const repairedAsset = await attemptRepair(apiKey, body, asset, validation.errors)
+        if (repairedAsset) {
+          console.log("[v0] API: generateChecklist - Success after repair!")
+          repairedAsset.generatedBy = "openai"
+          return NextResponse.json({
+            success: true,
+            asset: repairedAsset,
+            repaired: true,
+          })
+        }
+      }
+
+      // Repair failed or not attempted
+      console.error("[v0] Generated asset failed validation (no successful repair):", validation.errors)
       return NextResponse.json(
         {
           success: false,
-          error: `Generated checklist validation failed: ${validation.errors.join("; ")}`,
+          error: "AI returned an incomplete checklist. Please try again or use Mock Preview.",
         },
         { status: 500 }
       )
     }
 
     console.log("[v0] API: generateChecklist - Success!")
+    
+    // Add source metadata (Phase 6)
+    asset.generatedBy = "openai"
+    
     return NextResponse.json({
       success: true,
       asset,
+      repaired: false,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error"
@@ -153,7 +242,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: `Internal server error: ${msg}`,
+        error: "AI generation failed. Please try again.",
       },
       { status: 500 }
     )
