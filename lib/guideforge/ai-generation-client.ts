@@ -93,9 +93,21 @@ export async function generateChecklist(
     const validation = validateGeneratedChecklist(asset)
     if (!validation.valid) {
       console.error("[v0] generateChecklist validation failed:", validation.errors)
+      
+      // Determine user-friendly error message based on validation errors
+      let userMessage = "Generated checklist did not match GuideForge structure. Try again."
+      
+      if (validation.errors.some(e => e.includes("sections") && e.includes("more than"))) {
+        userMessage = "Checklist has too many sections. Use up to 8 sections."
+      } else if (validation.errors.some(e => e.includes("items") && e.includes("more than"))) {
+        userMessage = "One or more sections have too many items. Use up to 12 items per section."
+      } else if (validation.errors.some(e => e.includes("sections") || e.includes("items"))) {
+        userMessage = "Checklist size constraints exceeded. Try again with fewer sections or items."
+      }
+      
       return {
         success: false,
-        error: "Generated checklist did not match GuideForge structure. Try again.",
+        error: userMessage,
         provider,
       }
     }

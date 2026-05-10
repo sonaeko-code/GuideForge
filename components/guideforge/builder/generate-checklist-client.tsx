@@ -59,7 +59,25 @@ export function GenerateChecklistClient() {
 
     setIsGenerating(true)
     try {
-      const response = await generateChecklist(formState, provider)
+      // Clamp values to validation limits before generation
+      const clampedRequest = {
+        ...formState,
+        numberOfSections: Math.max(1, Math.min(8, formState.numberOfSections)),
+        itemsPerSection: Math.max(1, Math.min(12, formState.itemsPerSection)),
+      }
+
+      // Show message if values were adjusted
+      if (
+        clampedRequest.numberOfSections !== formState.numberOfSections ||
+        clampedRequest.itemsPerSection !== formState.itemsPerSection
+      ) {
+        console.log("[v0] Clamped generation request sizes:", {
+          original: { sections: formState.numberOfSections, items: formState.itemsPerSection },
+          clamped: { sections: clampedRequest.numberOfSections, items: clampedRequest.itemsPerSection },
+        })
+      }
+
+      const response = await generateChecklist(clampedRequest, provider)
       if (!response.success) {
         throw new Error(response.error || "Generation failed")
       }
@@ -245,10 +263,11 @@ export function GenerateChecklistClient() {
                 id="sections"
                 type="number"
                 min="1"
-                max="10"
+                max="8"
                 value={formState.numberOfSections}
-                onChange={(e) => handleFieldChange("numberOfSections", parseInt(e.target.value))}
+                onChange={(e) => handleFieldChange("numberOfSections", Math.min(8, Math.max(1, parseInt(e.target.value) || 1)))}
               />
+              <p className="text-xs text-muted-foreground">Max 8 sections</p>
             </div>
 
             <div className="space-y-2">
@@ -257,10 +276,11 @@ export function GenerateChecklistClient() {
                 id="items"
                 type="number"
                 min="1"
-                max="20"
+                max="12"
                 value={formState.itemsPerSection}
-                onChange={(e) => handleFieldChange("itemsPerSection", parseInt(e.target.value))}
+                onChange={(e) => handleFieldChange("itemsPerSection", Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
               />
+              <p className="text-xs text-muted-foreground">Max 12 items per section</p>
             </div>
           </div>
         </div>
