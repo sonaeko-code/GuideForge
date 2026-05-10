@@ -48,18 +48,23 @@ async function callOpenAI(apiKey: string, messages: any[]): Promise<string | nul
     if (!openaiResponse.ok) {
       let errorDetail = "Unknown error"
       
+      // Read response body exactly once
+      let responseBodyText: string
       try {
-        // Try to parse as JSON first (OpenAI error response)
-        const errorJson = await openaiResponse.json()
-        errorDetail = errorJson.error?.message || JSON.stringify(errorJson)
-      } catch (_) {
-        // If JSON parse fails, try text (HTML error page, etc.)
+        responseBodyText = await openaiResponse.text()
+      } catch (readErr) {
+        console.error("[v0] API: Failed to read OpenAI error response body", readErr)
+        responseBodyText = ""
+      }
+      
+      // Try to parse as JSON
+      if (responseBodyText) {
         try {
-          const errorText = await openaiResponse.text()
-          // Ensure errorText is a string before calling substring
-          errorDetail = (typeof errorText === "string" ? errorText : String(errorText)).substring(0, 200)
+          const errorJson = JSON.parse(responseBodyText)
+          errorDetail = errorJson.error?.message || JSON.stringify(errorJson)
         } catch (_) {
-          errorDetail = `HTTP ${openaiResponse.status}: ${openaiResponse.statusText}`
+          // If JSON parse fails, use the text as-is
+          errorDetail = (typeof responseBodyText === "string" ? responseBodyText : String(responseBodyText)).substring(0, 200)
         }
       }
 
@@ -86,7 +91,7 @@ async function callOpenAI(apiKey: string, messages: any[]): Promise<string | nul
       }
     }
 
-    // Parse successful response
+    // Parse successful response - body is unread, so json() is safe here
     const openaiData = await openaiResponse.json()
     const content = openaiData.choices[0]?.message?.content
 
@@ -441,7 +446,16 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error"
+    
+    // Log the actual error for debugging
     console.error("[v0] generateChecklist API error:", err)
+    
+    // Check if it's a body-stream error and log with context
+    if (typeof msg === "string" && msg.includes("body stream")) {
+      console.error("[v0] Body stream error - likely due to multiple reads of the same Response object")
+    }
+    
+    // Always return a friendly error to user
     return NextResponse.json(
       {
         success: false,

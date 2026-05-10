@@ -54,16 +54,26 @@ export async function generateChecklist(
         body: JSON.stringify(request),
       })
 
-      // Always try to parse response as JSON
+      // Read response body exactly once, store as string
+      let responseText: string
+      try {
+        responseText = await response.text()
+      } catch (readErr) {
+        console.error("[v0] generateChecklist: Failed to read response body", readErr)
+        return {
+          success: false,
+          error: "AI generation failed. Please try again.",
+          provider: "ai",
+        }
+      }
+
+      // Parse JSON from the text we already read
       let data: any
       try {
-        const text = await response.text()
-        data = JSON.parse(text)
+        data = JSON.parse(responseText)
       } catch (parseErr) {
         console.error("[v0] generateChecklist: Failed to parse API response as JSON")
-        // Use text variable instead of response.text method
-        const text = await response.text()
-        const debugText = typeof text === "string" ? text.substring(0, 200) : String(text).substring(0, 200)
+        const debugText = typeof responseText === "string" ? responseText.substring(0, 200) : String(responseText).substring(0, 200)
         console.error("[v0] First 200 chars of response:", debugText || "[no text]")
         return {
           success: false,
