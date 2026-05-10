@@ -144,7 +144,18 @@ export function GenerateChecklistClient() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
       console.error("[v0] Checklist generation error:", err)
-      setError(`Generation failed: ${msg}`)
+      
+      // Clean up technical error messages for display
+      let displayError = msg
+      if (msg.includes("Generation error:")) {
+        // Remove "Generation error: " prefix for cleaner display
+        displayError = msg.replace("Generation error: ", "")
+      }
+      if (msg.includes("Unexpected token")) {
+        displayError = "AI generation failed. The server returned an invalid response."
+      }
+      
+      setError(displayError)
     } finally {
       setIsGenerating(false)
     }

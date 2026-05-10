@@ -325,8 +325,13 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
 
       {/* Title and Metadata */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline">{getAssetTypeName()}</Badge>
+          {asset?.payload?.generatedBy && (
+            <Badge variant="secondary" className="text-xs">
+              {asset.payload.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+            </Badge>
+          )}
           <span className="text-sm text-muted-foreground">Workspace Draft</span>
         </div>
         

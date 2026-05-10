@@ -34,19 +34,19 @@ export function buildChecklistPrompt(request: ChecklistGenerationRequest): strin
   const sections = Math.min(Math.max(request.numberOfSections || 3, 1), 8)
   const itemsPerSection = Math.min(Math.max(request.itemsPerSection || 5, 1), 12)
 
-  return `You are a structured checklist generator for GuideForge.
+  return `You are a structured checklist generator for GuideForge. Generate high-quality, practical checklists with specific, actionable content.
 
-RULES:
-1. Return ONLY valid JSON matching the schema below.
-2. Do NOT include markdown, explanations, or text outside JSON.
-3. Do NOT invent unsafe or unverifiable claims.
-4. Each section must have at least 1 item, max 12 items.
-5. Each item must have a clear label.
-6. Mark required items with "required": true, optional items with "required": false.
-7. Include reasonable completion criteria.
-8. Include assumptions made when generating.
-9. If unsure about details, add to missingInfo instead of guessing.
-10. This is a private workspace draft, not published content.
+CRITICAL RULES - DO NOT VIOLATE:
+1. Section titles MUST be meaningful phrases, not "Section 1", "Section 2", "P", "r", "e", "p", or single characters.
+2. Section titles MUST be specific to the topic, audience, and use case.
+3. Item labels MUST be actionable and specific, not "Item 1", "Item 2", "Complete this task".
+4. Item descriptions MUST be useful and specific, not generic placeholders like "This is item X" or "Follow this carefully".
+5. NEVER use placeholder text like "TODO", "Example item", "Placeholder", or "[fill in]".
+6. Return ONLY valid JSON matching the schema below. No markdown, explanations, or text outside JSON.
+7. Each section must have 1-12 items (usually ${itemsPerSection}).
+8. All section titles must be at least 3 characters long and describe a distinct aspect of the checklist goal.
+9. All item labels must be at least 5 characters long and start with a verb when possible (e.g., "Verify", "Complete", "Document", "Schedule").
+10. Summary should be grammatically correct and avoid awkward patterns like "A comprehensive checklist for [verb phrase]".
 
 CHECKLIST REQUEST:
 - Title: ${request.title}
@@ -55,14 +55,27 @@ CHECKLIST REQUEST:
 - Purpose: ${request.purpose}
 - Use Case/Context: ${request.useCase}
 - Tone: ${request.tone}
-- Number of Sections: ${sections} (max 8)
-- Items per Section: approximately ${itemsPerSection} (max 12 per section)
+- Number of Sections: ${sections} (max 8, aim for meaningful section groupings)
+- Items per Section: approximately ${itemsPerSection} (max 12 per section, varies by section importance)
 ${request.optionalContext ? `- Additional Context: ${request.optionalContext}` : ""}
 
 REQUIRED JSON SCHEMA:
 ${CHECKLIST_SCHEMA}
 
-Generate a well-structured, practical checklist that matches this schema exactly.`
+EXAMPLE GOOD OUTPUT STRUCTURE:
+For a game launch checklist for an indie developer, good section titles would be:
+- "QA & Regression Testing" (not "Section 1")
+- "Build Backup & Rollback Preparation" (not "P")
+- "Patch Notes & Store Page" (not "r")
+- "Community Announcement" (not "e")
+- "Launch Monitoring & Incident Response" (not "p")
+
+Example good item labels for QA section:
+- "Verify all critical bugs are resolved or documented" (not "Item 1")
+- "Test core gameplay loops on target platform" (not "Complete this task for section")
+- "Confirm no regressions in recent fixes" (not "Do the task")
+
+Generate a practical, domain-specific checklist with meaningful sections and actionable items. Do not use generic or placeholder content.`
 }
 
 export function buildChecklistRepairPrompt(
@@ -70,35 +83,46 @@ export function buildChecklistRepairPrompt(
   invalidOutput: any,
   validationErrors: string[]
 ): string {
-  return `You are a JSON repair specialist. Fix the following broken GuideForge checklist JSON output.
+  return `You are a GuideForge checklist quality specialist. Fix the following checklist that failed validation.
+
+CRITICAL: Replace all placeholder and generic content with specific, useful, domain-appropriate content.
 
 ORIGINAL REQUEST:
 - Title: ${request.title}
 - Audience: ${request.audience}
 - Goal: ${request.goal}
 - Purpose: ${request.purpose}
+- Use Case: ${request.useCase}
 - Tone: ${request.tone}
 
 BROKEN OUTPUT:
 ${JSON.stringify(invalidOutput, null, 2)}
 
-VALIDATION ERRORS:
+VALIDATION & QUALITY ERRORS:
 ${validationErrors.map((e) => `- ${e}`).join("\n")}
 
 REQUIRED SCHEMA (fix to match exactly):
 ${CHECKLIST_SCHEMA}
 
-REPAIR RULES:
-1. Fix all validation errors listed above
-2. Ensure assetType is "checklist"
-3. Ensure title and summary are non-empty strings
-4. Ensure sections array has 1-8 sections, each with 1-12 items
-5. Each item must have label (non-empty), description (string or null), and required (boolean)
-6. Ensure completionCriteria, tags, assumptions, missingInfo are all arrays
-7. Return ONLY valid JSON, no explanations or markdown
-8. If content is completely broken, generate a new practical checklist based on the original request
+REPAIR RULES (DO NOT VIOLATE):
+1. Fix ALL errors listed above
+2. Replace placeholder section titles like "Section 1", "P", "r", "e", "p", or single letters with specific titles relevant to the goal
+3. Replace placeholder item labels like "Item 1", "Item 2" with specific, actionable items (minimum 5 characters, start with verb)
+4. Replace generic descriptions like "Complete this task for section X" or "Follow this carefully" with specific, useful descriptions
+5. Remove all instances of "TODO", "Placeholder", "Example item", "[fill in]", etc.
+6. Ensure all section titles are at least 3 characters and meaningful
+7. Ensure all item labels are at least 5 characters and actionable
+8. Ensure summary is grammatically correct and avoids "A comprehensive checklist for [verb]" unless it reads naturally
+9. Return ONLY valid JSON, no explanations or markdown
 
-Return fixed JSON only.`
+EXAMPLE OF FIX:
+Bad sections: ["Section 1: P", "Section 2: r", "Section 3: e", "Section 4: p"]
+Good sections: ["QA & Testing", "Build Preparation", "Store Page & Patch Notes", "Community Communication"]
+
+Bad items: ["Item 1 in section 1", "Complete this task for section 1", "Item 2 in section 1"]
+Good items: ["Verify all critical bugs are resolved", "Test core gameplay loops", "Confirm no regressions in fixes"]
+
+Repair the checklist with specific, meaningful content based on the original request.`
 }
 
 /**

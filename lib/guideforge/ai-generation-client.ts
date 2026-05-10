@@ -54,17 +54,36 @@ export async function generateChecklist(
         body: JSON.stringify(request),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
+      // Read response body exactly once, store as string
+      let responseText: string
+      try {
+        responseText = await response.text()
+      } catch (readErr) {
+        console.error("[v0] generateChecklist: Failed to read response body", readErr)
         return {
           success: false,
-          error: error.error || "AI generation failed",
+          error: "AI generation failed. Please try again.",
           provider: "ai",
         }
       }
 
-      const data = await response.json()
-      if (!data.success) {
+      // Parse JSON from the text we already read
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseErr) {
+        console.error("[v0] generateChecklist: Failed to parse API response as JSON")
+        const debugText = typeof responseText === "string" ? responseText.substring(0, 200) : String(responseText).substring(0, 200)
+        console.error("[v0] First 200 chars of response:", debugText || "[no text]")
+        return {
+          success: false,
+          error: "AI generation failed. The server returned an invalid response.",
+          provider: "ai",
+        }
+      }
+
+      // Check for error response
+      if (!response.ok || !data.success) {
         return {
           success: false,
           error: data.error || "AI generation failed",
