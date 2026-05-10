@@ -77,12 +77,15 @@ export function LoginForm() {
       }
 
       console.log('[v0] LoginForm: Login successful, user:', data.user.id)
+      console.log('[v0] LoginForm: returnTo query param =', returnTo)
       
       // Session is stored in Supabase and AuthProvider will pick it up via onAuthStateChange
       // Redirect to returnTo if available, otherwise to builder
       const destination = returnTo || '/builder/networks'
-      console.log('[v0] LoginForm: Redirecting to', destination)
-      router.push(destination)
+      console.log('[v0] LoginForm: Redirecting to destination =', destination)
+      
+      // Use window.location.href for reliable navigation (router.push may not work reliably during auth transition)
+      window.location.href = destination
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed'
       console.error('[v0] LoginForm error:', message)

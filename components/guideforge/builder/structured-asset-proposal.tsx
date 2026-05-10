@@ -30,13 +30,19 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     try {
       const pendingProposal = {
         asset,
+        assetType: asset.assetType,
         createdAt: new Date().toISOString(),
         returnRoute: pathname,
       }
       sessionStorage.setItem('guideforge.pendingAssetProposal', JSON.stringify(pendingProposal))
-      console.log('[v0] Stored pending proposal to sessionStorage for route:', pathname)
+      console.log('[v0] StructuredAssetProposal: Stored pending proposal to sessionStorage', {
+        key: 'guideforge.pendingAssetProposal',
+        assetType: asset.assetType,
+        returnRoute: pathname,
+        createdAt: pendingProposal.createdAt,
+      })
     } catch (err) {
-      console.warn('[v0] Failed to store pending proposal:', err instanceof Error ? err.message : String(err))
+      console.warn('[v0] StructuredAssetProposal: Failed to store pending proposal:', err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -68,8 +74,9 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       // Clear pending proposal from sessionStorage on successful save
       try {
         sessionStorage.removeItem('guideforge.pendingAssetProposal')
+        console.log('[v0] StructuredAssetProposal: Cleared pending proposal from sessionStorage after successful save')
       } catch (err) {
-        console.warn('[v0] Failed to clear pending proposal:', err)
+        console.warn('[v0] StructuredAssetProposal: Failed to clear pending proposal:', err instanceof Error ? err.message : String(err))
       }
 
       // Route to asset workspace page
@@ -324,7 +331,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         <Card className="p-4 border-blue-500/20 bg-blue-500/5">
           <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Sign in to save this draft</p>
           <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
-            Sign in to your GuideForge account to save drafts to your workspace. We&apos;ll bring you back here afterward.
+            Sign in to your GuideForge account to save drafts to your workspace. We&apos;ll bring you back here afterward. Keep this tab open so your unsaved proposal can be restored.
           </p>
           <div className="flex gap-2">
             <Button asChild variant="default" size="sm">

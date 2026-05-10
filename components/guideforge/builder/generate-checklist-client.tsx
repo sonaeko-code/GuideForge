@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Loader2, Sparkles, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,10 @@ import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 
+/**
+ * Checklist client component with pending proposal restore support.
+ * On mount, checks sessionStorage for guideforge.pendingAssetProposal and restores if valid.
+ */
 export function GenerateChecklistClient() {
   const [formState, setFormState] = useState<ChecklistIntakeRequest>({
     title: "",
@@ -31,6 +35,61 @@ export function GenerateChecklistClient() {
   const [proposal, setProposal] = useState<GeneratedChecklist | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [provider, setProvider] = useState<GenerationProvider>("mock")
+  const [restoredMessage, setRestoredMessage] = useState<string | null>(null)
+
+  // On mount, check for pending proposal in sessionStorage and restore if valid
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem('guideforge.pendingAssetProposal')
+      if (!pending) {
+        console.log('[v0] GenerateChecklistClient: No pending proposal in sessionStorage')
+        return
+      }
+
+      const parsed = JSON.parse(pending)
+      
+      // Validate the pending proposal
+      const isValid =
+        parsed &&
+        parsed.asset &&
+        parsed.assetType === 'checklist' &&
+        parsed.createdAt &&
+        parsed.returnRoute
+      
+      if (!isValid) {
+        console.warn('[v0] GenerateChecklistClient: Pending proposal failed validation', parsed)
+        sessionStorage.removeItem('guideforge.pendingAssetProposal')
+        return
+      }
+
+      // Check if proposal is recent (max 2 hours old)
+      const createdAt = new Date(parsed.createdAt)
+      const now = new Date()
+      const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
+      
+      if (ageMinutes > 120) {
+        console.log('[v0] GenerateChecklistClient: Pending proposal expired (age:', ageMinutes, 'minutes)')
+        sessionStorage.removeItem('guideforge.pendingAssetProposal')
+        return
+      }
+
+      // Restore the proposal
+      console.log('[v0] GenerateChecklistClient: Restoring pending proposal (age:', ageMinutes.toFixed(1), 'minutes)', {
+        assetType: parsed.assetType,
+        returnRoute: parsed.returnRoute,
+      })
+      
+      setProposal(parsed.asset as GeneratedChecklist)
+      setRestoredMessage('We restored your unsaved proposal after sign-in.')
+    } catch (err) {
+      console.warn('[v0] GenerateChecklistClient: Failed to restore pending proposal:', err instanceof Error ? err.message : String(err))
+      try {
+        sessionStorage.removeItem('guideforge.pendingAssetProposal')
+      } catch (_) {
+        // ignore
+      }
+    }
+  }, [])
 
   const handleFieldChange = (field: keyof ChecklistIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
@@ -92,7 +151,10 @@ export function GenerateChecklistClient() {
   }
 
   if (proposal) {
-    return <StructuredAssetProposal asset={proposal} onBack={() => setProposal(null)} />
+    return <StructuredAssetProposal asset={proposal} onBack={() => {
+      setProposal(null)
+      setRestoredMessage(null)
+    }} />
   }
 
   return (
@@ -114,6 +176,14 @@ export function GenerateChecklistClient() {
             This creates a structured draft checklist. Nothing is published automatically.
           </p>
         </Card>
+
+        {restoredMessage && (
+          <Card className="p-3 border-emerald-500/20 bg-emerald-500/5">
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+              {restoredMessage}
+            </p>
+          </Card>
+        )}
       </div>
 
       <form
