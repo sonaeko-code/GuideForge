@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, Folder, Wand2, ArrowRight } from "lucide-react"
+import { Plus, Folder, Wand2, FileText, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
@@ -21,10 +21,16 @@ export default async function NetworksDirectoryPage() {
         <SiteHeader hideCta />
         
         <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-          <div className="mb-8">
+          <div className="mb-8 flex justify-between items-center">
             <Button asChild variant="ghost" size="sm">
               <Link href="/builder">
                 ← Back to Builder
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/builder/assets">
+                <FileText className="mr-2 size-4" aria-hidden="true" />
+                My Assets
               </Link>
             </Button>
           </div>

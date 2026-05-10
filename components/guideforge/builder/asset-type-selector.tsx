@@ -61,7 +61,7 @@ export function AssetTypeSelector() {
       <div className="space-y-3">
         <h1 className="text-3xl font-bold tracking-tight">Generate Structured Asset</h1>
         <p className="text-base text-muted-foreground">
-          Create a structured draft asset. Save it to your workspace, attach it to a network later, or publish and embed it when ready.
+          Create a single asset draft. It saves to your workspace first — no network needed. You can edit, attach to a network later, or publish separately.
         </p>
       </div>
 
@@ -101,7 +101,7 @@ export function AssetTypeSelector() {
 
       <Card className="p-4 border-blue-500/20 bg-blue-500/5">
         <p className="text-sm text-blue-700 dark:text-blue-300">
-          <strong>Note:</strong> Single guides are fully implemented. Other asset types are coming soon. You can still use the intake forms as references to structure your own custom guides.
+          <strong>How it works:</strong> Generate an asset draft → save to your workspace → review it → attach to a network or use separately. Only Single Guides are fully implemented now.
         </p>
       </Card>
     </div>
