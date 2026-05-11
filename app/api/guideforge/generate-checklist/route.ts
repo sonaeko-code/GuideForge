@@ -20,10 +20,19 @@ import { DEFAULT_CHECKLIST_MODEL, GENERATION_TEMPERATURE, MAX_GENERATION_TOKENS,
 export const runtime = "nodejs"
 export const maxDuration = 30
 
+/** Hard ceiling for the OpenAI call inside the debug path.
+ *  Must be well under maxDuration (30 s) so we always return JSON
+ *  before Vercel sends a 504 HTML response. */
+const DEBUG_OPENAI_TIMEOUT_MS = 8000
+
 /**
  * Call OpenAI API to generate or repair checklist
  */
-async function callOpenAI(apiKey: string, messages: any[]): Promise<string | null> {
+async function callOpenAI(
+  apiKey: string,
+  messages: any[],
+  signal?: AbortSignal
+): Promise<string | null> {
   let openaiResponse: Response | null = null
   
   try {
@@ -42,6 +51,7 @@ async function callOpenAI(apiKey: string, messages: any[]): Promise<string | nul
         max_tokens: MAX_GENERATION_TOKENS,
         response_format: { type: "json_object" },
       }),
+      signal,
     })
 
     // Handle non-2xx responses safely
@@ -243,10 +253,58 @@ async function debugGenerateOnly(request: NextRequest, body: ChecklistGeneration
       throw new Error(debugApiKeyErrorDetail)
     }
 
-    // STAGE: openai_call
+    // STAGE: openai_call — raced against a hard timeout so we always
+    // return JSON before Vercel can send a 504 HTML response.
     debugStage = "openai_call"
     const openaiStartTime = Date.now()
-    const content = await callOpenAI(rawOpenAiApiKey, messages)
+
+    const debugAbortController = new AbortController()
+    const debugTimeoutHandle = setTimeout(() => {
+      debugAbortController.abort()
+    }, DEBUG_OPENAI_TIMEOUT_MS)
+
+    let content: string | null = null
+    try {
+      content = await callOpenAI(rawOpenAiApiKey, messages, debugAbortController.signal)
+    } catch (openaiErr) {
+      clearTimeout(debugTimeoutHandle)
+      debugOpenaiElapsedMs = Date.now() - openaiStartTime
+
+      // Distinguish an abort (timeout) from any other OpenAI error
+      const isAbort =
+        debugAbortController.signal.aborted ||
+        (openaiErr instanceof Error && (openaiErr.name === "AbortError" || openaiErr.message.includes("abort")))
+
+      if (isAbort) {
+        debugStage = "openai_timeout"
+        const timeoutMsg = `OpenAI request timed out after ${DEBUG_OPENAI_TIMEOUT_MS}ms`
+        console.error("[v0] Debug: " + timeoutMsg)
+        debugElapsedMs = Date.now() - startTime
+
+        return NextResponse.json(
+          {
+            success: false,
+            stage: debugStage,
+            elapsedMs: debugElapsedMs,
+            openaiElapsedMs: debugOpenaiElapsedMs,
+            model: debugModel,
+            promptLength: debugPromptLength,
+            contentLength: null,
+            apiKeyPresent: debugApiKeyPresent,
+            apiKeyLength: debugApiKeyLength,
+            apiKeyMasked: debugApiKeyMasked,
+            error: timeoutMsg,
+            detail: "The request reached OpenAI but did not return before the debug timeout.",
+          },
+          { status: 200 }
+        )
+      }
+
+      // Non-timeout OpenAI error — re-throw so the outer catch handles it
+      throw openaiErr
+    }
+
+    clearTimeout(debugTimeoutHandle)
     debugOpenaiElapsedMs = Date.now() - openaiStartTime
 
     if (!content) {
