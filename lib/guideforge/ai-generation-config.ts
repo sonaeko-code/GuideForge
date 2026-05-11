@@ -14,10 +14,11 @@
 /**
  * Default AI model for checklist generation.
  *
- * Current choice: gpt-4-turbo
+ * Current choice: gpt-4o-mini
+ * - Lightweight, fast, and cost-effective
  * - Reliable JSON output with structured format
- * - Good balance of capability and cost
- * - Supports 128k context (useful for complex prompts)
+ * - Excellent balance of capability and speed
+ * - ~1/5 the cost of gpt-4-turbo
  *
  * If you want to switch models:
  * 1. Update DEFAULT_CHECKLIST_MODEL below
@@ -25,7 +26,7 @@
  * 3. Monitor validation failure rates
  * 4. Consider cost implications
  */
-export const DEFAULT_CHECKLIST_MODEL = "gpt-4-turbo"
+export const DEFAULT_CHECKLIST_MODEL = "gpt-4o-mini"
 
 /**
  * AI generation temperature (creativity/randomness).

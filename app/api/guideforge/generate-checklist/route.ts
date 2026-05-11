@@ -5,8 +5,9 @@
  *
  * Server-side endpoint for AI generation.
  * Uses OPENAI_API_KEY (server-only).
- * Validates output before returning.
- * Attempts one repair pass if output is malformed.
+ * Uses gpt-4o-mini model for fast, cost-effective generation.
+ * MVP approach: one OpenAI call, no repair loops.
+ * All paths (normal and debug) have timeout protection to ensure JSON responses.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -14,7 +15,7 @@ import type { ChecklistGenerationRequest } from "@/lib/guideforge/ai-generation-
 import type { GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import { validateGeneratedChecklist } from "@/lib/guideforge/ai-generation-validation"
 import { validateChecklistQuality } from "@/lib/guideforge/checklist-quality-validation"
-import { buildChecklistPrompt, buildChecklistRepairPrompt } from "@/lib/guideforge/ai-prompts"
+import { buildChecklistPrompt } from "@/lib/guideforge/ai-prompts"
 import { DEFAULT_CHECKLIST_MODEL, GENERATION_TEMPERATURE, MAX_GENERATION_TOKENS, MAX_REPAIR_ATTEMPTS } from "@/lib/guideforge/ai-generation-config"
 
 export const runtime = "nodejs"
@@ -29,6 +30,15 @@ const DEBUG_OPENAI_TIMEOUT_MS = 5000
  *  Must be much lower than maxDuration to ensure we return JSON
  *  before Vercel's function timeout. Returns error JSON if exceeded. */
 const DEBUG_ROUTE_TIMEOUT_MS = 9000
+
+/** Hard ceiling for the OpenAI call in normal (non-debug) path.
+ *  Must be well under maxDuration (30 s). Set to 10s for normal generation. */
+const NORMAL_OPENAI_TIMEOUT_MS = 10000
+
+/** Hard ceiling for the entire normal route.
+ *  Must be much lower than maxDuration to ensure we return JSON
+ *  before Vercel's function timeout. Returns error JSON if exceeded. */
+const NORMAL_ROUTE_TIMEOUT_MS = 15000
 
 /**
  * Call OpenAI API to generate or repair checklist
@@ -129,56 +139,6 @@ async function callOpenAI(
 /**
  * Attempt to repair invalid output
  */
-async function attemptRepair(
-  apiKey: string,
-  body: ChecklistGenerationRequest,
-  invalidOutput: any,
-  validationErrors: string[]
-): Promise<GeneratedChecklist | null> {
-  console.log("[v0] API: Attempting repair of invalid AI output...")
-
-  try {
-    const repairPrompt = buildChecklistRepairPrompt(body, invalidOutput, validationErrors)
-
-    const repairContent = await callOpenAI(apiKey, [
-      {
-        role: "system",
-        content:
-          "You are a JSON repair specialist. Your job is to fix broken JSON output to match the GuideForge schema. Return valid JSON only.",
-      },
-      {
-        role: "user",
-        content: repairPrompt,
-      },
-    ])
-
-    if (!repairContent) {
-      console.log("[v0] API: Repair returned empty content")
-      return null
-    }
-
-    let repairedAsset: GeneratedChecklist
-    try {
-      repairedAsset = JSON.parse(repairContent)
-    } catch (err) {
-      console.log("[v0] API: Repair JSON parsing failed")
-      return null
-    }
-
-    const repairValidation = validateGeneratedChecklist(repairedAsset)
-    if (repairValidation.valid) {
-      console.log("[v0] API: Repair successful!")
-      return repairedAsset
-    } else {
-      console.log("[v0] API: Repaired output still invalid:", repairValidation.errors)
-      return null
-    }
-  } catch (err) {
-    console.error("[v0] API: Repair attempt failed:", err instanceof Error ? err.message : String(err))
-    return null
-  }
-}
-
 /**
  * Debug-only mode: trace through generation stages with detailed timing and validation
  * Returns object with stage results instead of final asset
@@ -455,6 +415,10 @@ export async function POST(request: NextRequest) {
   const url = new URL(request.url)
   const isDebugMode = url.searchParams.get("debug") === "true"
 
+  // Initialize route-level timeout for normal (non-debug) path
+  let normalRouteAbortController: AbortController | null = null
+  let normalRouteTimeoutHandle: NodeJS.Timeout | null = null
+
   try {
     const apiKey = process.env.OPENAI_API_KEY?.trim()
 
@@ -505,27 +469,73 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] API: generateChecklist - Starting AI generation for:", body.title)
 
+    // Set up route-level timeout to ensure we return JSON before Vercel timeout
+    normalRouteAbortController = new AbortController()
+    normalRouteTimeoutHandle = setTimeout(() => {
+      normalRouteAbortController!.abort()
+    }, NORMAL_ROUTE_TIMEOUT_MS)
+
     // Build the prompt
     const prompt = buildChecklistPrompt(body)
 
-    // Call OpenAI API
-    let content: string
+    // Call OpenAI API with timeout protection
+    let content: string | null = null
     try {
-      content = await callOpenAI(apiKey, [
-        {
-          role: "system",
-          content:
-            "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ])
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error"
+      const openaiAbortController = new AbortController()
+      const openaiTimeoutHandle = setTimeout(() => {
+        openaiAbortController.abort()
+      }, NORMAL_OPENAI_TIMEOUT_MS)
+
+      try {
+        content = await callOpenAI(apiKey, [
+          {
+            role: "system",
+            content:
+              "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ], openaiAbortController.signal)
+      } finally {
+        clearTimeout(openaiTimeoutHandle)
+      }
+
+      if (!content) {
+        clearTimeout(normalRouteTimeoutHandle!)
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI returned an incomplete response. Please try again.",
+          },
+          { status: 500 }
+        )
+      }
+    } catch (openaiErr) {
+      // Check if this was a timeout
+      const isAbort =
+        normalRouteAbortController!.signal.aborted ||
+        (openaiErr instanceof Error && (openaiErr.name === "AbortError" || openaiErr.message.includes("abort")))
+
+      if (isAbort) {
+        clearTimeout(normalRouteTimeoutHandle!)
+        console.error("[v0] OpenAI call timed out after", NORMAL_OPENAI_TIMEOUT_MS, "ms")
+        return NextResponse.json(
+          {
+            success: false,
+            error: "AI generation is taking too long. Please try again.",
+            stage: "openai_timeout",
+          },
+          { status: 500 }
+        )
+      }
+
+      const errorMsg = openaiErr instanceof Error ? openaiErr.message : "Unknown error"
       console.error("[v0] OpenAI API call failed:", errorMsg)
-      
+
+      clearTimeout(normalRouteTimeoutHandle!)
+
       // Provide user-friendly error messages based on error type
       if (errorMsg === "AUTH_ERROR") {
         return NextResponse.json(
@@ -562,111 +572,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse AI response
+    // Parse AI response — MVP: no repair loop
     let asset: GeneratedChecklist
     try {
       asset = JSON.parse(content)
     } catch (parseErr) {
-      console.error("[v0] Failed to parse OpenAI response as JSON, attempting repair...")
-      // Safely log first 300 chars of content
+      console.error("[v0] Failed to parse OpenAI response as JSON")
       const debugContent = (typeof content === "string" ? content : String(content)).substring(0, 300)
       console.error("[v0] Raw content:", debugContent)
-
-      // If parsing fails, try repair pass
-      if (MAX_REPAIR_ATTEMPTS > 0) {
-        try {
-          // Build repair prompt with the raw content that failed to parse
-          const repairPrompt = buildChecklistRepairPrompt(body, { raw: content }, ["JSON parsing failed"])
-          const repairContent = await callOpenAI(apiKey, [
-            {
-              role: "system",
-              content: "You are a JSON repair specialist. Fix the following content to return valid JSON only.",
-            },
-            {
-              role: "user",
-              content: repairPrompt,
-            },
-          ])
-
-          if (repairContent) {
-            try {
-              asset = JSON.parse(repairContent)
-              console.log("[v0] JSON repair succeeded!")
-              // Continue to validation below
-            } catch (repairParseErr) {
-              console.error("[v0] JSON repair parsing also failed")
-              return NextResponse.json(
-                {
-                  success: false,
-                  error: "AI returned an incomplete checklist. Please try again or use Mock Preview.",
-                },
-                { status: 500 }
-              )
-            }
-          } else {
-            return NextResponse.json(
-              {
-                success: false,
-                error: "AI returned an incomplete checklist. Please try again or use Mock Preview.",
-              },
-              { status: 500 }
-            )
-          }
-        } catch (repairErr) {
-          console.error("[v0] JSON repair attempt failed:", repairErr instanceof Error ? repairErr.message : String(repairErr))
-          return NextResponse.json(
-            {
-              success: false,
-              error: "AI returned invalid JSON. Please try again or use Mock Preview.",
-            },
-            { status: 500 }
-          )
-        }
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "AI returned invalid JSON. Please try again or use Mock Preview.",
-          },
-          { status: 500 }
-        )
-      }
+      clearTimeout(normalRouteTimeoutHandle!)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "AI returned invalid JSON. Please try again or use Mock Preview.",
+        },
+        { status: 500 }
+      )
     }
 
-    // Validate output (schema first, then quality)
+    // Validate output (schema first, then quality) — MVP: no repair loop
     const validation = validateGeneratedChecklist(asset)
     if (!validation.valid) {
-      console.log("[v0] API: Schema validation failed, attempting repair...")
+      console.log("[v0] API: Schema validation failed")
       console.log("[v0] Schema errors:", validation.errors)
-
-      // Attempt one repair for schema errors
-      if (MAX_REPAIR_ATTEMPTS > 0) {
-        const repairedAsset = await attemptRepair(apiKey, body, asset, validation.errors)
-        if (repairedAsset) {
-          // Check quality after repair
-          const qualityCheck = validateChecklistQuality(repairedAsset)
-          if (!qualityCheck.valid) {
-            console.log("[v0] API: Repair succeeded schema but failed quality check")
-            return NextResponse.json(
-              {
-                success: false,
-                error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
-              },
-              { status: 500 }
-            )
-          }
-          console.log("[v0] API: generateChecklist - Success after repair!")
-          repairedAsset.generatedBy = "openai"
-          return NextResponse.json({
-            success: true,
-            asset: repairedAsset,
-            repaired: true,
-          })
-        }
-      }
-
-      // Repair failed or not attempted
-      console.error("[v0] Generated asset failed schema validation (no successful repair):", validation.errors)
+      clearTimeout(normalRouteTimeoutHandle!)
       return NextResponse.json(
         {
           success: false,
@@ -679,48 +608,9 @@ export async function POST(request: NextRequest) {
     // Schema passed, now check quality
     const qualityCheck = validateChecklistQuality(asset)
     if (!qualityCheck.valid) {
-      console.log("[v0] API: Schema passed but quality validation failed, attempting repair...")
+      console.log("[v0] API: Quality validation failed")
       console.log("[v0] Quality errors:", qualityCheck.errors)
-
-      // Attempt one repair for quality issues
-      if (MAX_REPAIR_ATTEMPTS > 0) {
-        const repairedAsset = await attemptRepair(apiKey, body, asset, qualityCheck.errors)
-        if (repairedAsset) {
-          // Verify repair passes both schema and quality
-          const schemaCheck = validateGeneratedChecklist(repairedAsset)
-          if (!schemaCheck.valid) {
-            console.log("[v0] API: Quality repair failed schema check")
-            return NextResponse.json(
-              {
-                success: false,
-                error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
-              },
-              { status: 500 }
-            )
-          }
-          const finalQualityCheck = validateChecklistQuality(repairedAsset)
-          if (!finalQualityCheck.valid) {
-            console.log("[v0] API: Quality repair still has quality issues")
-            return NextResponse.json(
-              {
-                success: false,
-                error: "AI generated a checklist, but it was too generic for GuideForge quality standards. Please try again with more context or use Mock Preview.",
-              },
-              { status: 500 }
-            )
-          }
-          console.log("[v0] API: generateChecklist - Success after quality repair!")
-          repairedAsset.generatedBy = "openai"
-          return NextResponse.json({
-            success: true,
-            asset: repairedAsset,
-            repaired: true,
-          })
-        }
-      }
-
-      // Quality repair failed or not attempted
-      console.error("[v0] Generated asset failed quality validation (no successful repair):", qualityCheck.errors)
+      clearTimeout(normalRouteTimeoutHandle!)
       return NextResponse.json(
         {
           success: false,
@@ -730,27 +620,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    clearTimeout(normalRouteTimeoutHandle!)
     console.log("[v0] API: generateChecklist - Success!")
-    
+
     // Add source metadata
     asset.generatedBy = "openai"
-    
+
     return NextResponse.json({
       success: true,
       asset,
       repaired: false,
     })
   } catch (err) {
+    if (normalRouteTimeoutHandle) {
+      clearTimeout(normalRouteTimeoutHandle)
+    }
+
+    // Check if this was a route-level timeout
+    if (normalRouteAbortController && normalRouteAbortController.signal.aborted) {
+      console.error("[v0] Generation exceeded", NORMAL_ROUTE_TIMEOUT_MS, "ms timeout")
+      return NextResponse.json(
+        {
+          success: false,
+          error: "AI generation is taking too long. Please try again.",
+          stage: "route_timeout",
+        },
+        { status: 500 }
+      )
+    }
+
     const msg = err instanceof Error ? err.message : "Unknown error"
-    
+
     // Log the actual error for debugging
     console.error("[v0] generateChecklist API error:", err)
-    
+
     // Check if it's a body-stream error and log with context
     if (typeof msg === "string" && msg.includes("body stream")) {
       console.error("[v0] Body stream error - likely due to multiple reads of the same Response object")
     }
-    
+
     // Always return a friendly error to user
     return NextResponse.json(
       {
