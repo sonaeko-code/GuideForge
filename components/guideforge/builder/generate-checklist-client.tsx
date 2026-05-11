@@ -151,6 +151,100 @@ export function GenerateChecklistClient() {
     }
   }
 
+  /**
+   * Run full AI generation in debug mode (no save).
+   * Developer tool to debug the complete generation pipeline.
+   */
+  const handleDebugFullGeneration = async () => {
+    setError(null)
+
+    if (!formState.title.trim()) {
+      setError("Please enter a checklist title")
+      return
+    }
+    if (!formState.audience.trim()) {
+      setError("Please specify the intended audience")
+      return
+    }
+    if (!formState.goal.trim()) {
+      setError("Please describe the checklist goal")
+      return
+    }
+    if (!formState.purpose.trim()) {
+      setError("Please describe the checklist purpose")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      console.log("[v0] Developer: Starting debug full generation...")
+      
+      const response = await fetch("/api/guideforge/generate-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formState,
+          debugGenerateOnly: true,
+        }),
+      })
+
+      let data: any
+      try {
+        data = await response.json()
+      } catch (parseErr) {
+        console.error("[v0] Failed to parse debug response")
+        setError("Failed to parse debug response")
+        setIsGenerating(false)
+        return
+      }
+
+      console.log("[v0] Debug full generation response:", {
+        success: data.success,
+        stage: data.stage,
+        elapsedMs: data.elapsedMs,
+        openaiElapsedMs: data.openaiElapsedMs,
+        model: data.model,
+        promptLength: data.promptLength,
+        contentLength: data.contentLength,
+        parseOk: data.parseOk,
+        schemaOk: data.schemaOk,
+        qualityOk: data.qualityOk,
+        error: data.error,
+        detail: data.detail,
+      })
+
+      if (data.success) {
+        alert(
+          `Debug Full Generation - Success!\n\n` +
+          `Total Elapsed: ${data.elapsedMs}ms\n` +
+          `OpenAI Elapsed: ${data.openaiElapsedMs}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n` +
+          `Content Length: ${data.contentLength} chars\n\n` +
+          `(Checks completed: Parse, Schema, Quality)\n` +
+          `(Not saved - debug only)`
+        )
+      } else {
+        alert(
+          `Debug Full Generation - Failed at ${data.stage}\n\n` +
+          `Total Elapsed: ${data.elapsedMs}ms\n` +
+          `OpenAI Elapsed: ${data.openaiElapsedMs || "N/A"}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n` +
+          `Content Length: ${data.contentLength || "N/A"} chars\n\n` +
+          `Error: ${data.error}\n` +
+          `Detail: ${data.detail || "N/A"}\n\n` +
+          `(See console for full details)`
+        )
+      }
+    } catch (err) {
+      console.error("[v0] Debug full generation error:", err)
+      setError(err instanceof Error ? err.message : "Debug failed")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const handleGenerate = async () => {
     setError(null)
 
@@ -460,15 +554,26 @@ export function GenerateChecklistClient() {
           
           {/* Developer diagnostic button (only shown in AI mode) */}
           {provider === "ai" && (
-            <Button 
-              size="lg" 
-              variant="outline" 
-              disabled={isGenerating}
-              onClick={handleCheckAiRouteConfig}
-              title="Check AI route configuration (no cost)"
-            >
-              ⚙️
-            </Button>
+            <>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                disabled={isGenerating}
+                onClick={handleCheckAiRouteConfig}
+                title="Check AI route configuration (no cost)"
+              >
+                ⚙️
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                disabled={isGenerating}
+                onClick={handleDebugFullGeneration}
+                title="Debug full generation pipeline (1 OpenAI call, not saved)"
+              >
+                🐛
+              </Button>
+            </>
           )}
         </div>
       </form>
