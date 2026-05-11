@@ -312,180 +312,235 @@ export async function POST(request: NextRequest) {
       console.log("[v0] API: debugGenerateOnly mode requested")
       
       const debugStartTime = Date.now()
-      const stages: any = {}
+      let currentStage = "body_parse"
       
       try {
-        // Stage 1: Body parsed (already done)
-        stages.bodyParsed = true
+        // Stage 1: Body validation
+        console.log("[v0] DEBUG: Stage 1 - Body parse")
+        currentStage = "body_parse"
         
-        // Stage 2: Prompt building
-        console.log("[v0] DEBUG: Building prompt...")
-        stages.promptBuildStart = Date.now()
+        if (!body.title?.trim()) {
+          throw new Error("Title is required")
+        }
+        if (!body.audience?.trim()) {
+          throw new Error("Audience is required")
+        }
+        if (!body.goal?.trim()) {
+          throw new Error("Goal is required")
+        }
+        if (!body.purpose?.trim()) {
+          throw new Error("Purpose is required")
+        }
         
-        const requestedSections = Math.min(Math.max(body.numberOfSections || 4, 1), MAX_SECTIONS_AI_MVP)
-        const requestedItems = Math.min(Math.max(body.itemsPerSection || 5, 1), MAX_ITEMS_AI_MVP)
+        // Stage 2: Input clamping
+        console.log("[v0] DEBUG: Stage 2 - Input clamping")
+        currentStage = "input_clamp"
         
-        const prompt = buildChecklistPrompt(body)
-        stages.promptLength = prompt.length
-        stages.promptBuildElapsed = Date.now() - stages.promptBuildStart
+        const debugRequestedSections = Math.min(Math.max(body.numberOfSections || 4, 1), MAX_SECTIONS_AI_MVP)
+        const debugRequestedItems = Math.min(Math.max(body.itemsPerSection || 5, 1), MAX_ITEMS_AI_MVP)
         
-        console.log("[v0] DEBUG: Prompt built", {
-          promptLength: stages.promptLength,
-          elapsedMs: stages.promptBuildElapsed,
+        console.log("[v0] DEBUG: Clamped values", {
+          sections: debugRequestedSections,
+          items: debugRequestedItems,
         })
         
-        // Stage 3: OpenAI call
-        console.log("[v0] DEBUG: Starting OpenAI call...")
-        stages.openaiStart = Date.now()
+        // Stage 3: Prompt building
+        console.log("[v0] DEBUG: Stage 3 - Prompt build")
+        currentStage = "prompt_build"
         
-        let content: string
+        const debugPrompt = buildChecklistPrompt(body)
+        const debugPromptLength = debugPrompt.length
+        
+        console.log("[v0] DEBUG: Prompt built", {
+          length: debugPromptLength,
+        })
+        
+        // Stage 4: Message building
+        console.log("[v0] DEBUG: Stage 4 - Message build")
+        currentStage = "message_build"
+        
+        const debugMessages = [
+          {
+            role: "system",
+            content: "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
+          },
+          {
+            role: "user",
+            content: debugPrompt,
+          },
+        ]
+        
+        console.log("[v0] DEBUG: Messages built", {
+          count: debugMessages.length,
+        })
+        
+        // Stage 5: Pre-OpenAI setup
+        console.log("[v0] DEBUG: Stage 5 - Pre-OpenAI setup")
+        currentStage = "pre_openai_setup"
+        
+        if (!apiKey) {
+          throw new Error("OPENAI_API_KEY not configured")
+        }
+        
+        console.log("[v0] DEBUG: Pre-OpenAI setup complete")
+        
+        // Stage 6: OpenAI call
+        console.log("[v0] DEBUG: Stage 6 - OpenAI call starting")
+        currentStage = "openai_call"
+        
+        const debugOpenaiStartTime = Date.now()
+        let debugContent: string
+        
         try {
-          content = await callOpenAI(apiKey, [
-            {
-              role: "system",
-              content: "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ], {
-            sections: requestedSections,
-            itemsPerSection: requestedItems,
-            elapsedBeforeCallMs: stages.openaiStart - debugStartTime,
+          debugContent = await callOpenAI(apiKey, debugMessages, {
+            sections: debugRequestedSections,
+            itemsPerSection: debugRequestedItems,
+            elapsedBeforeCallMs: debugOpenaiStartTime - debugStartTime,
             debugMode: true,
           })
           
-          stages.openaiElapsed = Date.now() - stages.openaiStart
-          stages.contentLength = content.length
+          const debugOpenaiElapsedMs = Date.now() - debugOpenaiStartTime
           
           console.log("[v0] DEBUG: OpenAI call completed", {
-            elapsedMs: stages.openaiElapsed,
-            contentLength: stages.contentLength,
+            elapsedMs: debugOpenaiElapsedMs,
+            contentLength: debugContent.length,
           })
-        } catch (err) {
-          stages.openaiError = err instanceof Error ? err.message : "Unknown error"
-          stages.openaiElapsed = Date.now() - stages.openaiStart
+        } catch (openaiErr) {
+          const debugOpenaiElapsedMs = Date.now() - debugOpenaiStartTime
+          const openaiErrorMessage = openaiErr instanceof Error ? openaiErr.message : "Unknown error"
+          
+          console.error("[v0] DEBUG: OpenAI call failed", {
+            elapsedMs: debugOpenaiElapsedMs,
+            error: openaiErrorMessage,
+          })
           
           return NextResponse.json({
             success: false,
             debugGenerateOnly: true,
             stage: "openai_call",
             elapsedMs: Date.now() - debugStartTime,
-            openaiElapsedMs: stages.openaiElapsed,
+            openaiElapsedMs: debugOpenaiElapsedMs,
             model: DEFAULT_CHECKLIST_MODEL,
-            promptLength: stages.promptLength,
-            error: stages.openaiError,
+            promptLength: debugPromptLength,
+            error: openaiErrorMessage,
           })
         }
         
-        // Stage 4: JSON parse
-        console.log("[v0] DEBUG: Parsing JSON...")
-        stages.parseStart = Date.now()
+        // Stage 7: JSON parse
+        console.log("[v0] DEBUG: Stage 7 - JSON parse")
+        currentStage = "parse"
         
-        let asset: GeneratedChecklist
+        let debugAsset: GeneratedChecklist
         try {
-          asset = JSON.parse(content)
-          stages.parseElapsed = Date.now() - stages.parseStart
-          stages.parseOk = true
-          
+          debugAsset = JSON.parse(debugContent)
           console.log("[v0] DEBUG: JSON parse succeeded")
         } catch (parseErr) {
-          stages.parseElapsed = Date.now() - stages.parseStart
-          stages.parseOk = false
-          stages.parseError = parseErr instanceof Error ? parseErr.message : "Unknown error"
+          const parseErrorMessage = parseErr instanceof Error ? parseErr.message : "Unknown error"
+          console.error("[v0] DEBUG: JSON parse failed", {
+            error: parseErrorMessage,
+          })
           
           return NextResponse.json({
             success: false,
             debugGenerateOnly: true,
             stage: "parse",
             elapsedMs: Date.now() - debugStartTime,
-            openaiElapsedMs: stages.openaiElapsed,
+            openaiElapsedMs: 0,
             model: DEFAULT_CHECKLIST_MODEL,
-            promptLength: stages.promptLength,
-            contentLength: stages.contentLength,
-            parseOk: false,
-            error: "JSON parse failed",
-            detail: stages.parseError,
+            promptLength: debugPromptLength,
+            contentLength: debugContent.length,
+            error: parseErrorMessage,
           })
         }
         
-        // Stage 5: Schema validation
-        console.log("[v0] DEBUG: Schema validation...")
-        stages.schemaStart = Date.now()
+        // Stage 8: Schema validation
+        console.log("[v0] DEBUG: Stage 8 - Schema validation")
+        currentStage = "schema_validation"
         
-        const validation = validateGeneratedChecklist(asset)
-        stages.schemaElapsed = Date.now() - stages.schemaStart
-        stages.schemaOk = validation.valid
-        
-        if (!validation.valid) {
-          console.log("[v0] DEBUG: Schema validation failed:", validation.errors)
+        const debugSchemaValidation = validateGeneratedChecklist(debugAsset)
+        if (!debugSchemaValidation.valid) {
+          console.error("[v0] DEBUG: Schema validation failed", {
+            errors: debugSchemaValidation.errors,
+          })
+          
           return NextResponse.json({
             success: false,
             debugGenerateOnly: true,
             stage: "schema_validation",
             elapsedMs: Date.now() - debugStartTime,
-            openaiElapsedMs: stages.openaiElapsed,
+            openaiElapsedMs: 0,
             model: DEFAULT_CHECKLIST_MODEL,
-            promptLength: stages.promptLength,
-            contentLength: stages.contentLength,
-            parseOk: true,
-            schemaOk: false,
+            promptLength: debugPromptLength,
+            contentLength: debugContent.length,
             error: "Schema validation failed",
-            detail: validation.errors[0] || "Multiple schema errors",
+            detail: debugSchemaValidation.errors[0] || "Unknown schema error",
           })
         }
         
-        // Stage 6: Quality validation
-        console.log("[v0] DEBUG: Quality validation...")
-        stages.qualityStart = Date.now()
+        console.log("[v0] DEBUG: Schema validation passed")
         
-        const qualityCheck = validateChecklistQuality(asset)
-        stages.qualityElapsed = Date.now() - stages.qualityStart
-        stages.qualityOk = qualityCheck.valid
+        // Stage 9: Quality validation
+        console.log("[v0] DEBUG: Stage 9 - Quality validation")
+        currentStage = "quality_validation"
         
-        if (!qualityCheck.valid) {
-          console.log("[v0] DEBUG: Quality validation failed:", qualityCheck.errors)
+        const debugQualityValidation = validateChecklistQuality(debugAsset)
+        if (!debugQualityValidation.valid) {
+          console.error("[v0] DEBUG: Quality validation failed", {
+            errors: debugQualityValidation.errors,
+          })
+          
           return NextResponse.json({
             success: false,
             debugGenerateOnly: true,
             stage: "quality_validation",
             elapsedMs: Date.now() - debugStartTime,
-            openaiElapsedMs: stages.openaiElapsed,
+            openaiElapsedMs: 0,
             model: DEFAULT_CHECKLIST_MODEL,
-            promptLength: stages.promptLength,
-            contentLength: stages.contentLength,
-            parseOk: true,
-            schemaOk: true,
-            qualityOk: false,
+            promptLength: debugPromptLength,
+            contentLength: debugContent.length,
             error: "Quality validation failed",
-            detail: qualityCheck.errors[0] || "Multiple quality errors",
+            detail: debugQualityValidation.errors[0] || "Unknown quality error",
           })
         }
         
-        // Success (but not saved)
-        console.log("[v0] DEBUG: Full generation succeeded (debugGenerateOnly - not saved)")
+        console.log("[v0] DEBUG: Quality validation passed")
+        
+        // Stage 10: Success
+        console.log("[v0] DEBUG: Stage 10 - Success")
+        currentStage = "success"
+        
+        const debugTotalElapsedMs = Date.now() - debugStartTime
+        console.log("[v0] DEBUG: Full generation succeeded (debugGenerateOnly - not saved)", {
+          totalElapsedMs: debugTotalElapsedMs,
+        })
+        
         return NextResponse.json({
           success: true,
           debugGenerateOnly: true,
           stage: "success",
-          elapsedMs: Date.now() - debugStartTime,
-          openaiElapsedMs: stages.openaiElapsed,
+          elapsedMs: debugTotalElapsedMs,
+          openaiElapsedMs: 0,
           model: DEFAULT_CHECKLIST_MODEL,
-          promptLength: stages.promptLength,
-          contentLength: stages.contentLength,
+          promptLength: debugPromptLength,
+          contentLength: debugContent.length,
           parseOk: true,
           schemaOk: true,
           qualityOk: true,
         })
-      } catch (err) {
-        console.error("[v0] DEBUG: Unexpected error:", err)
+      } catch (unexpectedErr) {
+        const errorMessage = unexpectedErr instanceof Error ? unexpectedErr.message : "Unknown error"
+        console.error("[v0] DEBUG: Unexpected error at stage", {
+          stage: currentStage,
+          error: errorMessage,
+        })
+        
         return NextResponse.json({
           success: false,
           debugGenerateOnly: true,
-          stage: "unknown",
+          stage: currentStage,
           elapsedMs: Date.now() - debugStartTime,
-          error: err instanceof Error ? err.message : "Unknown error",
+          model: DEFAULT_CHECKLIST_MODEL,
+          error: errorMessage,
         }, { status: 500 })
       }
     }
