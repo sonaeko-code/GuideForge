@@ -96,6 +96,231 @@ export function GenerateChecklistClient() {
     setError(null)
   }
 
+  /**
+   * Check AI route configuration without calling OpenAI.
+   * Developer-only diagnostic tool for debugging timeouts.
+   */
+  const handleCheckAiRouteConfig = async () => {
+    setError(null)
+    console.log("[v0] Developer: Checking AI route configuration...")
+    
+    try {
+      const response = await fetch("/api/guideforge/generate-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagnosticOnly: true }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] Diagnostic request failed:", errorData)
+        setError("Diagnostic request failed: " + response.statusText)
+        return
+      }
+      
+      const data = await response.json()
+      console.log("[v0] AI Route Config (diagnostic):", {
+        routeVersion: data.routeVersion,
+        model: data.model,
+        maxTokens: data.maxTokens,
+        maxRepairAttempts: data.maxRepairAttempts,
+        maxSectionsAiMvp: data.maxSectionsAiMvp,
+        maxItemsAiMvp: data.maxItemsAiMvp,
+        openaiRequestTimeoutMs: data.openaiRequestTimeoutMs,
+        runtime: data.runtime,
+        maxDuration: data.maxDuration,
+        timestamp: data.timestamp,
+      })
+      
+      setError(null)
+      alert(
+        `AI Route Config:\n\n` +
+        `Version: ${data.routeVersion}\n` +
+        `Model: ${data.model}\n` +
+        `Max Tokens: ${data.maxTokens}\n` +
+        `Repair Attempts: ${data.maxRepairAttempts}\n` +
+        `AI MVP Caps: ${data.maxSectionsAiMvp} sections, ${data.maxItemsAiMvp} items\n` +
+        `OpenAI Timeout: ${data.openaiRequestTimeoutMs}ms\n` +
+        `Max Duration: ${data.maxDuration}s\n` +
+        `Timestamp: ${data.timestamp}\n\n` +
+        `(See console for full details)`
+      )
+    } catch (err) {
+      console.error("[v0] Error checking AI route config:", err)
+      setError(err instanceof Error ? err.message : "Failed to check config")
+    }
+  }
+
+  /**
+   * Run full AI generation in debug mode (no save).
+   * Developer tool to debug the complete generation pipeline.
+   */
+  const handleDebugFullGeneration = async () => {
+    setError(null)
+
+    if (!formState.title.trim()) {
+      setError("Please enter a checklist title")
+      return
+    }
+    if (!formState.audience.trim()) {
+      setError("Please specify the intended audience")
+      return
+    }
+    if (!formState.goal.trim()) {
+      setError("Please describe the checklist goal")
+      return
+    }
+    if (!formState.purpose.trim()) {
+      setError("Please describe the checklist purpose")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      console.log("[v0] Developer: Starting debug full generation...")
+      
+      const response = await fetch("/api/guideforge/generate-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formState,
+          debugGenerateOnly: true,
+        }),
+      })
+
+      let data: any
+      try {
+        data = await response.json()
+      } catch (parseErr) {
+        console.error("[v0] Failed to parse debug response")
+        setError("Failed to parse debug response")
+        setIsGenerating(false)
+        return
+      }
+
+      console.log("[v0] Debug full generation response:", {
+        success: data.success,
+        stage: data.stage,
+        elapsedMs: data.elapsedMs,
+        openaiElapsedMs: data.openaiElapsedMs,
+        model: data.model,
+        promptLength: data.promptLength,
+        contentLength: data.contentLength,
+        parseOk: data.parseOk,
+        schemaOk: data.schemaOk,
+        qualityOk: data.qualityOk,
+        error: data.error,
+        detail: data.detail,
+      })
+
+      if (data.success) {
+        alert(
+          `Debug Full Generation - Success!\n\n` +
+          `Total Elapsed: ${data.elapsedMs}ms\n` +
+          `OpenAI Elapsed: ${data.openaiElapsedMs}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n` +
+          `Content Length: ${data.contentLength} chars\n\n` +
+          `(Checks completed: Parse, Schema, Quality)\n` +
+          `(Not saved - debug only)`
+        )
+      } else {
+        alert(
+          `Debug Full Generation - Failed at ${data.stage}\n\n` +
+          `Total Elapsed: ${data.elapsedMs}ms\n` +
+          `OpenAI Elapsed: ${data.openaiElapsedMs || "N/A"}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n` +
+          `Content Length: ${data.contentLength || "N/A"} chars\n\n` +
+          `Error: ${data.error}\n` +
+          `Detail: ${data.detail || "N/A"}\n\n` +
+          `(See console for full details)`
+        )
+      }
+    } catch (err) {
+      console.error("[v0] Debug full generation error:", err)
+      setError(err instanceof Error ? err.message : "Debug failed")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  /**
+   * Debug prompt build (Phase 6/7): Test prompt generation without OpenAI.
+   * Developer-only tool to verify prompt builds correctly before calling OpenAI.
+   */
+  const handleDebugPromptOnly = async () => {
+    setError(null)
+
+    if (!formState.title.trim()) {
+      setError("Please enter a checklist title")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      console.log("[v0] Developer: Starting debug prompt-only...")
+      
+      const response = await fetch("/api/guideforge/generate-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formState,
+          debugPromptOnly: true,
+        }),
+      })
+
+      let data: any
+      try {
+        data = await response.json()
+      } catch (parseErr) {
+        console.error("[v0] Failed to parse debug prompt response")
+        setError("Failed to parse debug response")
+        setIsGenerating(false)
+        return
+      }
+
+      console.log("[v0] Debug prompt-only response:", {
+        success: data.success,
+        stage: data.stage,
+        elapsedMs: data.elapsedMs,
+        model: data.model,
+        promptLength: data.promptLength,
+        messagesCount: data.messagesCount,
+        cappedSections: data.cappedSections,
+        cappedItems: data.cappedItems,
+        error: data.error,
+      })
+
+      if (data.success) {
+        alert(
+          `Debug Prompt Build - Success!\n\n` +
+          `Elapsed: ${data.elapsedMs}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n` +
+          `Messages Count: ${data.messagesCount}\n` +
+          `Capped Sections: ${data.cappedSections}\n` +
+          `Capped Items: ${data.cappedItems}\n\n` +
+          `(Not saved - debug only)`
+        )
+      } else {
+        alert(
+          `Debug Prompt Build - Failed at ${data.stage}\n\n` +
+          `Elapsed: ${data.elapsedMs}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n\n` +
+          `Error: ${data.error}\n\n` +
+          `(See console for full details)`
+        )
+      }
+    } catch (err) {
+      console.error("[v0] Debug prompt-only error:", err)
+      setError(err instanceof Error ? err.message : "Debug failed")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const handleGenerate = async () => {
     setError(null)
 
@@ -348,7 +573,7 @@ export function GenerateChecklistClient() {
                 value={formState.numberOfSections}
                 onChange={(e) => handleFieldChange("numberOfSections", Math.min(8, Math.max(1, parseInt(e.target.value) || 1)))}
               />
-              <p className="text-xs text-muted-foreground">Max 8 sections</p>
+              <p className="text-xs text-muted-foreground">Max 8 sections {provider === "ai" ? "(AI capped at 4 for MVP speed)" : ""}</p>
             </div>
 
             <div className="space-y-2">
@@ -361,7 +586,7 @@ export function GenerateChecklistClient() {
                 value={formState.itemsPerSection}
                 onChange={(e) => handleFieldChange("itemsPerSection", Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
               />
-              <p className="text-xs text-muted-foreground">Max 12 items per section</p>
+              <p className="text-xs text-muted-foreground">Max 12 items per section {provider === "ai" ? "(AI capped at 5 for MVP speed)" : ""}</p>
             </div>
           </div>
         </div>
@@ -387,20 +612,55 @@ export function GenerateChecklistClient() {
           </Card>
         )}
 
-        {/* Submit */}
-        <Button size="lg" disabled={isGenerating} className="w-full">
-          {isGenerating ? (
+        {/* Submit and Debug */}
+        <div className="flex gap-2">
+          <Button size="lg" disabled={isGenerating} className="flex-1" onClick={handleGenerate}>
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                {provider === "mock" ? "Generating Mock Checklist..." : "Generating with AI..."}
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 size-4" aria-hidden="true" />
+                {provider === "mock" ? "Generate Mock Checklist" : "Generate AI Checklist"}
+              </>
+            )}
+          </Button>
+          
+          {/* Developer diagnostic buttons (only shown in AI mode) */}
+          {provider === "ai" && (
             <>
-              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-              {provider === "mock" ? "Generating Mock Checklist..." : "Generating with AI..."}
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 size-4" aria-hidden="true" />
-              {provider === "mock" ? "Generate Mock Checklist" : "Generate AI Checklist"}
+              <Button 
+                size="lg" 
+                variant="outline" 
+                disabled={isGenerating}
+                onClick={handleCheckAiRouteConfig}
+                title="Check AI route configuration (no cost)"
+              >
+                ⚙️
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                disabled={isGenerating}
+                onClick={handleDebugPromptOnly}
+                title="Debug prompt build (no OpenAI call, not saved)"
+              >
+                📝
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                disabled={isGenerating}
+                onClick={handleDebugFullGeneration}
+                title="Debug full generation pipeline (1 OpenAI call, not saved)"
+              >
+                🐛
+              </Button>
             </>
           )}
-        </Button>
+        </div>
       </form>
     </div>
   )
