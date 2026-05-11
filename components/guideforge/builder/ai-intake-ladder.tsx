@@ -21,63 +21,296 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
   const result: Record<string, string | number | boolean> = {}
   const lowerText = text.toLowerCase()
 
-  // Detect audience keywords
-  if (lowerText.includes("beginner")) result.audienceLevel = "beginner"
-  if (lowerText.includes("expert") || lowerText.includes("professional")) result.audienceLevel = "expert"
-  if (lowerText.includes("advanced")) result.audienceLevel = "advanced"
-  if (lowerText.includes("youtube") || lowerText.includes("video")) result.audience = "Video creator, content producer"
-  if (lowerText.includes("developer") || lowerText.includes("engineer")) result.audience = "Developers, engineers"
-  if (lowerText.includes("designer")) result.audience = "Designers, UX professionals"
-  if (lowerText.includes("manager") || lowerText.includes("team lead")) result.audience = "Managers, team leads"
-  if (lowerText.includes("student")) result.audience = "Students, learners"
+  // 1. EXTRACT TITLE - strip common prefix phrases and extract meaningful title
+  const title = extractTitle(text)
+  if (title) result.title = title
 
-  // Detect tone keywords - map to normalized shared tone set
-  if (lowerText.includes("funny") || lowerText.includes("humor")) result.tone = "helpful"
-  if (lowerText.includes("technical") || lowerText.includes("precise")) result.tone = "technical"
-  if (lowerText.includes("story") || lowerText.includes("narrative")) result.tone = "helpful"
-  if (lowerText.includes("quick") || lowerText.includes("minimal")) result.tone = "minimal"
-  if (lowerText.includes("beginner") && !result.tone) result.tone = "beginner-friendly"
-  if (lowerText.includes("practical") || lowerText.includes("straightforward")) result.tone = "practical"
-  if (lowerText.includes("detail") || lowerText.includes("thorough")) result.tone = "detailed"
+  // 2. EXTRACT PURPOSE - general intent/problem
+  const purpose = extractPurpose(text, title)
+  if (purpose) result.purpose = purpose
 
-  // Detect guide type keywords
-  if (lowerText.includes("how to") || lowerText.includes("how-to")) result.guideType = "guide"
-  if (lowerText.includes("tutorial") || lowerText.includes("step")) result.guideType = "tutorial"
-  if (lowerText.includes("reference") || lowerText.includes("lookup")) result.guideType = "reference"
-  if (lowerText.includes("why") || lowerText.includes("explain")) result.guideType = "explanation"
+  // 3. EXTRACT GOAL - specific outcomes or what they should achieve
+  const goal = extractGoal(text)
+  if (goal) result.goal = goal
 
-  // Detect difficulty
-  if (result.audienceLevel === "beginner") result.difficulty = "beginner"
-  if (result.audienceLevel === "advanced") result.difficulty = "advanced"
-  if (result.audienceLevel === "expert") result.difficulty = "expert"
+  // 4. EXTRACT AUDIENCE - from "for X" phrases or audience keywords
+  const audience = extractAudience(text)
+  if (audience) result.audience = audience
 
-  // Detect warnings/prerequisites
-  if (lowerText.includes("danger") || lowerText.includes("warning") || lowerText.includes("careful")) result.hasWarnings = true
-  if (lowerText.includes("require") || lowerText.includes("prerequisite") || lowerText.includes("before")) result.hasPrerequisites = true
+  // 5. EXTRACT USE CASE / CONTEXT - from "when", "for publishing", etc.
+  const useCase = extractUseCase(text)
+  if (useCase) result.useCase = useCase
 
-  // Extract goal (for both single_guide and checklist)
-  if (lowerText.includes("goal")) {
-    const goalMatch = text.match(/goal[^.!?]*[.!?]/i)
-    if (goalMatch) result.goal = goalMatch[0].replace(/goal[:\s]+/i, "").trim()
+  // 6. EXTRACT ADDITIONAL CONTEXT - topics covered, what's included
+  const additionalContext = extractAdditionalContext(text)
+  if (additionalContext) result.optionalContext = additionalContext
+
+  // 7. DETECT TONE from keywords
+  const tone = detectTone(lowerText)
+  if (tone) result.tone = tone
+
+  // 8. DETECT DIFFICULTY/AUDIENCE LEVEL
+  const difficulty = detectDifficulty(lowerText)
+  if (difficulty) result.difficulty = difficulty
+
+  // 9. DETECT GUIDE TYPE/FORMAT
+  const guideType = detectGuideType(lowerText)
+  if (guideType) result.guideType = guideType
+
+  // 10. DETECT WARNINGS AND PREREQUISITES
+  if (
+    lowerText.includes("warning") ||
+    lowerText.includes("caution") ||
+    lowerText.includes("safety") ||
+    lowerText.includes("dangerous") ||
+    lowerText.includes("avoid mistakes") ||
+    lowerText.includes("risk")
+  ) {
+    result.hasWarnings = true
   }
 
-  // Extract use case
-  if (lowerText.includes("use case") || lowerText.includes("when")) {
-    const useCaseMatch = text.match(/(use case|when)[^.!?]*[.!?]/i)
-    if (useCaseMatch) result.useCase = useCaseMatch[0].replace(/(use case|when)[:\s]+/i, "").trim()
+  if (
+    lowerText.includes("prerequisite") ||
+    lowerText.includes("requirement") ||
+    lowerText.includes("before you start") ||
+    lowerText.includes("need to have") ||
+    lowerText.includes("setup required")
+  ) {
+    result.hasPrerequisites = true
   }
 
-  // Detect checklist specifics
-  if (lowerText.includes("section")) result.numberOfSections = 4
-  if (lowerText.includes("item")) result.itemsPerSection = 5
-
-  // Extract title from first line (if it looks like a title)
-  const firstLine = text.split("\n")[0].trim()
-  if (firstLine.length > 5 && firstLine.length < 100 && !firstLine.match(/[.,:;]/)) {
-    result.title = firstLine
-  }
+  // 11. DETERMINE NUMBER OF STEPS
+  const numberOfSteps = determineNumberOfSteps(lowerText, result.difficulty as string)
+  if (numberOfSteps) result.numberOfSteps = numberOfSteps
 
   return result
+}
+
+/**
+ * Extract a clean title from rough idea, stripping common prefixes
+ */
+function extractTitle(text: string): string | null {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0)
+
+  // Try first line as potential title
+  const firstLine = lines[0]
+  if (!firstLine) return null
+
+  // Strip common guide/tutorial prefixes
+  let cleanedTitle = firstLine
+    .replace(/^a\s+(beginner-?friendly\s+)?guide\s+(for|on|to)\s+/i, "")
+    .replace(/^a\s+(technical\s+)?guide\s+(for|on|to)\s+/i, "")
+    .replace(/^a\s+tutorial\s+(for|on|to)\s+/i, "")
+    .replace(/^how\s+to\s+/i, "")
+    .replace(/^tutorial\s+on\s+/i, "")
+    .replace(/^guide\s+(for|to|on)\s+/i, "")
+    .replace(/^step-?by-?step\s+(guide\s+)?/i, "")
+    .trim()
+
+  // Only use if it's a reasonable title length and doesn't look like a full sentence
+  if (cleanedTitle.length > 3 && cleanedTitle.length < 100 && !cleanedTitle.match(/[.!?]$/)) {
+    return cleanedTitle
+  }
+
+  return null
+}
+
+/**
+ * Extract the general purpose/problem the guide solves
+ */
+function extractPurpose(text: string, title: string | null): string | null {
+  // If we have a title, use it to construct purpose
+  if (title) {
+    // Look for action verbs to construct purpose
+    const lowerText = text.toLowerCase()
+    if (lowerText.includes("help")) {
+      return `Help readers understand and ${title.toLowerCase()}`
+    }
+    if (lowerText.includes("learn") || lowerText.includes("teach")) {
+      return `Teach how to ${title.toLowerCase()}`
+    }
+    if (lowerText.includes("prepare") || lowerText.includes("guide")) {
+      return `Guide readers through ${title.toLowerCase()}`
+    }
+    return `Provide structured guidance on ${title.toLowerCase()}`
+  }
+
+  // Look for explicit purpose phrases
+  const purposeMatch = text.match(
+    /(?:purpose is|purpose:|aim is|goal is to help|help readers?|designed to|intended to)[^.!?]+[.!?]/i
+  )
+  if (purposeMatch) {
+    return purposeMatch[0].replace(/(?:purpose is|purpose:|aim is|goal is to help|help readers?|designed to|intended to)\s*/i, "").trim()
+  }
+
+  return null
+}
+
+/**
+ * Extract the specific goal or outcome
+ */
+function extractGoal(text: string): string | null {
+  // Look for "goal is to" or "goal:"
+  const goalMatch = text.match(/(?:goal is to|goal:?)\s*([^.!?]+)[.!?]/i)
+  if (goalMatch) {
+    return goalMatch[1].trim()
+  }
+
+  // Look for "so they can" or "to help them"
+  const helpMatch = text.match(/(?:so they can|to help them?|make sure|ensure)\s*([^.!?]+)[.!?]/i)
+  if (helpMatch) {
+    return helpMatch[1].trim()
+  }
+
+  // Look for "avoid" patterns
+  const avoidMatch = text.match(/avoid(?:ing)?\s+([^.!?]+)[.!?]/i)
+  if (avoidMatch) {
+    return `Avoid ${avoidMatch[1].trim()}`
+  }
+
+  // Look for "prepare" patterns
+  const prepareMatch = text.match(/prepare\s+(?:users?|them?|readers?)\s+(?:for|to)\s+([^.!?]+)[.!?]/i)
+  if (prepareMatch) {
+    return `Prepare users to ${prepareMatch[1].trim()}`
+  }
+
+  return null
+}
+
+/**
+ * Extract intended audience from "for X" or audience keywords
+ */
+function extractAudience(text: string): string | null {
+  // Look for "for [audience]" pattern
+  const forMatch = text.match(/for\s+([a-z]+(?:\s+[a-z]+)*?)(?:\s+on\s+|(?:,|\.|!|\?|$))/i)
+  if (forMatch) {
+    const candidate = forMatch[1].trim()
+    // Make sure it's not accidentally capturing other keywords
+    if (candidate.length < 50 && !candidate.includes("the") && !candidate.includes("a ")) {
+      return candidate.charAt(0).toUpperCase() + candidate.slice(1)
+    }
+  }
+
+  // Fallback to keyword detection
+  if (text.match(/youtube|video\s+creator|streamer/i)) return "Video creators and streamers"
+  if (text.match(/developer|engineer|programmer/i)) return "Developers and engineers"
+  if (text.match(/designer|design\s+professional/i)) return "Designers and UX professionals"
+  if (text.match(/manager|team\s+lead|leadership/i)) return "Managers and team leads"
+  if (text.match(/student|learner|beginner/i)) return "Students and learners"
+  if (text.match(/indie\s+game|game\s+developer/i)) return "Game developers"
+  if (text.match(/content\s+creator|creator|solo\s+creator/i)) return "Content creators"
+
+  return null
+}
+
+/**
+ * Extract use case or context from "when", "publishing", etc.
+ */
+function extractUseCase(text: string): string | null {
+  // Look for "when" patterns
+  const whenMatch = text.match(/when\s+([^.!?]+)[.!?]/i)
+  if (whenMatch) {
+    return whenMatch[1].trim()
+  }
+
+  // Look for "useful when" patterns
+  const usefulMatch = text.match(/useful\s+when\s+([^.!?]+)[.!?]/i)
+  if (usefulMatch) {
+    return usefulMatch[1].trim()
+  }
+
+  // Look for "in the context of"
+  const contextMatch = text.match(/(?:in the context of|for)\s+([a-z]+(?:\s+[a-z]+)*?)\s+(?:process|workflow|experience)/i)
+  if (contextMatch) {
+    return contextMatch[1].trim()
+  }
+
+  // Look for action keywords: publishing, launching, deploying, onboarding, etc.
+  const actionMatch = text.match(/(publishing|deploying|launching|launching|onboarding|setting\s+up|installing)\s+([a-z\s]+?)(?:\.|,|!|\?|$)/i)
+  if (actionMatch) {
+    return `${actionMatch[1]} ${actionMatch[2]}`.trim()
+  }
+
+  return null
+}
+
+/**
+ * Extract topics covered and other details
+ */
+function extractAdditionalContext(text: string): string | null {
+  // Look for "including", "include", "cover", "with" patterns
+  const includeMatch = text.match(
+    /(?:including|include|cover|covering|with)\s+([^.!?]+?)\s*(?:and\s+)?(?:post-?release|analytics|more)?[.!?]/i
+  )
+  if (includeMatch) {
+    return "Include " + includeMatch[1].trim()
+  }
+
+  // Look for a comma-separated list of topics after "such as"
+  const listMatch = text.match(/such\s+as\s+([^.!?]+)[.!?]/i)
+  if (listMatch) {
+    return "Cover: " + listMatch[1].trim()
+  }
+
+  return null
+}
+
+/**
+ * Detect tone from keywords
+ */
+function detectTone(lowerText: string): string | null {
+  if (lowerText.includes("technical") || lowerText.includes("precision")) return "technical"
+  if (lowerText.includes("beginner-friendly") || lowerText.includes("beginner friendly")) return "beginner-friendly"
+  if (lowerText.includes("practical") || lowerText.includes("straightforward")) return "practical"
+  if (lowerText.includes("detailed") || lowerText.includes("thorough") || lowerText.includes("comprehensive")) return "detailed"
+  if (lowerText.includes("quick") || lowerText.includes("minimal") || lowerText.includes("concise")) return "minimal"
+  if (lowerText.includes("friendly") || lowerText.includes("helpful")) return "helpful"
+
+  // If mentions "beginner" level, use beginner-friendly tone
+  if (lowerText.includes("beginner")) return "beginner-friendly"
+
+  return null
+}
+
+/**
+ * Detect difficulty level
+ */
+function detectDifficulty(lowerText: string): string | null {
+  if (lowerText.includes("beginner")) return "beginner"
+  if (lowerText.includes("expert") || lowerText.includes("professional")) return "expert"
+  if (lowerText.includes("advanced")) return "advanced"
+
+  return null
+}
+
+/**
+ * Detect guide type/format
+ */
+function detectGuideType(lowerText: string): string | null {
+  if (lowerText.includes("how to") || lowerText.includes("how-to")) return "guide"
+  if (lowerText.includes("tutorial") || lowerText.includes("step-by-step")) return "tutorial"
+  if (lowerText.includes("reference")) return "reference"
+  if (lowerText.includes("troubleshoot") || lowerText.includes("why")) return "explanation"
+
+  return null
+}
+
+/**
+ * Determine appropriate number of steps based on difficulty
+ */
+function determineNumberOfSteps(lowerText: string, difficulty: string | undefined): number | null {
+  // If explicit step mention, use that
+  if (lowerText.includes("5 step") || lowerText.includes("five step")) return 5
+  if (lowerText.includes("6 step") || lowerText.includes("six step")) return 6
+  if (lowerText.includes("7 step") || lowerText.includes("seven step")) return 7
+  if (lowerText.includes("8 step") || lowerText.includes("eight step")) return 8
+
+  // Otherwise, base on difficulty
+  if (difficulty === "beginner") return 5
+  if (difficulty === "advanced") return 8
+  if (difficulty === "expert") return 10
+
+  return null
 }
 
 export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps) {
@@ -175,14 +408,32 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
               Fields detected from your idea:
             </h3>
             <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
-              {Object.entries(result).map(([key, value]) => (
-                <li key={key} className="flex items-start gap-2">
-                  <span className="text-green-600 dark:text-green-400 font-bold">✓</span>
-                  <span>
-                    <span className="font-medium capitalize">{key.replace(/([A-Z])/g, " $1")}:</span> {String(value)}
-                  </span>
-                </li>
-              ))}
+              {Object.entries(result).map(([key, value]) => {
+                // Format field names for display
+                const fieldLabels: Record<string, string> = {
+                  title: "Guide Title",
+                  purpose: "Guide Purpose",
+                  audience: "Intended Audience",
+                  goal: "Guide Goal",
+                  useCase: "Use Case / Context",
+                  optionalContext: "Additional Context",
+                  tone: "Tone",
+                  difficulty: "Difficulty Level",
+                  guideType: "Guide Type",
+                  numberOfSteps: "Number of Steps",
+                  hasWarnings: "Include Safety Warnings",
+                  hasPrerequisites: "Include Prerequisites",
+                }
+                const label = fieldLabels[key] || key.replace(/([A-Z])/g, " $1").toLowerCase()
+                return (
+                  <li key={key} className="flex items-start gap-2">
+                    <span className="text-green-600 dark:text-green-400 font-bold">✓</span>
+                    <span>
+                      <span className="font-medium">{label}:</span> {String(value)}
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )}
@@ -227,9 +478,13 @@ function buildFieldsFromParsed(
 ): Partial<SingleGuideIntakeRequest> | Partial<ChecklistIntakeRequest> {
   const fields: Record<string, any> = {}
 
-  // Common fields
+  // Common fields - always apply if detected
   if (parsed.title) fields.title = parsed.title
+  if (parsed.purpose) fields.purpose = parsed.purpose
   if (parsed.audience) fields.audience = parsed.audience
+  if (parsed.goal) fields.goal = parsed.goal
+  if (parsed.useCase) fields.useCase = parsed.useCase
+  if (parsed.optionalContext) fields.optionalContext = parsed.optionalContext
   if (parsed.tone) fields.tone = parsed.tone
   if (parsed.difficulty) fields.difficulty = parsed.difficulty
 
@@ -238,24 +493,24 @@ function buildFieldsFromParsed(
     if (parsed.guideType) fields.guideType = parsed.guideType
     if (parsed.hasWarnings !== undefined) fields.hasWarnings = parsed.hasWarnings
     if (parsed.hasPrerequisites !== undefined) fields.hasPrerequisites = parsed.hasPrerequisites
+    if (parsed.numberOfSteps) fields.numberOfSteps = parsed.numberOfSteps
 
-    // Default/fallback values for guide
+    // Set defaults only if not already set by parser
     if (!fields.purpose) fields.purpose = "Provide structured, step-by-step guidance"
-    if (!fields.numberOfSteps) fields.numberOfSteps = 5
+    if (!fields.numberOfSteps) {
+      fields.numberOfSteps = fields.difficulty === "beginner" ? 4 : fields.difficulty === "advanced" ? 8 : 5
+    }
     if (!fields.guideType) fields.guideType = "guide"
-    if (fields.difficulty === "beginner") fields.numberOfSteps = 4
-    if (fields.difficulty === "advanced") fields.numberOfSteps = 8
 
     return fields as Partial<SingleGuideIntakeRequest>
   }
 
   if (assetType === "checklist") {
     // Checklist specific
-    if (parsed.goal) fields.goal = parsed.goal
     if (parsed.numberOfSections) fields.numberOfSections = parsed.numberOfSections
     if (parsed.itemsPerSection) fields.itemsPerSection = parsed.itemsPerSection
 
-    // Default/fallback values for checklist
+    // Set defaults only if not already set
     if (!fields.purpose) fields.purpose = "Provide a structured, actionable checklist"
     if (!fields.numberOfSections) fields.numberOfSections = 4
     if (!fields.itemsPerSection) fields.itemsPerSection = 5
