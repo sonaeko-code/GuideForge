@@ -25,21 +25,21 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
   const title = extractTitle(text)
   if (title) result.title = title
 
-  // 2. EXTRACT PURPOSE - general intent/problem
-  const purpose = extractPurpose(text, title)
+  // 4. EXTRACT AUDIENCE - from "for X" phrases or audience keywords (needed for purpose)
+  const audience = extractAudience(text)
+  if (audience) result.audience = audience
+
+  // 5. EXTRACT USE CASE / CONTEXT - from "when", "for publishing", etc. (needed for purpose)
+  const useCase = extractUseCase(text)
+  if (useCase) result.useCase = useCase
+
+  // 2. EXTRACT PURPOSE - general intent/problem (now with audience and useCase)
+  const purpose = extractPurpose(text, title, audience, useCase)
   if (purpose) result.purpose = purpose
 
   // 3. EXTRACT GOAL - specific outcomes or what they should achieve
   const goal = extractGoal(text)
   if (goal) result.goal = goal
-
-  // 4. EXTRACT AUDIENCE - from "for X" phrases or audience keywords
-  const audience = extractAudience(text)
-  if (audience) result.audience = audience
-
-  // 5. EXTRACT USE CASE / CONTEXT - from "when", "for publishing", etc.
-  const useCase = extractUseCase(text)
-  if (useCase) result.useCase = useCase
 
   // 6. EXTRACT ADDITIONAL CONTEXT - topics covered, what's included
   const additionalContext = extractAdditionalContext(text)
@@ -96,21 +96,37 @@ function extractTitle(text: string): string | null {
   const firstLine = lines[0]
   if (!firstLine) return null
 
-  // Strip common guide/tutorial prefixes
+  // Pattern for "A [adjective] guide for [audience] on [topic]" or similar
+  // Extract just the [topic] part and title-case it
+  const guideOnMatch = firstLine.match(/(?:guide|tutorial)\s+(?:for\s+[^o]+\s+)?on\s+([^.!?]+)/i)
+  if (guideOnMatch) {
+    let topic = guideOnMatch[1].trim()
+    // Title-case the topic
+    return topic
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ")
+  }
+
+  // Fallback: strip common guide/tutorial prefixes
   let cleanedTitle = firstLine
-    .replace(/^a\s+(beginner-?friendly\s+)?guide\s+for\s+[a-z\s]+\s+on\s+/i, "")
-    .replace(/^a\s+(beginner-?friendly\s+)?guide\s+(for|on|to)\s+/i, "")
-    .replace(/^a\s+(technical\s+)?guide\s+(for|on|to)\s+/i, "")
-    .replace(/^a\s+tutorial\s+(for|on|to)\s+/i, "")
+    .replace(/^a\s+(?:beginner-?friendly\s+)?(?:technical\s+)?guide\s+(?:for|on|to)\s+/i, "")
+    .replace(/^a\s+tutorial\s+(?:on|for|to)\s+/i, "")
     .replace(/^how\s+to\s+/i, "")
     .replace(/^tutorial\s+on\s+/i, "")
-    .replace(/^guide\s+(for|to|on)\s+/i, "")
-    .replace(/^step-?by-?step\s+(guide\s+)?/i, "")
+    .replace(/^step-?by-?step\s+(?:guide\s+)?(?:on|for)\s+/i, "")
     .trim()
 
-  // Only use if it's a reasonable title length and doesn't look like a full sentence
-  if (cleanedTitle.length > 3 && cleanedTitle.length < 100 && !cleanedTitle.match(/[.!?]$/)) {
+  // Remove trailing period if it exists
+  cleanedTitle = cleanedTitle.replace(/\.$/, "").trim()
+
+  // Only use if it's a reasonable title length
+  if (cleanedTitle.length > 3 && cleanedTitle.length < 120) {
+    // Title-case the result
     return cleanedTitle
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ")
   }
 
   return null
@@ -119,29 +135,48 @@ function extractTitle(text: string): string | null {
 /**
  * Extract the general purpose/problem the guide solves
  */
-function extractPurpose(text: string, title: string | null): string | null {
-  // If we have a title, use it to construct a better purpose
+function extractPurpose(text: string, title: string | null, audience?: string, useCase?: string): string | null {
+  // If we have audience and useCase, build a personalized purpose
+  if (audience && useCase) {
+    // Extract key terms from the text for richer purpose
+    // Look for action verbs: prepare, help, teach, guide, etc.
+    const lowerText = text.toLowerCase()
+    
+    if (lowerText.includes("prepare")) {
+      return `Help ${audience.toLowerCase()} prepare for ${useCase.toLowerCase()}.`
+    }
+    if (lowerText.includes("teach") || lowerText.includes("learn")) {
+      return `Teach ${audience.toLowerCase()} how to ${useCase.toLowerCase()}.`
+    }
+    if (lowerText.includes("guide")) {
+      return `Guide ${audience.toLowerCase()} through ${useCase.toLowerCase()}.`
+    }
+    
+    // Default personalized purpose
+    return `Help ${audience.toLowerCase()} ${useCase.toLowerCase()}.`
+  }
+
+  // Fallback: use title if available
   if (title) {
     const lowerText = text.toLowerCase()
     
-    // Look for explicit purpose/goal indicators to pick better verb
     if (lowerText.includes("help them prepare") || lowerText.includes("help them")) {
-      return `Help readers prepare for ${title.toLowerCase()}`
+      return `Help readers prepare for ${title.toLowerCase()}.`
     }
     if (lowerText.includes("help")) {
-      return `Help readers understand and accomplish ${title.toLowerCase()}`
+      return `Help readers understand and accomplish ${title.toLowerCase()}.`
     }
     if (lowerText.includes("learn") || lowerText.includes("teach")) {
-      return `Teach how to ${title.toLowerCase()}`
+      return `Teach how to ${title.toLowerCase()}.`
     }
     if (lowerText.includes("prepare")) {
-      return `Prepare readers for ${title.toLowerCase()}`
+      return `Prepare readers for ${title.toLowerCase()}.`
     }
     if (lowerText.includes("guide")) {
-      return `Guide readers through ${title.toLowerCase()}`
+      return `Guide readers through ${title.toLowerCase()}.`
     }
-    // Default construction
-    return `Provide comprehensive guidance on ${title.toLowerCase()}`
+    
+    return `Provide comprehensive guidance on ${title.toLowerCase()}.`
   }
 
   // Look for explicit purpose phrases
@@ -149,7 +184,8 @@ function extractPurpose(text: string, title: string | null): string | null {
     /(?:purpose is|purpose:|aim is|goal is to help|help readers?|designed to|intended to)[^.!?]+[.!?]/i
   )
   if (purposeMatch) {
-    return purposeMatch[0].replace(/(?:purpose is|purpose:|aim is|goal is to help|help readers?|designed to|intended to)\s*/i, "").trim()
+    const extracted = purposeMatch[0].replace(/(?:purpose is|purpose:|aim is|goal is to help|help readers?|designed to|intended to)\s*/i, "").trim()
+    return extracted
   }
 
   return null
@@ -159,28 +195,51 @@ function extractPurpose(text: string, title: string | null): string | null {
  * Extract the specific goal or outcome
  */
 function extractGoal(text: string): string | null {
-  // Look for "goal is to" or "goal:"
-  const goalMatch = text.match(/(?:goal is to|goal:?)\s*([^.!?]+)[.!?]/i)
+  // Look for "The goal is to" or "goal is to" or "goal:"
+  const goalMatch = text.match(/(?:the\s+)?goal\s+(?:is\s+)?to\s+([^.!?]+)[.!?]/i)
   if (goalMatch) {
-    return goalMatch[1].trim()
+    let goal = goalMatch[1].trim()
+    // Capitalize the first letter
+    goal = goal.charAt(0).toUpperCase() + goal.slice(1)
+    return goal
   }
 
-  // Look for "so they can" or "to help them"
-  const helpMatch = text.match(/(?:so they can|to help them?|make sure|ensure)\s*([^.!?]+)[.!?]/i)
-  if (helpMatch) {
-    return helpMatch[1].trim()
+  // Look for just "goal:" pattern
+  const goalColonMatch = text.match(/goal:\s*([^.!?]+)[.!?]/i)
+  if (goalColonMatch) {
+    let goal = goalColonMatch[1].trim()
+    goal = goal.charAt(0).toUpperCase() + goal.slice(1)
+    return goal
   }
 
-  // Look for "avoid" patterns
-  const avoidMatch = text.match(/avoid(?:ing)?\s+([^.!?]+)[.!?]/i)
+  // Look for "The goal is..." without "to"
+  const goalIsMatch = text.match(/(?:the\s+)?goal\s+is\s+([^.!?]+)[.!?]/i)
+  if (goalIsMatch) {
+    let goal = goalIsMatch[1].trim()
+    goal = goal.charAt(0).toUpperCase() + goal.slice(1)
+    return goal
+  }
+
+  // Look for "so they can" or "so users can"
+  const soTheyMatch = text.match(/so\s+(?:they|users?|readers?)\s+can\s+([^.!?]+)[.!?]/i)
+  if (soTheyMatch) {
+    let goal = soTheyMatch[1].trim()
+    goal = goal.charAt(0).toUpperCase() + goal.slice(1)
+    return goal
+  }
+
+  // Look for "to avoid..." pattern
+  const avoidMatch = text.match(/to\s+avoid\s+([^.!?]+)[.!?]/i)
   if (avoidMatch) {
-    return `Avoid ${avoidMatch[1].trim()}`
+    let goal = "Avoid " + avoidMatch[1].trim()
+    return goal
   }
 
-  // Look for "prepare" patterns
-  const prepareMatch = text.match(/prepare\s+(?:users?|them?|readers?)\s+(?:for|to)\s+([^.!?]+)[.!?]/i)
-  if (prepareMatch) {
-    return `Prepare users to ${prepareMatch[1].trim()}`
+  // Look for just "avoid..." pattern
+  const avoidDirectMatch = text.match(/avoid\s+(?:missing|having|making)?\s*([^.!?]+)[.!?]/i)
+  if (avoidDirectMatch) {
+    let goal = "Avoid missing " + avoidDirectMatch[1].trim()
+    return goal
   }
 
   return null
@@ -375,6 +434,9 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
 
       // Build structured fields based on asset type
       const fieldsToApply = buildFieldsFromParsed(parsed, assetType)
+      
+      // Debug log for development
+      console.log("[GuideForge Intake Ladder] fieldsToApply", fieldsToApply)
       
       // Display the actual fields that will be applied (not just parsed)
       setResult(fieldsToApply as Record<string, string | number | boolean>)
