@@ -14,6 +14,42 @@ interface AIIntakeLadderProps {
 }
 
 /**
+ * Title-case a string while preserving common acronyms and brand names
+ */
+function titleCaseGuideTitle(text: string): string {
+  // Common acronyms and brand names that should preserve their casing
+  const preserveCasing: Record<string, string> = {
+    youtube: "YouTube",
+    "youtube channel": "YouTube Channel",
+    api: "API",
+    ai: "AI",
+    seo: "SEO",
+    "ci/cd": "CI/CD",
+    next: "Next.js",
+    nextjs: "Next.js",
+    vercel: "Vercel",
+    steam: "Steam",
+    discord: "Discord",
+  }
+
+  // Check for whole word matches first
+  for (const [lower, proper] of Object.entries(preserveCasing)) {
+    const regex = new RegExp(`\\b${lower}\\b`, "gi")
+    text = text.replace(regex, proper)
+  }
+
+  // Title-case remaining words
+  return text
+    .split(" ")
+    .map((word) => {
+      // Skip if already title-cased (contains uppercase letters)
+      if (/[A-Z]/.test(word)) return word
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    })
+    .join(" ")
+}
+
+/**
  * Local heuristic parser for filling structured intake fields from rough ideas.
  * Uses simple keyword matching and text analysis instead of calling OpenAI.
  */
@@ -21,17 +57,18 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
   const result: Record<string, string | number | boolean> = {}
   const lowerText = text.toLowerCase()
 
-  // 1. EXTRACT TITLE - strip common prefix phrases and extract meaningful title
-  const title = extractTitle(text)
-  if (title) result.title = title
-
   // 4. EXTRACT AUDIENCE - from "for X" phrases or audience keywords (needed for purpose)
   const audience = extractAudience(text)
   if (audience) result.audience = audience
 
-  // 5. EXTRACT USE CASE / CONTEXT - from "when", "for publishing", etc. (needed for purpose)
+  // 5. EXTRACT USE CASE / CONTEXT - from "when", "for publishing", etc. (needed for purpose and title fallback)
   const useCase = extractUseCase(text)
   if (useCase) result.useCase = useCase
+
+  // 1. EXTRACT TITLE - strip common prefix phrases and extract meaningful title
+  // Pass useCase as fallback if direct title extraction fails
+  const title = extractTitle(text, useCase)
+  if (title) result.title = title
 
   // 2. EXTRACT PURPOSE - general intent/problem (now with audience and useCase)
   const purpose = extractPurpose(text, title, audience, useCase)
@@ -88,8 +125,9 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
 
 /**
  * Extract a clean title from rough idea, stripping common prefixes
+ * Falls back to useCase if no direct title found
  */
-function extractTitle(text: string): string | null {
+function extractTitle(text: string, useCase?: string | null): string | null {
   const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0)
 
   // Try first line as potential title
@@ -101,11 +139,7 @@ function extractTitle(text: string): string | null {
   const guideOnMatch = firstLine.match(/(?:guide|tutorial)\s+(?:for\s+[^o]+\s+)?on\s+([^.!?]+)/i)
   if (guideOnMatch) {
     let topic = guideOnMatch[1].trim()
-    // Title-case the topic
-    return topic
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ")
+    return titleCaseGuideTitle(topic)
   }
 
   // Fallback: strip common guide/tutorial prefixes
@@ -122,11 +156,12 @@ function extractTitle(text: string): string | null {
 
   // Only use if it's a reasonable title length
   if (cleanedTitle.length > 3 && cleanedTitle.length < 120) {
-    // Title-case the result
-    return cleanedTitle
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ")
+    return titleCaseGuideTitle(cleanedTitle)
+  }
+
+  // Final fallback: if useCase exists, derive title from it
+  if (useCase && useCase.length > 3 && useCase.length < 120) {
+    return titleCaseGuideTitle(useCase)
   }
 
   return null
@@ -325,23 +360,58 @@ function extractUseCase(text: string): string | null {
  * Extract topics covered and other details
  */
 function extractAdditionalContext(text: string): string | null {
-  // Look for "including" pattern - capture everything until end of sentence
+  // Look for "prepare the [list]" or "prepare [list]" pattern
+  // This captures comma-separated lists after "prepare"
+  const prepareMatch = text.match(
+    /(?:should\s+)?(?:help\s+them\s+)?prepare\s+(?:the\s+)?([^.!?]+?)(?:\.|!|\?|$)/i
+  )
+  if (prepareMatch) {
+    let items = prepareMatch[1].trim()
+    // Clean up: remove trailing phrases like "for release", "and post-release analytics"
+    items = items
+      .replace(/\s+(?:and\s+)?(?:for\s+)?(?:release|to\s+release)\s*$/i, "")
+      .replace(/\s+(?:and\s+)?(?:post-?release|analytics|etc\.)\s*$/i, "")
+      .trim()
+    
+    if (items.length > 5) {
+      // Title-case the list items
+      const listItems = items
+        .split(/,\s*/)
+        .map((item) => titleCaseGuideTitle(item.trim()))
+        .join(", ")
+      return listItems
+    }
+  }
+
+  // Look for "include/including/cover/with [list]" pattern
   const includeMatch = text.match(
     /(?:should\s+)?(?:include|including|cover|covering|with)\s+([^.!?]+?)(?:\.|!|\?|$)/i
   )
   if (includeMatch) {
-    const items = includeMatch[1].trim()
+    let items = includeMatch[1].trim()
     // Filter out common ending phrases
-    const cleaned = items.replace(/\s+(?:and\s+)?(?:post-?release|analytics|etc\.)?\s*$/i, "").trim()
-    if (cleaned.length > 5) {
-      return cleaned
+    items = items
+      .replace(/\s+(?:and\s+)?(?:post-?release|analytics|etc\.)\s*$/i, "")
+      .trim()
+    
+    if (items.length > 5) {
+      const listItems = items
+        .split(/,\s*/)
+        .map((item) => titleCaseGuideTitle(item.trim()))
+        .join(", ")
+      return listItems
     }
   }
 
   // Look for "such as" pattern - capture comma-separated list
   const listMatch = text.match(/such\s+as\s+([^.!?]+)[.!?]/i)
   if (listMatch) {
-    return listMatch[1].trim()
+    let items = listMatch[1].trim()
+    const listItems = items
+      .split(/,\s*/)
+      .map((item) => titleCaseGuideTitle(item.trim()))
+      .join(", ")
+    return listItems
   }
 
   return null
