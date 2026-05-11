@@ -13,6 +13,7 @@ import type { ChecklistIntakeRequest, GeneratedChecklist } from "@/lib/guideforg
 import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
+import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 
 /**
@@ -101,13 +102,8 @@ export function GenerateChecklistClient() {
     const checkDebugAccess = async () => {
       try {
         const profile = await getCurrentUserProfile()
-        if (profile && profile.role) {
-          const debugRoles = ['founder', 'admin', 'developer', 'dev']
-          const hasDebugAccess = debugRoles.includes(profile.role.toLowerCase())
-          setCanSeeDebugTools(hasDebugAccess)
-        } else {
-          setCanSeeDebugTools(false)
-        }
+        const hasAccess = canUseDebugTools(profile?.role)
+        setCanSeeDebugTools(hasAccess)
       } catch (err) {
         console.log('[v0] GenerateChecklistClient: Could not check debug access:', err instanceof Error ? err.message : String(err))
         setCanSeeDebugTools(false)
