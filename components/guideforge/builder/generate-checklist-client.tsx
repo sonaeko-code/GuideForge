@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2, Sparkles, Zap } from "lucide-react"
+import { ArrowLeft, Bug, CheckCircle2, Loader2, Sparkles, XCircle, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,9 @@ export function GenerateChecklistClient() {
   const [error, setError] = useState<string | null>(null)
   const [provider, setProvider] = useState<GenerationProvider>("mock")
   const [restoredMessage, setRestoredMessage] = useState<string | null>(null)
+  const [isDebugging, setIsDebugging] = useState(false)
+  const [debugResult, setDebugResult] = useState<Record<string, any> | null>(null)
+  const [debugError, setDebugError] = useState<string | null>(null)
 
   // On mount, check for pending proposal in sessionStorage and restore if valid
   useEffect(() => {
@@ -158,6 +161,67 @@ export function GenerateChecklistClient() {
       setError(displayError)
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  /**
+   * Debug Full Generation
+   *
+   * Calls POST /api/guideforge/generate-checklist?debug=true with the same
+   * form payload as normal AI generation. The server walks through each
+   * generation stage (body_parse -> input_clamp -> prompt_build ->
+   * message_build -> api_key_check -> openai_call -> parse ->
+   * schema_validation -> quality_validation) and returns a structured
+   * diagnostic object instead of throwing on the first failure.
+   *
+   * The server route declares all debug tracking variables BEFORE its
+   * try/catch block, so this path is immune to the
+   * "Cannot access 'i' before initialization" TDZ error that occurred
+   * in the previous minified build.
+   */
+  const handleDebugFullGeneration = async () => {
+    setDebugError(null)
+    setDebugResult(null)
+
+    if (!formState.title.trim() || !formState.audience.trim() || !formState.goal.trim() || !formState.purpose.trim()) {
+      setDebugError("Please fill in title, audience, goal, and purpose before running debug.")
+      return
+    }
+
+    setIsDebugging(true)
+    try {
+      const clampedRequest = {
+        ...formState,
+        numberOfSections: Math.max(1, Math.min(8, formState.numberOfSections)),
+        itemsPerSection: Math.max(1, Math.min(12, formState.itemsPerSection)),
+      }
+
+      console.log("[v0] Debug Full Generation: POST /api/guideforge/generate-checklist?debug=true")
+
+      const response = await fetch("/api/guideforge/generate-checklist?debug=true", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clampedRequest),
+      })
+
+      const responseText = await response.text()
+      let data: Record<string, any>
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseErr) {
+        console.error("[v0] Debug: Failed to parse response as JSON:", parseErr)
+        setDebugError(`Server returned non-JSON response (status ${response.status}). First 200 chars: ${responseText.substring(0, 200)}`)
+        return
+      }
+
+      console.log("[v0] Debug result:", data)
+      setDebugResult(data)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      console.error("[v0] Debug request error:", err)
+      setDebugError(`Debug request failed: ${msg}`)
+    } finally {
+      setIsDebugging(false)
     }
   }
 
@@ -388,7 +452,7 @@ export function GenerateChecklistClient() {
         )}
 
         {/* Submit */}
-        <Button size="lg" disabled={isGenerating} className="w-full">
+        <Button size="lg" disabled={isGenerating || isDebugging} className="w-full">
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
@@ -401,6 +465,158 @@ export function GenerateChecklistClient() {
             </>
           )}
         </Button>
+
+        {/* Debug Tools — only in AI Generate mode */}
+        {provider === "ai" && (
+          <div className="space-y-3 rounded-lg border border-dashed border-border bg-muted/30 p-4">
+            <div className="flex items-center gap-2">
+              <Bug className="size-4 text-muted-foreground" aria-hidden="true" />
+              <h3 className="text-sm font-semibold text-foreground">Debug Tools</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Run the AI pipeline with stage-by-stage diagnostics. Calls{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+                POST /api/guideforge/generate-checklist?debug=true
+              </code>{" "}
+              with the same payload as normal generation.
+            </p>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDebugFullGeneration}
+              disabled={isGenerating || isDebugging}
+              className="w-full"
+            >
+              {isDebugging ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                  Running debug pipeline...
+                </>
+              ) : (
+                <>
+                  <Bug className="mr-2 size-4" aria-hidden="true" />
+                  Debug Full Generation
+                </>
+              )}
+            </Button>
+
+            {debugError && (
+              <Card className="border-red-500/30 bg-red-500/5 p-3">
+                <p className="text-xs text-red-700 dark:text-red-300">{debugError}</p>
+              </Card>
+            )}
+
+            {debugResult && (
+              <Card
+                className={`p-3 ${
+                  debugResult.success
+                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    : "border-amber-500/30 bg-amber-500/5"
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {debugResult.success ? (
+                      <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                    ) : (
+                      <XCircle className="size-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                    )}
+                    <p
+                      className={`text-xs font-semibold ${
+                        debugResult.success
+                          ? "text-emerald-700 dark:text-emerald-300"
+                          : "text-amber-700 dark:text-amber-300"
+                      }`}
+                    >
+                      {debugResult.success ? "Debug pipeline succeeded" : "Debug pipeline failed"}
+                    </p>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                    {typeof debugResult.stage === "string" && (
+                      <>
+                        <dt className="text-muted-foreground">Stage</dt>
+                        <dd className="font-mono text-foreground">{debugResult.stage}</dd>
+                      </>
+                    )}
+                    {typeof debugResult.elapsedMs === "number" && (
+                      <>
+                        <dt className="text-muted-foreground">Elapsed</dt>
+                        <dd className="font-mono text-foreground">{debugResult.elapsedMs} ms</dd>
+                      </>
+                    )}
+                    {typeof debugResult.openaiElapsedMs === "number" && (
+                      <>
+                        <dt className="text-muted-foreground">OpenAI elapsed</dt>
+                        <dd className="font-mono text-foreground">{debugResult.openaiElapsedMs} ms</dd>
+                      </>
+                    )}
+                    {typeof debugResult.model === "string" && (
+                      <>
+                        <dt className="text-muted-foreground">Model</dt>
+                        <dd className="font-mono text-foreground">{debugResult.model}</dd>
+                      </>
+                    )}
+                    {typeof debugResult.promptLength === "number" && (
+                      <>
+                        <dt className="text-muted-foreground">Prompt length</dt>
+                        <dd className="font-mono text-foreground">{debugResult.promptLength}</dd>
+                      </>
+                    )}
+                    {typeof debugResult.contentLength === "number" && (
+                      <>
+                        <dt className="text-muted-foreground">Response length</dt>
+                        <dd className="font-mono text-foreground">{debugResult.contentLength}</dd>
+                      </>
+                    )}
+                    {typeof debugResult.apiKeyPresent === "boolean" && (
+                      <>
+                        <dt className="text-muted-foreground">API key present</dt>
+                        <dd className="font-mono text-foreground">{String(debugResult.apiKeyPresent)}</dd>
+                      </>
+                    )}
+                    {typeof debugResult.apiKeyMasked === "string" && (
+                      <>
+                        <dt className="text-muted-foreground">API key</dt>
+                        <dd className="font-mono text-foreground">{debugResult.apiKeyMasked}</dd>
+                      </>
+                    )}
+                  </dl>
+
+                  {typeof debugResult.error === "string" && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      <span className="font-semibold">Error:</span> {debugResult.error}
+                    </p>
+                  )}
+
+                  {Array.isArray(debugResult.schemaValidErrors) && debugResult.schemaValidErrors.length > 0 && (
+                    <div className="text-xs text-amber-700 dark:text-amber-300">
+                      <p className="font-semibold">Schema errors:</p>
+                      <ul className="list-disc pl-4">
+                        {debugResult.schemaValidErrors.map((e: string, i: number) => (
+                          <li key={i}>{e}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {Array.isArray(debugResult.qualityValidErrors) && debugResult.qualityValidErrors.length > 0 && (
+                    <div className="text-xs text-amber-700 dark:text-amber-300">
+                      <p className="font-semibold">Quality errors:</p>
+                      <ul className="list-disc pl-4">
+                        {debugResult.qualityValidErrors.map((e: string, i: number) => (
+                          <li key={i}>{e}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
       </form>
     </div>
   )
