@@ -16,7 +16,7 @@ import type { GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import { validateGeneratedChecklist } from "@/lib/guideforge/ai-generation-validation"
 import { validateChecklistQuality } from "@/lib/guideforge/checklist-quality-validation"
 import { buildChecklistPrompt } from "@/lib/guideforge/ai-prompts"
-import { DEFAULT_CHECKLIST_MODEL, GENERATION_TEMPERATURE, MAX_GENERATION_TOKENS, MAX_REPAIR_ATTEMPTS } from "@/lib/guideforge/ai-generation-config"
+import { DEFAULT_CHECKLIST_MODEL, GENERATION_TEMPERATURE, MAX_GENERATION_TOKENS } from "@/lib/guideforge/ai-generation-config"
 
 export const runtime = "nodejs"
 export const maxDuration = 30

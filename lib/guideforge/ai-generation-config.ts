@@ -30,10 +30,11 @@ export const DEFAULT_CHECKLIST_MODEL = "gpt-4o-mini"
 
 /**
  * AI generation temperature (creativity/randomness).
- * 0.7 provides good balance between consistency and variety.
- * Lower (0.0-0.5) = more predictable, higher (0.7-1.0) = more creative
+ * 0.3 provides deterministic, reliable output suitable for structured JSON generation.
+ * Lower values (0.0-0.5) produce more predictable, repeatable results.
+ * Matches Techsperts pattern for consistency.
  */
-export const GENERATION_TEMPERATURE = 0.7
+export const GENERATION_TEMPERATURE = 0.3
 
 /**
  * Maximum tokens for a single generation.
@@ -41,10 +42,3 @@ export const GENERATION_TEMPERATURE = 0.7
  * Set to 2000 for safety margin.
  */
 export const MAX_GENERATION_TOKENS = 2000
-
-/**
- * Maximum repair attempts for malformed output.
- * Currently: 1 repair attempt allowed
- * If first repair fails, return user error instead of looping
- */
-export const MAX_REPAIR_ATTEMPTS = 1
