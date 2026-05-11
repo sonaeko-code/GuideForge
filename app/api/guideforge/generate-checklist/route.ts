@@ -22,8 +22,13 @@ export const maxDuration = 30
 
 /** Hard ceiling for the OpenAI call inside the debug path.
  *  Must be well under maxDuration (30 s) so we always return JSON
- *  before Vercel sends a 504 HTML response. */
-const DEBUG_OPENAI_TIMEOUT_MS = 8000
+ *  before Vercel sends a 504 HTML response. Set to 5s to give buffer. */
+const DEBUG_OPENAI_TIMEOUT_MS = 5000
+
+/** Hard ceiling for the entire debug route.
+ *  Must be much lower than maxDuration to ensure we return JSON
+ *  before Vercel's function timeout. Returns error JSON if exceeded. */
+const DEBUG_ROUTE_TIMEOUT_MS = 9000
 
 /**
  * Call OpenAI API to generate or repair checklist
@@ -177,6 +182,9 @@ async function attemptRepair(
 /**
  * Debug-only mode: trace through generation stages with detailed timing and validation
  * Returns object with stage results instead of final asset
+ * 
+ * Wrapped with a hard timeout (DEBUG_ROUTE_TIMEOUT_MS) to ensure this function
+ * always returns JSON before Vercel's FUNCTION_INVOCATION_TIMEOUT fires.
  */
 async function debugGenerateOnly(request: NextRequest, body: ChecklistGenerationRequest) {
   // Initialize all debug tracking variables upfront, before any try/catch or error handling
@@ -204,6 +212,13 @@ async function debugGenerateOnly(request: NextRequest, body: ChecklistGeneration
   let debugQualityValidErrors: string[] = []
 
   const startTime = Date.now()
+  
+  // Hard route-level timeout: if we exceed this, return error JSON
+  // before Vercel's function timeout can send us a 504 HTML response.
+  const debugRouteAbortController = new AbortController()
+  const debugRouteTimeoutHandle = setTimeout(() => {
+    debugRouteAbortController.abort()
+  }, DEBUG_ROUTE_TIMEOUT_MS)
 
   try {
     // STAGE: body_parse
@@ -253,6 +268,23 @@ async function debugGenerateOnly(request: NextRequest, body: ChecklistGeneration
       throw new Error(debugApiKeyErrorDetail)
     }
 
+    // Check route-level timeout before proceeding
+    if (debugRouteAbortController.signal.aborted) {
+      clearTimeout(debugRouteTimeoutHandle)
+      debugElapsedMs = Date.now() - startTime
+      debugStage = "route_timeout"
+      return NextResponse.json(
+        {
+          success: false,
+          stage: debugStage,
+          elapsedMs: debugElapsedMs,
+          error: `Debug route exceeded ${DEBUG_ROUTE_TIMEOUT_MS}ms timeout`,
+          detail: "The entire debug pipeline took too long. Likely stuck in a previous stage.",
+        },
+        { status: 200 }
+      )
+    }
+
     // STAGE: openai_call — raced against a hard timeout so we always
     // return JSON before Vercel can send a 504 HTML response.
     debugStage = "openai_call"
@@ -276,6 +308,7 @@ async function debugGenerateOnly(request: NextRequest, body: ChecklistGeneration
         (openaiErr instanceof Error && (openaiErr.name === "AbortError" || openaiErr.message.includes("abort")))
 
       if (isAbort) {
+        clearTimeout(debugRouteTimeoutHandle)
         debugStage = "openai_timeout"
         const timeoutMsg = `OpenAI request timed out after ${DEBUG_OPENAI_TIMEOUT_MS}ms`
         console.error("[v0] Debug: " + timeoutMsg)
@@ -344,6 +377,7 @@ async function debugGenerateOnly(request: NextRequest, body: ChecklistGeneration
       throw new Error(`Quality validation failed: ${qualityValidation.errors.join(", ")}`)
     }
 
+    clearTimeout(debugRouteTimeoutHandle)
     debugStage = "success"
     debugElapsedMs = Date.now() - startTime
 
@@ -367,7 +401,24 @@ async function debugGenerateOnly(request: NextRequest, body: ChecklistGeneration
       asset,
     })
   } catch (err) {
+    clearTimeout(debugRouteTimeoutHandle)
     debugElapsedMs = Date.now() - startTime
+
+    // Check if this was a route-level timeout
+    if (debugRouteAbortController.signal.aborted) {
+      const timeoutMsg = `Debug route exceeded ${DEBUG_ROUTE_TIMEOUT_MS}ms timeout`
+      console.error("[v0] Debug: " + timeoutMsg)
+      return NextResponse.json(
+        {
+          success: false,
+          stage: "route_timeout",
+          elapsedMs: debugElapsedMs,
+          error: timeoutMsg,
+          detail: "The entire debug pipeline took too long.",
+        },
+        { status: 200 }
+      )
+    }
 
     const errorMsg = err instanceof Error ? err.message : String(err)
     console.error(`[v0] Debug stage '${debugStage}' failed:`, err)
