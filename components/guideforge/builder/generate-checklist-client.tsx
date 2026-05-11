@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import type { ChecklistIntakeRequest, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
+import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 
 /**
@@ -39,6 +40,7 @@ export function GenerateChecklistClient() {
   const [isDebugging, setIsDebugging] = useState(false)
   const [debugResult, setDebugResult] = useState<Record<string, any> | null>(null)
   const [debugError, setDebugError] = useState<string | null>(null)
+  const [canSeeDebugTools, setCanSeeDebugTools] = useState(false)
 
   // On mount, check for pending proposal in sessionStorage and restore if valid
   useEffect(() => {
@@ -92,6 +94,27 @@ export function GenerateChecklistClient() {
         // ignore
       }
     }
+  }, [])
+
+  // Check user profile role to determine if debug tools should be visible
+  useEffect(() => {
+    const checkDebugAccess = async () => {
+      try {
+        const profile = await getCurrentUserProfile()
+        if (profile && profile.role) {
+          const debugRoles = ['founder', 'admin', 'developer', 'dev']
+          const hasDebugAccess = debugRoles.includes(profile.role.toLowerCase())
+          setCanSeeDebugTools(hasDebugAccess)
+        } else {
+          setCanSeeDebugTools(false)
+        }
+      } catch (err) {
+        console.log('[v0] GenerateChecklistClient: Could not check debug access:', err instanceof Error ? err.message : String(err))
+        setCanSeeDebugTools(false)
+      }
+    }
+
+    checkDebugAccess()
   }, [])
 
   const handleFieldChange = (field: keyof ChecklistIntakeRequest, value: any) => {
@@ -466,8 +489,8 @@ export function GenerateChecklistClient() {
           )}
         </Button>
 
-        {/* Debug Tools — only in AI Generate mode */}
-        {provider === "ai" && (
+        {/* Debug Tools — only visible to dev/admin/founder accounts in AI Generate mode */}
+        {provider === "ai" && canSeeDebugTools && (
           <div className="space-y-3 rounded-lg border border-dashed border-border bg-muted/30 p-4">
             <div className="flex items-center gap-2">
               <Bug className="size-4 text-muted-foreground" aria-hidden="true" />
