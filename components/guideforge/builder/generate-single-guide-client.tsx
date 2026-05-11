@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import type { SingleGuideIntakeRequest, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { generateSingleGuideMock } from "@/lib/guideforge/mock-asset-generator"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
+import { AIIntakeLadder } from "./ai-intake-ladder"
 import type { DifficultyLevel, GuideType } from "@/lib/guideforge/types"
 
 export function GenerateSingleGuideClient() {
@@ -36,6 +37,17 @@ export function GenerateSingleGuideClient() {
   const handleFieldChange = (field: keyof SingleGuideIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
     setError(null)
+  }
+
+  const handleApplyIntakeLadderFields = (fields: Partial<SingleGuideIntakeRequest>) => {
+    setFormState((prev) => ({ ...prev, ...fields }))
+    // Scroll to form for visual feedback
+    setTimeout(() => {
+      const formElement = document.querySelector("form")
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    }, 100)
   }
 
   const handleGenerate = async () => {
@@ -94,6 +106,9 @@ export function GenerateSingleGuideClient() {
           </p>
         </Card>
       </div>
+
+      {/* AI Intake Ladder */}
+      <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} />
 
       <form
         onSubmit={(e) => {
