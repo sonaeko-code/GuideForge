@@ -164,9 +164,198 @@ async function attemptRepair(
   }
 }
 
+/**
+ * Debug-only mode: trace through generation stages with detailed timing and validation
+ * Returns object with stage results instead of final asset
+ */
+async function debugGenerateOnly(request: NextRequest, body: ChecklistGenerationRequest) {
+  // Initialize all debug tracking variables upfront, before any try/catch or error handling
+  let debugStage = "body_parse"
+  let debugElapsedMs = 0
+  let debugOpenaiElapsedMs: number | undefined = undefined
+  let debugModel = DEFAULT_CHECKLIST_MODEL
+  let debugPromptLength = 0
+  let debugContentLength: number | undefined = undefined
+
+  // API key debug variables - declared BEFORE any try/catch
+  let debugApiKeyPresent = false
+  let debugApiKeyLength = 0
+  let debugApiKeyMasked = "not_configured"
+  let debugApiKeyErrorDetail: string | null = null
+
+  // Parse result tracking
+  let debugParseSuccess = false
+  let debugParseError: string | null = null
+
+  // Validation result tracking
+  let debugSchemaValidValid = false
+  let debugSchemaValidErrors: string[] = []
+  let debugQualityValidValid = false
+  let debugQualityValidErrors: string[] = []
+
+  const startTime = Date.now()
+
+  try {
+    // STAGE: body_parse
+    debugStage = "body_parse"
+    if (!body.title?.trim() || !body.audience?.trim() || !body.goal?.trim() || !body.purpose?.trim()) {
+      throw new Error("Required fields missing")
+    }
+
+    // STAGE: input_clamp
+    debugStage = "input_clamp"
+    const clampedRequest = {
+      ...body,
+      numberOfSections: Math.max(1, Math.min(8, body.numberOfSections)),
+      itemsPerSection: Math.max(1, Math.min(12, body.itemsPerSection)),
+    }
+
+    // STAGE: prompt_build
+    debugStage = "prompt_build"
+    const prompt = buildChecklistPrompt(clampedRequest)
+    debugPromptLength = prompt.length
+
+    // STAGE: message_build
+    debugStage = "message_build"
+    const messages = [
+      {
+        role: "system" as const,
+        content:
+          "You are a structured data generator for GuideForge. Return valid JSON only. Do not include markdown or explanations.",
+      },
+      {
+        role: "user" as const,
+        content: prompt,
+      },
+    ]
+
+    // STAGE: api_key_check - ALL VARIABLES DECLARED BEFORE THIS BLOCK
+    debugStage = "api_key_check"
+    const rawOpenAiApiKey = process.env.OPENAI_API_KEY ?? ""
+    debugApiKeyPresent = rawOpenAiApiKey.length > 0
+    debugApiKeyLength = rawOpenAiApiKey.length
+    debugApiKeyMasked = debugApiKeyPresent
+      ? `${rawOpenAiApiKey.slice(0, 7)}...${rawOpenAiApiKey.slice(-4)}`
+      : "not_configured"
+
+    if (!debugApiKeyPresent) {
+      debugApiKeyErrorDetail = "OPENAI_API_KEY is not configured"
+      throw new Error(debugApiKeyErrorDetail)
+    }
+
+    // STAGE: openai_call
+    debugStage = "openai_call"
+    const openaiStartTime = Date.now()
+    const content = await callOpenAI(rawOpenAiApiKey, messages)
+    debugOpenaiElapsedMs = Date.now() - openaiStartTime
+
+    if (!content) {
+      throw new Error("Empty response from OpenAI")
+    }
+    debugContentLength = content.length
+
+    // STAGE: parse
+    debugStage = "parse"
+    let asset: GeneratedChecklist
+    try {
+      asset = JSON.parse(content)
+      debugParseSuccess = true
+    } catch (parseErr) {
+      debugParseSuccess = false
+      debugParseError = parseErr instanceof Error ? parseErr.message : String(parseErr)
+      throw parseErr
+    }
+
+    // STAGE: schema_validation
+    debugStage = "schema_validation"
+    const schemaValidation = validateGeneratedChecklist(asset)
+    debugSchemaValidValid = schemaValidation.valid
+    debugSchemaValidErrors = schemaValidation.errors
+
+    if (!debugSchemaValidValid) {
+      throw new Error(`Schema validation failed: ${schemaValidation.errors.join(", ")}`)
+    }
+
+    // STAGE: quality_validation
+    debugStage = "quality_validation"
+    const qualityValidation = validateChecklistQuality(asset)
+    debugQualityValidValid = qualityValidation.valid
+    debugQualityValidErrors = qualityValidation.errors
+
+    if (!debugQualityValidValid) {
+      throw new Error(`Quality validation failed: ${qualityValidation.errors.join(", ")}`)
+    }
+
+    debugStage = "success"
+    debugElapsedMs = Date.now() - startTime
+
+    return NextResponse.json({
+      success: true,
+      stage: debugStage,
+      elapsedMs: debugElapsedMs,
+      openaiElapsedMs: debugOpenaiElapsedMs,
+      model: debugModel,
+      promptLength: debugPromptLength,
+      contentLength: debugContentLength,
+      apiKeyPresent: debugApiKeyPresent,
+      apiKeyLength: debugApiKeyLength,
+      apiKeyMasked: debugApiKeyMasked,
+      parseSuccess: debugParseSuccess,
+      parseError: debugParseError,
+      schemaValidValid: debugSchemaValidValid,
+      schemaValidErrors: debugSchemaValidErrors,
+      qualityValidValid: debugQualityValidValid,
+      qualityValidErrors: debugQualityValidErrors,
+      asset,
+    })
+  } catch (err) {
+    debugElapsedMs = Date.now() - startTime
+
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.error(`[v0] Debug stage '${debugStage}' failed:`, err)
+
+    return NextResponse.json(
+      {
+        success: false,
+        stage: debugStage,
+        elapsedMs: debugElapsedMs,
+        openaiElapsedMs: debugOpenaiElapsedMs,
+        model: debugModel,
+        promptLength: debugPromptLength,
+        contentLength: debugContentLength,
+        apiKeyPresent: debugApiKeyPresent,
+        apiKeyLength: debugApiKeyLength,
+        apiKeyMasked: debugApiKeyMasked,
+        apiKeyErrorDetail: debugApiKeyErrorDetail,
+        parseSuccess: debugParseSuccess,
+        parseError: debugParseError,
+        schemaValidValid: debugSchemaValidValid,
+        schemaValidErrors: debugSchemaValidErrors,
+        qualityValidValid: debugQualityValidValid,
+        qualityValidErrors: debugQualityValidErrors,
+        error: errorMsg,
+        detail: errorMsg,
+      },
+      { status: 200 }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
+  // Check for debug mode query parameter
+  const url = new URL(request.url)
+  const isDebugMode = url.searchParams.get("debug") === "true"
+
   try {
     const apiKey = process.env.OPENAI_API_KEY?.trim()
+
+    // Parse body first to allow debug mode to use it
+    const body: ChecklistGenerationRequest = await request.json()
+
+    // Route to debug handler if requested
+    if (isDebugMode) {
+      return await debugGenerateOnly(request, body)
+    }
 
     if (!apiKey) {
       return NextResponse.json(
@@ -178,8 +367,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const body: ChecklistGenerationRequest = await request.json()
 
     // Validate intake request
     if (!body.title?.trim()) {
