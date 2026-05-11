@@ -311,7 +311,7 @@ export function GenerateChecklistClient() {
                 <Zap className={`mt-0.5 size-4 shrink-0 ${provider === "ai" ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" />
                 <div>
                   <p className="font-semibold text-sm">AI Generate</p>
-                  <p className="text-xs text-muted-foreground">Real AI powered (~5-10 seconds)</p>
+                  <p className="text-xs text-muted-foreground">Real AI powered (~10-25 seconds)</p>
                 </div>
               </div>
             </button>
@@ -446,7 +446,7 @@ export function GenerateChecklistClient() {
         {provider === "ai" && (
           <Card className="p-3 border-amber-500/20 bg-amber-500/5">
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Larger generations (8+ sections, 12+ items per section) may take longer. Typical generation: 5-10 seconds.
+              Larger generations (8+ sections, 12+ items per section) may take longer. Typical generation: 10-25 seconds.
             </p>
           </Card>
         )}

@@ -38,7 +38,7 @@ export const GENERATION_TEMPERATURE = 0.3
 
 /**
  * Maximum tokens for a single generation.
- * Checklists typically use 1000-1500 tokens.
- * Set to 2000 for safety margin.
+ * Checklists with 4 sections and 5 items per section typically use 1500-2000 tokens.
+ * Set to 2200 to ensure adequate output without excessive token usage.
  */
-export const MAX_GENERATION_TOKENS = 2000
+export const MAX_GENERATION_TOKENS = 2200

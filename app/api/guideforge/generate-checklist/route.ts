@@ -23,22 +23,22 @@ export const maxDuration = 30
 
 /** Hard ceiling for the OpenAI call inside the debug path.
  *  Must be well under maxDuration (30 s) so we always return JSON
- *  before Vercel sends a 504 HTML response. Set to 5s to give buffer. */
-const DEBUG_OPENAI_TIMEOUT_MS = 5000
+ *  before Vercel sends a 504 HTML response. Set to 12s for structured checklist generation. */
+const DEBUG_OPENAI_TIMEOUT_MS = 12000
 
 /** Hard ceiling for the entire debug route.
  *  Must be much lower than maxDuration to ensure we return JSON
  *  before Vercel's function timeout. Returns error JSON if exceeded. */
-const DEBUG_ROUTE_TIMEOUT_MS = 9000
+const DEBUG_ROUTE_TIMEOUT_MS = 15000
 
 /** Hard ceiling for the OpenAI call in normal (non-debug) path.
- *  Must be well under maxDuration (30 s). Set to 10s for normal generation. */
-const NORMAL_OPENAI_TIMEOUT_MS = 10000
+ *  Must be well under maxDuration (30 s). Set to 22s for normal generation with buffer. */
+const NORMAL_OPENAI_TIMEOUT_MS = 22000
 
 /** Hard ceiling for the entire normal route.
  *  Must be much lower than maxDuration to ensure we return JSON
  *  before Vercel's function timeout. Returns error JSON if exceeded. */
-const NORMAL_ROUTE_TIMEOUT_MS = 15000
+const NORMAL_ROUTE_TIMEOUT_MS = 27000
 
 /**
  * Call OpenAI API to generate or repair checklist
