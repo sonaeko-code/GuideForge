@@ -31,11 +31,14 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
   if (lowerText.includes("manager") || lowerText.includes("team lead")) result.audience = "Managers, team leads"
   if (lowerText.includes("student")) result.audience = "Students, learners"
 
-  // Detect tone keywords
+  // Detect tone keywords - map to normalized shared tone set
   if (lowerText.includes("funny") || lowerText.includes("humor")) result.tone = "helpful"
   if (lowerText.includes("technical") || lowerText.includes("precise")) result.tone = "technical"
-  if (lowerText.includes("story") || lowerText.includes("narrative")) result.tone = "narrative"
+  if (lowerText.includes("story") || lowerText.includes("narrative")) result.tone = "helpful"
   if (lowerText.includes("quick") || lowerText.includes("minimal")) result.tone = "minimal"
+  if (lowerText.includes("beginner") && !result.tone) result.tone = "beginner-friendly"
+  if (lowerText.includes("practical") || lowerText.includes("straightforward")) result.tone = "practical"
+  if (lowerText.includes("detail") || lowerText.includes("thorough")) result.tone = "detailed"
 
   // Detect guide type keywords
   if (lowerText.includes("how to") || lowerText.includes("how-to")) result.guideType = "guide"
@@ -52,13 +55,21 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
   if (lowerText.includes("danger") || lowerText.includes("warning") || lowerText.includes("careful")) result.hasWarnings = true
   if (lowerText.includes("require") || lowerText.includes("prerequisite") || lowerText.includes("before")) result.hasPrerequisites = true
 
-  // Detect checklist specifics
-  if (lowerText.includes("section")) result.numberOfSections = 4
-  if (lowerText.includes("item")) result.itemsPerSection = 5
+  // Extract goal (for both single_guide and checklist)
   if (lowerText.includes("goal")) {
     const goalMatch = text.match(/goal[^.!?]*[.!?]/i)
     if (goalMatch) result.goal = goalMatch[0].replace(/goal[:\s]+/i, "").trim()
   }
+
+  // Extract use case
+  if (lowerText.includes("use case") || lowerText.includes("when")) {
+    const useCaseMatch = text.match(/(use case|when)[^.!?]*[.!?]/i)
+    if (useCaseMatch) result.useCase = useCaseMatch[0].replace(/(use case|when)[:\s]+/i, "").trim()
+  }
+
+  // Detect checklist specifics
+  if (lowerText.includes("section")) result.numberOfSections = 4
+  if (lowerText.includes("item")) result.itemsPerSection = 5
 
   // Extract title from first line (if it looks like a title)
   const firstLine = text.split("\n")[0].trim()

@@ -21,6 +21,8 @@ export function GenerateSingleGuideClient() {
     title: "",
     audience: "",
     purpose: "",
+    goal: "",
+    useCase: "",
     tone: "helpful",
     difficulty: "intermediate",
     guideType: "guide",
@@ -157,6 +159,26 @@ export function GenerateSingleGuideClient() {
               rows={3}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="goal">Guide Goal (Optional)</Label>
+            <Input
+              id="goal"
+              placeholder="e.g., Help beginners understand the deployment process"
+              value={formState.goal || ""}
+              onChange={(e) => handleFieldChange("goal", e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="useCase">Use Case / Context (Optional)</Label>
+            <Input
+              id="useCase"
+              placeholder="e.g., First-time deployments, troubleshooting, team onboarding"
+              value={formState.useCase || ""}
+              onChange={(e) => handleFieldChange("useCase", e.target.value)}
+            />
+          </div>
         </div>
 
         {/* Style & Structure */}
@@ -171,10 +193,12 @@ export function GenerateSingleGuideClient() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="practical">Practical & straightforward</SelectItem>
                   <SelectItem value="helpful">Helpful & friendly</SelectItem>
+                  <SelectItem value="beginner-friendly">Beginner-friendly</SelectItem>
                   <SelectItem value="technical">Technical & precise</SelectItem>
-                  <SelectItem value="narrative">Narrative & storytelling</SelectItem>
-                  <SelectItem value="minimal">Minimal & concise</SelectItem>
+                  <SelectItem value="detailed">Detailed & thorough</SelectItem>
+                  <SelectItem value="minimal">Quick & minimal</SelectItem>
                 </SelectContent>
               </Select>
             </div>

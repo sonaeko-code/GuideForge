@@ -414,9 +414,11 @@ export function GenerateChecklistClient() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="practical">Practical & straightforward</SelectItem>
-                  <SelectItem value="formal">Formal & compliance-focused</SelectItem>
-                  <SelectItem value="casual">Casual & friendly</SelectItem>
-                  <SelectItem value="technical">Technical & detailed</SelectItem>
+                  <SelectItem value="helpful">Helpful & friendly</SelectItem>
+                  <SelectItem value="beginner-friendly">Beginner-friendly</SelectItem>
+                  <SelectItem value="technical">Technical & precise</SelectItem>
+                  <SelectItem value="detailed">Detailed & thorough</SelectItem>
+                  <SelectItem value="minimal">Quick & minimal</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -413,6 +413,8 @@ export interface SingleGuideIntakeRequest {
   title: string
   audience: string
   purpose: string
+  goal?: string
+  useCase?: string
   tone: string
   difficulty: DifficultyLevel
   guideType: GuideType
