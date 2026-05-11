@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import type { SingleGuideIntakeRequest, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { generateSingleGuideMock } from "@/lib/guideforge/mock-asset-generator"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
+import { AIIntakeLadder } from "./ai-intake-ladder"
 import type { DifficultyLevel, GuideType } from "@/lib/guideforge/types"
 
 export function GenerateSingleGuideClient() {
@@ -20,6 +21,8 @@ export function GenerateSingleGuideClient() {
     title: "",
     audience: "",
     purpose: "",
+    goal: "",
+    useCase: "",
     tone: "helpful",
     difficulty: "intermediate",
     guideType: "guide",
@@ -36,6 +39,17 @@ export function GenerateSingleGuideClient() {
   const handleFieldChange = (field: keyof SingleGuideIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
     setError(null)
+  }
+
+  const handleApplyIntakeLadderFields = (fields: Partial<SingleGuideIntakeRequest>) => {
+    setFormState((prev) => ({ ...prev, ...fields }))
+    // Scroll to form for visual feedback
+    setTimeout(() => {
+      const formElement = document.querySelector("form")
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    }, 100)
   }
 
   const handleGenerate = async () => {
@@ -95,6 +109,9 @@ export function GenerateSingleGuideClient() {
         </Card>
       </div>
 
+      {/* AI Intake Ladder */}
+      <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} />
+
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -142,6 +159,26 @@ export function GenerateSingleGuideClient() {
               rows={3}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="goal">Guide Goal (Optional)</Label>
+            <Input
+              id="goal"
+              placeholder="e.g., Help beginners understand the deployment process"
+              value={formState.goal || ""}
+              onChange={(e) => handleFieldChange("goal", e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="useCase">Use Case / Context (Optional)</Label>
+            <Input
+              id="useCase"
+              placeholder="e.g., First-time deployments, troubleshooting, team onboarding"
+              value={formState.useCase || ""}
+              onChange={(e) => handleFieldChange("useCase", e.target.value)}
+            />
+          </div>
         </div>
 
         {/* Style & Structure */}
@@ -156,10 +193,12 @@ export function GenerateSingleGuideClient() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="practical">Practical & straightforward</SelectItem>
                   <SelectItem value="helpful">Helpful & friendly</SelectItem>
+                  <SelectItem value="beginner-friendly">Beginner-friendly</SelectItem>
                   <SelectItem value="technical">Technical & precise</SelectItem>
-                  <SelectItem value="narrative">Narrative & storytelling</SelectItem>
-                  <SelectItem value="minimal">Minimal & concise</SelectItem>
+                  <SelectItem value="detailed">Detailed & thorough</SelectItem>
+                  <SelectItem value="minimal">Quick & minimal</SelectItem>
                 </SelectContent>
               </Select>
             </div>
