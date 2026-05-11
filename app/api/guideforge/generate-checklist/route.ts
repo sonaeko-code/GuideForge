@@ -45,10 +45,15 @@ async function callOpenAI(apiKey: string, messages: any[], debugInfo: any = {}):
   
   try {
     console.log("[v0] API: callOpenAI start", {
+      endpoint: "/v1/chat/completions",
       model: DEFAULT_CHECKLIST_MODEL,
-      maxTokens: MAX_GENERATION_TOKENS,
+      maxTokensField: "max_tokens",
+      maxTokensValue: MAX_GENERATION_TOKENS,
+      responseFormatPresent: true,
+      messagesCount: messages.length,
+      smokeTest: debugInfo.smokeTest || false,
+      elapsedBeforeCall: debugInfo.elapsedBeforeCall || 0,
       repairsEnabled: MAX_REPAIR_ATTEMPTS > 0,
-      ...debugInfo,
     })
     
     openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -70,6 +75,9 @@ async function callOpenAI(apiKey: string, messages: any[], debugInfo: any = {}):
     // Handle non-2xx responses
     if (!openaiResponse.ok) {
       let errorDetail = "Unknown error"
+      let errorType = "unknown"
+      let errorCode = "unknown"
+      let errorParam = ""
       
       // Read response body exactly once
       let responseBodyText: string
@@ -84,7 +92,10 @@ async function callOpenAI(apiKey: string, messages: any[], debugInfo: any = {}):
       if (responseBodyText) {
         try {
           const errorJson = JSON.parse(responseBodyText)
-          errorDetail = errorJson.error?.message || JSON.stringify(errorJson)
+          errorDetail = errorJson.error?.message || JSON.stringify(errorJson).substring(0, 200)
+          errorType = errorJson.error?.type || "unknown"
+          errorCode = errorJson.error?.code || "unknown"
+          errorParam = errorJson.error?.param || ""
         } catch (_) {
           // If JSON parse fails, use the text as-is
           errorDetail = (typeof responseBodyText === "string" ? responseBodyText : String(responseBodyText)).substring(0, 200)
@@ -101,6 +112,9 @@ async function callOpenAI(apiKey: string, messages: any[], debugInfo: any = {}):
         status: openaiResponse.status,
         statusText: openaiResponse.statusText,
         detail: errorDetailSafe,
+        type: errorType,
+        code: errorCode,
+        param: errorParam,
         isAuth: isAuthError,
         isQuota: isQuotaError,
         elapsedMs: Date.now() - startTime,
@@ -113,7 +127,7 @@ async function callOpenAI(apiKey: string, messages: any[], debugInfo: any = {}):
       } else if (isQuotaError) {
         throw new Error("QUOTA_ERROR")
       } else {
-        throw new Error(`OPENAI_ERROR: ${errorDetail}`)
+        throw new Error(`OPENAI_ERROR_${openaiResponse.status}: ${errorType}`)
       }
     }
 
@@ -214,8 +228,12 @@ export async function POST(request: NextRequest) {
             model: DEFAULT_CHECKLIST_MODEL,
             messages: [
               {
+                role: "system",
+                content: "Return JSON only.",
+              },
+              {
                 role: "user",
-                content: 'Return only: {"ok":true}',
+                content: 'Return: {"ok":true}',
               },
             ],
             max_tokens: 20,
@@ -227,11 +245,34 @@ export async function POST(request: NextRequest) {
         clearTimeout(timeoutHandle)
         
         if (!response.ok) {
+          // Capture OpenAI error details
+          let errorDetail = ""
+          let errorType = ""
+          let errorCode = ""
+          
+          try {
+            const errorBody = await response.text()
+            if (errorBody) {
+              try {
+                const errorJson = JSON.parse(errorBody)
+                errorDetail = errorJson.error?.message || ""
+                errorType = errorJson.error?.type || ""
+                errorCode = errorJson.error?.code || ""
+              } catch (_) {
+                errorDetail = errorBody.substring(0, 100)
+              }
+            }
+          } catch (_) {
+            // Ignore error reading response body
+          }
+          
           return NextResponse.json({
             success: false,
             smokeTest: true,
             providerResponded: false,
             statusCode: response.status,
+            error: errorDetail || `HTTP ${response.status}`,
+            detail: `${errorType}${errorCode ? ` (${errorCode})` : ""}`.trim() || undefined,
             elapsedMs: Date.now() - smokeStartTime,
           }, { status: 500 })
         }
@@ -393,6 +434,21 @@ export async function POST(request: NextRequest) {
             error: "AI generation took too long. Please try again.",
           },
           { status: 504 }
+        )
+      } else if (errorMsg.startsWith("OPENAI_ERROR_")) {
+        // Extract status code from error message
+        const parts = errorMsg.split(": ")
+        const statusCode = parseInt(parts[0].replace("OPENAI_ERROR_", ""))
+        const errorType = parts[1] || "request_error"
+        
+        // Return safe error details
+        return NextResponse.json(
+          {
+            success: false,
+            error: "OpenAI request failed. Please try again.",
+            detail: `${errorType} (status: ${statusCode})`,
+          },
+          { status: 500 }
         )
       } else {
         return NextResponse.json(
