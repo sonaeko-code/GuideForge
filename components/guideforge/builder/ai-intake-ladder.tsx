@@ -98,6 +98,7 @@ function extractTitle(text: string): string | null {
 
   // Strip common guide/tutorial prefixes
   let cleanedTitle = firstLine
+    .replace(/^a\s+(beginner-?friendly\s+)?guide\s+for\s+[a-z\s]+\s+on\s+/i, "")
     .replace(/^a\s+(beginner-?friendly\s+)?guide\s+(for|on|to)\s+/i, "")
     .replace(/^a\s+(technical\s+)?guide\s+(for|on|to)\s+/i, "")
     .replace(/^a\s+tutorial\s+(for|on|to)\s+/i, "")
@@ -119,20 +120,28 @@ function extractTitle(text: string): string | null {
  * Extract the general purpose/problem the guide solves
  */
 function extractPurpose(text: string, title: string | null): string | null {
-  // If we have a title, use it to construct purpose
+  // If we have a title, use it to construct a better purpose
   if (title) {
-    // Look for action verbs to construct purpose
     const lowerText = text.toLowerCase()
+    
+    // Look for explicit purpose/goal indicators to pick better verb
+    if (lowerText.includes("help them prepare") || lowerText.includes("help them")) {
+      return `Help readers prepare for ${title.toLowerCase()}`
+    }
     if (lowerText.includes("help")) {
-      return `Help readers understand and ${title.toLowerCase()}`
+      return `Help readers understand and accomplish ${title.toLowerCase()}`
     }
     if (lowerText.includes("learn") || lowerText.includes("teach")) {
       return `Teach how to ${title.toLowerCase()}`
     }
-    if (lowerText.includes("prepare") || lowerText.includes("guide")) {
+    if (lowerText.includes("prepare")) {
+      return `Prepare readers for ${title.toLowerCase()}`
+    }
+    if (lowerText.includes("guide")) {
       return `Guide readers through ${title.toLowerCase()}`
     }
-    return `Provide structured guidance on ${title.toLowerCase()}`
+    // Default construction
+    return `Provide comprehensive guidance on ${title.toLowerCase()}`
   }
 
   // Look for explicit purpose phrases
@@ -181,12 +190,22 @@ function extractGoal(text: string): string | null {
  * Extract intended audience from "for X" or audience keywords
  */
 function extractAudience(text: string): string | null {
-  // Look for "for [audience]" pattern
-  const forMatch = text.match(/for\s+([a-z]+(?:\s+[a-z]+)*?)(?:\s+on\s+|(?:,|\.|!|\?|$))/i)
+  // Look for "for [audience] on" pattern (greedy capture up to " on ")
+  const forOnMatch = text.match(/for\s+([a-z\s]+?)\s+on\s+/i)
+  if (forOnMatch) {
+    const candidate = forOnMatch[1].trim()
+    // Make sure it's not accidentally capturing other keywords
+    if (candidate.length < 100 && candidate.length > 2) {
+      return candidate.charAt(0).toUpperCase() + candidate.slice(1)
+    }
+  }
+
+  // Look for "for [audience]" pattern (general case, up to punctuation or end)
+  const forMatch = text.match(/for\s+([a-z\s]+?)(?:\s*[,.]|$)/i)
   if (forMatch) {
     const candidate = forMatch[1].trim()
     // Make sure it's not accidentally capturing other keywords
-    if (candidate.length < 50 && !candidate.includes("the") && !candidate.includes("a ")) {
+    if (candidate.length < 100 && candidate.length > 2 && !candidate.includes("the") && !candidate.includes("a guide")) {
       return candidate.charAt(0).toUpperCase() + candidate.slice(1)
     }
   }
@@ -207,6 +226,15 @@ function extractAudience(text: string): string | null {
  * Extract use case or context from "when", "publishing", etc.
  */
 function extractUseCase(text: string): string | null {
+  // Look for "on [usecase]" pattern (e.g., "on publishing a YouTube video")
+  const onMatch = text.match(/\s+on\s+([^.!?]+?)(?:\.|,|$)/i)
+  if (onMatch) {
+    const candidate = onMatch[1].trim()
+    if (candidate.length > 3 && candidate.length < 100) {
+      return candidate
+    }
+  }
+
   // Look for "when" patterns
   const whenMatch = text.match(/when\s+([^.!?]+)[.!?]/i)
   if (whenMatch) {
@@ -238,18 +266,23 @@ function extractUseCase(text: string): string | null {
  * Extract topics covered and other details
  */
 function extractAdditionalContext(text: string): string | null {
-  // Look for "including", "include", "cover", "with" patterns
+  // Look for "including" pattern - capture everything until end of sentence
   const includeMatch = text.match(
-    /(?:including|include|cover|covering|with)\s+([^.!?]+?)\s*(?:and\s+)?(?:post-?release|analytics|more)?[.!?]/i
+    /(?:should\s+)?(?:include|including|cover|covering|with)\s+([^.!?]+?)(?:\.|!|\?|$)/i
   )
   if (includeMatch) {
-    return "Include " + includeMatch[1].trim()
+    const items = includeMatch[1].trim()
+    // Filter out common ending phrases
+    const cleaned = items.replace(/\s+(?:and\s+)?(?:post-?release|analytics|etc\.)?\s*$/i, "").trim()
+    if (cleaned.length > 5) {
+      return cleaned
+    }
   }
 
-  // Look for a comma-separated list of topics after "such as"
+  // Look for "such as" pattern - capture comma-separated list
   const listMatch = text.match(/such\s+as\s+([^.!?]+)[.!?]/i)
   if (listMatch) {
-    return "Cover: " + listMatch[1].trim()
+    return listMatch[1].trim()
   }
 
   return null
@@ -340,10 +373,13 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
         return
       }
 
-      setResult(parsed)
-
       // Build structured fields based on asset type
       const fieldsToApply = buildFieldsFromParsed(parsed, assetType)
+      
+      // Display the actual fields that will be applied (not just parsed)
+      setResult(fieldsToApply as Record<string, string | number | boolean>)
+      
+      // Apply fields to form
       onApplyFields(fieldsToApply)
 
       // Clear the textarea after successful application
