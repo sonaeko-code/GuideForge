@@ -245,6 +245,82 @@ export function GenerateChecklistClient() {
     }
   }
 
+  /**
+   * Debug prompt build (Phase 6/7): Test prompt generation without OpenAI.
+   * Developer-only tool to verify prompt builds correctly before calling OpenAI.
+   */
+  const handleDebugPromptOnly = async () => {
+    setError(null)
+
+    if (!formState.title.trim()) {
+      setError("Please enter a checklist title")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      console.log("[v0] Developer: Starting debug prompt-only...")
+      
+      const response = await fetch("/api/guideforge/generate-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formState,
+          debugPromptOnly: true,
+        }),
+      })
+
+      let data: any
+      try {
+        data = await response.json()
+      } catch (parseErr) {
+        console.error("[v0] Failed to parse debug prompt response")
+        setError("Failed to parse debug response")
+        setIsGenerating(false)
+        return
+      }
+
+      console.log("[v0] Debug prompt-only response:", {
+        success: data.success,
+        stage: data.stage,
+        elapsedMs: data.elapsedMs,
+        model: data.model,
+        promptLength: data.promptLength,
+        messagesCount: data.messagesCount,
+        cappedSections: data.cappedSections,
+        cappedItems: data.cappedItems,
+        error: data.error,
+      })
+
+      if (data.success) {
+        alert(
+          `Debug Prompt Build - Success!\n\n` +
+          `Elapsed: ${data.elapsedMs}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n` +
+          `Messages Count: ${data.messagesCount}\n` +
+          `Capped Sections: ${data.cappedSections}\n` +
+          `Capped Items: ${data.cappedItems}\n\n` +
+          `(Not saved - debug only)`
+        )
+      } else {
+        alert(
+          `Debug Prompt Build - Failed at ${data.stage}\n\n` +
+          `Elapsed: ${data.elapsedMs}ms\n` +
+          `Model: ${data.model}\n` +
+          `Prompt Length: ${data.promptLength} chars\n\n` +
+          `Error: ${data.error}\n\n` +
+          `(See console for full details)`
+        )
+      }
+    } catch (err) {
+      console.error("[v0] Debug prompt-only error:", err)
+      setError(err instanceof Error ? err.message : "Debug failed")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const handleGenerate = async () => {
     setError(null)
 
@@ -552,7 +628,7 @@ export function GenerateChecklistClient() {
             )}
           </Button>
           
-          {/* Developer diagnostic button (only shown in AI mode) */}
+          {/* Developer diagnostic buttons (only shown in AI mode) */}
           {provider === "ai" && (
             <>
               <Button 
@@ -563,6 +639,15 @@ export function GenerateChecklistClient() {
                 title="Check AI route configuration (no cost)"
               >
                 ⚙️
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                disabled={isGenerating}
+                onClick={handleDebugPromptOnly}
+                title="Debug prompt build (no OpenAI call, not saved)"
+              >
+                📝
               </Button>
               <Button 
                 size="lg" 
