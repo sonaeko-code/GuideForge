@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/guideforge/auth-context"
 import { getAssetDraft, updateAssetDraft, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import type { GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
+import { SingleGuideEditor } from "@/components/guideforge/builder/single-guide-editor"
 
 interface AssetDetailPageProps {
   params: Promise<{ assetId: string }>
@@ -137,10 +138,11 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
     setSaveMessage(null)
     
     try {
-      // For Single Guide, update payload fields
+      // For Single Guide, SingleGuideEditor writes title/summary directly into editPayload.
+      // Sync editTitle/editSummary from editPayload so the save call uses the edited values.
       if (asset.assetType === "single_guide" && editPayload) {
-        editPayload.title = editTitle
-        editPayload.summary = editSummary
+        if (editPayload.title) setEditTitle(editPayload.title)
+        if (editPayload.summary != null) setEditSummary(editPayload.summary)
       }
 
       // For Checklist, update payload fields
@@ -375,112 +377,40 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
         
         {isEditMode ? (
           <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-2 block">Title</label>
-              <input
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-2xl font-bold"
-                placeholder="Asset title..."
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-2 block">Summary</label>
-              <textarea
-                value={editSummary}
-                onChange={(e) => setEditSummary(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-base"
-                placeholder="Asset summary..."
-              />
-            </div>
-
-            {/* Single Guide: Edit Requirements */}
-            {asset?.assetType === "single_guide" && editPayload && (
+            {/* Title/summary inputs are shown for non-single_guide assets.
+                For single_guide, SingleGuideEditor renders its own title/summary fields. */}
+            {asset?.assetType !== "single_guide" && (
               <>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Requirements (one per line)</label>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-2xl font-bold"
+                    placeholder="Asset title..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Summary</label>
                   <textarea
-                    value={editPayload.requirements?.join('\n') || ''}
-                    onChange={(e) => {
-                      setEditPayload({
-                        ...editPayload,
-                        requirements: e.target.value.split('\n').filter(r => r.trim()),
-                      })
-                    }}
+                    value={editSummary}
+                    onChange={(e) => setEditSummary(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
-                    placeholder="Enter one requirement per line..."
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-base"
+                    placeholder="Asset summary..."
                   />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Warnings (one per line)</label>
-                  <textarea
-                    value={editPayload.warnings?.join('\n') || ''}
-                    onChange={(e) => {
-                      setEditPayload({
-                        ...editPayload,
-                        warnings: e.target.value.split('\n').filter(w => w.trim()),
-                      })
-                    }}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
-                    placeholder="Enter one warning per line..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Assumptions (one per line)</label>
-                  <textarea
-                    value={editPayload.assumptions?.join('\n') || ''}
-                    onChange={(e) => {
-                      setEditPayload({
-                        ...editPayload,
-                        assumptions: e.target.value.split('\n').filter(a => a.trim()),
-                      })
-                    }}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
-                    placeholder="Enter one assumption per line..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Steps</label>
-                  <div className="space-y-4">
-                    {editPayload.steps?.map((step: any, idx: number) => (
-                      <Card key={idx} className="p-3 border-blue-500/30">
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={step.title}
-                            onChange={(e) => {
-                              const newSteps = [...editPayload.steps]
-                              newSteps[idx].title = e.target.value
-                              setEditPayload({ ...editPayload, steps: newSteps })
-                            }}
-                            className="w-full px-2 py-1 border border-border rounded text-sm font-semibold bg-background"
-                            placeholder={`Step ${idx + 1} title...`}
-                          />
-                          <textarea
-                            value={step.body}
-                            onChange={(e) => {
-                              const newSteps = [...editPayload.steps]
-                              newSteps[idx].body = e.target.value
-                              setEditPayload({ ...editPayload, steps: newSteps })
-                            }}
-                            rows={2}
-                            className="w-full px-2 py-1 border border-border rounded text-xs bg-background"
-                            placeholder="Step description..."
-                          />
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
                 </div>
               </>
+            )}
+
+            {/* Single Guide: shared editor (edit + preview tabs, add/remove steps) */}
+            {asset?.assetType === "single_guide" && editPayload && (
+              <SingleGuideEditor
+                value={editPayload as GeneratedSingleGuide}
+                onChange={(updated) => setEditPayload(updated as any)}
+                editTabLabel="Edit Asset"
+              />
             )}
 
             {/* Checklist: Edit Sections & Items */}
@@ -696,45 +626,11 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           <h2 className="text-lg font-semibold mb-4">Asset Content</h2>
 
           {asset.assetType === "single_guide" && (
-            <div className="space-y-4">
-              {asset.payload.requirements && asset.payload.requirements.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Requirements</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {asset.payload.requirements.map((req, idx) => (
-                      <li key={idx}>• {req}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-2">
-                  Steps ({asset.payload.steps.length})
-                </h3>
-                <ol className="space-y-3">
-                  {asset.payload.steps.slice(0, 5).map((step, idx) => (
-                    <li key={idx} className="text-sm">
-                      <strong>{idx + 1}. {step.title}</strong>
-                      {step.body && (
-                        <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{step.body}</p>
-                      )}
-                      {step.tip && (
-                        <p className="text-blue-700 dark:text-blue-300 text-xs mt-1">💡 {step.tip}</p>
-                      )}
-                      {step.warning && (
-                        <p className="text-amber-700 dark:text-amber-300 text-xs mt-1">⚠️ {step.warning}</p>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-                {asset.payload.steps.length > 5 && (
-                  <p className="text-xs text-muted-foreground mt-3">
-                    ... and {asset.payload.steps.length - 5} more step{asset.payload.steps.length - 5 !== 1 ? 's' : ''}
-                  </p>
-                )}
-              </div>
-            </div>
+            <SingleGuideEditor
+              value={asset.payload as GeneratedSingleGuide}
+              onChange={() => {}}
+              mode="preview"
+            />
           )}
 
           {asset.assetType === "recipe" && (
