@@ -100,30 +100,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     }
   }
 
-  const getAssetTypeName = (): string => {
-    const names: Record<GeneratedStructuredAsset["assetType"], string> = {
-      single_guide: "Guide",
-      recipe: "Recipe",
-      checklist: "Checklist",
-      sop: "SOP / Procedure",
-      troubleshooting_flow: "Troubleshooting Flow",
-    }
-    return names[asset.assetType]
-  }
-
-  const getAssetTypeName = (): string => {
-    const names: Record<GeneratedStructuredAsset["assetType"], string> = {
-      single_guide: "Guide",
-      recipe: "Recipe",
-      checklist: "Checklist",
-      sop: "SOP / Procedure",
-      troubleshooting_flow: "Troubleshooting Flow",
-    }
-    return names[asset.assetType]
-  }
-
-  // Single Guide uses its own dedicated proposal component with Edit/Preview tabs
-  if (asset.assetType === "single_guide") {
+  const handleApplyRefinement = () => {
     return (
       <SingleGuideProposal
         asset={asset as GeneratedSingleGuide}
@@ -380,7 +357,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         <div className="space-y-2">
           <p className="text-sm font-semibold text-foreground">Ready to save to your workspace:</p>
           <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-            <li>• 1 {getAssetTypeName()}: {asset.title}</li>
+            <li>• 1 {asset.assetType === "single_guide" ? "Guide" : asset.assetType === "recipe" ? "Recipe" : asset.assetType === "sop" ? "SOP / Procedure" : asset.assetType === "troubleshooting_flow" ? "Troubleshooting Flow" : "Checklist"}: {asset.title}</li>
             <li>• Saved as a draft to your personal workspace</li>
             <li>• You can edit, attach to a network, or delete it later</li>
           </ul>
