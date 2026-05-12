@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Sparkles, CheckCircle2, Check, Zap } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Check, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -35,7 +35,7 @@ import { createNetwork } from "@/lib/guideforge/supabase-networks"
 import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
 import { getScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
-import { getAllNetworkThemes } from "@/lib/guideforge/network-themes"
+import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
 import { smartFillNetwork } from "@/lib/guideforge/smart-fill-network"
 import type {
   NetworkType,
@@ -134,10 +134,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [domainPrefix, setDomainPrefix] = useState(defaults.slug)
   const [domainPrefixManuallyEdited, setDomainPrefixManuallyEdited] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [autofilled, setAutofilled] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [roughIdea, setRoughIdea] = useState("")
-  const [showSmartFillPanel, setShowSmartFillPanel] = useState(false)
 
   // Compute current scaffold template based on current type (not initialType)
   const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
@@ -158,7 +156,6 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setTheme(draft.themeDirection)
     setDomainPrefix(draft.subdomainSuggestion)
     setDomainPrefixManuallyEdited(false)
-    setAutofilled(true)
   }
 
   function handleSmartFill() {
@@ -283,64 +280,43 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
       {step === "configure" && (
         <>
-          {/* Smart Fill Panel */}
-          {!showSmartFillPanel ? (
-            <Card className="p-4 border-amber-500/20 bg-amber-500/5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground mb-2">Start with a rough idea</p>
-                  <p className="text-sm text-muted-foreground">
-                    Describe the network you want to build. GuideForge will intelligently fill in the name, type, theme, and suggested structure.
-                  </p>
-                </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => setShowSmartFillPanel(true)} className="flex-shrink-0">
-                  <Zap className="size-4 mr-1.5" aria-hidden="true" />
-                  Smart Fill
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Card className="p-5 border-amber-500/30 bg-amber-500/10">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-sm text-foreground mb-1">Describe your network</h3>
-                  <p className="text-xs text-muted-foreground mb-3">What kind of network are you building? Include details about the topic, audience, and purpose.</p>
-                  <Textarea
-                    value={roughIdea}
-                    onChange={(e) => setRoughIdea(e.target.value)}
-                    placeholder="e.g. 'Build a gaming guide network for a survival RPG with hubs for beginner guides, builds, crafting, bosses, and patch notes.'"
-                    rows={3}
-                    className="text-sm"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowSmartFillPanel(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="button" size="sm" onClick={handleSmartFill} className="gap-1.5">
-                    <Zap className="size-4" aria-hidden="true" />
-                    Fill Network Fields
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">Autofill with GuideForge:</span> Generate a network draft with starter name and theme based on your network type. <span className="text-xs text-muted-foreground">Mock generation — no credits used.</span>
+          {/* Smart Fill Panel — always visible, primary flow */}
+          <Card className="p-5 border-amber-500/30 bg-amber-500/5">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-1">Start with a rough idea</p>
+                <p className="text-xs text-muted-foreground">
+                  Describe the network you want to build and GuideForge will fill in the name, type, theme, hubs, and slug.
                 </p>
               </div>
-              {autofilled && (
-                <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-              )}
+              <Textarea
+                value={roughIdea}
+                onChange={(e) => setRoughIdea(e.target.value)}
+                placeholder={`e.g. "A gaming guide network for a survival RPG — beginner guides, crafting, builds, boss fights, patch notes, and community strategies."`}
+                rows={3}
+                className="text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleSmartFill()
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleAutofill}
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                >
+                  Quick Example
+                </button>
+                <Button type="button" size="sm" onClick={handleSmartFill} className="gap-1.5">
+                  <Zap className="size-3.5" aria-hidden="true" />
+                  Smart Fill Network
+                </Button>
+              </div>
             </div>
-            {autofilled && (
-              <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Network draft generated. You can edit anything before continuing.</p>
-            )}
-          </div>
+          </Card>
 
           <SectionCard title="Network basics" description="Name your network and tell readers what it covers.">
             <FieldGroup>
@@ -543,42 +519,52 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         </>
       )}
 
-      {step === "preview" && scaffoldTemplate && (
-        <>
-          <SectionCard title="Preview your scaffold" description="Review the network, hubs, and collections that will be created.">
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground mb-1">Network</p>
-                <p className="text-sm text-muted-foreground">{name}</p>
-                <p className="text-xs text-muted-foreground mt-1">Subdomain: <span className="font-mono">{slug}</span></p>
-              </div>
-              <div className="pt-2 border-t">
-                <p className="text-sm font-semibold text-foreground mb-3">Hubs and Collections</p>
-                <div className="space-y-3">
-                  {scaffoldTemplate.hubs.map((hubGroup, hubIdx) => (
-                    <div key={hubIdx} className="pl-2">
-                      <p className="text-sm font-medium text-foreground">{hubGroup.hub.name}</p>
-                      <ul className="mt-1 space-y-1">
-                        {hubGroup.collections.map((collection, colIdx) => (
-                          <li key={colIdx} className="text-sm text-muted-foreground ml-2">
-                            • {collection.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Will create: <strong>{scaffoldTemplate.hubs.length}</strong> hubs and{" "}
-                  <strong>{scaffoldTemplate.hubs.reduce((sum, h) => sum + h.collections.length, 0)}</strong> collections
+      {step === "preview" && scaffoldTemplate && (() => {
+        const previewTheme = getNetworkTheme(theme)
+        return (
+          <>
+            {/* Themed scaffold preview — matches what the created network page will look like */}
+            <div className={`rounded-xl border p-6 ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                Scaffold Preview
+              </p>
+
+              {/* Network header mock */}
+              <div className={`rounded-lg p-4 mb-4 ${previewTheme.previewClasses} border ${previewTheme.borderClasses}`}>
+                <p className={`text-lg font-black tracking-tight ${previewTheme.accentClasses}`}>{name || "Network Name"}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {slug}.guideforge.app
                 </p>
               </div>
+
+              {/* Hub list */}
+              <div className="space-y-2 mb-4">
+                {scaffoldTemplate.hubs.map((hubGroup, hubIdx) => (
+                  <div key={hubIdx} className={`rounded-md p-3 border ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
+                    <p className={`text-sm font-semibold ${previewTheme.accentClasses}`}>{hubGroup.hub.name}</p>
+                    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                      {hubGroup.collections.map((collection, colIdx) => (
+                        <li key={colIdx}>
+                          <span className={`inline-block rounded px-2 py-0.5 text-xs ${previewTheme.badgeClasses}`}>
+                            {collection.name}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Will create:{" "}
+                <strong>{scaffoldTemplate.hubs.length}</strong> hubs and{" "}
+                <strong>{scaffoldTemplate.hubs.reduce((sum, h) => sum + h.collections.length, 0)}</strong> collections
+                {" · "}Theme: <strong>{previewTheme.label}</strong>
+              </p>
             </div>
-          </SectionCard>
-        </>
-      )}
+          </>
+        )
+      })()}
 
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button asChild variant="ghost" type="button">
@@ -590,10 +576,6 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         <div className="flex gap-2">
           {step === "configure" && (
             <>
-              <Button type="button" size="lg" variant="secondary" className="gap-2" onClick={handleAutofill} disabled={submitting}>
-                <Sparkles className="size-4" aria-hidden="true" />
-                Autofill Network
-              </Button>
               <Button type="button" size="lg" className="gap-2" onClick={handleContinueToPreview} disabled={submitting || !name.trim()}>
                 {scaffoldTemplate ? "Preview Scaffold" : "Continue"}
                 <ArrowRight className="size-4" aria-hidden="true" />

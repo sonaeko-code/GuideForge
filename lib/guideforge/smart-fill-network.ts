@@ -86,7 +86,8 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     }
   }
 
-  // Match theme to network type if no specific theme match
+  // Always override theme from type when we have confident type detection
+  // The type map is more reliable than loose keyword matching on theme
   const typeToThemeMap: Record<NetworkType, ThemeDirection> = {
     gaming: "ember",
     repair: "industrial",
@@ -95,42 +96,97 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     training: "parchment",
     community: "copper",
   }
-  if (typeScore >= 2) {
+  if (typeScore >= 1) {
     theme = typeToThemeMap[type]
   }
 
-  // ============ Name and Description Extraction ============
-  // Try to extract a meaningful name from the idea
-  let name = roughIdea.trim()
+  // ============ Name Extraction ============
+  // Try to produce a short, real network title from the idea rather than
+  // returning the raw sentence. Strategy:
+  // 1. Strip leading filler phrases ("Build a", "Create a", "I want to build", etc.)
+  // 2. Extract a specific topic/game/product name if detectable
+  // 3. Append a type-appropriate suffix to make it feel branded
 
-  // Limit name to first ~10 words
-  const nameParts = name.split(/[.!?]/)
-  if (nameParts.length > 0) {
-    name = nameParts[0]
-      .split(/\s+/)
-      .slice(0, 10)
-      .join(" ")
-      .trim()
+  const fillerPrefixes = [
+    /^build\s+(a\s+)?/i,
+    /^create\s+(a\s+)?/i,
+    /^make\s+(a\s+)?/i,
+    /^i\s+want\s+to\s+(build|create|make)\s+(a\s+)?/i,
+    /^set\s+up\s+(a\s+)?/i,
+    /^start\s+(a\s+)?/i,
+    /^launch\s+(a\s+)?/i,
+  ]
+
+  let stripped = roughIdea.trim()
+  for (const re of fillerPrefixes) {
+    stripped = stripped.replace(re, "")
   }
 
-  // If name is too short, augment it
-  if (name.length < 5) {
-    const typeNames: Record<NetworkType, string> = {
-      gaming: "Gaming Guide Network",
-      repair: "Repair & Maintenance Hub",
-      sop: "Process & Procedures Hub",
-      creator: "Knowledge Base",
-      training: "Learning Network",
-      community: "Community Knowledge Base",
+  // Try to find a quoted or capitalized proper noun (game name, product, etc.)
+  const quotedMatch = roughIdea.match(/["']([^"']+)["']/)
+  const properNounMatch = stripped.match(/\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b/)
+
+  // Type-aware suffix and fallback name templates
+  const typeSuffix: Record<NetworkType, string> = {
+    gaming: "Guides",
+    repair: "Repair Hub",
+    sop: "Runbook",
+    creator: "Guide Hub",
+    training: "Learning Network",
+    community: "Knowledge Base",
+  }
+
+  const typeDefaultNames: Record<NetworkType, string> = {
+    gaming: "Game Guide Network",
+    repair: "Repair & Maintenance Hub",
+    sop: "Process & Procedures Portal",
+    creator: "My Guide Hub",
+    training: "Training Library",
+    community: "Community Knowledge Base",
+  }
+
+  let name: string
+
+  if (quotedMatch) {
+    // Use quoted text as the core name
+    name = `${quotedMatch[1]} ${typeSuffix[type]}`
+  } else if (properNounMatch && properNounMatch[1].length > 2) {
+    // Use detected proper noun
+    name = `${properNounMatch[1]} ${typeSuffix[type]}`
+  } else {
+    // Fall back to a cleaned-up, concise version: take first meaningful noun phrase
+    // Remove type-describing words and pick up to 3 specific words
+    const stopWords = new Set([
+      "gaming", "guide", "network", "hub", "platform", "site", "wiki",
+      "a", "an", "the", "for", "with", "and", "or", "to", "in", "on",
+      "guides", "knowledge", "base", "community", "repair", "training",
+    ])
+    const candidateWords = stripped
+      .split(/\s+/)
+      .filter((w) => !stopWords.has(w.toLowerCase()) && w.length > 2)
+      .slice(0, 3)
+
+    if (candidateWords.length >= 1) {
+      // Capitalize first letters
+      const core = candidateWords
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+      name = `${core} ${typeSuffix[type]}`
+    } else {
+      name = typeDefaultNames[type]
     }
-    name = typeNames[type]
+  }
+
+  // Trim to a reasonable length
+  if (name.length > 50) {
+    name = name.substring(0, 47).trim() + "..."
   }
 
   // Description is the full idea, trimmed
   const description = roughIdea
     .replace(/\n+/g, " ")
     .trim()
-    .substring(0, 300) // Limit to 300 chars
+    .substring(0, 300)
 
   // ============ Slug Generation ============
   const slug = slugify(name)
@@ -155,39 +211,86 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
 }
 
 /**
- * Generate suggested hubs based on network type and idea
+ * Generate suggested hubs based on network type and idea.
+ * Prefers explicit topics mentioned in the rough idea over generic defaults.
  */
 function generateHubSuggestions(type: NetworkType, idea: string, words: string[]): string[] {
-  const suggestions: Record<NetworkType, string[]> = {
-    gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Community Highlights"],
-    repair: ["Diagnostics", "Safety Procedures", "Model-Specific", "Tools & Equipment", "Troubleshooting"],
-    sop: ["Getting Started", "Core Procedures", "Advanced Topics", "Compliance", "Team Resources"],
-    creator: ["Fundamentals", "Intermediate", "Advanced", "Resources", "FAQ"],
-    training: ["Onboarding", "Core Curriculum", "Advanced Topics", "Resources", "Assessment"],
-    community: ["Getting Started", "Best Practices", "Community Highlights", "Resources", "Troubleshooting"],
-  }
-
-  const baseHubs = suggestions[type] || []
-
-  // Try to detect custom hubs from the idea
-  const customHubKeywords: Record<string, string> = {
+  // Map of keyword → hub display name. More complete than before.
+  const keywordToHub: Record<string, string> = {
+    // Gaming / RPG
     "survival": "Survival Mechanics",
     "crafting": "Crafting & Materials",
     "pvp": "PvP & Combat",
-    "progression": "Progression Guide",
+    "build": "Builds & Loadouts",
+    "builds": "Builds & Loadouts",
+    "boss": "Boss Guides",
+    "bosses": "Boss Guides",
+    "patch": "Patch Notes",
+    "beginner": "Beginner Guides",
+    "progression": "Progression Guides",
     "economy": "Economy & Trading",
     "farming": "Farming & Resources",
-    "social": "Social & Multiplayer",
+    "multiplayer": "Multiplayer & Co-op",
+    "lore": "Lore & World Building",
+    "quest": "Quests & Missions",
+    "strategy": "Strategy & Tactics",
+    "strategies": "Strategy & Tactics",
+    "community": "Community Highlights",
+    "tier": "Tier Lists",
+    "map": "Maps & Locations",
+    // Repair / Technical
+    "diagnostic": "Diagnostics & Testing",
+    "safety": "Safety Procedures",
+    "tools": "Tools & Equipment",
+    "troubleshoot": "Troubleshooting",
+    "maintenance": "Preventive Maintenance",
+    "installation": "Installation Guides",
+    // Training / SOP
+    "onboarding": "Onboarding",
+    "compliance": "Compliance & Policies",
+    "workflow": "Workflows & Processes",
+    "assessment": "Assessments & Quizzes",
+    "curriculum": "Core Curriculum",
+    "advanced": "Advanced Topics",
+    // General
+    "news": "News & Updates",
+    "faq": "FAQ",
+    "reference": "Reference",
+    "getting started": "Getting Started",
+    "resource": "Resources",
+    "resources": "Resources",
     "settings": "Configuration & Settings",
-    "security": "Security & Auth",
     "performance": "Performance & Optimization",
+    "security": "Security",
   }
 
-  for (const [keyword, hubName] of Object.entries(customHubKeywords)) {
-    if (idea.includes(keyword)) {
-      baseHubs.push(hubName)
+  // Pull hubs detected directly from the idea
+  const detected: string[] = []
+  const seen = new Set<string>()
+  for (const [keyword, hubName] of Object.entries(keywordToHub)) {
+    if (idea.includes(keyword) && !seen.has(hubName)) {
+      detected.push(hubName)
+      seen.add(hubName)
     }
   }
 
-  return baseHubs.slice(0, 5)
+  // Fallback defaults per type if we didn't detect enough
+  const defaults: Record<NetworkType, string[]> = {
+    gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Community Highlights"],
+    repair: ["Diagnostics & Testing", "Safety Procedures", "Tools & Equipment", "Troubleshooting", "Preventive Maintenance"],
+    sop: ["Getting Started", "Core Procedures", "Advanced Topics", "Compliance & Policies", "Team Resources"],
+    creator: ["Fundamentals", "Intermediate", "Advanced Topics", "Resources", "FAQ"],
+    training: ["Onboarding", "Core Curriculum", "Advanced Topics", "Resources", "Assessments & Quizzes"],
+    community: ["Getting Started", "Best Practices", "Community Highlights", "Resources", "Troubleshooting"],
+  }
+
+  // Merge: detected first, then fill from defaults to reach 5
+  const merged: string[] = [...detected]
+  for (const d of defaults[type] || []) {
+    if (!seen.has(d) && merged.length < 5) {
+      merged.push(d)
+    }
+  }
+
+  return merged.slice(0, 5)
 }
