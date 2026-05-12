@@ -129,14 +129,15 @@ export function GenerateChecklistClient() {
     setFormState((prev) => ({
       ...prev,
       ...fields,
-      // Clamp numeric fields to stay within form limits
+      // Clamp to safe generation defaults (max 5 sections, max 5 items per section).
+      // The user can still manually increase these in the form after filling.
       numberOfSections:
         fields.numberOfSections !== undefined
-          ? Math.max(1, Math.min(8, Number(fields.numberOfSections)))
+          ? Math.max(1, Math.min(5, Number(fields.numberOfSections)))
           : prev.numberOfSections,
       itemsPerSection:
         fields.itemsPerSection !== undefined
-          ? Math.max(1, Math.min(12, Number(fields.itemsPerSection)))
+          ? Math.max(1, Math.min(5, Number(fields.itemsPerSection)))
           : prev.itemsPerSection,
     }))
     setError(null)
@@ -371,7 +372,7 @@ export function GenerateChecklistClient() {
           {provider === "ai" && (
             <Card className="border-amber-500/30 bg-amber-500/5 p-2">
               <p className="text-xs text-amber-700 dark:text-amber-300">
-                Requires OPENAI_API_KEY. If not configured, generation will fail with a clear error.
+                AI generation may take 10&ndash;25 seconds. If generation fails, try a smaller checklist or use Mock Preview.
               </p>
             </Card>
           )}

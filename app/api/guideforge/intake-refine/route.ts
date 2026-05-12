@@ -146,9 +146,9 @@ Rules:
 - goal: The specific outcome the reader achieves by completing the checklist.
 - useCase: The specific situation when this checklist is used.
 - tone: Must be exactly one of: "practical", "helpful", "beginner-friendly", "technical", "detailed", "minimal".
-- numberOfSections: Integer from 2 to 8. Infer from complexity of the idea.
-- itemsPerSection: Integer from 3 to 10. Infer from detail level.
-- optionalContext: Comma-separated list of specific items or topics the checklist should cover.
+- numberOfSections: IMPORTANT — Default to 4. Use 5 only for genuinely complex workflows with 5 or more clearly distinct phases. Never choose 6 or more unless the user's rough idea explicitly says "6 sections" or "8 sections". Do not infer 6+ sections from a long topic list alone.
+- itemsPerSection: IMPORTANT — Default to 5. Use 4 for simpler topics. Use 6 only for highly detailed topics. Never exceed 6 unless the user explicitly requests more items. Keep output generation-friendly.
+- optionalContext: Comma-separated list of specific items or topics the checklist should cover. Extract from any "include", "confirm", "prepare", or list language in the rough idea.
 - assumptions: Array of strings.
 - missingInfo: Array of strings.
 - couldBeBetterWith: Array of strings.${currentFieldsBlock}
@@ -395,7 +395,8 @@ export async function POST(request: NextRequest) {
       } satisfies IntakeRefineResponse)
     }
 
-    // checklist
+    // checklist — clamp to safe generation defaults (max 5 sections, max 5 items)
+    // This prevents AI from casually choosing 6+ which causes generation timeouts.
     const fields: ChecklistIntakeFields = {
       title: typeof parsed.title === "string" ? parsed.title : "",
       audience: typeof parsed.audience === "string" ? parsed.audience : "",
@@ -403,8 +404,8 @@ export async function POST(request: NextRequest) {
       goal: typeof parsed.goal === "string" ? parsed.goal : "",
       useCase: typeof parsed.useCase === "string" ? parsed.useCase : "",
       tone: isValidTone(parsed.tone) ? parsed.tone : "practical",
-      numberOfSections: typeof parsed.numberOfSections === "number" ? Math.max(2, Math.min(8, parsed.numberOfSections)) : 4,
-      itemsPerSection: typeof parsed.itemsPerSection === "number" ? Math.max(3, Math.min(10, parsed.itemsPerSection)) : 5,
+      numberOfSections: typeof parsed.numberOfSections === "number" ? Math.max(2, Math.min(5, parsed.numberOfSections)) : 4,
+      itemsPerSection: typeof parsed.itemsPerSection === "number" ? Math.max(3, Math.min(5, parsed.itemsPerSection)) : 5,
       optionalContext: typeof parsed.optionalContext === "string" ? parsed.optionalContext : "",
     }
 

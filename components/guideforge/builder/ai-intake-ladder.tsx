@@ -473,25 +473,30 @@ function detectGuideType(lowerText: string): string | null {
 }
 
 /**
- * Infer number of checklist sections from explicit counts or topic list length
+ * Infer number of checklist sections from explicit counts or topic list length.
+ * Defaults conservatively: topic-list inference caps at 5.
+ * Only an explicit user-stated count of 6+ is allowed to exceed 5.
  */
 function inferNumberOfSections(lowerText: string): number | null {
-  // Explicit section count mentions
+  // Explicit section count stated by the user (e.g. "6 sections", "8 sections")
   const explicitMatch = lowerText.match(/(\d+)\s*sections?/i)
   if (explicitMatch) {
     const n = parseInt(explicitMatch[1])
+    // Honour explicit requests for 6+ but keep a hard ceiling
     return Math.max(2, Math.min(8, n))
   }
 
-  // Count comma-separated high-level topics in "confirm/include/cover" lists
-  // Each distinct named topic = a candidate section
+  // Count comma-separated topics in "confirm/include/cover/help them" lists.
+  // Cap at 5 regardless of how many topics are listed — a long topic list is
+  // not a signal the user wants more than 5 sections; topics become items, not
+  // sections.
   const topicListMatch = lowerText.match(
-    /(?:confirm|include|cover|sections?:?|covering)\s+([^.!?]{10,200})/i
+    /(?:confirm|include|cover|sections?:?|covering|help\s+them)\s+([^.!?]{10,200})/i
   )
   if (topicListMatch) {
     const topics = topicListMatch[1].split(/,|and\s+/).filter((t) => t.trim().length > 2)
     if (topics.length >= 3) {
-      return Math.max(2, Math.min(8, Math.ceil(topics.length / 1.5)))
+      return Math.max(2, Math.min(5, Math.ceil(topics.length / 1.5)))
     }
   }
 
@@ -499,16 +504,18 @@ function inferNumberOfSections(lowerText: string): number | null {
 }
 
 /**
- * Infer items per section from explicit counts or detail density keywords
+ * Infer items per section from explicit counts or detail density keywords.
+ * Caps at 5 for density keywords to stay generation-safe.
  */
 function inferItemsPerSection(lowerText: string): number | null {
   const explicitMatch = lowerText.match(/(\d+)\s*items?\s*(?:per|each)/i)
   if (explicitMatch) {
     const n = parseInt(explicitMatch[1])
-    return Math.max(3, Math.min(10, n))
+    // Honour explicit requests but keep a safe ceiling
+    return Math.max(3, Math.min(8, n))
   }
 
-  if (lowerText.includes("detailed") || lowerText.includes("thorough") || lowerText.includes("comprehensive")) return 6
+  if (lowerText.includes("detailed") || lowerText.includes("thorough") || lowerText.includes("comprehensive")) return 5
   if (lowerText.includes("quick") || lowerText.includes("minimal") || lowerText.includes("concise")) return 3
 
   return null
