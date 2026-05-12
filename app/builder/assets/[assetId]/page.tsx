@@ -416,36 +416,108 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             {/* Checklist: Edit Sections & Items */}
             {asset?.assetType === "checklist" && editPayload && (
               <>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Completion Criteria (one per line)</label>
-                  <textarea
-                    value={editPayload.completionCriteria?.join('\n') || ''}
-                    onChange={(e) => {
-                      setEditPayload({
-                        ...editPayload,
-                        completionCriteria: e.target.value.split('\n').filter(c => c.trim()),
-                      })
-                    }}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
-                    placeholder="Enter one completion criterion per line..."
-                  />
+                {/* Completion Criteria — per-item list editor */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground">Completion Criteria</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        setEditPayload({
+                          ...editPayload,
+                          completionCriteria: [...(editPayload.completionCriteria ?? []), ""],
+                        })
+                      }
+                    >
+                      + Add Criterion
+                    </Button>
+                  </div>
+                  {(editPayload.completionCriteria ?? []).length === 0 && (
+                    <p className="text-xs text-muted-foreground italic">No completion criteria yet.</p>
+                  )}
+                  <div className="space-y-1.5">
+                    {(editPayload.completionCriteria ?? []).map((criterion: string, cIdx: number) => (
+                      <div key={cIdx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={criterion}
+                          onChange={(e) => {
+                            const updated = [...(editPayload.completionCriteria ?? [])]
+                            updated[cIdx] = e.target.value
+                            setEditPayload({ ...editPayload, completionCriteria: updated })
+                          }}
+                          className="flex-1 px-2 py-1.5 border border-border rounded-md bg-background text-foreground text-sm"
+                          placeholder="Completion criterion..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (editPayload.completionCriteria ?? []).filter((_: string, i: number) => i !== cIdx)
+                            setEditPayload({ ...editPayload, completionCriteria: updated })
+                          }}
+                          className="shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs px-1.5 py-1 rounded"
+                          aria-label="Remove criterion"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Assumptions (one per line)</label>
-                  <textarea
-                    value={editPayload.assumptions?.join('\n') || ''}
-                    onChange={(e) => {
-                      setEditPayload({
-                        ...editPayload,
-                        assumptions: e.target.value.split('\n').filter(a => a.trim()),
-                      })
-                    }}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm font-mono"
-                    placeholder="Enter one assumption per line..."
-                  />
+                {/* Assumptions — per-item list editor */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground">Assumptions</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        setEditPayload({
+                          ...editPayload,
+                          assumptions: [...(editPayload.assumptions ?? []), ""],
+                        })
+                      }
+                    >
+                      + Add Assumption
+                    </Button>
+                  </div>
+                  {(editPayload.assumptions ?? []).length === 0 && (
+                    <p className="text-xs text-muted-foreground italic">No assumptions yet.</p>
+                  )}
+                  <div className="space-y-1.5">
+                    {(editPayload.assumptions ?? []).map((assumption: string, aIdx: number) => (
+                      <div key={aIdx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={assumption}
+                          onChange={(e) => {
+                            const updated = [...(editPayload.assumptions ?? [])]
+                            updated[aIdx] = e.target.value
+                            setEditPayload({ ...editPayload, assumptions: updated })
+                          }}
+                          className="flex-1 px-2 py-1.5 border border-border rounded-md bg-background text-foreground text-sm"
+                          placeholder="Assumption..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (editPayload.assumptions ?? []).filter((_: string, i: number) => i !== aIdx)
+                            setEditPayload({ ...editPayload, assumptions: updated })
+                          }}
+                          className="shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs px-1.5 py-1 rounded"
+                          aria-label="Remove assumption"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
