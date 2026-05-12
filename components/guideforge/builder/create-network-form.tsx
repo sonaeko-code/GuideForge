@@ -166,15 +166,29 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
     const result = smartFillNetwork(roughIdea)
     if (result.success) {
-      setName(result.name)
-      setDescription(result.description)
-      setType(result.type)
-      setTheme(result.theme)
-      setDomainPrefix(result.slug)
-      setDomainPrefixManuallyEdited(false)
-      setShowSmartFillPanel(false)
+      // Smart Fill: merge results, preserving manual selections for invalid Smart Fill outputs
+      // Only update fields where Smart Fill provided meaningful values
+      if (result.name && result.name.trim()) {
+        setName(result.name)
+      }
+      if (result.description && result.description.trim()) {
+        setDescription(result.description)
+      }
+      // Preserve manual type if Smart Fill didn't return valid one
+      if (result.type && ["gaming", "repair", "sop", "creator", "training", "community"].includes(result.type)) {
+        setType(result.type)
+      }
+      // Preserve manual theme if Smart Fill didn't return valid one
+      if (result.theme && ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(result.theme)) {
+        setTheme(result.theme)
+      }
+      if (result.slug && result.slug.trim()) {
+        setDomainPrefix(result.slug)
+        setDomainPrefixManuallyEdited(false)
+      }
       setRoughIdea("")
       setError(null)
+      console.log("[v0] Smart Fill Network: Applied results", { type: result.type, theme: result.theme, name: result.name })
     } else {
       setError("Could not parse your idea. Try being more specific.")
     }
@@ -210,6 +224,22 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setError(null)
 
     try {
+      // Validate required fields before save
+      if (!name.trim()) {
+        throw new Error("Network name is required")
+      }
+      if (!slug.trim()) {
+        throw new Error("Subdomain is required")
+      }
+      if (!type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(type)) {
+        throw new Error(`Invalid network type: ${type}. Using default 'gaming'.`)
+      }
+      if (!theme || !["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(theme)) {
+        throw new Error(`Invalid theme: ${theme}. Using default 'parchment'.`)
+      }
+
+      console.log("[v0] CreateNetworkForm: Pre-save validation:", { name, type, theme, slug })
+
       // Check if this is a scaffold type
       if (currentScaffoldId) {
         if (!scaffoldTemplate) {
@@ -237,7 +267,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         router.push(`/builder/network/${result.network.id}/dashboard`)
       } else {
         // Create blank network for non-scaffold types
-        console.log("[v0] CreateNetworkForm: Creating blank network:", { name, type, slug })
+        console.log("[v0] CreateNetworkForm: Creating blank network:", { name, type, slug, theme })
 
         const { network, error: createError } = await createNetwork({
           name,
