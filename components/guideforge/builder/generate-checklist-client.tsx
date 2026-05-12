@@ -15,6 +15,7 @@ import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
+import { AIIntakeLadder } from "./ai-intake-ladder"
 
 /**
  * Checklist client component with pending proposal restore support.
@@ -115,6 +116,29 @@ export function GenerateChecklistClient() {
 
   const handleFieldChange = (field: keyof ChecklistIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
+    setError(null)
+  }
+
+  /**
+   * Called by AIIntakeLadder (Quick Fill or Smart Fill) to merge detected
+   * fields into the checklist form state. Numeric fields are clamped to the
+   * form's own validation limits so the generate button never receives
+   * out-of-range values.
+   */
+  const handleApplyIntakeLadderFields = (fields: Partial<ChecklistIntakeRequest>) => {
+    setFormState((prev) => ({
+      ...prev,
+      ...fields,
+      // Clamp numeric fields to stay within form limits
+      numberOfSections:
+        fields.numberOfSections !== undefined
+          ? Math.max(1, Math.min(8, Number(fields.numberOfSections)))
+          : prev.numberOfSections,
+      itemsPerSection:
+        fields.itemsPerSection !== undefined
+          ? Math.max(1, Math.min(12, Number(fields.itemsPerSection)))
+          : prev.itemsPerSection,
+    }))
     setError(null)
   }
 
@@ -279,6 +303,14 @@ export function GenerateChecklistClient() {
           </Card>
         )}
       </div>
+
+      {/* AI Intake Ladder — Smart Fill / Quick Fill */}
+      <AIIntakeLadder
+        assetType="checklist"
+        onApplyFields={(fields) =>
+          handleApplyIntakeLadderFields(fields as Partial<ChecklistIntakeRequest>)
+        }
+      />
 
       <form
         onSubmit={(e) => {
