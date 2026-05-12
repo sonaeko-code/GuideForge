@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { SingleGuideEditor } from "./single-guide-editor"
+import { AssetTypeBadge } from "./asset-type-badge"
 
 interface SingleGuideProposalProps {
   asset: GeneratedSingleGuide
@@ -48,7 +49,7 @@ export function SingleGuideProposal({
 
       {/* Page header */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Badge variant="outline">Single Guide</Badge>
+        <AssetTypeBadge assetType="single_guide" variant="small" />
         <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
       </div>
 

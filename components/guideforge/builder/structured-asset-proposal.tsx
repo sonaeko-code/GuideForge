@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import type { GeneratedStructuredAsset, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { saveStructuredAssetToWorkspace } from "@/lib/guideforge/save-structured-asset"
 import { SingleGuideProposal } from "./single-guide-proposal"
+import { AssetTypeBadge } from "./asset-type-badge"
 
 interface StructuredAssetProposalProps {
   asset: GeneratedStructuredAsset
@@ -110,6 +111,17 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     return names[asset.assetType]
   }
 
+  const getAssetTypeName = (): string => {
+    const names: Record<GeneratedStructuredAsset["assetType"], string> = {
+      single_guide: "Guide",
+      recipe: "Recipe",
+      checklist: "Checklist",
+      sop: "SOP / Procedure",
+      troubleshooting_flow: "Troubleshooting Flow",
+    }
+    return names[asset.assetType]
+  }
+
   // Single Guide uses its own dedicated proposal component with Edit/Preview tabs
   if (asset.assetType === "single_guide") {
     return (
@@ -158,7 +170,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       {/* Header */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline">{getAssetTypeName()}</Badge>
+          <AssetTypeBadge assetType={asset.assetType} variant="small" />
           {asset.generatedBy && (
             <Badge variant="secondary" className="text-xs">
               {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}

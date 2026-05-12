@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { StructuredAssetType } from "@/lib/guideforge/generation-schemas"
+import { AssetTypeBadge } from "./asset-type-badge"
 
 export function AssetTypeSelector() {
   const assetTypes: Array<{
@@ -76,12 +77,15 @@ export function AssetTypeSelector() {
             >
               <Card className="h-full min-h-48 border border-border/50 hover:border-primary/50 transition-colors cursor-pointer hover:bg-accent/50">
                 <div className="h-full p-6 flex flex-col">
-                  <div className="flex-shrink-0">
-                    <h2 className="font-semibold text-foreground text-lg">{assetType.title}</h2>
+                  {/* Asset Type Badge with Icon */}
+                  <div className="flex-shrink-0 mb-3">
+                    <AssetTypeBadge assetType={assetType.id as StructuredAssetType} variant="large" />
                   </div>
-                  <p className="text-sm text-muted-foreground mt-3 flex-1 overflow-hidden break-words whitespace-normal">
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground mt-2 flex-1 overflow-hidden break-words whitespace-normal">
                     {assetType.description}
                   </p>
+                  {/* Status Badge */}
                   <div className="pt-3 mt-auto flex-shrink-0">
                     <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
                       Available
@@ -96,12 +100,15 @@ export function AssetTypeSelector() {
               className="h-full min-h-48 border border-border/50 bg-muted/30 cursor-not-allowed"
             >
               <div className="h-full p-6 flex flex-col">
-                <div className="flex-shrink-0">
-                  <h2 className="font-semibold text-foreground/70 text-lg">{assetType.title}</h2>
+                {/* Asset Type Badge with Icon (muted for coming soon) */}
+                <div className="flex-shrink-0 mb-3 opacity-60">
+                  <AssetTypeBadge assetType={assetType.id as StructuredAssetType} variant="large" />
                 </div>
-                <p className="text-sm text-muted-foreground/80 mt-3 flex-1 overflow-hidden break-words whitespace-normal">
+                {/* Description */}
+                <p className="text-sm text-muted-foreground/80 mt-2 flex-1 overflow-hidden break-words whitespace-normal">
                   {assetType.description}
                 </p>
+                {/* Status Badge */}
                 <div className="pt-3 mt-auto flex-shrink-0">
                   <Badge variant="secondary" className="text-xs">Coming soon</Badge>
                 </div>
