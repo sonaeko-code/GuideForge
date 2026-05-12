@@ -70,14 +70,30 @@ export function GenerateSingleGuideClient() {
 
     setIsGenerating(true)
     try {
-      const response = await generateSingleGuideMock(formState)
-      if (!response.success) {
-        throw new Error(response.error || "Generation failed")
+      // Attempt AI generation first
+      const aiResponse = await fetch("/api/guideforge/generate-single-guide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formState),
+      })
+
+      const aiData = await aiResponse.json()
+
+      if (aiData.success && aiData.asset) {
+        setProposal(aiData.asset as GeneratedSingleGuide)
+        return
       }
-      setProposal(response.asset as GeneratedSingleGuide)
+
+      // AI route returned an error — fall back to mock generator
+      console.warn("[GuideForge] AI generation failed, falling back to mock:", aiData.error)
+
+      const mockResponse = await generateSingleGuideMock(formState)
+      if (!mockResponse.success) {
+        throw new Error(mockResponse.error || "Generation failed")
+      }
+      setProposal(mockResponse.asset as GeneratedSingleGuide)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
-      console.error("[v0] Single guide generation error:", err)
       setError(`Generation failed: ${msg}`)
     } finally {
       setIsGenerating(false)

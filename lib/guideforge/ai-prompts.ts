@@ -5,7 +5,7 @@
  * Ensures AI output matches GuideForge schemas and rules.
  */
 
-import type { ChecklistGenerationRequest } from "./ai-generation-types"
+import type { ChecklistGenerationRequest, SingleGuideGenerationRequest } from "./ai-generation-types"
 import type { GeneratedChecklist } from "./generation-schemas"
 
 const CHECKLIST_SCHEMA = `{
@@ -123,6 +123,98 @@ Bad items: ["Item 1 in section 1", "Complete this task for section 1", "Item 2 i
 Good items: ["Verify all critical bugs are resolved", "Test core gameplay loops", "Confirm no regressions in fixes"]
 
 Repair the checklist with specific, meaningful content based on the original request.`
+}
+
+// ========== Single Guide Prompt ==========
+
+const SINGLE_GUIDE_SCHEMA = `{
+  "assetType": "single_guide",
+  "title": "string - the guide title",
+  "summary": "string - 1-2 sentence description of what this guide covers and who it is for",
+  "audience": "string - the intended audience",
+  "difficulty": "string - beginner | intermediate | advanced | expert",
+  "requirements": ["string - prerequisite or requirement (empty array if none)"],
+  "warnings": ["string - safety warning or caution (empty array if none)"],
+  "steps": [
+    {
+      "title": "string - step title, specific and action-oriented",
+      "body": "string - detailed step instructions, at least 2-3 sentences",
+      "successCondition": "string or null - how the user knows this step is complete",
+      "tip": "string or null - optional pro tip or shortcut",
+      "warning": "string or null - optional step-level warning"
+    }
+  ],
+  "tags": ["string - relevant tags"],
+  "assumptions": ["string - assumptions made during generation"],
+  "missingInfo": ["string - information gaps that would improve the guide"]
+}`
+
+export function buildSingleGuidePrompt(request: SingleGuideGenerationRequest): string {
+  const numSteps = Math.min(Math.max(request.numberOfSteps || 5, 2), 20)
+
+  // Build context lines for optional fields
+  const contextLines: string[] = []
+  if (request.goal?.trim()) contextLines.push(`- Goal: ${request.goal.trim()}`)
+  if (request.useCase?.trim()) contextLines.push(`- Use Case / Context: ${request.useCase.trim()}`)
+  if (request.optionalContext?.trim()) contextLines.push(`- Additional Context / Topics to Cover: ${request.optionalContext.trim()}`)
+  if (request.hasPrerequisites) contextLines.push(`- Include prerequisites: Yes — list what the reader needs before starting`)
+  if (request.hasWarnings) contextLines.push(`- Include warnings: Yes — add relevant safety warnings or cautions`)
+
+  const guideTypeDescription: Record<string, string> = {
+    guide: "a practical how-to guide with clear steps",
+    tutorial: "a step-by-step tutorial walking the reader through a complete workflow",
+    reference: "a reference guide the reader can look up quickly",
+    explanation: "an explanation-focused guide covering the why and how behind the topic",
+  }
+  const guideTypeDesc = guideTypeDescription[request.guideType] || "a structured guide"
+
+  const toneDescription: Record<string, string> = {
+    "beginner-friendly": "Write in a warm, encouraging, beginner-friendly tone. Avoid jargon. Explain terms when first used. Use short sentences.",
+    "technical": "Write in a precise, technical tone suitable for experienced practitioners. Use correct terminology.",
+    "practical": "Write in a practical, direct tone. Skip unnecessary explanation. Focus on what to do.",
+    "helpful": "Write in a helpful, friendly tone. Be encouraging but efficient.",
+    "detailed": "Write in a thorough, detailed tone. Explain each step fully with context.",
+    "minimal": "Write in a minimal, concise tone. Keep steps short. Avoid padding.",
+  }
+  const toneInstruction = toneDescription[request.tone] || `Write in a ${request.tone} tone.`
+
+  return `You are a structured guide generator for GuideForge. Generate a high-quality, practical guide with specific, actionable content.
+
+CRITICAL RULES — DO NOT VIOLATE:
+1. Step titles MUST be specific and action-oriented (e.g., "Set Up Your Recording Software", not "Step 1" or "Configure").
+2. Step bodies MUST contain real, useful instructions — at least 2-3 sentences. No placeholder text.
+3. NEVER use placeholder text like "TODO", "Follow this carefully", "Do this step", "Complete this action", or "[fill in]".
+4. Generate EXACTLY ${numSteps} steps.
+5. If "Additional Context / Topics to Cover" is provided, distribute those topics across the steps — do not ignore them.
+6. Return ONLY valid JSON matching the schema below. No markdown, no explanations, no text outside JSON.
+7. All step titles must be at least 5 characters and describe a distinct action.
+8. The summary must be 1-2 sentences and sound natural — avoid "A comprehensive guide for [verb phrase]".
+9. tags must be lowercase and relevant to the guide topic.
+10. ${toneInstruction}
+
+GUIDE REQUEST:
+- Title: ${request.title}
+- Intended Audience: ${request.audience}
+- Purpose: ${request.purpose}
+${contextLines.join("\n")}
+- Tone: ${request.tone}
+- Difficulty: ${request.difficulty}
+- Guide Type: ${guideTypeDesc}
+- Number of Steps: ${numSteps}
+
+REQUIRED JSON SCHEMA:
+${SINGLE_GUIDE_SCHEMA}
+
+EXAMPLE OF GOOD STEP QUALITY (for a YouTube upload guide):
+{
+  "title": "Write a Click-Worthy Title and Description",
+  "body": "Your video title should include your main keyword within the first 60 characters, since YouTube truncates titles beyond that in search results. Write a description of at least 200 words: start with 2-3 sentences summarizing the video, then add timestamps, links, and relevant keywords in a natural way. Avoid keyword stuffing — YouTube's algorithm penalizes descriptions that feel spammy.",
+  "successCondition": "Title is under 60 characters and contains your primary keyword. Description is at least 200 words with a timestamp list.",
+  "tip": "Use a tool like TubeBuddy or vidIQ to score your title before publishing.",
+  "warning": null
+}
+
+Generate a complete, domain-specific guide with meaningful steps relevant to the title, audience, and context above. Do not use generic or placeholder content.`
 }
 
 /**
