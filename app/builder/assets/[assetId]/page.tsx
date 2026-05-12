@@ -630,6 +630,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               value={asset.payload as GeneratedSingleGuide}
               onChange={() => {}}
               mode="preview"
+              showModeTabs={false}
             />
           )}
 

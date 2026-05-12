@@ -24,9 +24,15 @@ interface SingleGuideEditorProps {
   mode?: SingleGuideEditorMode
   onModeChange?: (mode: SingleGuideEditorMode) => void
   /**
-   * Label shown on the tab toggle. Defaults to "Edit Draft".
+   * Label shown on the edit tab. Defaults to "Edit Draft".
    */
   editTabLabel?: string
+  /**
+   * Whether to render the Edit / Preview tab toggle.
+   * Set to false for read-only preview contexts where tabs would be confusing.
+   * Defaults to true.
+   */
+  showModeTabs?: boolean
 }
 
 export function SingleGuideEditor({
@@ -35,6 +41,7 @@ export function SingleGuideEditor({
   mode: externalMode,
   onModeChange,
   editTabLabel = "Edit Draft",
+  showModeTabs = true,
 }: SingleGuideEditorProps) {
   // Internal mode used only when the parent does not control it
   const [internalMode, setInternalMode] = useState<SingleGuideEditorMode>("edit")
@@ -394,29 +401,31 @@ export function SingleGuideEditor({
 
   return (
     <div className="space-y-5">
-      {/* Tab toggle */}
-      <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
-        <button
-          onClick={() => setMode("edit")}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            mode === "edit"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {editTabLabel}
-        </button>
-        <button
-          onClick={() => setMode("preview")}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            mode === "preview"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Preview Guide
-        </button>
-      </div>
+      {/* Tab toggle — hidden when showModeTabs is false (e.g. read-only preview contexts) */}
+      {showModeTabs && (
+        <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
+          <button
+            onClick={() => setMode("edit")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              mode === "edit"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {editTabLabel}
+          </button>
+          <button
+            onClick={() => setMode("preview")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              mode === "preview"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Preview Guide
+          </button>
+        </div>
+      )}
 
       {/* Tab content */}
       {mode === "edit" ? editView : previewView}
