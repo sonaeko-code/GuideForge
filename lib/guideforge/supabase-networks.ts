@@ -45,9 +45,14 @@ function normalizeNetwork(row: any): Network {
     name: row.name,
     description: row.description,
     type: row.type,
-    visibility: row.visibility,
+    visibility: row.is_public ? "public" : (row.visibility || "private"),
     domain: row.domain,
-    branding: row.branding,
+    branding: {
+      primaryColor: row.primary_color || "#6366f1",
+      accentColor: row.accent_color,
+      theme: row.theme || "parchment",
+      logoUrl: row.logo_url,
+    },
     forgeRuleIds: row.forgeRuleIds || [],
     hubIds: row.hubIds || [],
     createdAt: row.created_at || row.createdAt,
@@ -117,7 +122,7 @@ async function normalizeNetworkIdForSupabase(networkId: string): Promise<string 
  * Create a new network
  */
 export async function createNetwork(
-  draft: NetworkDraft & { slug: string; primaryColor: string }
+  draft: NetworkDraft & { slug: string; primaryColor: string; theme?: string }
 ): Promise<{ network: Network; source: "supabase" | "local"; error?: string }> {
   if (!isSupabaseConfigured()) {
     console.log("[v0] Supabase not configured, using localStorage fallback for network creation")
@@ -127,20 +132,22 @@ export async function createNetwork(
   try {
     const profileId = await getCurrentProfileId()
     
-    // Only include schema-supported fields. Do NOT include UI-only fields.
-    // The networks table only has: id, slug, name, description, created_at, updated_at, owner_user_id
-    // All other fields (theme, visibility, branding, etc) are UI-only and stored in app state
+    // Map UI theme to database columns
     const networkData: Record<string, any> = {
       slug: draft.slug,
       name: draft.name,
       description: draft.description,
+      type: draft.type,
+      is_public: draft.visibility === "public",
+      primary_color: draft.primaryColor,
+      theme: draft.theme || "parchment",
     }
 
     // Ownership Phase 2: Include owner_user_id if user is logged in
     // If profileId is DEV_PROFILE_ID (no real user session), omit owner_user_id to save as null
     if (profileId !== DEV_PROFILE_ID) {
-      networkData.owner_user_id = profileId
-      console.log("[v0] Network save with owner_user_id:", profileId)
+      networkData.owner_id = profileId
+      console.log("[v0] Network save with owner_id:", profileId)
     } else {
       console.log("[v0] Network save without owner (signed out or mock)")
     }
@@ -158,7 +165,7 @@ export async function createNetwork(
       return { network: {} as Network, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Network saved:", data.id, "owner:", data.owner_user_id || "null")
+    console.log("[v0] Network saved:", data.id, "theme:", data.theme, "owner:", data.owner_id || "null")
     // Normalize snake_case Supabase columns to camelCase Network type
     return { network: normalizeNetwork(data), source: "supabase" }
   } catch (err) {

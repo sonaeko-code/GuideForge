@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Sparkles, CheckCircle2, Check } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Sparkles, CheckCircle2, Check, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -36,6 +36,7 @@ import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
 import { getScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { getAllNetworkThemes } from "@/lib/guideforge/network-themes"
+import { smartFillNetwork } from "@/lib/guideforge/smart-fill-network"
 import type {
   NetworkType,
   ThemeDirection,
@@ -135,6 +136,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [submitting, setSubmitting] = useState(false)
   const [autofilled, setAutofilled] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [roughIdea, setRoughIdea] = useState("")
+  const [showSmartFillPanel, setShowSmartFillPanel] = useState(false)
 
   // Compute current scaffold template based on current type (not initialType)
   const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
@@ -156,6 +159,28 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setDomainPrefix(draft.subdomainSuggestion)
     setDomainPrefixManuallyEdited(false)
     setAutofilled(true)
+  }
+
+  function handleSmartFill() {
+    if (!roughIdea.trim()) {
+      setError("Please describe your network idea")
+      return
+    }
+
+    const result = smartFillNetwork(roughIdea)
+    if (result.success) {
+      setName(result.name)
+      setDescription(result.description)
+      setType(result.type)
+      setTheme(result.theme)
+      setDomainPrefix(result.slug)
+      setDomainPrefixManuallyEdited(false)
+      setShowSmartFillPanel(false)
+      setRoughIdea("")
+      setError(null)
+    } else {
+      setError("Could not parse your idea. Try being more specific.")
+    }
   }
 
   function handleTypeChange(newType: NetworkType) {
@@ -258,6 +283,49 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
       {step === "configure" && (
         <>
+          {/* Smart Fill Panel */}
+          {!showSmartFillPanel ? (
+            <Card className="p-4 border-amber-500/20 bg-amber-500/5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-foreground mb-2">Start with a rough idea</p>
+                  <p className="text-sm text-muted-foreground">
+                    Describe the network you want to build. GuideForge will intelligently fill in the name, type, theme, and suggested structure.
+                  </p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => setShowSmartFillPanel(true)} className="flex-shrink-0">
+                  <Zap className="size-4 mr-1.5" aria-hidden="true" />
+                  Smart Fill
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-5 border-amber-500/30 bg-amber-500/10">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-sm text-foreground mb-1">Describe your network</h3>
+                  <p className="text-xs text-muted-foreground mb-3">What kind of network are you building? Include details about the topic, audience, and purpose.</p>
+                  <Textarea
+                    value={roughIdea}
+                    onChange={(e) => setRoughIdea(e.target.value)}
+                    placeholder="e.g. 'Build a gaming guide network for a survival RPG with hubs for beginner guides, builds, crafting, bosses, and patch notes.'"
+                    rows={3}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setShowSmartFillPanel(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleSmartFill} className="gap-1.5">
+                    <Zap className="size-4" aria-hidden="true" />
+                    Fill Network Fields
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">

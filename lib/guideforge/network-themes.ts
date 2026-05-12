@@ -169,3 +169,23 @@ export function getThemesForNetworkType(networkType: string): NetworkTheme[] {
   const themeIds = typeMap[networkType] || []
   return themeIds.map((id) => NETWORK_THEMES[id])
 }
+
+/**
+ * Get a theme by ID with safe fallback
+ */
+export function getNetworkTheme(themeId: string | undefined): NetworkTheme | null {
+  if (!themeId || !(themeId in NETWORK_THEMES)) {
+    return NETWORK_THEMES.parchment
+  }
+  return NETWORK_THEMES[themeId as ThemeDirection]
+}
+
+/**
+ * Normalize and validate a theme ID, with fallback to default
+ */
+export function normalizeThemeId(themeId: string | undefined): ThemeDirection {
+  if (!themeId || !(themeId in NETWORK_THEMES)) {
+    return "parchment"
+  }
+  return themeId as ThemeDirection
+}
