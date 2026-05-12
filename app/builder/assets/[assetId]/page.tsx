@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
 import { getAssetDraft, updateAssetDraft, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
-import type { GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
+import type { GeneratedSingleGuide, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import { SingleGuideEditor } from "@/components/guideforge/builder/single-guide-editor"
+import { ChecklistEditor } from "@/components/guideforge/builder/checklist-editor"
 import { AssetTypeBadge } from "@/components/guideforge/builder/asset-type-badge"
 
 interface AssetDetailPageProps {
@@ -81,43 +82,6 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
 
     fetchAsset()
   }, [isAuthenticated, isLoading, assetId])
-
-  const getChecklistStats = (): { sections: number; totalItems: number; requiredItems: number; malformed: boolean } => {
-    if (asset?.assetType !== "checklist" || !asset.payload) {
-      return { sections: 0, totalItems: 0, requiredItems: 0, malformed: false }
-    }
-    
-    const payload = asset.payload as any
-    
-    // Check if sections exist and are an array
-    if (!Array.isArray(payload.sections)) {
-      return { sections: 0, totalItems: 0, requiredItems: 0, malformed: true }
-    }
-
-    let totalItems = 0
-    let requiredItems = 0
-    let isMalformed = false
-
-    for (const section of payload.sections) {
-      if (!section || typeof section !== 'object') {
-        isMalformed = true
-        continue
-      }
-      if (!Array.isArray(section.items)) {
-        isMalformed = true
-        continue
-      }
-      totalItems += section.items.length
-      requiredItems += section.items.filter((item: any) => item?.required === true).length
-    }
-
-    return {
-      sections: payload.sections.length,
-      totalItems,
-      requiredItems,
-      malformed: isMalformed
-    }
-  }
 
   const handleSaveChanges = async () => {
     if (!asset) return
@@ -401,166 +365,13 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               />
             )}
 
-            {/* Checklist: Edit Sections & Items */}
+            {/* Checklist: Full Editor */}
             {asset?.assetType === "checklist" && editPayload && (
-              <>
-                {/* Completion Criteria — per-item list editor */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-muted-foreground">Completion Criteria</label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() =>
-                        setEditPayload({
-                          ...editPayload,
-                          completionCriteria: [...(editPayload.completionCriteria ?? []), ""],
-                        })
-                      }
-                    >
-                      + Add Criterion
-                    </Button>
-                  </div>
-                  {(editPayload.completionCriteria ?? []).length === 0 && (
-                    <p className="text-xs text-muted-foreground italic">No completion criteria yet.</p>
-                  )}
-                  <div className="space-y-1.5">
-                    {(editPayload.completionCriteria ?? []).map((criterion: string, cIdx: number) => (
-                      <div key={cIdx} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={criterion}
-                          onChange={(e) => {
-                            const updated = [...(editPayload.completionCriteria ?? [])]
-                            updated[cIdx] = e.target.value
-                            setEditPayload({ ...editPayload, completionCriteria: updated })
-                          }}
-                          className="flex-1 px-2 py-1.5 border border-border rounded-md bg-background text-foreground text-sm"
-                          placeholder="Completion criterion..."
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = (editPayload.completionCriteria ?? []).filter((_: string, i: number) => i !== cIdx)
-                            setEditPayload({ ...editPayload, completionCriteria: updated })
-                          }}
-                          className="shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs px-1.5 py-1 rounded"
-                          aria-label="Remove criterion"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Assumptions — per-item list editor */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-muted-foreground">Assumptions</label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() =>
-                        setEditPayload({
-                          ...editPayload,
-                          assumptions: [...(editPayload.assumptions ?? []), ""],
-                        })
-                      }
-                    >
-                      + Add Assumption
-                    </Button>
-                  </div>
-                  {(editPayload.assumptions ?? []).length === 0 && (
-                    <p className="text-xs text-muted-foreground italic">No assumptions yet.</p>
-                  )}
-                  <div className="space-y-1.5">
-                    {(editPayload.assumptions ?? []).map((assumption: string, aIdx: number) => (
-                      <div key={aIdx} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={assumption}
-                          onChange={(e) => {
-                            const updated = [...(editPayload.assumptions ?? [])]
-                            updated[aIdx] = e.target.value
-                            setEditPayload({ ...editPayload, assumptions: updated })
-                          }}
-                          className="flex-1 px-2 py-1.5 border border-border rounded-md bg-background text-foreground text-sm"
-                          placeholder="Assumption..."
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = (editPayload.assumptions ?? []).filter((_: string, i: number) => i !== aIdx)
-                            setEditPayload({ ...editPayload, assumptions: updated })
-                          }}
-                          className="shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs px-1.5 py-1 rounded"
-                          aria-label="Remove assumption"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Sections</label>
-                  <div className="space-y-4">
-                    {editPayload.sections?.map((section: any, sIdx: number) => (
-                      <Card key={sIdx} className="p-3 border-blue-500/30">
-                        <div className="space-y-3">
-                          <input
-                            type="text"
-                            value={section.title}
-                            onChange={(e) => {
-                              const newSections = [...editPayload.sections]
-                              newSections[sIdx].title = e.target.value
-                              setEditPayload({ ...editPayload, sections: newSections })
-                            }}
-                            className="w-full px-2 py-1 border border-border rounded text-sm font-semibold bg-background"
-                            placeholder={`Section ${sIdx + 1} title...`}
-                          />
-                          <div className="space-y-2 ml-2">
-                            {section.items?.map((item: any, iIdx: number) => (
-                              <div key={iIdx} className="space-y-1 p-2 bg-muted/20 rounded">
-                                <input
-                                  type="text"
-                                  value={item.label}
-                                  onChange={(e) => {
-                                    const newSections = [...editPayload.sections]
-                                    newSections[sIdx].items[iIdx].label = e.target.value
-                                    setEditPayload({ ...editPayload, sections: newSections })
-                                  }}
-                                  className="w-full px-1 py-1 border border-border rounded text-xs bg-background"
-                                  placeholder="Item label..."
-                                />
-                                {item.description && (
-                                  <input
-                                    type="text"
-                                    value={item.description}
-                                    onChange={(e) => {
-                                      const newSections = [...editPayload.sections]
-                                      newSections[sIdx].items[iIdx].description = e.target.value
-                                      setEditPayload({ ...editPayload, sections: newSections })
-                                    }}
-                                    className="w-full px-1 py-1 border border-border rounded text-xs bg-background text-muted-foreground"
-                                    placeholder="Item description (optional)..."
-                                  />
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              </>
+              <ChecklistEditor
+                value={editPayload as GeneratedChecklist}
+                onChange={(updated) => setEditPayload(updated)}
+                editTabLabel="Edit Draft"
+              />
             )}
 
             <div className="flex gap-2 justify-end pt-2 border-t border-border">
@@ -714,147 +525,12 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           )}
 
           {asset.assetType === "checklist" && (
-            <div className="space-y-6">
-              {/* Checklist Statistics */}
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BarChart3 className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-                    <span className="text-xs font-semibold text-muted-foreground">Sections</span>
-                  </div>
-                  <p className="text-lg font-bold text-foreground">{getChecklistStats().sections}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ListTodo className="size-4 text-green-600 dark:text-green-400" aria-hidden="true" />
-                    <span className="text-xs font-semibold text-muted-foreground">Total Items</span>
-                  </div>
-                  <p className="text-lg font-bold text-foreground">{getChecklistStats().totalItems}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckSquare2 className="size-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-                    <span className="text-xs font-semibold text-muted-foreground">Required</span>
-                  </div>
-                  <p className="text-lg font-bold text-foreground">{getChecklistStats().requiredItems}</p>
-                </div>
-              </div>
-
-              {/* Malformed Data Alert */}
-              {getChecklistStats().malformed && (
-                <Card className="p-4 border-amber-500/30 bg-amber-500/5">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
-                    <div>
-                      <p className="font-semibold text-amber-900 dark:text-amber-100">Malformed Checklist Data</p>
-                      <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                        Some sections or items are missing expected fields. Edit the asset to correct the structure.
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Completion Criteria */}
-              {asset.payload.completionCriteria && asset.payload.completionCriteria.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-foreground">Completion Criteria</h3>
-                  <ul className="space-y-1">
-                    {asset.payload.completionCriteria.map((criterion, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="text-green-600 dark:text-green-400 font-bold mt-0.5">✓</span>
-                        <span>{criterion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Sections with Items */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-foreground">Checklist Sections</h3>
-                {asset.payload.sections && Array.isArray(asset.payload.sections) && asset.payload.sections.length > 0 ? (
-                  <div className="space-y-3">
-                    {asset.payload.sections.map((section, sIdx) => {
-                      const itemCount = Array.isArray(section?.items) ? section.items.length : 0
-                      const requiredCount = Array.isArray(section?.items) ? section.items.filter((item: any) => item?.required === true).length : 0
-                      return (
-                        <div key={sIdx} className="border border-border rounded-lg overflow-hidden">
-                          <div className="bg-muted/40 px-4 py-3 border-b border-border">
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="text-sm font-semibold text-foreground">{section?.title || `Section ${sIdx + 1}`}</h4>
-                              <div className="flex gap-2 text-xs">
-                                <span className="px-2 py-1 rounded bg-background text-muted-foreground">
-                                  {itemCount} item{itemCount !== 1 ? 's' : ''}
-                                </span>
-                                {requiredCount > 0 && (
-                                  <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300">
-                                    {requiredCount} required
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-4">
-                            {itemCount > 0 ? (
-                              <ul className="space-y-2">
-                                {section.items.map((item, iIdx) => (
-                                  <li key={iIdx} className="flex items-start gap-3 text-sm">
-                                    <div className="flex-shrink-0 mt-1">
-                                      <input
-                                        type="checkbox"
-                                        disabled
-                                        className="w-4 h-4 rounded border-border"
-                                        aria-label="Checklist item"
-                                      />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-baseline gap-2 flex-wrap">
-                                        <span className="text-foreground">{item?.label || '(untitled item)'}</span>
-                                        {item?.required && (
-                                          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                                            Required
-                                          </span>
-                                        )}
-                                      </div>
-                                      {item?.description && (
-                                        <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
-                                      )}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">No items in this section</p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <Card className="p-6 text-center border-dashed">
-                    <AlertCircle className="size-8 text-muted-foreground mx-auto mb-2 opacity-50" aria-hidden="true" />
-                    <p className="text-muted-foreground">No sections found in this checklist</p>
-                  </Card>
-                )}
-              </div>
-
-              {/* Assumptions */}
-              {asset.payload.assumptions && asset.payload.assumptions.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-foreground">Assumptions</h3>
-                  <ul className="space-y-1">
-                    {asset.payload.assumptions.map((assumption, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>{assumption}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <ChecklistEditor
+              value={asset.payload as GeneratedChecklist}
+              onChange={() => {}}
+              mode="preview"
+              showModeTabs={false}
+            />
           )}
         </div>
       </Card>
