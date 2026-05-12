@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { LandingHero } from "@/components/guideforge/landing/hero"
+import { IconConcepts } from "@/components/guideforge/landing/icon-concepts"
 import { WhatItBuilds } from "@/components/guideforge/landing/what-it-builds"
 import { HowItWorks } from "@/components/guideforge/landing/how-it-works"
 import { ExampleNetworks } from "@/components/guideforge/landing/example-networks"
@@ -11,6 +12,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-background">
       <SiteHeader />
       <LandingHero />
+      <IconConcepts />
       <WhatItBuilds />
       <HowItWorks />
       <ExampleNetworks />

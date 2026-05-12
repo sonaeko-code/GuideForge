@@ -60,33 +60,40 @@ export function AssetTypeSelector() {
       </div>
 
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight">Generate Structured Asset</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Create Structured Asset</h1>
         <p className="text-base text-muted-foreground">
-          Create a single asset draft. It saves to your workspace first — no network needed. You can edit, attach to a network later, or publish separately.
+          Choose an asset type to generate. Your draft saves to your workspace — then edit, refine, and reuse it.
         </p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2">
         {assetTypes.map((assetType) => {
           const isAvailable = assetType.status === "available"
+          const colorClasses = {
+            single_guide: "hover:border-amber-500/30 hover:bg-amber-500/5 dark:hover:bg-amber-950/20",
+            recipe: "hover:border-orange-500/30 hover:bg-orange-500/5 dark:hover:bg-orange-950/20",
+            checklist: "hover:border-blue-500/30 hover:bg-blue-500/5 dark:hover:bg-blue-950/20",
+            sop: "hover:border-slate-500/30 hover:bg-slate-500/5 dark:hover:bg-slate-950/20",
+            troubleshooting_flow: "hover:border-red-500/30 hover:bg-red-500/5 dark:hover:bg-red-950/20",
+          }
           return isAvailable ? (
             <Link
               key={assetType.id}
               href={`/builder/generate-asset/${assetType.id}`}
               className="block h-full"
             >
-              <Card className="h-full min-h-48 border border-border/50 hover:border-primary/50 transition-colors cursor-pointer hover:bg-accent/50">
+              <Card className={`h-full min-h-56 border border-border/50 transition-all cursor-pointer ${colorClasses[assetType.id as keyof typeof colorClasses] || ""}`}>
                 <div className="h-full p-6 flex flex-col">
                   {/* Asset Type Badge with Icon */}
-                  <div className="flex-shrink-0 mb-3">
+                  <div className="flex-shrink-0 mb-4">
                     <AssetTypeBadge assetType={assetType.id as StructuredAssetType} variant="large" />
                   </div>
                   {/* Description */}
-                  <p className="text-sm text-muted-foreground mt-2 flex-1 overflow-hidden break-words whitespace-normal">
+                  <p className="text-sm text-muted-foreground mt-2 flex-1 overflow-hidden break-words whitespace-normal leading-relaxed">
                     {assetType.description}
                   </p>
                   {/* Status Badge */}
-                  <div className="pt-3 mt-auto flex-shrink-0">
+                  <div className="pt-4 mt-auto flex-shrink-0">
                     <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
                       Available
                     </Badge>
@@ -97,19 +104,19 @@ export function AssetTypeSelector() {
           ) : (
             <Card
               key={assetType.id}
-              className="h-full min-h-48 border border-border/50 bg-muted/30 cursor-not-allowed"
+              className="h-full min-h-56 border border-border/50 bg-muted/30 cursor-not-allowed"
             >
               <div className="h-full p-6 flex flex-col">
                 {/* Asset Type Badge with Icon (muted for coming soon) */}
-                <div className="flex-shrink-0 mb-3 opacity-60">
+                <div className="flex-shrink-0 mb-4 opacity-50">
                   <AssetTypeBadge assetType={assetType.id as StructuredAssetType} variant="large" />
                 </div>
                 {/* Description */}
-                <p className="text-sm text-muted-foreground/80 mt-2 flex-1 overflow-hidden break-words whitespace-normal">
+                <p className="text-sm text-muted-foreground/80 mt-2 flex-1 overflow-hidden break-words whitespace-normal leading-relaxed">
                   {assetType.description}
                 </p>
                 {/* Status Badge */}
-                <div className="pt-3 mt-auto flex-shrink-0">
+                <div className="pt-4 mt-auto flex-shrink-0">
                   <Badge variant="secondary" className="text-xs">Coming soon</Badge>
                 </div>
               </div>
@@ -118,9 +125,9 @@ export function AssetTypeSelector() {
         })}
       </div>
 
-      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
-          <strong>How it works:</strong> Generate an asset draft → save to your workspace → review it → attach to a network or use separately. Only Single Guides are fully implemented now.
+      <Card className="p-4 border-amber-500/20 bg-amber-500/5">
+        <p className="text-sm text-amber-900 dark:text-amber-200">
+          <strong>How it works:</strong> Select an asset type → generate a draft → save to your workspace → edit and refine. Both Guides and Checklists are fully functional. Others are coming soon.
         </p>
       </Card>
     </div>

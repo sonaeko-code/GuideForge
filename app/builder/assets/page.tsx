@@ -239,36 +239,37 @@ export default function AssetsPage() {
                   </div>
                 </Card>
               ) : (
-                <Card className="p-4 border-border/50 hover:border-primary/50 transition-colors flex flex-col h-full">
+                <Card className="p-5 border-border/50 hover:border-primary/30 transition-all hover:shadow-sm flex flex-col h-full">
                   <div className="space-y-3 flex-1">
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-start justify-between gap-2 mb-2.5">
                         <AssetTypeBadge assetType={asset.assetType} variant="small" />
-                        <span className="text-xs text-muted-foreground">{new Date(asset.createdAt).toLocaleDateString()}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(asset.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <h3 className="font-semibold text-foreground line-clamp-2">{asset.title}</h3>
+                      <h3 className="font-semibold text-foreground line-clamp-2 mb-1">{asset.title}</h3>
                     </div>
                     {asset.summary && (
                       <p className="text-sm text-muted-foreground line-clamp-2">{asset.summary}</p>
                     )}
                   </div>
                   
-                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                  <div className="flex gap-2 mt-5 pt-4 border-t border-border/50">
                     <Button asChild variant="outline" size="sm" className="flex-1">
                       <Link href={`/builder/assets/${asset.id}`}>
-                        <Eye className="mr-2 size-4" aria-hidden="true" />
-                        View
+                        <Eye className="mr-1.5 size-4" aria-hidden="true" />
+                        <span className="hidden sm:inline">View</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" size="sm" className="flex-1">
                       <Link href={`/builder/assets/${asset.id}?edit=true`}>
-                        <Edit className="mr-2 size-4" aria-hidden="true" />
-                        Edit
+                        <Edit className="mr-1.5 size-4" aria-hidden="true" />
+                        <span className="hidden sm:inline">Edit</span>
                       </Link>
                     </Button>
                     <Button
-                      variant="destructive"
+                      variant="ghost"
                       size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => setDeleteConfirm(asset.id)}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -280,13 +281,16 @@ export default function AssetsPage() {
           ))}
         </div>
       ) : !setupError && !isFetching ? (
-        <Card className="p-12 text-center">
-          <div className="space-y-4">
-            <p className="text-lg font-semibold text-foreground">No asset drafts yet</p>
-            <p className="text-muted-foreground">
-              Create your first structured asset draft by generating one.
+        <Card className="p-12 text-center border-border/50 bg-muted/40">
+          <div className="space-y-4 max-w-md mx-auto">
+            <div className="flex justify-center mb-2">
+              <Plus className="size-12 text-muted-foreground/40" aria-hidden="true" />
+            </div>
+            <p className="text-lg font-semibold text-foreground">Start building your knowledge base</p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Create your first structured guide or checklist. Once saved, your drafts appear here ready to edit, refine, and reuse.
             </p>
-            <Button asChild>
+            <Button asChild className="mt-2">
               <Link href="/builder/generate-asset">
                 <Plus className="mr-2 size-4" aria-hidden="true" />
                 Generate Asset

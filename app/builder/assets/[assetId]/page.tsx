@@ -316,19 +316,24 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       </div>
 
       {/* Title and Metadata */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="space-y-4">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {asset && <AssetTypeBadge assetType={asset.assetType} variant="small" />}
           {asset?.payload?.generatedBy && (
             <Badge variant="secondary" className="text-xs">
               {asset.payload.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
             </Badge>
           )}
-          <span className="text-sm text-muted-foreground">Workspace Draft</span>
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Draft</span>
+          {asset?.createdAt && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              Created {new Date(asset.createdAt).toLocaleDateString()}
+            </span>
+          )}
         </div>
         
         {isEditMode ? (
-          <div className="space-y-3 border border-border rounded-lg p-4 bg-muted/30">
+          <div className="space-y-4 border border-border rounded-lg p-5 bg-muted/40">
             {/* Title/summary inputs are shown for non-single_guide assets.
                 For single_guide, SingleGuideEditor renders its own title/summary fields. */}
             {asset?.assetType !== "single_guide" && (
