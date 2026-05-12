@@ -34,6 +34,71 @@ async function getCurrentProfileId(): Promise<string> {
 }
 
 /**
+ * Normalize a network create payload to ensure required fields are valid.
+ * Protects against undefined, null, or invalid values from Smart Fill or manual entry.
+ * 
+ * Returns a safe, valid payload ready for database insert.
+ */
+export function normalizeNetworkCreatePayload(
+  draft: Partial<NetworkDraft & { slug: string; primaryColor: string; theme?: string }>
+): {
+  valid: boolean
+  normalized: Record<string, any>
+  errors: string[]
+} {
+  const errors: string[] = []
+  const normalized: Record<string, any> = {}
+
+  // Validate name
+  if (!draft.name || typeof draft.name !== "string" || !draft.name.trim()) {
+    errors.push("Network name is required and must be a non-empty string")
+  } else {
+    normalized.name = draft.name.trim()
+  }
+
+  // Validate slug
+  if (!draft.slug || typeof draft.slug !== "string" || !draft.slug.trim()) {
+    errors.push("Network slug/subdomain is required and must be a non-empty string")
+  } else {
+    normalized.slug = draft.slug.trim()
+  }
+
+  // Validate and normalize type
+  const validTypes = ["gaming", "repair", "sop", "creator", "training", "community"]
+  if (!draft.type || !validTypes.includes(draft.type)) {
+    errors.push(`Invalid network type: ${draft.type}. Must be one of: ${validTypes.join(", ")}`)
+    normalized.type = "gaming" // Safe fallback
+  } else {
+    normalized.type = draft.type
+  }
+
+  // Validate and normalize theme
+  const validThemes = ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"]
+  if (!draft.theme || !validThemes.includes(draft.theme)) {
+    normalized.theme = "parchment" // Safe fallback
+  } else {
+    normalized.theme = draft.theme
+  }
+
+  // Description (optional, safe string default)
+  normalized.description = draft.description && typeof draft.description === "string" 
+    ? draft.description.trim() 
+    : ""
+
+  // Visibility
+  normalized.is_public = draft.visibility === "public"
+
+  // Primary color
+  normalized.primary_color = draft.primaryColor || "#6366f1"
+
+  return {
+    valid: errors.length === 0,
+    normalized,
+    errors,
+  }
+}
+
+/**
  * Normalize a raw Supabase network row to the Network type
  * Maps snake_case columns to camelCase properties
  * Handles Ownership Phase 2: owner_user_id → ownerUserId
@@ -45,9 +110,14 @@ function normalizeNetwork(row: any): Network {
     name: row.name,
     description: row.description,
     type: row.type,
-    visibility: row.visibility,
+    visibility: row.is_public ? "public" : (row.visibility || "private"),
     domain: row.domain,
-    branding: row.branding,
+    branding: {
+      primaryColor: row.primary_color || "#6366f1",
+      accentColor: row.accent_color,
+      theme: row.theme || "parchment",
+      logoUrl: row.logo_url,
+    },
     forgeRuleIds: row.forgeRuleIds || [],
     hubIds: row.hubIds || [],
     createdAt: row.created_at || row.createdAt,
@@ -117,7 +187,7 @@ async function normalizeNetworkIdForSupabase(networkId: string): Promise<string 
  * Create a new network
  */
 export async function createNetwork(
-  draft: NetworkDraft & { slug: string; primaryColor: string }
+  draft: NetworkDraft & { slug: string; primaryColor: string; theme?: string }
 ): Promise<{ network: Network; source: "supabase" | "local"; error?: string }> {
   if (!isSupabaseConfigured()) {
     console.log("[v0] Supabase not configured, using localStorage fallback for network creation")
@@ -125,27 +195,47 @@ export async function createNetwork(
   }
 
   try {
+    // Validate required fields before save
+    if (!draft.name || !draft.name.trim()) {
+      throw new Error("Network name is required")
+    }
+    if (!draft.slug || !draft.slug.trim()) {
+      throw new Error("Network slug/subdomain is required")
+    }
+    if (!draft.type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(draft.type)) {
+      console.warn("[v0] Invalid network type:", draft.type, "— defaulting to 'gaming'")
+      // Fallback to valid type if invalid provided
+      draft.type = "gaming"
+    }
+
     const profileId = await getCurrentProfileId()
     
-    // Only include schema-supported fields. Do NOT include UI-only fields.
-    // The networks table only has: id, slug, name, description, created_at, updated_at, owner_user_id
-    // All other fields (theme, visibility, branding, etc) are UI-only and stored in app state
+    // Map UI theme to database columns, with safe fallback
+    const normalizedTheme = draft.theme && ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(draft.theme) 
+      ? draft.theme 
+      : "parchment"
+
     const networkData: Record<string, any> = {
-      slug: draft.slug,
-      name: draft.name,
-      description: draft.description,
+      slug: draft.slug.trim(),
+      name: draft.name.trim(),
+      description: draft.description || "",
+      type: draft.type,
+      is_public: draft.visibility === "public",
+      primary_color: draft.primaryColor || "#6366f1",
+      theme: normalizedTheme,
     }
 
     // Ownership Phase 2: Include owner_user_id if user is logged in
     // If profileId is DEV_PROFILE_ID (no real user session), omit owner_user_id to save as null
     if (profileId !== DEV_PROFILE_ID) {
-      networkData.owner_user_id = profileId
-      console.log("[v0] Network save with owner_user_id:", profileId)
+      networkData.owner_id = profileId
+      console.log("[v0] Network save with owner_id:", profileId)
     } else {
       console.log("[v0] Network save without owner (signed out or mock)")
     }
 
     console.log("[v0] Network save payload:", networkData)
+    console.log("[v0] Network save validation: type=", networkData.type, "slug=", networkData.slug, "theme=", networkData.theme)
 
     const { data, error } = await supabase
       .from("networks")
@@ -154,11 +244,11 @@ export async function createNetwork(
       .single()
 
     if (error) {
-      console.error("[v0] Network save error:", error.message)
+      console.error("[v0] Network save error:", error.message, error.code)
       return { network: {} as Network, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Network saved:", data.id, "owner:", data.owner_user_id || "null")
+    console.log("[v0] Network saved:", data.id, "type:", data.type, "theme:", data.theme, "owner:", data.owner_id || "null")
     // Normalize snake_case Supabase columns to camelCase Network type
     return { network: normalizeNetwork(data), source: "supabase" }
   } catch (err) {

@@ -17,6 +17,8 @@ import {
 } from "@/lib/guideforge/supabase-networks"
 import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
 import { QUESTLINE_NETWORK, getHubsByNetwork, MOCK_GUIDES } from "@/lib/guideforge/mock-data"
+import { getNetworkTheme } from "@/lib/guideforge/network-themes"
+import type { ThemeDirection } from "@/lib/guideforge/types"
 
 export default async function PublicNetworkPage({
   params,
@@ -66,6 +68,10 @@ export default async function PublicNetworkPage({
     }
   }
 
+  // Resolve network theme — safe fallback to neutral
+  const themeId = (network.branding?.theme ?? "neutral") as ThemeDirection
+  const theme = getNetworkTheme(themeId)
+
   // Derive featured sections
   const featured = allPublishedGuides.find(g => g.verification === "forge-verified") ?? allPublishedGuides[0]
   const featuredHub = featured ? hubs.find(h => h.id === featured.hubId) : undefined
@@ -81,12 +87,12 @@ export default async function PublicNetworkPage({
     <main className="min-h-screen bg-background">
       <QuestLineHeader />
 
-      {/* MASTHEAD */}
-      <section className="border-b border-foreground/15">
+      {/* MASTHEAD — themed by network.branding.theme */}
+      <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
         <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
           <div className="space-y-6">
             <div>
-              <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground mb-4">
+              <div className={`flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] mb-4 ${theme.accentClasses}`}>
                 <span>Guide Network</span>
                 <span aria-hidden>—</span>
                 <span>{hubs.length} hubs</span>
@@ -100,27 +106,27 @@ export default async function PublicNetworkPage({
             </div>
 
             {/* Masthead stats */}
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 border-t border-foreground/15 pt-6">
+            <dl className={`grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 border-t ${theme.borderClasses} pt-6`}>
               <div>
-                <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
                   Hubs
                 </dt>
                 <dd className="mt-1 text-2xl font-bold">{hubs.length}</dd>
               </div>
               <div>
-                <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
                   Verified guides
                 </dt>
                 <dd className="mt-1 text-2xl font-bold">{forgedGuides.length}</dd>
               </div>
               <div>
-                <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
                   Total published
                 </dt>
                 <dd className="mt-1 text-2xl font-bold">{allPublishedGuides.length}</dd>
               </div>
               <div>
-                <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
                   Collections
                 </dt>
                 <dd className="mt-1 text-2xl font-bold">{allCollections.length}</dd>
@@ -196,7 +202,7 @@ export default async function PublicNetworkPage({
           </div>
         </section>
       ) : (
-        <section className="border-b border-foreground/15 bg-muted/20">
+        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Explore" title="Available hubs" />
             <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -243,7 +249,7 @@ export default async function PublicNetworkPage({
 
       {/* BEGINNER GUIDES */}
       {beginnerGuides.length > 0 && (
-        <section className="border-b border-foreground/15 bg-muted/20">
+        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading
               eyebrow="Start here"
@@ -279,12 +285,12 @@ export default async function PublicNetworkPage({
                   <Link
                     key={guide.id}
                     href={`/n/${networkSlug}/${hub?.slug || ""}/${guide.slug}`}
-                    className="group flex flex-col rounded-lg border border-primary/30 bg-primary/5 p-5 transition-colors hover:bg-primary/10 h-full"
+                    className={`group flex flex-col rounded-lg border p-5 transition-colors h-full ${theme.cardClasses} ${theme.borderClasses} hover:opacity-90`}
                   >
                     <div className="mb-3 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider">
-                      <span className="text-primary">Verified</span>
+                      <span className={theme.accentClasses}>Verified</span>
                     </div>
-                    <h4 className="line-clamp-2 text-base font-bold leading-snug transition-colors group-hover:text-primary">
+                    <h4 className={`line-clamp-2 text-base font-bold leading-snug transition-colors group-hover:${theme.accentClasses}`}>
                       {guide.title}
                     </h4>
                     <p className="mt-2 line-clamp-3 flex-1 text-xs leading-relaxed text-muted-foreground">

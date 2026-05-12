@@ -29,6 +29,12 @@
 export const DEFAULT_CHECKLIST_MODEL = "gpt-4o-mini"
 
 /**
+ * Default AI model for single guide generation.
+ * Uses the same model as checklist for consistency and cost efficiency.
+ */
+export const DEFAULT_SINGLE_GUIDE_MODEL = "gpt-4o-mini"
+
+/**
  * AI generation temperature (creativity/randomness).
  * 0.3 provides deterministic, reliable output suitable for structured JSON generation.
  * Lower values (0.0-0.5) produce more predictable, repeatable results.

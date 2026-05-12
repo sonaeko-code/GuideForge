@@ -53,3 +53,20 @@ export interface ChecklistGenerationRequest {
 }
 
 export interface ChecklistGenerationResponse extends AIGenerationResponse<GeneratedChecklist> {}
+
+// ========== Single Guide-Specific Types ==========
+
+export interface SingleGuideGenerationRequest {
+  title: string
+  audience: string
+  purpose: string
+  goal?: string
+  useCase?: string
+  tone: string
+  difficulty: string
+  guideType: string
+  numberOfSteps: number
+  hasWarnings: boolean
+  hasPrerequisites: boolean
+  optionalContext?: string
+}

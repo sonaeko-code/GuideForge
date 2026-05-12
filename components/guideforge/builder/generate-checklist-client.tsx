@@ -15,6 +15,7 @@ import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
+import { AIIntakeLadder } from "./ai-intake-ladder"
 
 /**
  * Checklist client component with pending proposal restore support.
@@ -115,6 +116,30 @@ export function GenerateChecklistClient() {
 
   const handleFieldChange = (field: keyof ChecklistIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
+    setError(null)
+  }
+
+  /**
+   * Called by AIIntakeLadder (Quick Fill or Smart Fill) to merge detected
+   * fields into the checklist form state. Numeric fields are clamped to the
+   * form's own validation limits so the generate button never receives
+   * out-of-range values.
+   */
+  const handleApplyIntakeLadderFields = (fields: Partial<ChecklistIntakeRequest>) => {
+    setFormState((prev) => ({
+      ...prev,
+      ...fields,
+      // Clamp to safe generation defaults (max 5 sections, max 5 items per section).
+      // The user can still manually increase these in the form after filling.
+      numberOfSections:
+        fields.numberOfSections !== undefined
+          ? Math.max(1, Math.min(5, Number(fields.numberOfSections)))
+          : prev.numberOfSections,
+      itemsPerSection:
+        fields.itemsPerSection !== undefined
+          ? Math.max(1, Math.min(5, Number(fields.itemsPerSection)))
+          : prev.itemsPerSection,
+    }))
     setError(null)
   }
 
@@ -280,6 +305,14 @@ export function GenerateChecklistClient() {
         )}
       </div>
 
+      {/* AI Intake Ladder — Smart Fill / Quick Fill */}
+      <AIIntakeLadder
+        assetType="checklist"
+        onApplyFields={(fields) =>
+          handleApplyIntakeLadderFields(fields as Partial<ChecklistIntakeRequest>)
+        }
+      />
+
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -339,7 +372,7 @@ export function GenerateChecklistClient() {
           {provider === "ai" && (
             <Card className="border-amber-500/30 bg-amber-500/5 p-2">
               <p className="text-xs text-amber-700 dark:text-amber-300">
-                Requires OPENAI_API_KEY. If not configured, generation will fail with a clear error.
+                AI generation may take 10&ndash;25 seconds. If generation fails, try a smaller checklist or use Mock Preview.
               </p>
             </Card>
           )}

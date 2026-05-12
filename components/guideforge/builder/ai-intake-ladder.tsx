@@ -116,9 +116,15 @@ function parseRoughIdea(text: string): Record<string, string | number | boolean>
     result.hasPrerequisites = true
   }
 
-  // 11. DETERMINE NUMBER OF STEPS
+  // 11. DETERMINE NUMBER OF STEPS (single guide)
   const numberOfSteps = determineNumberOfSteps(lowerText, result.difficulty as string)
   if (numberOfSteps) result.numberOfSteps = numberOfSteps
+
+  // 12. INFER CHECKLIST STRUCTURE - numberOfSections and itemsPerSection
+  const sections = inferNumberOfSections(lowerText)
+  if (sections) result.numberOfSections = sections
+  const items = inferItemsPerSection(lowerText)
+  if (items) result.itemsPerSection = items
 
   return result
 }
@@ -134,17 +140,26 @@ function extractTitle(text: string, useCase?: string | null): string | null {
   const firstLine = lines[0]
   if (!firstLine) return null
 
-  // Pattern for "A [adjective] guide for [audience] on [topic]" or similar
+  // Pattern for "A [adjective] guide/checklist for [audience] on [topic]" or similar
   // Extract just the [topic] part and title-case it
-  const guideOnMatch = firstLine.match(/(?:guide|tutorial)\s+(?:for\s+[^o]+\s+)?on\s+([^.!?]+)/i)
+  const guideOnMatch = firstLine.match(/(?:guide|tutorial|checklist)\s+(?:for\s+[^o]+\s+)?on\s+([^.!?]+)/i)
   if (guideOnMatch) {
     let topic = guideOnMatch[1].trim()
     return titleCaseGuideTitle(topic)
   }
 
-  // Fallback: strip common guide/tutorial prefixes
+  // Pattern for "A checklist for [topic]" — capture the topic after "for"
+  const checklistForMatch = firstLine.match(/^a\s+(?:\w+\s+)?checklist\s+for\s+([^.!?,]+)/i)
+  if (checklistForMatch) {
+    const topic = checklistForMatch[1].trim()
+    if (topic.length > 3 && topic.length < 100) {
+      return titleCaseGuideTitle(topic) + " Checklist"
+    }
+  }
+
+  // Fallback: strip common guide/tutorial/checklist prefixes
   let cleanedTitle = firstLine
-    .replace(/^a\s+(?:beginner-?friendly\s+)?(?:technical\s+)?guide\s+(?:for|on|to)\s+/i, "")
+    .replace(/^a\s+(?:beginner-?friendly\s+)?(?:technical\s+)?(?:practical\s+)?(?:guide|checklist)\s+(?:for|on|to)\s+/i, "")
     .replace(/^a\s+tutorial\s+(?:on|for|to)\s+/i, "")
     .replace(/^how\s+to\s+/i, "")
     .replace(/^tutorial\s+on\s+/i, "")
@@ -453,6 +468,55 @@ function detectGuideType(lowerText: string): string | null {
   if (lowerText.includes("tutorial") || lowerText.includes("step-by-step")) return "tutorial"
   if (lowerText.includes("reference")) return "reference"
   if (lowerText.includes("troubleshoot") || lowerText.includes("why")) return "explanation"
+
+  return null
+}
+
+/**
+ * Infer number of checklist sections from explicit counts or topic list length.
+ * Defaults conservatively: topic-list inference caps at 5.
+ * Only an explicit user-stated count of 6+ is allowed to exceed 5.
+ */
+function inferNumberOfSections(lowerText: string): number | null {
+  // Explicit section count stated by the user (e.g. "6 sections", "8 sections")
+  const explicitMatch = lowerText.match(/(\d+)\s*sections?/i)
+  if (explicitMatch) {
+    const n = parseInt(explicitMatch[1])
+    // Honour explicit requests for 6+ but keep a hard ceiling
+    return Math.max(2, Math.min(8, n))
+  }
+
+  // Count comma-separated topics in "confirm/include/cover/help them" lists.
+  // Cap at 5 regardless of how many topics are listed — a long topic list is
+  // not a signal the user wants more than 5 sections; topics become items, not
+  // sections.
+  const topicListMatch = lowerText.match(
+    /(?:confirm|include|cover|sections?:?|covering|help\s+them)\s+([^.!?]{10,200})/i
+  )
+  if (topicListMatch) {
+    const topics = topicListMatch[1].split(/,|and\s+/).filter((t) => t.trim().length > 2)
+    if (topics.length >= 3) {
+      return Math.max(2, Math.min(5, Math.ceil(topics.length / 1.5)))
+    }
+  }
+
+  return null
+}
+
+/**
+ * Infer items per section from explicit counts or detail density keywords.
+ * Caps at 5 for density keywords to stay generation-safe.
+ */
+function inferItemsPerSection(lowerText: string): number | null {
+  const explicitMatch = lowerText.match(/(\d+)\s*items?\s*(?:per|each)/i)
+  if (explicitMatch) {
+    const n = parseInt(explicitMatch[1])
+    // Honour explicit requests but keep a safe ceiling
+    return Math.max(3, Math.min(8, n))
+  }
+
+  if (lowerText.includes("detailed") || lowerText.includes("thorough") || lowerText.includes("comprehensive")) return 5
+  if (lowerText.includes("quick") || lowerText.includes("minimal") || lowerText.includes("concise")) return 3
 
   return null
 }

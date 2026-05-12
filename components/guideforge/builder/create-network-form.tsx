@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Sparkles, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Check, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -27,12 +27,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
 import { createNetwork } from "@/lib/guideforge/supabase-networks"
 import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
 import { getScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
+import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
+import { smartFillNetwork } from "@/lib/guideforge/smart-fill-network"
 import type {
   NetworkType,
   ThemeDirection,
@@ -43,7 +47,6 @@ interface CreateNetworkFormProps {
   initialType: NetworkType
 }
 
-// Map network types to scaffold template IDs
 const SCAFFOLD_TEMPLATE_MAP: Partial<Record<NetworkType, string>> = {
   gaming: "gaming",
   repair: "repair",
@@ -58,17 +61,6 @@ const NETWORK_TYPE_LABEL: Record<NetworkType, string> = {
   training: "Training Library",
   community: "Community Knowledge Base",
 }
-
-const THEME_OPTIONS: { value: ThemeDirection; label: string; hint: string }[] =
-  [
-    { value: "parchment", label: "Parchment", hint: "Warm cream + graphite, calm and crafted" },
-    { value: "copper", label: "Copper", hint: "Muted copper accent on warm neutrals" },
-    { value: "neutral", label: "Neutral", hint: "Brand-agnostic baseline" },
-    { value: "industrial", label: "Industrial", hint: "Repair / SOP feel" },
-    { value: "soft", label: "Soft", hint: "Creator and training networks" },
-    { value: "arcane", label: "Arcane", hint: "Cool slate with violet edges" },
-    { value: "ember", label: "Ember", hint: "Warm amber, gaming-leaning" },
-  ]
 
 const DEFAULTS_BY_TYPE: Record<
   NetworkType,
@@ -142,8 +134,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [domainPrefix, setDomainPrefix] = useState(defaults.slug)
   const [domainPrefixManuallyEdited, setDomainPrefixManuallyEdited] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [autofilled, setAutofilled] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [roughIdea, setRoughIdea] = useState("")
 
   // Compute current scaffold template based on current type (not initialType)
   const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
@@ -164,7 +156,42 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setTheme(draft.themeDirection)
     setDomainPrefix(draft.subdomainSuggestion)
     setDomainPrefixManuallyEdited(false)
-    setAutofilled(true)
+  }
+
+  function handleSmartFill() {
+    if (!roughIdea.trim()) {
+      setError("Please describe your network idea")
+      return
+    }
+
+    const result = smartFillNetwork(roughIdea)
+    if (result.success) {
+      // Smart Fill: merge results, preserving manual selections for invalid Smart Fill outputs
+      // Only update fields where Smart Fill provided meaningful values
+      if (result.name && result.name.trim()) {
+        setName(result.name)
+      }
+      if (result.description && result.description.trim()) {
+        setDescription(result.description)
+      }
+      // Preserve manual type if Smart Fill didn't return valid one
+      if (result.type && ["gaming", "repair", "sop", "creator", "training", "community"].includes(result.type)) {
+        setType(result.type)
+      }
+      // Preserve manual theme if Smart Fill didn't return valid one
+      if (result.theme && ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(result.theme)) {
+        setTheme(result.theme)
+      }
+      if (result.slug && result.slug.trim()) {
+        setDomainPrefix(result.slug)
+        setDomainPrefixManuallyEdited(false)
+      }
+      setRoughIdea("")
+      setError(null)
+      console.log("[v0] Smart Fill Network: Applied results", { type: result.type, theme: result.theme, name: result.name })
+    } else {
+      setError("Could not parse your idea. Try being more specific.")
+    }
   }
 
   function handleTypeChange(newType: NetworkType) {
@@ -197,6 +224,22 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setError(null)
 
     try {
+      // Validate required fields before save
+      if (!name.trim()) {
+        throw new Error("Network name is required")
+      }
+      if (!slug.trim()) {
+        throw new Error("Subdomain is required")
+      }
+      if (!type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(type)) {
+        throw new Error(`Invalid network type: ${type}. Using default 'gaming'.`)
+      }
+      if (!theme || !["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(theme)) {
+        throw new Error(`Invalid theme: ${theme}. Using default 'parchment'.`)
+      }
+
+      console.log("[v0] CreateNetworkForm: Pre-save validation:", { name, type, theme, slug })
+
       // Check if this is a scaffold type
       if (currentScaffoldId) {
         if (!scaffoldTemplate) {
@@ -224,7 +267,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         router.push(`/builder/network/${result.network.id}/dashboard`)
       } else {
         // Create blank network for non-scaffold types
-        console.log("[v0] CreateNetworkForm: Creating blank network:", { name, type, slug })
+        console.log("[v0] CreateNetworkForm: Creating blank network:", { name, type, slug, theme })
 
         const { network, error: createError } = await createNetwork({
           name,
@@ -267,21 +310,43 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
       {step === "configure" && (
         <>
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">Autofill with GuideForge:</span> Generate a network draft with starter name and theme based on your network type. <span className="text-xs text-muted-foreground">Mock generation — no credits used.</span>
+          {/* Smart Fill Panel — always visible, primary flow */}
+          <Card className="p-5 border-amber-500/30 bg-amber-500/5">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-1">Start with a rough idea</p>
+                <p className="text-xs text-muted-foreground">
+                  Describe the network you want to build and GuideForge will fill in the name, type, theme, hubs, and slug.
                 </p>
               </div>
-              {autofilled && (
-                <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-              )}
+              <Textarea
+                value={roughIdea}
+                onChange={(e) => setRoughIdea(e.target.value)}
+                placeholder={`e.g. "A gaming guide network for a survival RPG — beginner guides, crafting, builds, boss fights, patch notes, and community strategies."`}
+                rows={3}
+                className="text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleSmartFill()
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleAutofill}
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                >
+                  Quick Example
+                </button>
+                <Button type="button" size="sm" onClick={handleSmartFill} className="gap-1.5">
+                  <Zap className="size-3.5" aria-hidden="true" />
+                  Smart Fill Network
+                </Button>
+              </div>
             </div>
-            {autofilled && (
-              <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Network draft generated. You can edit anything before continuing.</p>
-            )}
-          </div>
+          </Card>
 
           <SectionCard title="Network basics" description="Name your network and tell readers what it covers.">
             <FieldGroup>
@@ -339,27 +404,91 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
           <SectionCard
             title="Theme and visibility"
-            description="Pick a starting theme. You can fully customize branding later."
+            description="Pick a starting theme. Visual themes help personalize your network's identity. You can fully customize branding later."
           >
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="network-theme">Theme direction</FieldLabel>
-                <Select
-                  value={theme}
-                  onValueChange={(value) => setTheme(value as ThemeDirection)}
-                >
-                  <SelectTrigger id="network-theme">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {THEME_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label} — {opt.hint}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FieldDescription className="mb-4">
+                  Select a visual direction for your network. Each theme has its own color palette and styling. The preview below updates as you select.
+                </FieldDescription>
+                
+                {/* Visual Theme Cards */}
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mb-6">
+                  {getAllNetworkThemes().map((themeOption) => (
+                    <button
+                      key={themeOption.id}
+                      type="button"
+                      onClick={() => setTheme(themeOption.id)}
+                      className={`group relative rounded-lg p-3 border-2 transition-all ${
+                        theme === themeOption.id
+                          ? `border-foreground ${themeOption.borderClasses} ${themeOption.bgClasses}`
+                          : "border-border/50 hover:border-foreground/30"
+                      }`}
+                    >
+                      {/* Preview background */}
+                      <div className={`absolute inset-0 rounded-lg ${themeOption.previewClasses} opacity-40 group-hover:opacity-60 transition-opacity`} />
+                      
+                      {/* Content */}
+                      <div className="relative flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-foreground">{themeOption.label}</h4>
+                          {theme === themeOption.id && (
+                            <Check className="size-4 text-foreground flex-shrink-0" aria-hidden="true" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground text-left">{themeOption.hint}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </Field>
+
+              {/* Theme Preview Panel */}
+              <div className="mt-6 p-4 rounded-lg border border-border/50 overflow-hidden">
+                {(() => {
+                  const selectedTheme = getAllNetworkThemes().find((t) => t.id === theme)
+                  if (!selectedTheme) return null
+                  
+                  return (
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Theme Preview</h4>
+                      
+                      {/* Sample Network Header */}
+                      <div className={`rounded-md p-4 ${selectedTheme.previewClasses} ${selectedTheme.borderClasses} border`}>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full ${selectedTheme.bgClasses} border ${selectedTheme.borderClasses}`} />
+                            <div>
+                              <p className={`text-sm font-bold ${selectedTheme.accentClasses}`}>{name || "Network Name"}</p>
+                              <p className="text-xs text-muted-foreground">Sample network header</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sample Cards */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Hub Card */}
+                        <div className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}>
+                          <p className="text-xs font-semibold text-foreground mb-1">Sample Hub</p>
+                          <p className={`text-xs ${selectedTheme.accentClasses}`}>3 Collections</p>
+                        </div>
+                        
+                        {/* Guide Card */}
+                        <div className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}>
+                          <p className="text-xs font-semibold text-foreground mb-1">Sample Guide</p>
+                          <Badge className={`text-xs ${selectedTheme.badgeClasses}`}>Draft</Badge>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Best for:</strong> {selectedTheme.bestFor.join(", ")}
+                      </p>
+                    </div>
+                  )
+                })()}
+              </div>
 
               <Field orientation="horizontal">
                 <FieldContent>
@@ -420,42 +549,52 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         </>
       )}
 
-      {step === "preview" && scaffoldTemplate && (
-        <>
-          <SectionCard title="Preview your scaffold" description="Review the network, hubs, and collections that will be created.">
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground mb-1">Network</p>
-                <p className="text-sm text-muted-foreground">{name}</p>
-                <p className="text-xs text-muted-foreground mt-1">Subdomain: <span className="font-mono">{slug}</span></p>
-              </div>
-              <div className="pt-2 border-t">
-                <p className="text-sm font-semibold text-foreground mb-3">Hubs and Collections</p>
-                <div className="space-y-3">
-                  {scaffoldTemplate.hubs.map((hubGroup, hubIdx) => (
-                    <div key={hubIdx} className="pl-2">
-                      <p className="text-sm font-medium text-foreground">{hubGroup.hub.name}</p>
-                      <ul className="mt-1 space-y-1">
-                        {hubGroup.collections.map((collection, colIdx) => (
-                          <li key={colIdx} className="text-sm text-muted-foreground ml-2">
-                            • {collection.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Will create: <strong>{scaffoldTemplate.hubs.length}</strong> hubs and{" "}
-                  <strong>{scaffoldTemplate.hubs.reduce((sum, h) => sum + h.collections.length, 0)}</strong> collections
+      {step === "preview" && scaffoldTemplate && (() => {
+        const previewTheme = getNetworkTheme(theme)
+        return (
+          <>
+            {/* Themed scaffold preview — matches what the created network page will look like */}
+            <div className={`rounded-xl border p-6 ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                Scaffold Preview
+              </p>
+
+              {/* Network header mock */}
+              <div className={`rounded-lg p-4 mb-4 ${previewTheme.previewClasses} border ${previewTheme.borderClasses}`}>
+                <p className={`text-lg font-black tracking-tight ${previewTheme.accentClasses}`}>{name || "Network Name"}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {slug}.guideforge.app
                 </p>
               </div>
+
+              {/* Hub list */}
+              <div className="space-y-2 mb-4">
+                {scaffoldTemplate.hubs.map((hubGroup, hubIdx) => (
+                  <div key={hubIdx} className={`rounded-md p-3 border ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
+                    <p className={`text-sm font-semibold ${previewTheme.accentClasses}`}>{hubGroup.hub.name}</p>
+                    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                      {hubGroup.collections.map((collection, colIdx) => (
+                        <li key={colIdx}>
+                          <span className={`inline-block rounded px-2 py-0.5 text-xs ${previewTheme.badgeClasses}`}>
+                            {collection.name}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Will create:{" "}
+                <strong>{scaffoldTemplate.hubs.length}</strong> hubs and{" "}
+                <strong>{scaffoldTemplate.hubs.reduce((sum, h) => sum + h.collections.length, 0)}</strong> collections
+                {" · "}Theme: <strong>{previewTheme.label}</strong>
+              </p>
             </div>
-          </SectionCard>
-        </>
-      )}
+          </>
+        )
+      })()}
 
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button asChild variant="ghost" type="button">
@@ -467,10 +606,6 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         <div className="flex gap-2">
           {step === "configure" && (
             <>
-              <Button type="button" size="lg" variant="secondary" className="gap-2" onClick={handleAutofill} disabled={submitting}>
-                <Sparkles className="size-4" aria-hidden="true" />
-                Autofill Network
-              </Button>
               <Button type="button" size="lg" className="gap-2" onClick={handleContinueToPreview} disabled={submitting || !name.trim()}>
                 {scaffoldTemplate ? "Preview Scaffold" : "Continue"}
                 <ArrowRight className="size-4" aria-hidden="true" />
