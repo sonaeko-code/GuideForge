@@ -171,16 +171,6 @@ export function getThemesForNetworkType(networkType: string): NetworkTheme[] {
 }
 
 /**
- * Get a theme by ID with safe fallback
- */
-export function getNetworkTheme(themeId: string | undefined): NetworkTheme | null {
-  if (!themeId || !(themeId in NETWORK_THEMES)) {
-    return NETWORK_THEMES.parchment
-  }
-  return NETWORK_THEMES[themeId as ThemeDirection]
-}
-
-/**
  * Normalize and validate a theme ID, with fallback to default
  */
 export function normalizeThemeId(themeId: string | undefined): ThemeDirection {
