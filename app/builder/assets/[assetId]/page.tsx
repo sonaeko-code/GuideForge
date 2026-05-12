@@ -12,6 +12,7 @@ import { getAssetDraft, updateAssetDraft, deleteAssetDraft } from "@/lib/guidefo
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import type { GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { SingleGuideEditor } from "@/components/guideforge/builder/single-guide-editor"
+import { AssetTypeBadge } from "@/components/guideforge/builder/asset-type-badge"
 
 interface AssetDetailPageProps {
   params: Promise<{ assetId: string }>
@@ -81,19 +82,6 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
     fetchAsset()
   }, [isAuthenticated, isLoading, assetId])
 
-  const getAssetTypeName = (): string => {
-    if (!asset) return ""
-    const names: Record<string, string> = {
-      single_guide: "Guide",
-      recipe: "Recipe",
-      checklist: "Checklist",
-      sop: "SOP / Procedure",
-      troubleshooting_flow: "Troubleshooting Flow",
-    }
-    return names[asset.assetType] || asset.assetType
-  }
-
-  // Calculate checklist statistics
   const getChecklistStats = (): { sections: number; totalItems: number; requiredItems: number; malformed: boolean } => {
     if (asset?.assetType !== "checklist" || !asset.payload) {
       return { sections: 0, totalItems: 0, requiredItems: 0, malformed: false }
@@ -366,7 +354,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       {/* Title and Metadata */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline">{getAssetTypeName()}</Badge>
+          {asset && <AssetTypeBadge assetType={asset.assetType} variant="small" />}
           {asset?.payload?.generatedBy && (
             <Badge variant="secondary" className="text-xs">
               {asset.payload.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}

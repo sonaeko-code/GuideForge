@@ -5,10 +5,10 @@ import Link from "next/link"
 import { ArrowLeft, Plus, AlertCircle, Loader2, Trash2, Eye, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
 import { listMyAssetDrafts, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
+import { AssetTypeBadge } from "@/components/guideforge/builder/asset-type-badge"
 
 export default function AssetsPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
@@ -44,17 +44,6 @@ export default function AssetsPage() {
 
     fetchAssets()
   }, [isAuthenticated, isLoading])
-
-  const getAssetTypeName = (type: string): string => {
-    const names: Record<string, string> = {
-      single_guide: "Guide",
-      recipe: "Recipe",
-      checklist: "Checklist",
-      sop: "SOP / Procedure",
-      troubleshooting_flow: "Troubleshooting Flow",
-    }
-    return names[type] || type
-  }
 
   const handleDeleteAsset = async (assetId: string) => {
     setIsDeleting(true)
@@ -253,8 +242,8 @@ export default function AssetsPage() {
                 <Card className="p-4 border-border/50 hover:border-primary/50 transition-colors flex flex-col h-full">
                   <div className="space-y-3 flex-1">
                     <div>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <Badge variant="outline" className="text-xs">{getAssetTypeName(asset.assetType)}</Badge>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <AssetTypeBadge assetType={asset.assetType} variant="small" />
                         <span className="text-xs text-muted-foreground">{new Date(asset.createdAt).toLocaleDateString()}</span>
                       </div>
                       <h3 className="font-semibold text-foreground line-clamp-2">{asset.title}</h3>
