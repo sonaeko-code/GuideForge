@@ -463,33 +463,38 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       </div>
 
       {/* Checklist Summary Card */}
-      {asset.assetType === "checklist" && (
-        <Card className="p-6 border-blue-500/20 bg-blue-500/5">
-          <div className="space-y-4">
-            <h2 className="text-base font-semibold text-foreground">Checklist Overview</h2>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1">Sections</p>
-                <p className="text-2xl font-bold text-foreground">{getChecklistStats().sections}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1">Total Items</p>
-                <p className="text-2xl font-bold text-foreground">{getChecklistStats().totalItems}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1">Required Items</p>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{getChecklistStats().requiredItems}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground mb-1">Source</p>
-                <p className="text-sm font-medium capitalize">
-                  {asset?.payload?.generatedBy === "openai" ? "AI Generated" : asset?.payload?.generatedBy === "mock" ? "Mock Preview" : asset?.source || "Unknown"}
-                </p>
+      {asset.assetType === "checklist" && (() => {
+        const sections = Array.isArray(asset.payload?.sections) ? asset.payload.sections : []
+        const totalItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.length : 0), 0)
+        const requiredItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.filter((i: any) => i?.required === true).length : 0), 0)
+        return (
+          <Card className="p-6 border-blue-500/20 bg-blue-500/5">
+            <div className="space-y-4">
+              <h2 className="text-base font-semibold text-foreground">Checklist Overview</h2>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Sections</p>
+                  <p className="text-2xl font-bold text-foreground">{sections.length}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Total Items</p>
+                  <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Required Items</p>
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{requiredItems}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Source</p>
+                  <p className="text-sm font-medium capitalize">
+                    {asset?.payload?.generatedBy === "openai" ? "AI Generated" : asset?.payload?.generatedBy === "mock" ? "Mock Preview" : asset?.source || "Unknown"}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )
+      })()}
 
       {/* Asset Content Preview */}
       <Card className="p-6 space-y-6">
