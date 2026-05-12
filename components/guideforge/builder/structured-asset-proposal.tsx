@@ -100,7 +100,8 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     }
   }
 
-  const handleApplyRefinement = () => {
+  // Single Guide uses its own dedicated proposal component with Edit/Preview tabs
+  if (asset.assetType === "single_guide") {
     return (
       <SingleGuideProposal
         asset={asset as GeneratedSingleGuide}
