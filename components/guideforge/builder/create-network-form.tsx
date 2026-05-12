@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Sparkles, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Sparkles, CheckCircle2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -27,12 +27,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
 import { createNetwork } from "@/lib/guideforge/supabase-networks"
 import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
 import { getScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
+import { getAllNetworkThemes } from "@/lib/guideforge/network-themes"
 import type {
   NetworkType,
   ThemeDirection,
@@ -43,7 +46,6 @@ interface CreateNetworkFormProps {
   initialType: NetworkType
 }
 
-// Map network types to scaffold template IDs
 const SCAFFOLD_TEMPLATE_MAP: Partial<Record<NetworkType, string>> = {
   gaming: "gaming",
   repair: "repair",
@@ -58,17 +60,6 @@ const NETWORK_TYPE_LABEL: Record<NetworkType, string> = {
   training: "Training Library",
   community: "Community Knowledge Base",
 }
-
-const THEME_OPTIONS: { value: ThemeDirection; label: string; hint: string }[] =
-  [
-    { value: "parchment", label: "Parchment", hint: "Warm cream + graphite, calm and crafted" },
-    { value: "copper", label: "Copper", hint: "Muted copper accent on warm neutrals" },
-    { value: "neutral", label: "Neutral", hint: "Brand-agnostic baseline" },
-    { value: "industrial", label: "Industrial", hint: "Repair / SOP feel" },
-    { value: "soft", label: "Soft", hint: "Creator and training networks" },
-    { value: "arcane", label: "Arcane", hint: "Cool slate with violet edges" },
-    { value: "ember", label: "Ember", hint: "Warm amber, gaming-leaning" },
-  ]
 
 const DEFAULTS_BY_TYPE: Record<
   NetworkType,
@@ -339,27 +330,91 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
           <SectionCard
             title="Theme and visibility"
-            description="Pick a starting theme. You can fully customize branding later."
+            description="Pick a starting theme. Visual themes help personalize your network's identity. You can fully customize branding later."
           >
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="network-theme">Theme direction</FieldLabel>
-                <Select
-                  value={theme}
-                  onValueChange={(value) => setTheme(value as ThemeDirection)}
-                >
-                  <SelectTrigger id="network-theme">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {THEME_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label} — {opt.hint}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FieldDescription className="mb-4">
+                  Select a visual direction for your network. Each theme has its own color palette and styling. The preview below updates as you select.
+                </FieldDescription>
+                
+                {/* Visual Theme Cards */}
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mb-6">
+                  {getAllNetworkThemes().map((themeOption) => (
+                    <button
+                      key={themeOption.id}
+                      type="button"
+                      onClick={() => setTheme(themeOption.id)}
+                      className={`group relative rounded-lg p-3 border-2 transition-all ${
+                        theme === themeOption.id
+                          ? `border-foreground ${themeOption.borderClasses} ${themeOption.bgClasses}`
+                          : "border-border/50 hover:border-foreground/30"
+                      }`}
+                    >
+                      {/* Preview background */}
+                      <div className={`absolute inset-0 rounded-lg ${themeOption.previewClasses} opacity-40 group-hover:opacity-60 transition-opacity`} />
+                      
+                      {/* Content */}
+                      <div className="relative flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-foreground">{themeOption.label}</h4>
+                          {theme === themeOption.id && (
+                            <Check className="size-4 text-foreground flex-shrink-0" aria-hidden="true" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground text-left">{themeOption.hint}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </Field>
+
+              {/* Theme Preview Panel */}
+              <div className="mt-6 p-4 rounded-lg border border-border/50 overflow-hidden">
+                {(() => {
+                  const selectedTheme = getAllNetworkThemes().find((t) => t.id === theme)
+                  if (!selectedTheme) return null
+                  
+                  return (
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Theme Preview</h4>
+                      
+                      {/* Sample Network Header */}
+                      <div className={`rounded-md p-4 ${selectedTheme.previewClasses} ${selectedTheme.borderClasses} border`}>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full ${selectedTheme.bgClasses} border ${selectedTheme.borderClasses}`} />
+                            <div>
+                              <p className={`text-sm font-bold ${selectedTheme.accentClasses}`}>{name || "Network Name"}</p>
+                              <p className="text-xs text-muted-foreground">Sample network header</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sample Cards */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Hub Card */}
+                        <div className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}>
+                          <p className="text-xs font-semibold text-foreground mb-1">Sample Hub</p>
+                          <p className={`text-xs ${selectedTheme.accentClasses}`}>3 Collections</p>
+                        </div>
+                        
+                        {/* Guide Card */}
+                        <div className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}>
+                          <p className="text-xs font-semibold text-foreground mb-1">Sample Guide</p>
+                          <Badge className={`text-xs ${selectedTheme.badgeClasses}`}>Draft</Badge>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Best for:</strong> {selectedTheme.bestFor.join(", ")}
+                      </p>
+                    </div>
+                  )
+                })()}
+              </div>
 
               <Field orientation="horizontal">
                 <FieldContent>
