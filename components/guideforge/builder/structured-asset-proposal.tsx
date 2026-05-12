@@ -6,8 +6,9 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import type { GeneratedStructuredAsset } from "@/lib/guideforge/generation-schemas"
+import type { GeneratedStructuredAsset, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { saveStructuredAssetToWorkspace } from "@/lib/guideforge/save-structured-asset"
+import { SingleGuideProposal } from "./single-guide-proposal"
 
 interface StructuredAssetProposalProps {
   asset: GeneratedStructuredAsset
@@ -107,6 +108,43 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       troubleshooting_flow: "Troubleshooting Flow",
     }
     return names[asset.assetType]
+  }
+
+  // Single Guide uses its own dedicated proposal component with Edit/Preview tabs
+  if (asset.assetType === "single_guide") {
+    return (
+      <SingleGuideProposal
+        asset={asset as GeneratedSingleGuide}
+        isSaving={isSaving}
+        saveError={saveError}
+        onBack={onBack}
+        onSave={async (edited) => {
+          setSaveError(null)
+          setIsSaving(true)
+          try {
+            const result = await saveStructuredAssetToWorkspace(edited)
+            if (!result.success) {
+              setSaveError(result.error || "Failed to save asset draft")
+              if (result.requiresAuth) {
+                storePendingProposal()
+                const returnTo = pathname || "/builder/generate-asset/single_guide"
+                window.location.href = `/auth/login?returnTo=${encodeURIComponent(returnTo)}`
+              }
+              return
+            }
+            try {
+              sessionStorage.removeItem("guideforge.pendingAssetProposal")
+            } catch {}
+            window.location.href = `/builder/assets/${result.assetId}`
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Unknown error"
+            setSaveError(`Failed to save: ${msg}`)
+          } finally {
+            setIsSaving(false)
+          }
+        }}
+      />
+    )
   }
 
   return (
