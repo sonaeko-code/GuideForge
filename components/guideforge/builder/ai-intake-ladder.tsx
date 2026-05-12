@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, Wand2, AlertCircle, Lightbulb } from "lucide-react"
+import { Loader2, Wand2, AlertCircle, Lightbulb, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -475,15 +475,25 @@ function determineNumberOfSteps(lowerText: string, difficulty: string | undefine
   return null
 }
 
+interface SmartFillResult {
+  fields: Record<string, string | number | boolean>
+  assumptions: string[]
+  missingInfo: string[]
+  couldBeBetterWith: string[]
+  source: "smart" | "quick"
+}
+
 export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps) {
   const [roughIdea, setRoughIdea] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
-  const [result, setResult] = useState<Record<string, string | number | boolean> | null>(null)
+  const [isSmartFilling, setIsSmartFilling] = useState(false)
+  const [result, setResult] = useState<SmartFillResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const handleFillInFields = async () => {
+  /** Quick Fill: local heuristic parser, no network call */
+  const handleQuickFill = async () => {
     if (!roughIdea.trim()) {
-      setError("Please describe your idea first")
+      setError("Please describe your idea first.")
       return
     }
 
@@ -491,35 +501,87 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
     setIsProcessing(true)
 
     try {
-      // Simulate a small processing delay for UX feedback
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await new Promise((resolve) => setTimeout(resolve, 200))
 
       const parsed = parseRoughIdea(roughIdea)
 
       if (Object.keys(parsed).length === 0) {
         setError("No patterns detected. Try mentioning audience, difficulty, or guide type.")
-        setIsProcessing(false)
         return
       }
 
-      // Build structured fields based on asset type
       const fieldsToApply = buildFieldsFromParsed(parsed, assetType)
-      
-      // Debug log for development
-      console.log("[GuideForge Intake Ladder] fieldsToApply", fieldsToApply)
-      
-      // Display the actual fields that will be applied (not just parsed)
-      setResult(fieldsToApply as Record<string, string | number | boolean>)
-      
-      // Apply fields to form
-      onApplyFields(fieldsToApply)
 
-      // Clear the textarea after successful application
+      setResult({
+        fields: fieldsToApply as Record<string, string | number | boolean>,
+        assumptions: [],
+        missingInfo: [],
+        couldBeBetterWith: [],
+        source: "quick",
+      })
+
+      onApplyFields(fieldsToApply)
       setRoughIdea("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process idea")
+      setError(err instanceof Error ? err.message : "Quick Fill failed.")
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  /** Smart Fill: server-side OpenAI call via /api/guideforge/intake-refine */
+  const handleSmartFill = async () => {
+    if (!roughIdea.trim()) {
+      setError("Please describe your idea first.")
+      return
+    }
+
+    setError(null)
+    setIsSmartFilling(true)
+
+    try {
+      const response = await fetch("/api/guideforge/intake-refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assetType,
+          roughIdea: roughIdea.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        // Graceful fallback to Quick Fill if Smart Fill fails
+        console.warn("[AIIntakeLadder] Smart Fill failed, falling back to Quick Fill:", data.error)
+        setError(`Smart Fill unavailable: ${data.error} — falling back to Quick Fill.`)
+        setIsSmartFilling(false)
+        // Run Quick Fill as fallback
+        await handleQuickFill()
+        return
+      }
+
+      const fields = data.fields as Record<string, string | number | boolean>
+
+      setResult({
+        fields,
+        assumptions: data.assumptions ?? [],
+        missingInfo: data.missingInfo ?? [],
+        couldBeBetterWith: data.couldBeBetterWith ?? [],
+        source: "smart",
+      })
+
+      onApplyFields(fields)
+      setRoughIdea("")
+    } catch (err) {
+      // Network error — fall back to Quick Fill
+      console.warn("[AIIntakeLadder] Smart Fill network error, falling back to Quick Fill:", err)
+      setError("Smart Fill could not connect. Falling back to Quick Fill.")
+      setIsSmartFilling(false)
+      await handleQuickFill()
+      return
+    } finally {
+      setIsSmartFilling(false)
     }
   }
 
@@ -528,6 +590,25 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
     setResult(null)
     setError(null)
   }
+
+  const fieldLabels: Record<string, string> = {
+    title: "Guide Title",
+    purpose: "Guide Purpose",
+    audience: "Intended Audience",
+    goal: "Guide Goal",
+    useCase: "Use Case / Context",
+    optionalContext: "Additional Context",
+    tone: "Tone",
+    difficulty: "Difficulty Level",
+    guideType: "Guide Type",
+    numberOfSteps: "Number of Steps",
+    hasWarnings: "Include Safety Warnings",
+    hasPrerequisites: "Include Prerequisites",
+    numberOfSections: "Number of Sections",
+    itemsPerSection: "Items Per Section",
+  }
+
+  const isBusy = isProcessing || isSmartFilling
 
   return (
     <Card className="p-6 border-blue-500/20 bg-blue-500/5 mb-6">
@@ -538,7 +619,8 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
           <div>
             <h2 className="font-semibold text-foreground">Start with a rough idea</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Describe what you want to build in plain language. We&apos;ll help fill in the structured fields.
+              Describe what you want to build in plain language and we&apos;ll fill in the structured fields.
+              Use <strong>Smart Fill</strong> for AI-powered extraction, or <strong>Quick Fill</strong> for instant local parsing.
             </p>
           </div>
         </div>
@@ -558,6 +640,7 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
             }}
             rows={4}
             className="resize-none"
+            disabled={isBusy}
           />
         </div>
 
@@ -571,63 +654,126 @@ export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps
 
         {/* Results */}
         {result && (
-          <div className="space-y-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-            <h3 className="text-sm font-semibold text-green-900 dark:text-green-100">
-              Fields detected from your idea:
-            </h3>
-            <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
-              {Object.entries(result).map(([key, value]) => {
-                // Format field names for display
-                const fieldLabels: Record<string, string> = {
-                  title: "Guide Title",
-                  purpose: "Guide Purpose",
-                  audience: "Intended Audience",
-                  goal: "Guide Goal",
-                  useCase: "Use Case / Context",
-                  optionalContext: "Additional Context",
-                  tone: "Tone",
-                  difficulty: "Difficulty Level",
-                  guideType: "Guide Type",
-                  numberOfSteps: "Number of Steps",
-                  hasWarnings: "Include Safety Warnings",
-                  hasPrerequisites: "Include Prerequisites",
-                }
-                const label = fieldLabels[key] || key.replace(/([A-Z])/g, " $1").toLowerCase()
-                return (
-                  <li key={key} className="flex items-start gap-2">
-                    <span className="text-green-600 dark:text-green-400 font-bold">✓</span>
-                    <span>
-                      <span className="font-medium">{label}:</span> {String(value)}
+          <div className="space-y-3">
+            {/* Fields panel */}
+            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-green-900 dark:text-green-100">
+                  Fields filled from your idea
+                  {result.source === "smart" && (
+                    <span className="ml-2 text-xs font-normal text-green-700 dark:text-green-300 bg-green-500/15 px-1.5 py-0.5 rounded">
+                      AI
                     </span>
-                  </li>
-                )
-              })}
-            </ul>
+                  )}
+                </h3>
+              </div>
+              <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
+                {Object.entries(result.fields).map(([key, value]) => {
+                  const label = fieldLabels[key] || key.replace(/([A-Z])/g, " $1").toLowerCase()
+                  return (
+                    <li key={key} className="flex items-start gap-2">
+                      <span className="text-green-600 dark:text-green-400 shrink-0 mt-0.5" aria-hidden="true">&#10003;</span>
+                      <span>
+                        <span className="font-medium">{label}:</span> {String(value)}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+
+            {/* Assumptions */}
+            {result.assumptions.length > 0 && (
+              <div className="p-3 rounded-lg bg-blue-500/8 border border-blue-500/15 space-y-1">
+                <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide">Assumptions made</p>
+                <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+                  {result.assumptions.map((a, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="shrink-0 mt-0.5" aria-hidden="true">&#8226;</span>
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Missing info */}
+            {result.missingInfo.length > 0 && (
+              <div className="p-3 rounded-lg bg-amber-500/8 border border-amber-500/15 space-y-1">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wide">Would help to know</p>
+                <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+                  {result.missingInfo.map((m, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="shrink-0 mt-0.5" aria-hidden="true">&#8226;</span>
+                      {m}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Could be better with */}
+            {result.couldBeBetterWith.length > 0 && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Could be better with</p>
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  {result.couldBeBetterWith.map((c, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="shrink-0 mt-0.5" aria-hidden="true">&#8226;</span>
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex gap-2 justify-end pt-2">
+        <div className="flex flex-wrap gap-2 justify-end pt-2">
           {result && (
-            <Button variant="outline" size="sm" onClick={handleReset}>
+            <Button variant="outline" size="sm" onClick={handleReset} disabled={isBusy}>
               Try Another Idea
             </Button>
           )}
+
+          {/* Quick Fill button */}
           <Button
+            variant="outline"
             size="sm"
-            onClick={handleFillInFields}
-            disabled={isProcessing || !roughIdea.trim()}
+            onClick={handleQuickFill}
+            disabled={isBusy || !roughIdea.trim()}
             className="gap-2"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                Organizing your idea...
+                Filling...
               </>
             ) : (
               <>
                 <Wand2 className="size-4" aria-hidden="true" />
-                Fill in fields
+                Quick Fill
+              </>
+            )}
+          </Button>
+
+          {/* Smart Fill button */}
+          <Button
+            size="sm"
+            onClick={handleSmartFill}
+            disabled={isBusy || !roughIdea.trim()}
+            className="gap-2"
+          >
+            {isSmartFilling ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Refining your idea...
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-4" aria-hidden="true" />
+                Smart Fill
               </>
             )}
           </Button>
