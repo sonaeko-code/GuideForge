@@ -2,7 +2,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { Network } from "@/lib/guideforge/types"
 import { getNetworkTheme } from "@/lib/guideforge/network-themes"
-import { getRegistryTypeById } from "@/lib/guideforge/network-types"
+import { getRegistryTypeById, getRegistryIdFromDbType } from "@/lib/guideforge/network-types"
 
 interface NetworkPublicHeaderProps {
   network: Network
@@ -11,7 +11,9 @@ interface NetworkPublicHeaderProps {
 
 export function NetworkPublicHeader({ network, className }: NetworkPublicHeaderProps) {
   const theme = getNetworkTheme(network.branding?.theme)
-  const registryEntry = getRegistryTypeById(network.type)
+  // Convert DB type to UI registry id
+  const registryId = getRegistryIdFromDbType(network.type)
+  const registryEntry = getRegistryTypeById(registryId)
   const typeLabel = registryEntry?.label ?? "Guide Network"
   
   return (

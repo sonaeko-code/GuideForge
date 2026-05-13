@@ -269,6 +269,21 @@ export function StarterPagesEditor() {
     router.push("/builder/network/forge-rules")
   }
 
+  function handleBack() {
+    if (load.kind !== "ready") return
+    setError(null)
+
+    // Save any edits to the scaffold before going back
+    const nextDraft: WizardDraft = {
+      ...load.draft,
+      scaffold: { hubs },
+      scaffoldIsDefaultForType: false,
+      updatedAt: new Date().toISOString(),
+    }
+    writeWizardDraft(nextDraft)
+    router.back()
+  }
+
   // ---------- Render ----------
 
   if (load.kind === "loading") {
@@ -553,11 +568,9 @@ export function StarterPagesEditor() {
 
       {/* Footer nav */}
       <div className="flex items-center justify-between gap-3 pt-4">
-        <Button asChild variant="ghost" type="button">
-          <Link href="/builder/network/new">
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back
-          </Link>
+        <Button variant="ghost" type="button" onClick={handleBack}>
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back
         </Button>
         <Button
           type="button"

@@ -87,6 +87,8 @@ export interface ScaffoldDraft {
 
 export interface WizardDraft {
   version: number
+  // Intake/router context
+  roughIdea: string
   // Step 2 fields
   name: string
   slug: string

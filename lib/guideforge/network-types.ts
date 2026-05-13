@@ -239,6 +239,12 @@ export function resolveDbType(id: string): NetworkType {
   return getRegistryTypeById(id)?.dbType ?? "gaming"
 }
 
+/** Resolve the UI registry id from a DB NetworkType. Used to find the correct registry entry for a stored network. */
+export function getRegistryIdFromDbType(dbType: NetworkType): string {
+  const entry = NETWORK_TYPE_REGISTRY.find((t) => t.dbType === dbType)
+  return entry?.id ?? "gaming"
+}
+
 /**
  * The set of valid UI type ids. Used to validate draft state so we never
  * write an empty string or unknown value into the draft.

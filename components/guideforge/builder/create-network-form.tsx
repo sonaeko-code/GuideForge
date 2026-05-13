@@ -236,12 +236,37 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     didHydrateRef.current = true
     const existing = readWizardDraft()
     if (!existing) {
-      // No existing draft; check if there's a quick idea from the intake panel
+      // No existing draft; check if there's a quick idea and router result from the intake panel
       const quickIdea = sessionStorage.getItem("guideforge:quick-idea")
+      const routerResultStr = sessionStorage.getItem("guideforge:idea-router-result")
+
       if (quickIdea) {
         setRoughIdea(quickIdea)
         sessionStorage.removeItem("guideforge:quick-idea")
-        // Optionally auto-trigger Smart Fill, but let user click manually for now
+      }
+
+      if (routerResultStr) {
+        try {
+          const routerResult = JSON.parse(routerResultStr)
+          // Auto-apply the recommended network type and theme if available
+          if (
+            routerResult.recommendedNetworkTypeId &&
+            VALID_REGISTRY_IDS.has(routerResult.recommendedNetworkTypeId)
+          ) {
+            setTypeId(routerResult.recommendedNetworkTypeId)
+          }
+          if (
+            routerResult.suggestedThemeId &&
+            ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+              routerResult.suggestedThemeId
+            )
+          ) {
+            setTheme(routerResult.suggestedThemeId)
+          }
+          sessionStorage.removeItem("guideforge:idea-router-result")
+        } catch (e) {
+          console.warn("[v0] Failed to parse router result:", e)
+        }
       }
       return
     }
@@ -256,6 +281,10 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setScaffoldDraft(existing.scaffold)
     setScaffoldIsDefaultForType(existing.scaffoldIsDefaultForType)
     setScaffoldSourceType(existing.scaffoldSourceType ?? existing.type)
+    // Also restore roughIdea if it was stored in the draft
+    if (existing.roughIdea) {
+      setRoughIdea(existing.roughIdea)
+    }
   }, [])
 
   const slug = useMemo(() => {
@@ -400,6 +429,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
       const existingDraft = readWizardDraft()
       const draft: WizardDraft = {
         version: 1,
+        roughIdea: roughIdea.trim(),
         name: name.trim(),
         slug: slug.trim(),
         description: description.trim(),
