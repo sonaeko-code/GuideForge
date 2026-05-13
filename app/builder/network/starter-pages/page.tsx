@@ -1,28 +1,12 @@
-import Link from "next/link"
-import {
-  Home,
-  Compass,
-  Gamepad2,
-  Zap,
-  Newspaper,
-  BookOpen,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { WizardProgress } from "@/components/guideforge/shared"
 import {
   BUILDER_WIZARD_STEPS,
   getWizardIndex,
 } from "@/lib/guideforge/wizard"
-import { StarterPagePicker } from "@/components/guideforge/builder/starter-page-picker"
+import { StarterPagesEditor } from "@/components/guideforge/builder/starter-pages-editor"
 
-export default async function StarterPagesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ name?: string }>
-}) {
-  const { name } = await searchParams
-
+export default function StarterPagesPage() {
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader hideCta />
@@ -40,15 +24,16 @@ export default async function StarterPagesPage({
             Step 3 — Starter pages
           </span>
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            {name ? `${name} — choose your pages` : "Pick your starter pages"}
+            Edit your hubs and collections
           </h1>
           <p className="text-pretty leading-relaxed text-muted-foreground">
-            These page templates ship with every gaming guide network. You can
-            customize or remove them later.
+            These are the starter pages for your network. Rename, reorder, add, or remove
+            anything below before continuing. Nothing is saved yet &mdash; the network is
+            created after the next step.
           </p>
         </header>
 
-        <StarterPagePicker networkName={name} />
+        <StarterPagesEditor />
       </div>
     </main>
   )

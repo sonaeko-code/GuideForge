@@ -31,12 +31,20 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
-import { createNetwork } from "@/lib/guideforge/supabase-networks"
-import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
-import { getScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
+import { getScaffoldTemplate, type ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
-import { smartFillNetwork } from "@/lib/guideforge/smart-fill-network"
+import { smartFillNetwork, type SmartFillScaffoldSuggestion } from "@/lib/guideforge/smart-fill-network"
+import {
+  getDefaultForgeRulesDraft,
+  makeCollectionClientId,
+  makeHubClientId,
+  writeWizardDraft,
+  type ScaffoldDraft,
+  type ScaffoldHubDraft,
+  type WizardDraft,
+} from "@/lib/guideforge/wizard-state"
+import { slugify as slugifyUtil } from "@/lib/guideforge/utils"
 import type {
   NetworkType,
   ThemeDirection,
@@ -120,6 +128,108 @@ function slugify(value: string): string {
     .slice(0, 40)
 }
 
+/**
+ * Generic fallback hub list per type, used when no rich ScaffoldTemplate
+ * exists for the selected network type (creator / training / community).
+ */
+const GENERIC_HUBS_BY_TYPE: Record<NetworkType, { name: string; collections: string[] }[]> = {
+  gaming: [
+    { name: "Beginner Guides", collections: ["Getting Started", "Core Concepts"] },
+    { name: "Builds & Loadouts", collections: ["Starter Builds", "Endgame Builds"] },
+    { name: "Boss Guides", collections: ["Early Bosses", "Late Bosses"] },
+  ],
+  repair: [
+    { name: "Common Issues", collections: ["Quick Fixes", "Recurring Problems"] },
+    { name: "Diagnostics", collections: ["Initial Triage", "Deep Diagnostics"] },
+    { name: "Tools & Safety", collections: ["Required Tools", "Safety Procedures"] },
+  ],
+  sop: [
+    { name: "Onboarding", collections: ["First Day", "First Week"] },
+    { name: "Daily Operations", collections: ["Opening", "Closing"] },
+    { name: "Compliance", collections: ["Internal Policies", "External Requirements"] },
+  ],
+  creator: [
+    { name: "Fundamentals", collections: ["Core Concepts", "First Steps"] },
+    { name: "Intermediate", collections: ["Common Patterns", "Building Skills"] },
+    { name: "Advanced Topics", collections: ["Deep Dives", "Expert Techniques"] },
+  ],
+  training: [
+    { name: "Onboarding", collections: ["First Day", "First Week"] },
+    { name: "Core Curriculum", collections: ["Foundations", "Applied Practice"] },
+    { name: "Assessments", collections: ["Knowledge Checks", "Certifications"] },
+  ],
+  community: [
+    { name: "Getting Started", collections: ["Quickstart", "First Project"] },
+    { name: "Best Practices", collections: ["Do This", "Avoid This"] },
+    { name: "Community Highlights", collections: ["Top Creators", "Hot Takes"] },
+  ],
+}
+
+/** Build a scaffold draft from a rich ScaffoldTemplate (gaming/repair/sop). */
+function scaffoldDraftFromTemplate(template: ScaffoldTemplate): ScaffoldDraft {
+  return {
+    hubs: template.hubs.map<ScaffoldHubDraft>((hubGroup) => ({
+      clientId: makeHubClientId(),
+      name: hubGroup.hub.name,
+      slug: hubGroup.hub.slug,
+      description: hubGroup.hub.description,
+      collections: hubGroup.collections.map((col) => ({
+        clientId: makeCollectionClientId(),
+        name: col.name,
+        slug: col.slug,
+        description: col.description,
+      })),
+    })),
+  }
+}
+
+/** Build a scaffold draft from a Smart Fill scaffold suggestion. */
+function scaffoldDraftFromSmartFill(suggestion: SmartFillScaffoldSuggestion): ScaffoldDraft {
+  return {
+    hubs: suggestion.hubs.map<ScaffoldHubDraft>((hub) => ({
+      clientId: makeHubClientId(),
+      name: hub.name,
+      slug: hub.slug,
+      description: hub.description,
+      collections: hub.collections.map((col) => ({
+        clientId: makeCollectionClientId(),
+        name: col.name,
+        slug: col.slug,
+        description: col.description,
+      })),
+    })),
+  }
+}
+
+/** Build a generic fallback scaffold for types without a rich template. */
+function scaffoldDraftFromGeneric(type: NetworkType): ScaffoldDraft {
+  const hubsSpec = GENERIC_HUBS_BY_TYPE[type] || GENERIC_HUBS_BY_TYPE.creator
+  return {
+    hubs: hubsSpec.map<ScaffoldHubDraft>((spec) => ({
+      clientId: makeHubClientId(),
+      name: spec.name,
+      slug: slugifyUtil(spec.name),
+      description: `${spec.name} for your ${type} network.`,
+      collections: spec.collections.map((colName) => ({
+        clientId: makeCollectionClientId(),
+        name: colName,
+        slug: slugifyUtil(colName),
+        description: "",
+      })),
+    })),
+  }
+}
+
+/** Build the default scaffold draft for any network type. */
+function buildDefaultScaffoldDraft(type: NetworkType): ScaffoldDraft {
+  const scaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
+  if (scaffoldId) {
+    const template = getScaffoldTemplate(scaffoldId)
+    if (template) return scaffoldDraftFromTemplate(template)
+  }
+  return scaffoldDraftFromGeneric(type)
+}
+
 export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   // Future: Network Settings should allow editing network name, slug, description, hubs, and collections.
   const defaults = DEFAULTS_BY_TYPE[initialType]
@@ -137,9 +247,15 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [roughIdea, setRoughIdea] = useState("")
 
-  // Compute current scaffold template based on current type (not initialType)
-  const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
-  const scaffoldTemplate = currentScaffoldId ? getScaffoldTemplate(currentScaffoldId) : null
+  // Unified scaffold draft — populated from defaults, Smart Fill, or type-change.
+  // Mutated in Step 3 after this form hands off via sessionStorage.
+  const [scaffoldDraft, setScaffoldDraft] = useState<ScaffoldDraft>(() =>
+    buildDefaultScaffoldDraft(initialType)
+  )
+  // Tracks whether the scaffold is still the unedited default for `scaffoldSourceType`.
+  // Used to decide whether type-change can silently regenerate the scaffold.
+  const [scaffoldIsDefaultForType, setScaffoldIsDefaultForType] = useState(true)
+  const [scaffoldSourceType, setScaffoldSourceType] = useState<NetworkType>(initialType)
 
   // Auto-sync slug from name unless user manually edited it
   const slug = useMemo(() => {
@@ -166,8 +282,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
     const result = smartFillNetwork(roughIdea)
     if (result.success) {
-      // Smart Fill: merge results, preserving manual selections for invalid Smart Fill outputs
-      // Only update fields where Smart Fill provided meaningful values
+      // Smart Fill: merge results, preserving manual selections for invalid Smart Fill outputs.
+      // Only update fields where Smart Fill provided meaningful values.
       if (result.name && result.name.trim()) {
         setName(result.name)
       }
@@ -175,7 +291,9 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         setDescription(result.description)
       }
       // Preserve manual type if Smart Fill didn't return valid one
+      let nextType: NetworkType = type
       if (result.type && ["gaming", "repair", "sop", "creator", "training", "community"].includes(result.type)) {
+        nextType = result.type
         setType(result.type)
       }
       // Preserve manual theme if Smart Fill didn't return valid one
@@ -186,6 +304,20 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         setDomainPrefix(result.slug)
         setDomainPrefixManuallyEdited(false)
       }
+
+      // Replace the scaffold draft with the Smart Fill scaffold suggestion.
+      // This is intentional: Smart Fill is the user opting into a generated scaffold.
+      if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
+        setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+        setScaffoldIsDefaultForType(true) // treat Smart Fill output as a fresh baseline
+        setScaffoldSourceType(nextType)
+      } else if (nextType !== scaffoldSourceType) {
+        // No scaffold suggestion but type changed — fall back to the new type's default.
+        setScaffoldDraft(buildDefaultScaffoldDraft(nextType))
+        setScaffoldIsDefaultForType(true)
+        setScaffoldSourceType(nextType)
+      }
+
       setRoughIdea("")
       setError(null)
       console.log("[v0] Smart Fill Network: Applied results", { type: result.type, theme: result.theme, name: result.name })
@@ -195,6 +327,21 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   }
 
   function handleTypeChange(newType: NetworkType) {
+    if (newType === type) return
+
+    // If the user has edited the scaffold, confirm before regenerating to the new type's defaults.
+    // This preserves user work (confirmation #3).
+    if (!scaffoldIsDefaultForType) {
+      const confirmed =
+        typeof window === "undefined" ||
+        window.confirm(
+          `Reset scaffold to the ${newType} defaults? Your current hub and collection edits will be replaced.`
+        )
+      if (!confirmed) {
+        return
+      }
+    }
+
     const newDefaults = DEFAULTS_BY_TYPE[newType]
     setType(newType)
     setName(newDefaults.name)
@@ -202,6 +349,9 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setTheme(newDefaults.theme)
     setDomainPrefix(newDefaults.slug)
     setDomainPrefixManuallyEdited(false)
+    setScaffoldDraft(buildDefaultScaffoldDraft(newType))
+    setScaffoldIsDefaultForType(true)
+    setScaffoldSourceType(newType)
     setStep("configure")
   }
 
@@ -224,7 +374,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setError(null)
 
     try {
-      // Validate required fields before save
+      // Validate required fields before handing off to Step 3.
       if (!name.trim()) {
         throw new Error("Network name is required")
       }
@@ -232,68 +382,44 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         throw new Error("Subdomain is required")
       }
       if (!type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(type)) {
-        throw new Error(`Invalid network type: ${type}. Using default 'gaming'.`)
+        throw new Error(`Invalid network type: ${type}.`)
       }
       if (!theme || !["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(theme)) {
-        throw new Error(`Invalid theme: ${theme}. Using default 'parchment'.`)
+        throw new Error(`Invalid theme: ${theme}.`)
+      }
+      if (!scaffoldDraft.hubs || scaffoldDraft.hubs.length === 0) {
+        throw new Error("Scaffold has no hubs. Use Smart Fill or pick a different network type.")
       }
 
-      console.log("[v0] CreateNetworkForm: Pre-save validation:", { name, type, theme, slug })
-
-      // Check if this is a scaffold type
-      if (currentScaffoldId) {
-        if (!scaffoldTemplate) {
-          throw new Error(`Invalid scaffold template: ${currentScaffoldId}`)
-        }
-
-        console.log("[v0] CreateNetworkForm: Creating scaffold network:", { name, type, slug, scaffoldId: currentScaffoldId })
-
-        const result = await createNetworkScaffold(scaffoldTemplate, {
-          networkName: name,
-          networkSlug: slug,
-          networkDescription: description,
-        })
-
-        if (!result.success || !result.network?.id) {
-          console.error("[v0] CreateNetworkForm: Scaffold creation failed:", result.error)
-          setError(result.error || "Failed to create network scaffold")
-          return
-        }
-
-        console.log("[v0] CreateNetworkForm: Scaffold created:", result.network.id)
-        console.log("[v0] CreateNetworkForm: Created", result.hubs?.length || 0, "hubs and", result.collections?.length || 0, "collections")
-
-        // Route to the new network's dashboard
-        router.push(`/builder/network/${result.network.id}/dashboard`)
-      } else {
-        // Create blank network for non-scaffold types
-        console.log("[v0] CreateNetworkForm: Creating blank network:", { name, type, slug, theme })
-
-        const { network, error: createError } = await createNetwork({
-          name,
-          type,
-          description,
-          theme,
-          visibility,
-          slug,
-          primaryColor: theme === "ember" ? "#f97316" : "#6366f1",
-        })
-
-        if (createError || !network.id) {
-          console.error("[v0] CreateNetworkForm: Network creation error:", createError)
-          setError(createError || "Failed to create network")
-          return
-        }
-
-        console.log("[v0] CreateNetworkForm: Blank network created:", network.id)
-        console.log("[v0] CreateNetworkForm: Routing to network dashboard:", network.id)
-
-        // Route to the new network's dashboard
-        router.push(`/builder/network/${network.id}/dashboard`)
+      // Persist the wizard draft to sessionStorage and hand off to Step 3.
+      // The actual Supabase create happens at the end of Step 4.
+      const draft: WizardDraft = {
+        version: 1,
+        name: name.trim(),
+        slug: slug.trim(),
+        description: description.trim(),
+        type,
+        theme,
+        visibility,
+        scaffoldIsDefaultForType,
+        scaffoldSourceType,
+        scaffold: scaffoldDraft,
+        forgeRules: getDefaultForgeRulesDraft(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }
+
+      console.log("[v0] CreateNetworkForm: Writing wizard draft and routing to Step 3:", {
+        name: draft.name,
+        type: draft.type,
+        hubs: draft.scaffold.hubs.length,
+      })
+
+      writeWizardDraft(draft)
+      router.push("/builder/network/starter-pages")
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
-      console.error("[v0] CreateNetworkForm: Creation exception:", message)
+      console.error("[v0] CreateNetworkForm: Step 2 submit exception:", message)
       setError(message)
     } finally {
       setSubmitting(false)
@@ -382,7 +508,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   </SelectContent>
                 </Select>
                 <FieldDescription>
-                  {SCAFFOLD_TEMPLATE_MAP[type] ? "Will create a scaffold with pre-configured hubs and collections." : "Determines starter Forge Rules and starter pages."}
+                  Determines the default scaffold (hubs and collections) and the starter Forge Rules for this network.
                 </FieldDescription>
               </Field>
 
@@ -549,8 +675,12 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         </>
       )}
 
-      {step === "preview" && scaffoldTemplate && (() => {
+      {step === "preview" && scaffoldDraft.hubs.length > 0 && (() => {
         const previewTheme = getNetworkTheme(theme)
+        const totalCollections = scaffoldDraft.hubs.reduce(
+          (sum, h) => sum + h.collections.length,
+          0,
+        )
         return (
           <>
             {/* Themed scaffold preview — matches what the created network page will look like */}
@@ -569,13 +699,21 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
               {/* Hub list */}
               <div className="space-y-2 mb-4">
-                {scaffoldTemplate.hubs.map((hubGroup, hubIdx) => (
-                  <div key={hubIdx} className={`rounded-md p-3 border ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
-                    <p className={`text-sm font-semibold ${previewTheme.accentClasses}`}>{hubGroup.hub.name}</p>
+                {scaffoldDraft.hubs.map((hub) => (
+                  <div
+                    key={hub.clientId}
+                    className={`rounded-md p-3 border ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}
+                  >
+                    <p className={`text-sm font-semibold ${previewTheme.accentClasses}`}>{hub.name}</p>
+                    {hub.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{hub.description}</p>
+                    )}
                     <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                      {hubGroup.collections.map((collection, colIdx) => (
-                        <li key={colIdx}>
-                          <span className={`inline-block rounded px-2 py-0.5 text-xs ${previewTheme.badgeClasses}`}>
+                      {hub.collections.map((collection) => (
+                        <li key={collection.clientId}>
+                          <span
+                            className={`inline-block rounded px-2 py-0.5 text-xs ${previewTheme.badgeClasses}`}
+                          >
                             {collection.name}
                           </span>
                         </li>
@@ -586,10 +724,12 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Will create:{" "}
-                <strong>{scaffoldTemplate.hubs.length}</strong> hubs and{" "}
-                <strong>{scaffoldTemplate.hubs.reduce((sum, h) => sum + h.collections.length, 0)}</strong> collections
+                Will create: <strong>{scaffoldDraft.hubs.length}</strong> hubs and{" "}
+                <strong>{totalCollections}</strong> collections
                 {" · "}Theme: <strong>{previewTheme.label}</strong>
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                You&apos;ll be able to edit, add, or remove hubs and collections on the next step before anything is saved.
               </p>
             </div>
           </>
@@ -606,20 +746,33 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         <div className="flex gap-2">
           {step === "configure" && (
             <>
-              <Button type="button" size="lg" className="gap-2" onClick={handleContinueToPreview} disabled={submitting || !name.trim()}>
-                {scaffoldTemplate ? "Preview Scaffold" : "Continue"}
+              <Button
+                type="button"
+                size="lg"
+                className="gap-2"
+                onClick={handleContinueToPreview}
+                disabled={submitting || !name.trim()}
+              >
+                Preview Scaffold
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
             </>
           )}
           {step === "preview" && (
             <>
-              <Button type="button" size="lg" variant="outline" className="gap-2" onClick={() => setStep("configure")} disabled={submitting}>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setStep("configure")}
+                disabled={submitting}
+              >
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 Back
               </Button>
               <Button type="submit" size="lg" className="gap-2" disabled={submitting}>
-                {submitting ? (scaffoldTemplate ? "Creating Scaffold..." : "Creating Network...") : "Create Network"}
+                {submitting ? "Saving..." : "Continue to Starter Pages"}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
             </>
