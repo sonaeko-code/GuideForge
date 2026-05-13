@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { WizardProgress } from "@/components/guideforge/shared"
+import { WelcomeIntakePanel } from "@/components/guideforge/builder/welcome-intake-panel"
 import {
   BUILDER_WIZARD_STEPS,
   getWizardIndex,
@@ -41,39 +42,8 @@ export default function BuilderWelcomePage() {
           </p>
         </header>
 
-        {/* Quick Idea Intake — for users who want to describe their idea first */}
-        <div className="mb-12 rounded-xl border border-primary/20 bg-primary/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-2">Start with an idea</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Describe what you want to build, and GuideForge will suggest the best path forward.
-          </p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              const idea = (e.currentTarget.elements.namedItem("quick-idea") as HTMLInputElement)?.value
-              if (idea.trim()) {
-                // Store the idea in sessionStorage for the wizard to pick up
-                sessionStorage.setItem("guideforge:quick-idea", idea)
-                // Route to network creation with the idea
-                window.location.href = "/builder/network/new"
-              }
-            }}
-            className="flex gap-2 flex-col sm:flex-row"
-          >
-            <input
-              name="quick-idea"
-              type="text"
-              placeholder="e.g. Build a survival RPG guide network for my gaming community..."
-              className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
-            >
-              Let&apos;s Build
-            </button>
-          </form>
-        </div>
+        {/* Quick Idea Intake */}
+        <WelcomeIntakePanel />
 
         {/* Enabled Network Types */}
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
