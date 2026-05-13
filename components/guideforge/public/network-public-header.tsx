@@ -2,6 +2,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { Network } from "@/lib/guideforge/types"
 import { getNetworkTheme } from "@/lib/guideforge/network-themes"
+import { getRegistryTypeById } from "@/lib/guideforge/network-types"
 
 interface NetworkPublicHeaderProps {
   network: Network
@@ -10,6 +11,8 @@ interface NetworkPublicHeaderProps {
 
 export function NetworkPublicHeader({ network, className }: NetworkPublicHeaderProps) {
   const theme = getNetworkTheme(network.branding?.theme)
+  const registryEntry = getRegistryTypeById(network.type)
+  const typeLabel = registryEntry?.label ?? "Guide Network"
   
   return (
     <header
@@ -49,7 +52,7 @@ export function NetworkPublicHeader({ network, className }: NetworkPublicHeaderP
 
         <div className={cn("flex items-center gap-3 text-xs", theme.accentClasses)}>
           <span className="hidden sm:inline-block capitalize">
-            {network.type} network
+            {typeLabel}
           </span>
         </div>
       </div>

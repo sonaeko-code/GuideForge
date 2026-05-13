@@ -148,20 +148,21 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   }
 
   const typeDefaultNames: Record<string, string> = {
-    gaming: "Game Strategy Network",
-    tech_repair: "Repair & Diagnostics Hub",
-    home_systems: "Home Maintenance Guide",
-    small_business: "Business Launch Playbook",
-    restaurant_training: "Restaurant Operations Runbook",
-    wellness_training: "Wellness & Training Program",
-    creator_workflow: "Creator Workflow System",
-    personal_knowledge: "Personal Knowledge System",
-    general: "General Knowledge Network",
+    gaming: "Game Guide Network",
+    tech_repair: "Repair Guides Hub",
+    home_systems: "Home Systems Library",
+    small_business: "Business Launch Hub",
+    restaurant_training: "Team Onboarding System",
+    wellness_training: "Wellness Program Library",
+    creator_workflow: "Creator Toolkit Hub",
+    personal_knowledge: "Personal Knowledge Hub",
+    general: "Knowledge Hub",
   }
 
   // Domain-anchor keywords: short, brandable nouns we'll bias toward when crafting a title.
   // These describe the "thing" the network is about (a genre, a product family, etc.).
   const DOMAIN_ANCHORS: Record<string, string> = {
+    // Gaming anchors
     "survival": "Survival",
     "rpg": "RPG",
     "mmorpg": "MMORPG",
@@ -182,22 +183,50 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     "platformer": "Platformer",
     "deckbuilder": "Deckbuilder",
     "soulslike": "Soulslike",
-    // Repair/SOP/training anchors
+    // Home/maintenance anchors
+    "hvac": "HVAC",
+    "plumbing": "Plumbing",
+    "electrical": "Electrical",
+    "appliance": "Appliance",
+    "automotive": "Automotive",
+    "lawn": "Lawn",
+    "garden": "Garden",
+    "seasonal": "Seasonal",
+    // Repair/device anchors
     "laptop": "Laptop",
     "printer": "Printer",
     "mobile": "Mobile Device",
-    "appliance": "Appliance",
-    "automotive": "Automotive",
+    "phone": "Phone",
+    "device": "Device",
+    // Team/business anchors
     "onboarding": "Onboarding",
     "compliance": "Compliance",
     "safety": "Safety",
+    "sop": "SOP",
+    "restaurant": "Restaurant",
+    "kitchen": "Kitchen",
+    "food": "Food Service",
+    // Wellness anchors
     "fitness": "Fitness",
     "wellness": "Wellness",
-    "cooking": "Cooking",
+    "nutrition": "Nutrition",
+    "mental": "Mental Health",
+    "coaching": "Coaching",
+    // Creator anchors
+    "youtube": "YouTube",
+    "streaming": "Streaming",
+    "podcast": "Podcast",
+    "tiktok": "TikTok",
+    "twitch": "Twitch",
+    "content": "Content",
+    // Knowledge anchors
     "photography": "Photography",
     "music": "Music",
     "design": "Design",
     "marketing": "Marketing",
+    "parenting": "Parenting",
+    "family": "Family",
+    "home": "Home",
   }
 
   // Find up to 2 domain anchors mentioned in the idea, preserving first-seen order.
@@ -216,15 +245,15 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   // Type-aware descriptor word that goes between the anchor and the suffix,
   // e.g. "Survival RPG Strategy Guides" or "Laptop Repair Hub".
   const typeDescriptor: Record<string, string> = {
-    gaming: "Strategy",
-    tech_repair: "Repair",
-    home_systems: "Maintenance",
-    small_business: "Operations",
-    restaurant_training: "Training",
-    wellness_training: "Wellness",
-    creator_workflow: "Workflow",
-    personal_knowledge: "Knowledge",
-    general: "Community",
+    gaming: "Strategy Guides",
+    tech_repair: "Repair Guides",
+    home_systems: "Maintenance Guides",
+    small_business: "Business Playbook",
+    restaurant_training: "Team Runbook",
+    wellness_training: "Wellness Program",
+    creator_workflow: "Creator Toolkit",
+    personal_knowledge: "Knowledge Base",
+    general: "Community Hub",
   }
 
   let name: string
@@ -238,14 +267,9 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     name = `${quotedMatch[1]} ${sfx}`
   } else if (detectedAnchors.length > 0) {
     // Combine detected domain anchors with type descriptor + suffix.
-    // "Survival RPG Strategy Guides" / "Laptop Repair Hub" / "Onboarding Training Network".
+    // "Survival RPG Strategy Guides" / "Laptop Repair Hub" / "Onboarding Team Runbook".
     const anchorPhrase = detectedAnchors.join(" ")
-    // Avoid duplication: if descriptor already appears as an anchor, drop it.
-    const lowerAnchor = anchorPhrase.toLowerCase()
-    const useDescriptor = !lowerAnchor.includes(descriptor.toLowerCase())
-    name = useDescriptor
-      ? `${anchorPhrase} ${descriptor} ${sfx}`
-      : `${anchorPhrase} ${sfx}`
+    name = `${anchorPhrase} ${descriptor}`
   } else if (properNounMatch && properNounMatch[1].length > 2) {
     // Use detected proper noun
     name = `${properNounMatch[1]} ${sfx}`
@@ -256,11 +280,12 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
       "gaming", "guide", "network", "hub", "platform", "site", "wiki",
       "a", "an", "the", "for", "with", "and", "or", "to", "in", "on",
       "guides", "knowledge", "base", "community", "repair", "training",
+      "build", "system", "organize", "create", "library", "app",
     ])
     const candidateWords = stripped
       .split(/\s+/)
       .filter((w) => !stopWords.has(w.toLowerCase()) && w.length > 2)
-      .slice(0, 3)
+      .slice(0, 2)
 
     if (candidateWords.length >= 1) {
       // Capitalize first letters

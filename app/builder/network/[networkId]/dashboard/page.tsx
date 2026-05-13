@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, AlertCircle, Settings } from "lucide-react"
+import { ArrowLeft, AlertCircle, Settings, Globe } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
@@ -60,8 +60,17 @@ export default async function NetworkDashboardPage({
               <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
               <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
             </div>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-mono text-foreground">{network.slug}</span>.guideforge.app
+            </p>
           </div>
           <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/n/${network.slug}`} target="_blank">
+                <Globe className="size-4 mr-1" aria-hidden="true" />
+                View Public Site
+              </Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href={`/builder/network/${networkId}/settings`}>
                 <Settings className="size-4 mr-1" aria-hidden="true" />

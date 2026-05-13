@@ -496,6 +496,17 @@ export function GenerateChecklistClient() {
           />
         </div>
 
+        {/* Repeatable Checklist Coming Soon */}
+        <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+          <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+            ✨ <span className="font-semibold">Repeatable Checklists Coming Soon</span>
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            Soon you'll be able to mark checklists as repeatable, set recurrence rules (daily, weekly), 
+            track completion history, and build habit streaks. Perfect for routines, recurring tasks, and habit tracking.
+          </p>
+        </Card>
+
         {/* Helper Copy */}
         {provider === "ai" && (
           <Card className="p-3 border-amber-500/20 bg-amber-500/5">

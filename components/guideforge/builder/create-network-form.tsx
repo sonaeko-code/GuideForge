@@ -235,7 +235,16 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     if (didHydrateRef.current) return
     didHydrateRef.current = true
     const existing = readWizardDraft()
-    if (!existing) return
+    if (!existing) {
+      // No existing draft; check if there's a quick idea from the intake panel
+      const quickIdea = sessionStorage.getItem("guideforge:quick-idea")
+      if (quickIdea) {
+        setRoughIdea(quickIdea)
+        sessionStorage.removeItem("guideforge:quick-idea")
+        // Optionally auto-trigger Smart Fill, but let user click manually for now
+      }
+      return
+    }
     // readWizardDraft already sanitizes type to a valid registry id
     setName(existing.name)
     setTypeId(existing.type)
@@ -765,12 +774,9 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         })()}
 
       <div className="flex items-center justify-between gap-3 pt-2">
-        <Button asChild variant="ghost" type="button">
-          <Link href="/builder/welcome">
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back
-          </Link>
-        </Button>
+        <div>
+          {/* No back button from form to welcome - users should use browser back or go to dashboard */}
+        </div>
         <div className="flex gap-2">
           {step === "configure" && (
             <Button
