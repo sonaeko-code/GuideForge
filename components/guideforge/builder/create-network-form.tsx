@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight, Globe, Lock, Check, Zap } from "lucide-react"
@@ -39,6 +39,7 @@ import {
   getDefaultForgeRulesDraft,
   makeCollectionClientId,
   makeHubClientId,
+  readWizardDraft,
   writeWizardDraft,
   type ScaffoldDraft,
   type ScaffoldHubDraft,
@@ -256,6 +257,36 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   // Used to decide whether type-change can silently regenerate the scaffold.
   const [scaffoldIsDefaultForType, setScaffoldIsDefaultForType] = useState(true)
   const [scaffoldSourceType, setScaffoldSourceType] = useState<NetworkType>(initialType)
+
+  // Restore the in-progress draft on mount if the user is returning from
+  // Step 3 or Step 4 (via browser back, or by deep-linking back into Step 2).
+  // We only run this once and only if a draft already exists; fresh entries
+  // from /builder/network/welcome keep the type-based defaults.
+  const didHydrateRef = useRef(false)
+  useEffect(() => {
+    if (didHydrateRef.current) return
+    didHydrateRef.current = true
+    const existing = readWizardDraft()
+    if (!existing) return
+    console.log("[v0] CreateNetworkForm: restoring wizard draft for Step 2:", {
+      name: existing.name,
+      type: existing.type,
+      hubs: existing.scaffold.hubs.length,
+    })
+    setName(existing.name)
+    setType(existing.type)
+    setDescription(existing.description)
+    setTheme(existing.theme)
+    setVisibility(existing.visibility)
+    setDomainPrefix(existing.slug)
+    // The slug was previously persisted by Step 2's own slugify pass, so
+    // mark it as manually edited so the auto-slug doesn't overwrite it
+    // unless the user changes the name.
+    setDomainPrefixManuallyEdited(true)
+    setScaffoldDraft(existing.scaffold)
+    setScaffoldIsDefaultForType(existing.scaffoldIsDefaultForType)
+    setScaffoldSourceType(existing.scaffoldSourceType ?? existing.type)
+  }, [])
 
   // Auto-sync slug from name unless user manually edited it
   const slug = useMemo(() => {

@@ -17,7 +17,7 @@ import {
   createCollection,
 } from "./supabase-networks"
 import { ScaffoldTemplate, validateScaffoldTemplate } from "./starter-scaffolds"
-import type { Network, Hub, Collection } from "./types"
+import type { Network, Hub, Collection, NetworkType, ThemeDirection, Visibility } from "./types"
 
 export interface CreateScaffoldResult {
   success: boolean
@@ -47,6 +47,19 @@ export async function createNetworkScaffold(
     networkName?: string
     networkSlug?: string
     networkDescription?: string
+    /**
+     * Network type override. REQUIRED to pass through to `createNetwork`
+     * because `ScaffoldTemplate` does not carry a `type` field. Without this,
+     * `createNetwork` would have to guess and could insert null, violating
+     * the `networks.type NOT NULL` constraint.
+     */
+    networkType?: NetworkType
+    /** Network theme override. Carries through to `branding.theme` on the public page. */
+    networkTheme?: ThemeDirection
+    /** Network visibility override (`"public"` | `"private"` | `"unlisted"`). */
+    networkVisibility?: Visibility
+    /** Network primary brand color override (hex). */
+    networkPrimaryColor?: string
   }
 ): Promise<CreateScaffoldResult> {
   console.log("[v0] createNetworkScaffold: Starting scaffold creation for template:", template.id)
@@ -62,15 +75,27 @@ export async function createNetworkScaffold(
   }
 
   try {
-    // Prepare network data with overrides
-    const networkDraft = {
+    // Prepare network data with overrides. type/theme are passed through so
+    // the wizard's selected values reach `networks.type` and `networks.theme`.
+    const networkDraft: Parameters<typeof createNetwork>[0] = {
       name: overrides?.networkName || template.networkTemplate.name,
       slug: overrides?.networkSlug || template.networkTemplate.slug,
       description: overrides?.networkDescription || template.networkTemplate.description,
-      primaryColor: "#000000", // Placeholder - UI-only field
+      // `createNetwork` will fall back to "gaming" if undefined, but we want the
+      // wizard's selected type to flow through unmodified.
+      type: overrides?.networkType ?? "gaming",
+      theme: overrides?.networkTheme ?? "parchment",
+      visibility: overrides?.networkVisibility ?? "private",
+      primaryColor: overrides?.networkPrimaryColor || "#6366f1",
     }
 
-    console.log("[v0] createNetworkScaffold: Creating network:", networkDraft)
+    console.log("[v0] createNetworkScaffold: Creating network with payload:", {
+      name: networkDraft.name,
+      slug: networkDraft.slug,
+      type: networkDraft.type,
+      theme: networkDraft.theme,
+      visibility: networkDraft.visibility,
+    })
 
     // Step 1: Create network
     const networkResult = await createNetwork(networkDraft)
