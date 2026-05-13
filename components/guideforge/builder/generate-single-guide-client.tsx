@@ -38,12 +38,16 @@ export function GenerateSingleGuideClient() {
   const [proposal, setProposal] = useState<GeneratedSingleGuide | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [restoredMessage, setRestoredMessage] = useState<string | null>(null)
+  const [importedIdea, setImportedIdea] = useState<string>("")
 
   // On mount, check for intake session from welcome intake panel
   useEffect(() => {
     const intakeSession = readIntakeSession()
     if (intakeSession.idea) {
       console.log('[v0] GenerateSingleGuideClient: Hydrating from welcome intake')
+      
+      // Store the original idea for AIIntakeLadder to display
+      setImportedIdea(intakeSession.idea)
       
       // Parse the rough idea to extract structured fields
       const parsed = parseRoughIdea(intakeSession.idea)
@@ -192,7 +196,7 @@ export function GenerateSingleGuideClient() {
       </div>
 
       {/* AI Intake Ladder */}
-      <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} />
+      <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} initialIdea={importedIdea} />
 
       <form
         onSubmit={(e) => {

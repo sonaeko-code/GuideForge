@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Loader2, Wand2, AlertCircle, Lightbulb, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
 interface AIIntakeLadderProps {
   assetType: "single_guide" | "checklist"
   onApplyFields: (fields: Partial<SingleGuideIntakeRequest> | Partial<ChecklistIntakeRequest>) => void
+  initialIdea?: string
 }
 
 /**
@@ -477,12 +478,19 @@ interface SmartFillResult {
   source: "smart" | "quick"
 }
 
-export function AIIntakeLadder({ assetType, onApplyFields }: AIIntakeLadderProps) {
+export function AIIntakeLadder({ assetType, onApplyFields, initialIdea }: AIIntakeLadderProps) {
   const [roughIdea, setRoughIdea] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSmartFilling, setIsSmartFilling] = useState(false)
   const [result, setResult] = useState<SmartFillResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Initialize roughIdea from initialIdea prop (e.g., from welcome intake hydration)
+  useEffect(() => {
+    if (initialIdea && initialIdea.trim() && !roughIdea) {
+      setRoughIdea(initialIdea.trim())
+    }
+  }, [initialIdea])
 
   /** Quick Fill: local heuristic parser, no network call */
   const handleQuickFill = async () => {
