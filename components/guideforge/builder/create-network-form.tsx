@@ -44,6 +44,7 @@ import {
   type ScaffoldHubDraft,
   type WizardDraft,
 } from "@/lib/guideforge/wizard-state"
+import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import {
   getEnabledRegistryTypes,
   getRegistryTypeById,
@@ -236,38 +237,34 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     didHydrateRef.current = true
     const existing = readWizardDraft()
     if (!existing) {
-      // No existing draft; check if there's a quick idea and router result from the intake panel
-      const quickIdea = sessionStorage.getItem("guideforge:quick-idea")
-      const routerResultStr = sessionStorage.getItem("guideforge:idea-router-result")
-
-      if (quickIdea) {
-        setRoughIdea(quickIdea)
-        sessionStorage.removeItem("guideforge:quick-idea")
+      // No existing draft; check for intake session from welcome
+      const intakeSession = readIntakeSession()
+      
+      if (intakeSession.idea) {
+        setRoughIdea(intakeSession.idea)
       }
 
-      if (routerResultStr) {
-        try {
-          const routerResult = JSON.parse(routerResultStr)
-          // Auto-apply the recommended network type and theme if available
-          if (
-            routerResult.recommendedNetworkTypeId &&
-            VALID_REGISTRY_IDS.has(routerResult.recommendedNetworkTypeId)
-          ) {
-            setTypeId(routerResult.recommendedNetworkTypeId)
-          }
-          if (
-            routerResult.suggestedThemeId &&
-            ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
-              routerResult.suggestedThemeId
-            )
-          ) {
-            setTheme(routerResult.suggestedThemeId)
-          }
-          sessionStorage.removeItem("guideforge:idea-router-result")
-        } catch (e) {
-          console.warn("[v0] Failed to parse router result:", e)
+      if (intakeSession.routerResult) {
+        const routerResult = intakeSession.routerResult
+        // Auto-apply the recommended network type and theme if available
+        if (
+          routerResult.recommendedNetworkTypeId &&
+          VALID_REGISTRY_IDS.has(routerResult.recommendedNetworkTypeId)
+        ) {
+          setTypeId(routerResult.recommendedNetworkTypeId)
+        }
+        if (
+          routerResult.suggestedThemeId &&
+          ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+            routerResult.suggestedThemeId
+          )
+        ) {
+          setTheme(routerResult.suggestedThemeId)
         }
       }
+
+      // Clear intake session after hydration
+      clearIntakeSession()
       return
     }
     // readWizardDraft already sanitizes type to a valid registry id

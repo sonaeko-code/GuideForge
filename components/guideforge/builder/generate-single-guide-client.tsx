@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { SingleGuideIntakeRequest, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { generateSingleGuideMock } from "@/lib/guideforge/mock-asset-generator"
+import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 import type { DifficultyLevel, GuideType } from "@/lib/guideforge/types"
@@ -35,6 +36,36 @@ export function GenerateSingleGuideClient() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [proposal, setProposal] = useState<GeneratedSingleGuide | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [restoredMessage, setRestoredMessage] = useState<string | null>(null)
+
+  // On mount, check for intake session from welcome intake panel
+  useEffect(() => {
+    const intakeSession = readIntakeSession()
+    if (intakeSession.idea) {
+      console.log('[v0] GenerateSingleGuideClient: Hydrating from welcome intake')
+      
+      // Prefill form fields with intake data
+      setFormState((prev) => {
+        const updated = { ...prev }
+        // Only prefill empty fields to not overwrite user edits
+        if (!prev.title && intakeSession.routerResult?.suggestedTitle) {
+          updated.title = intakeSession.routerResult.suggestedTitle
+        }
+        if (!prev.useCase) {
+          updated.useCase = intakeSession.idea
+        }
+        if (!prev.purpose && intakeSession.routerResult?.detectedIntent) {
+          updated.purpose = intakeSession.routerResult.detectedIntent
+        }
+        return updated
+      })
+      
+      setRestoredMessage('Imported from your welcome prompt.')
+      
+      // Clear intake session after hydration
+      clearIntakeSession()
+    }
+  }, [])
 
   const handleFieldChange = (field: keyof SingleGuideIntakeRequest, value: any) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
@@ -138,6 +169,12 @@ export function GenerateSingleGuideClient() {
         {error && (
           <Card className="border-red-500/30 bg-red-500/5 p-4">
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          </Card>
+        )}
+
+        {restoredMessage && (
+          <Card className="border-green-500/30 bg-green-500/5 p-4">
+            <p className="text-sm text-green-700 dark:text-green-300">{restoredMessage}</p>
           </Card>
         )}
 

@@ -193,7 +193,12 @@ function suggestTheme(typeId?: string): ThemeDirection | undefined {
 }
 
 /**
- * Main idea router function.
+ * Main idea router function with improved routing priority.
+ *
+ * Priority rules:
+ * 1. NETWORK: Multi-domain systems, household/family management, or broad organization needs
+ * 2. CHECKLIST: Single, bounded task/routine/workflow
+ * 3. SINGLE_GUIDE: Instructional/tutorial for one topic
  */
 export function routeIdea(roughIdea: string): IdeaRouterResult {
   const idea = roughIdea.trim()
@@ -226,96 +231,149 @@ export function routeIdea(roughIdea: string): IdeaRouterResult {
   const checklistScore = countKeywords(idea, CHECKLIST_KEYWORDS)
   const networkScore = countKeywords(idea, NETWORK_KEYWORDS)
   const guideScore = countKeywords(idea, GUIDE_KEYWORDS)
+  
+  // Check for multi-domain/system signals that force NETWORK
+  const hasMultipleDomains = /(\+|and|,|\s(plus|also)\s)/.test(idea) && idea.length > 100
+  const hasSystemKeywords = /\b(system|network|hub|organize|family|household|emergency|maintenance)\b/i.test(idea)
+  const hasMultipleChecklists = /\b(checklists?|lists?|routines?)\b/i.test(idea) && checklistScore < 3
 
-  // Heuristic routing logic
-  let recommendedPath: RecommendedPath
-  let detectedIntent: string
-  let reasoning: string[] = []
-  let confidence: Confidence
-
-  if (checklistScore >= 2 && checklistScore >= networkScore && checklistScore >= guideScore) {
-    // Clearly a checklist idea
-    recommendedPath = "checklist"
-    detectedIntent = "Repeatable or one-time task checklist"
-    reasoning = [
-      `Found ${checklistScore} checklist-related keywords: ${idea
-        .split(/\s+/)
-        .filter((w) => CHECKLIST_KEYWORDS.some((kw) => w.toLowerCase().includes(kw)))
-        .slice(0, 3)
-        .join(", ")}`,
-    ]
-    confidence = checklistScore >= 3 ? "high" : "medium"
-  } else if (guideScore >= 2 && guideScore > networkScore && guideScore > checklistScore && idea.length < 200) {
-    // Seems like a single guide
-    recommendedPath = "single_guide"
-    detectedIntent = "Single how-to guide or tutorial"
-    reasoning = [
-      `Detected guide-related intent and shorter scope.`,
-    ]
-    confidence = "medium"
-  } else {
-    // Default to network (most common/powerful path)
-    recommendedPath = "network"
-    detectedIntent = "Comprehensive guide network or system"
-    reasoning = [`Longer scope or structured organization intent detected.`]
-    confidence = networkScore >= 2 ? "high" : "medium"
+  // Rule: Multi-domain systems always route to NETWORK
+  if (hasMultipleDomains && hasSystemKeywords) {
+    return {
+      recommendedPath: "network",
+      confidence: "high",
+      detectedIntent: "Multi-domain household or organizational system",
+      recommendedNetworkTypeId: detectNetworkType(idea),
+      suggestedThemeId: suggestTheme(detectNetworkType(idea)),
+      reasoning: [
+        "Detected multiple interrelated domains and system-building intent.",
+        "This is best served as a comprehensive network with organized hubs.",
+      ],
+      routeOptions: [
+        {
+          path: "network",
+          label: `Build a ${detectNetworkType(idea)?.replace(/_/g, " ") || "multi-domain"} network`,
+          description: "Organize all related guides and resources together",
+        },
+        {
+          path: "checklist",
+          label: "Create a Checklist Instead",
+          description: "Focus on one repeatable task or routine",
+        },
+        {
+          path: "single_guide",
+          label: "Create a Single Guide Instead",
+          description: "Standalone tutorial for one topic",
+        },
+      ],
+    }
   }
 
-  const typeId = recommendedPath === "network" ? detectNetworkType(idea) : undefined
-  const themeId = suggestTheme(typeId)
-
-  const options: RouteOption[] = []
-
-  if (recommendedPath === "network") {
-    options.push({
-      path: "network",
-      label: "Build a Network",
-      description: typeId ? `Create a ${typeId.replace(/_/g, " ")} with hubs and guides` : "Full guide network",
-    })
-  } else if (recommendedPath === "checklist") {
-    options.push({
-      path: "checklist",
-      label: "Create a Checklist",
-      description: "One-time or repeatable task list",
-    })
-  } else {
-    options.push({
-      path: "single_guide",
-      label: "Create a Guide",
-      description: "Single tutorial or how-to",
-    })
+  // Rule: High checklist score + low network score + short/bounded scope = CHECKLIST
+  // But NOT if it mentions multiple items/categories
+  if (
+    checklistScore >= 2 &&
+    checklistScore > networkScore &&
+    checklistScore >= guideScore &&
+    !hasMultipleDomains &&
+    idea.length < 300
+  ) {
+    return {
+      recommendedPath: "checklist",
+      confidence: checklistScore >= 3 ? "high" : "medium",
+      detectedIntent: "Repeatable or one-time task checklist",
+      reasoning: [
+        `Found ${checklistScore} checklist-related keywords.`,
+        "Single focused task workflow detected.",
+      ],
+      routeOptions: [
+        {
+          path: "checklist",
+          label: "Create a Checklist",
+          description: "One-time or repeatable task list",
+        },
+        {
+          path: "network",
+          label: "Build a Network Instead",
+          description: "Full guide ecosystem with hubs and collections",
+        },
+        {
+          path: "single_guide",
+          label: "Create a Single Guide Instead",
+          description: "Standalone tutorial",
+        },
+      ],
+    }
   }
 
-  // Always show alternatives
-  if (recommendedPath !== "network") {
-    options.push({
-      path: "network",
-      label: "Build a Network Instead",
-      description: "Full guide ecosystem with hubs and collections",
-    })
+  // Rule: Guide keywords + short scope + instructional tone = SINGLE_GUIDE
+  if (
+    guideScore >= 2 &&
+    guideScore > networkScore &&
+    guideScore > checklistScore &&
+    idea.length < 200
+  ) {
+    return {
+      recommendedPath: "single_guide",
+      confidence: "medium",
+      detectedIntent: "Single how-to guide or tutorial",
+      reasoning: ["Detected instructional intent with focused scope."],
+      routeOptions: [
+        {
+          path: "single_guide",
+          label: "Create a Guide",
+          description: "Single tutorial or how-to",
+        },
+        {
+          path: "network",
+          label: "Build a Network Instead",
+          description: "Full guide ecosystem with hubs and collections",
+        },
+        {
+          path: "checklist",
+          label: "Create a Checklist Instead",
+          description: "Task list or routine",
+        },
+      ],
+    }
   }
-  if (recommendedPath !== "checklist") {
-    options.push({
-      path: "checklist",
-      label: "Create a Checklist Instead",
-      description: "Task list or routine",
-    })
-  }
-  if (recommendedPath !== "single_guide") {
-    options.push({
-      path: "single_guide",
-      label: "Create a Single Guide Instead",
-      description: "Standalone tutorial",
-    })
-  }
+
+  // Default: NETWORK (most powerful and flexible)
+  const typeId = detectNetworkType(idea)
+  const confidence =
+    networkScore >= 2 ? "high" : hasMultipleDomains ? "high" : "medium"
 
   return {
-    recommendedPath,
+    recommendedPath: "network",
     confidence,
-    detectedIntent,
+    detectedIntent: "Comprehensive guide network or system",
     recommendedNetworkTypeId: typeId,
-    suggestedThemeId: themeId,
-    reasoning,
-    routeOptions: options.slice(0, 4),
+    suggestedThemeId: suggestTheme(typeId),
+    reasoning: [
+      hasMultipleDomains
+        ? "Multiple related domains detected—network provides best structure."
+        : hasSystemKeywords
+          ? "System-building intent detected."
+          : "Longer scope or structured organization intent detected.",
+    ],
+    routeOptions: [
+      {
+        path: "network",
+        label: typeId
+          ? `Build a ${typeId.replace(/_/g, " ")} Network`
+          : "Build a Network",
+        description: typeId ? `Create a ${typeId.replace(/_/g, " ")} with hubs and guides` : "Full guide network",
+      },
+      {
+        path: "checklist",
+        label: "Create a Checklist Instead",
+        description: "Task list or routine",
+      },
+      {
+        path: "single_guide",
+        label: "Create a Single Guide Instead",
+        description: "Standalone tutorial",
+      },
+    ].slice(0, 3),
   }
 }

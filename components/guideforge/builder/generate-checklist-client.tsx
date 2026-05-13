@@ -14,6 +14,7 @@ import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
+import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 
@@ -44,57 +45,67 @@ export function GenerateChecklistClient() {
   const [debugError, setDebugError] = useState<string | null>(null)
   const [canSeeDebugTools, setCanSeeDebugTools] = useState(false)
 
-  // On mount, check for pending proposal in sessionStorage and restore if valid
+  // On mount, check for pending proposal AND intake session from welcome
   useEffect(() => {
+    // First, try to restore pending proposal from auth/sign-in
     try {
       const pending = sessionStorage.getItem('guideforge.pendingAssetProposal')
-      if (!pending) {
-        console.log('[v0] GenerateChecklistClient: No pending proposal in sessionStorage')
-        return
+      if (pending) {
+        const parsed = JSON.parse(pending)
+        
+        // Validate the pending proposal
+        const isValid =
+          parsed &&
+          parsed.asset &&
+          parsed.assetType === 'checklist' &&
+          parsed.createdAt &&
+          parsed.returnRoute
+        
+        if (!isValid) {
+          console.warn('[v0] GenerateChecklistClient: Pending proposal failed validation', parsed)
+          sessionStorage.removeItem('guideforge.pendingAssetProposal')
+        } else {
+          // Check if proposal is recent (max 2 hours old)
+          const createdAt = new Date(parsed.createdAt)
+          const now = new Date()
+          const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
+          
+          if (ageMinutes <= 120) {
+            console.log('[v0] GenerateChecklistClient: Restoring pending proposal')
+            setProposal(parsed.asset as GeneratedChecklist)
+            setRestoredMessage('We restored your unsaved proposal after sign-in.')
+            return
+          } else {
+            sessionStorage.removeItem('guideforge.pendingAssetProposal')
+          }
+        }
       }
-
-      const parsed = JSON.parse(pending)
-      
-      // Validate the pending proposal
-      const isValid =
-        parsed &&
-        parsed.asset &&
-        parsed.assetType === 'checklist' &&
-        parsed.createdAt &&
-        parsed.returnRoute
-      
-      if (!isValid) {
-        console.warn('[v0] GenerateChecklistClient: Pending proposal failed validation', parsed)
-        sessionStorage.removeItem('guideforge.pendingAssetProposal')
-        return
-      }
-
-      // Check if proposal is recent (max 2 hours old)
-      const createdAt = new Date(parsed.createdAt)
-      const now = new Date()
-      const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
-      
-      if (ageMinutes > 120) {
-        console.log('[v0] GenerateChecklistClient: Pending proposal expired (age:', ageMinutes, 'minutes)')
-        sessionStorage.removeItem('guideforge.pendingAssetProposal')
-        return
-      }
-
-      // Restore the proposal
-      console.log('[v0] GenerateChecklistClient: Restoring pending proposal (age:', ageMinutes.toFixed(1), 'minutes)', {
-        assetType: parsed.assetType,
-        returnRoute: parsed.returnRoute,
-      })
-      
-      setProposal(parsed.asset as GeneratedChecklist)
-      setRestoredMessage('We restored your unsaved proposal after sign-in.')
     } catch (err) {
       console.warn('[v0] GenerateChecklistClient: Failed to restore pending proposal:', err instanceof Error ? err.message : String(err))
-      try {
-        sessionStorage.removeItem('guideforge.pendingAssetProposal')
-      } catch (_) {
-        // ignore
-      }
+    }
+
+    // Second, check for intake session from welcome intake panel
+    const intakeSession = readIntakeSession()
+    if (intakeSession.idea) {
+      console.log('[v0] GenerateChecklistClient: Hydrating from welcome intake')
+      
+      // Prefill rough idea if form is empty
+      setFormState((prev) => {
+        const updated = { ...prev }
+        // Only prefill empty fields
+        if (!prev.title && intakeSession.routerResult?.suggestedTitle) {
+          updated.title = intakeSession.routerResult.suggestedTitle
+        }
+        if (!prev.useCase) {
+          updated.useCase = intakeSession.idea
+        }
+        return updated
+      })
+      
+      setRestoredMessage('Imported from your welcome prompt.')
+      
+      // Clear intake session after hydration
+      clearIntakeSession()
     }
   }, [])
 

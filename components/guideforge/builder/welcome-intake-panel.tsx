@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { routeIdea, type IdeaRouterResult, type RecommendedPath } from "@/lib/guideforge/idea-router"
+import { writeIntakeSession } from "@/lib/guideforge/intake-session"
 
 const EXAMPLE_CHIPS = [
   "Build a full guide network",
@@ -41,9 +42,12 @@ export function WelcomeIntakePanel() {
 
     setIsSubmitting(true)
 
-    // Store idea and router result in sessionStorage
-    sessionStorage.setItem("guideforge:quick-idea", trimmedIdea)
-    sessionStorage.setItem("guideforge:idea-router-result", JSON.stringify(result))
+    // Use unified intake session helper to write all data
+    writeIntakeSession({
+      idea: trimmedIdea,
+      routerResult: result,
+      targetPath: path,
+    })
 
     // Route to the appropriate builder
     switch (path) {
