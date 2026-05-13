@@ -8,7 +8,8 @@
  */
 
 import { slugify } from "./utils"
-import type { NetworkType, ThemeDirection, NetworkDraft } from "./types"
+import type { ThemeDirection, NetworkDraft } from "./types"
+import { NETWORK_TYPE_REGISTRY, getDefaultRegistryId } from "./network-types"
 
 export interface SmartFillCollectionSuggestion {
   name: string
@@ -30,7 +31,8 @@ export interface SmartFillScaffoldSuggestion {
 export interface SmartFillResult {
   name: string
   description: string
-  type: NetworkType
+  /** Registry UI id (e.g. "gaming", "personal_knowledge"). Validated against VALID_REGISTRY_IDS. */
+  type: string
   theme: ThemeDirection
   slug: string
   /** Flat hub-name list (legacy callers). */
@@ -51,7 +53,7 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     return {
       name: "",
       description: "",
-      type: "creator",
+      type: getDefaultRegistryId(),
       theme: "parchment",
       slug: "",
       visibility: "private",
@@ -63,32 +65,27 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   const words = idea.split(/\s+/)
   const detectedKeywords: string[] = []
 
-  // ============ Type Detection ============
-  let type: NetworkType = "creator"
+  // ============ Type Detection — driven by the registry ============
+  // Build a keyword→registryId map from all enabled entries.
+  let typeId: string = getDefaultRegistryId()
   let typeScore = 0
 
-  const typePatterns: Record<NetworkType, string[]> = {
-    gaming: ["game", "gaming", "quest", "boss", "build", "rpg", "survival", "mmorpg", "steam", "dota", "wow", "raid", "dungeon", "esports"],
-    repair: ["repair", "fix", "maintenance", "maintenance", "procedure", "step-by-step", "how-to fix", "troubleshoot", "broken", "broken", "diagnostic"],
-    sop: ["process", "sop", "workflow", "business", "team", "procedure", "operational", "runbook", "standard", "protocol"],
-    training: ["course", "training", "learn", "curriculum", "lesson", "educational", "school", "onboarding", "instructor"],
-    creator: ["guide", "tutorial", "knowledge", "reference", "documentation", "personal", "portfolio"],
-    community: ["community", "wiki", "crowdsourced", "collaborative", "shared", "forum", "discussion"],
+  for (const entry of NETWORK_TYPE_REGISTRY) {
+    if (!entry.enabled) continue
+    const matches = entry.keywords.filter((p) => idea.includes(p))
+    if (matches.length > typeScore) {
+      typeScore = matches.length
+      typeId = entry.id
+    }
+    detectedKeywords.push(...matches)
   }
 
-  for (const [networkType, patterns] of Object.entries(typePatterns)) {
-    const matches = patterns.filter((p) => idea.includes(p)).length
-    if (matches > typeScore) {
-      typeScore = matches
-      type = networkType as NetworkType
-    }
-    if (matches > 0) {
-      detectedKeywords.push(...patterns.filter((p) => idea.includes(p)))
-    }
-  }
+  // Resolved theme from the winning registry entry
+  const resolvedEntry = NETWORK_TYPE_REGISTRY.find((e) => e.id === typeId)
 
   // ============ Theme Detection ============
-  let theme: ThemeDirection = "parchment"
+  let theme: ThemeDirection = resolvedEntry?.defaultTheme ?? "parchment"
+
   const themePatterns: Record<ThemeDirection, string[]> = {
     ember: ["gaming", "game", "quest", "fire", "warm", "energy", "fast-paced"],
     arcane: ["dark", "mystery", "complex", "fantasy", "advanced", "sophisticated", "arcane"],
@@ -106,18 +103,9 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     }
   }
 
-  // Always override theme from type when we have confident type detection
-  // The type map is more reliable than loose keyword matching on theme
-  const typeToThemeMap: Record<NetworkType, ThemeDirection> = {
-    gaming: "ember",
-    repair: "industrial",
-    sop: "industrial",
-    creator: "parchment",
-    training: "parchment",
-    community: "copper",
-  }
-  if (typeScore >= 1) {
-    theme = typeToThemeMap[type]
+  // Registry entry theme always wins when type was confidently detected
+  if (typeScore >= 1 && resolvedEntry) {
+    theme = resolvedEntry.defaultTheme
   }
 
   // ============ Name Extraction ============
@@ -146,23 +134,29 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   const quotedMatch = roughIdea.match(/["']([^"']+)["']/)
   const properNounMatch = stripped.match(/\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b/)
 
-  // Type-aware suffix and fallback name templates
-  const typeSuffix: Record<NetworkType, string> = {
+  // Type-aware suffix and fallback name templates (keyed by registry id)
+  const typeSuffix: Record<string, string> = {
     gaming: "Guides",
-    repair: "Repair Hub",
-    sop: "Runbook",
-    creator: "Guide Hub",
-    training: "Learning Network",
-    community: "Knowledge Base",
+    tech_repair: "Repair Hub",
+    home_systems: "Home Guide",
+    small_business: "Runbook",
+    restaurant_training: "Operations Hub",
+    wellness_training: "Wellness Guide",
+    creator_workflow: "Workflow Hub",
+    personal_knowledge: "Notebook",
+    general: "Knowledge Base",
   }
 
-  const typeDefaultNames: Record<NetworkType, string> = {
+  const typeDefaultNames: Record<string, string> = {
     gaming: "Game Strategy Network",
-    repair: "Repair & Maintenance Hub",
-    sop: "Process & Procedures Portal",
-    creator: "Creator Guide Hub",
-    training: "Training Library",
-    community: "Community Knowledge Base",
+    tech_repair: "Repair & Diagnostics Hub",
+    home_systems: "Home Maintenance Guide",
+    small_business: "Business Launch Playbook",
+    restaurant_training: "Restaurant Operations Runbook",
+    wellness_training: "Wellness & Training Program",
+    creator_workflow: "Creator Workflow System",
+    personal_knowledge: "Personal Knowledge System",
+    general: "General Knowledge Network",
   }
 
   // Domain-anchor keywords: short, brandable nouns we'll bias toward when crafting a title.
@@ -221,34 +215,40 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
 
   // Type-aware descriptor word that goes between the anchor and the suffix,
   // e.g. "Survival RPG Strategy Guides" or "Laptop Repair Hub".
-  const typeDescriptor: Record<NetworkType, string> = {
+  const typeDescriptor: Record<string, string> = {
     gaming: "Strategy",
-    repair: "Repair",
-    sop: "Operations",
-    creator: "Knowledge",
-    training: "Training",
-    community: "Community",
+    tech_repair: "Repair",
+    home_systems: "Maintenance",
+    small_business: "Operations",
+    restaurant_training: "Training",
+    wellness_training: "Wellness",
+    creator_workflow: "Workflow",
+    personal_knowledge: "Knowledge",
+    general: "Community",
   }
 
   let name: string
 
+  const sfx = typeSuffix[typeId] ?? "Guide Hub"
+  const defaultName = typeDefaultNames[typeId] ?? "Knowledge Network"
+  const descriptor = typeDescriptor[typeId] ?? "Guide"
+
   if (quotedMatch) {
     // Use quoted text as the core name
-    name = `${quotedMatch[1]} ${typeSuffix[type]}`
+    name = `${quotedMatch[1]} ${sfx}`
   } else if (detectedAnchors.length > 0) {
     // Combine detected domain anchors with type descriptor + suffix.
     // "Survival RPG Strategy Guides" / "Laptop Repair Hub" / "Onboarding Training Network".
     const anchorPhrase = detectedAnchors.join(" ")
-    const descriptor = typeDescriptor[type]
     // Avoid duplication: if descriptor already appears as an anchor, drop it.
     const lowerAnchor = anchorPhrase.toLowerCase()
     const useDescriptor = !lowerAnchor.includes(descriptor.toLowerCase())
     name = useDescriptor
-      ? `${anchorPhrase} ${descriptor} ${typeSuffix[type]}`
-      : `${anchorPhrase} ${typeSuffix[type]}`
+      ? `${anchorPhrase} ${descriptor} ${sfx}`
+      : `${anchorPhrase} ${sfx}`
   } else if (properNounMatch && properNounMatch[1].length > 2) {
     // Use detected proper noun
-    name = `${properNounMatch[1]} ${typeSuffix[type]}`
+    name = `${properNounMatch[1]} ${sfx}`
   } else {
     // Fall back to a cleaned-up, concise version: take first meaningful noun phrase
     // Remove type-describing words and pick up to 3 specific words
@@ -267,9 +267,9 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
       const core = candidateWords
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ")
-      name = `${core} ${typeSuffix[type]}`
+      name = `${core} ${sfx}`
     } else {
-      name = typeDefaultNames[type]
+      name = defaultName
     }
   }
 
@@ -291,17 +291,17 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   const slug = slugify(name)
 
   // ============ Hub Suggestions ============
-  const suggestedHubs = generateHubSuggestions(type, idea, words)
+  const suggestedHubs = generateHubSuggestions(typeId, idea, words)
 
   // ============ Scaffold Suggestion (hubs + collections) ============
-  const suggestedScaffold = generateScaffoldSuggestion(type, suggestedHubs)
+  const suggestedScaffold = generateScaffoldSuggestion(typeId, suggestedHubs)
 
   const confidence = Math.min(100, (typeScore * 20 + (detectedKeywords.length > 0 ? 40 : 0)))
 
   return {
     name,
     description,
-    type,
+    type: typeId,
     theme,
     slug,
     suggestedHubs,
@@ -317,7 +317,7 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
  * Generate suggested hubs based on network type and idea.
  * Prefers explicit topics mentioned in the rough idea over generic defaults.
  */
-function generateHubSuggestions(type: NetworkType, idea: string, words: string[]): string[] {
+function generateHubSuggestions(type: string, idea: string, words: string[]): string[] {
   // Map of keyword → hub display name. More complete than before.
   const keywordToHub: Record<string, string> = {
     // Gaming / RPG
@@ -377,14 +377,17 @@ function generateHubSuggestions(type: NetworkType, idea: string, words: string[]
     }
   }
 
-  // Fallback defaults per type if we didn't detect enough
-  const defaults: Record<NetworkType, string[]> = {
+  // Fallback defaults per type (keyed by registry id)
+  const defaults: Record<string, string[]> = {
     gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Community Highlights"],
-    repair: ["Diagnostics & Testing", "Safety Procedures", "Tools & Equipment", "Troubleshooting", "Preventive Maintenance"],
-    sop: ["Getting Started", "Core Procedures", "Advanced Topics", "Compliance & Policies", "Team Resources"],
-    creator: ["Fundamentals", "Intermediate", "Advanced Topics", "Resources", "FAQ"],
-    training: ["Onboarding", "Core Curriculum", "Advanced Topics", "Resources", "Assessments & Quizzes"],
-    community: ["Getting Started", "Best Practices", "Community Highlights", "Resources", "Troubleshooting"],
+    tech_repair: ["Diagnostics & Testing", "Safety Procedures", "Tools & Equipment", "Troubleshooting", "Preventive Maintenance"],
+    home_systems: ["Seasonal Maintenance", "Home Systems", "Emergency Prep", "Tools & Equipment", "Common Issues"],
+    small_business: ["Launch Checklist", "Client Onboarding", "Daily Operations", "Compliance & Policies", "Team Resources"],
+    restaurant_training: ["Onboarding", "Daily Operations", "Food Safety", "Compliance & Policies", "Team Resources"],
+    wellness_training: ["Programs", "Nutrition", "Habits & Mindset", "Assessments & Quizzes", "Resources"],
+    creator_workflow: ["Content Planning", "Production Workflow", "Publishing", "Analytics & Growth", "Resources"],
+    personal_knowledge: ["Daily Planning", "Projects", "Learning & Goals", "Resources", "Reviews & Reflections"],
+    general: ["Getting Started", "Best Practices", "Community Highlights", "Resources", "Troubleshooting"],
   }
 
   // Merge: detected first, then fill from defaults to reach 5
@@ -598,7 +601,7 @@ const HUB_TO_COLLECTIONS: Record<string, SmartFillCollectionSuggestion[]> = {
  * falling back to a generic two-collection seed when the hub is unknown.
  */
 function generateScaffoldSuggestion(
-  type: NetworkType,
+  typeId: string,
   hubNames: string[],
 ): SmartFillScaffoldSuggestion {
   const hubs: SmartFillHubSuggestion[] = hubNames.map((hubName) => {
@@ -612,7 +615,7 @@ function generateScaffoldSuggestion(
     return {
       name: hubName,
       slug: slugify(hubName),
-      description: `${hubName} for your ${type} network.`,
+      description: `${hubName} for your network.`,
       collections: collections.map((c) => ({ ...c })),
     }
   })

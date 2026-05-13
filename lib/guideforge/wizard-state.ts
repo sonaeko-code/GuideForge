@@ -17,7 +17,8 @@
  * only locally for now. The Step 4 UI explicitly surfaces this limitation.
  */
 
-import type { NetworkType, ThemeDirection, Visibility } from "./types"
+import type { ThemeDirection, Visibility } from "./types"
+import { VALID_REGISTRY_IDS, getDefaultRegistryId } from "./network-types"
 
 export const WIZARD_DRAFT_KEY = "guideforge:wizard-draft"
 export const WIZARD_DRAFT_VERSION = 1
@@ -90,14 +91,19 @@ export interface WizardDraft {
   name: string
   slug: string
   description: string
-  type: NetworkType
+  /**
+   * Registry UI id (e.g. "gaming", "personal_knowledge", "tech_repair").
+   * Use resolveDbType(draft.type) to get the DB-safe NetworkType value.
+   * Always a non-empty string matching a VALID_REGISTRY_IDS entry.
+   */
+  type: string
   theme: ThemeDirection
   visibility: Visibility
   /** When true, the scaffold is the unedited default for the current type
    * (so a type change can safely regenerate without losing user edits). */
   scaffoldIsDefaultForType: boolean
   /** Captures which type's defaults the scaffold was generated from. */
-  scaffoldSourceType: NetworkType | null
+  scaffoldSourceType: string | null
   // Step 3 — unified scaffold (edited in Step 3, previewed in Step 2)
   scaffold: ScaffoldDraft
   // Step 4 — local governance metadata (no Supabase column yet)
@@ -139,6 +145,11 @@ export function readWizardDraft(): WizardDraft | null {
     if (!parsed || typeof parsed !== "object" || parsed.version !== WIZARD_DRAFT_VERSION) {
       // Stale/incompatible draft — drop it.
       return null
+    }
+    // Sanitize: if the stored type is missing or not in the current registry,
+    // reset to a safe default rather than returning a broken draft.
+    if (!parsed.type || !VALID_REGISTRY_IDS.has(parsed.type)) {
+      parsed.type = getDefaultRegistryId()
     }
     return parsed
   } catch (err) {
@@ -192,6 +203,9 @@ export function validateWizardDraft(draft: WizardDraft): WizardDraftValidation {
 
   if (!draft.name.trim()) errors.push("Network name is required.")
   if (!draft.slug.trim()) errors.push("Network slug is required.")
+  if (!draft.type || !VALID_REGISTRY_IDS.has(draft.type)) {
+    errors.push(`Network type is invalid (received: "${draft.type || ""}"). Please select a type.`)
+  }
 
   if (!draft.scaffold.hubs || draft.scaffold.hubs.length === 0) {
     errors.push("At least one hub is required.")

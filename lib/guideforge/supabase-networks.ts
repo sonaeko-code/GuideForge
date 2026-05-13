@@ -18,6 +18,7 @@
 import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
+import { resolveDbType } from "./network-types"
 
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
@@ -63,13 +64,21 @@ export function normalizeNetworkCreatePayload(
     normalized.slug = draft.slug.trim()
   }
 
-  // Validate and normalize type
-  const validTypes = ["gaming", "repair", "sop", "creator", "training", "community"]
-  if (!draft.type || !validTypes.includes(draft.type)) {
-    errors.push(`Invalid network type: ${draft.type}. Must be one of: ${validTypes.join(", ")}`)
-    normalized.type = "gaming" // Safe fallback
+  // Validate and normalize type.
+  // draft.type may be a registry UI id (e.g. "personal_knowledge") or a legacy DB value.
+  // resolveDbType maps both to a valid DB enum value (gaming|repair|sop|creator|training|community).
+  const validDbTypes = ["gaming", "repair", "sop", "creator", "training", "community"]
+  if (!draft.type) {
+    errors.push("Network type is required.")
+    normalized.type = "gaming"
   } else {
-    normalized.type = draft.type
+    const resolved = resolveDbType(draft.type)
+    if (!validDbTypes.includes(resolved)) {
+      errors.push(`Invalid network type: "${draft.type}". Could not resolve to a valid DB type.`)
+      normalized.type = "gaming"
+    } else {
+      normalized.type = resolved
+    }
   }
 
   // Validate and normalize theme
@@ -202,10 +211,13 @@ export async function createNetwork(
     if (!draft.slug || !draft.slug.trim()) {
       throw new Error("Network slug/subdomain is required")
     }
-    if (!draft.type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(draft.type)) {
-      console.warn("[v0] Invalid network type:", draft.type, "— defaulting to 'gaming'")
-      // Fallback to valid type if invalid provided
+    // Resolve registry id → DB-safe NetworkType before insertion.
+    const resolvedType = resolveDbType(draft.type || "gaming")
+    if (!["gaming", "repair", "sop", "creator", "training", "community"].includes(resolvedType)) {
+      console.warn("[v0] Invalid network type after resolution:", draft.type, "→", resolvedType, "— defaulting to 'gaming'")
       draft.type = "gaming"
+    } else {
+      draft.type = resolvedType
     }
 
     const profileId = await getCurrentProfileId()

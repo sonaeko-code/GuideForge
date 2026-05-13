@@ -32,6 +32,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import type { ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
+import { resolveDbType, getRegistryTypeById } from "@/lib/guideforge/network-types"
 import {
   clearWizardDraft,
   mergeWizardDraft,
@@ -181,7 +182,7 @@ export function ForgeRulesEditor() {
         networkName: draft.name,
         networkSlug: draft.slug,
         networkDescription: draft.description,
-        networkType: draft.type,
+        networkType: resolveDbType(draft.type),
         networkTheme: draft.theme,
         networkVisibility: draft.visibility,
         networkPrimaryColor: draft.theme === "ember" ? "#f97316" : "#6366f1",
@@ -267,7 +268,7 @@ export function ForgeRulesEditor() {
         </p>
         <p className="mt-1 text-lg font-semibold text-foreground">{draft.name}</p>
         <p className="text-xs text-muted-foreground">
-          {draft.slug}.guideforge.app &middot; {draft.type} &middot; theme: {draft.theme}{" "}
+          {draft.slug}.guideforge.app &middot; {getRegistryTypeById(draft.type)?.label ?? draft.type} &middot; theme: {draft.theme}{" "}
           &middot; {draft.scaffold.hubs.length} hubs,{" "}
           {draft.scaffold.hubs.reduce((s, h) => s + h.collections.length, 0)} collections
         </p>

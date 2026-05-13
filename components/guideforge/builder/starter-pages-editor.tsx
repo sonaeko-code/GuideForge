@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { slugify } from "@/lib/guideforge/utils"
+import { getRegistryTypeById } from "@/lib/guideforge/network-types"
 import {
   makeCollectionClientId,
   makeHubClientId,
@@ -303,7 +304,7 @@ export function StarterPagesEditor() {
           <div className="flex flex-col gap-1">
             <p className="text-sm font-semibold text-foreground">{load.draft.name}</p>
             <p className="text-xs text-muted-foreground">
-              {load.draft.type} · {hubs.length} hubs · {totalCollections} collections
+              {getRegistryTypeById(load.draft.type)?.label ?? load.draft.type} · {hubs.length} hubs · {totalCollections} collections
             </p>
           </div>
           <Badge variant="secondary" className="text-xs">
