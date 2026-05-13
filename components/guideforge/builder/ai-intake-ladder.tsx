@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import type { SingleGuideIntakeRequest, ChecklistIntakeRequest } from "@/lib/guideforge/generation-schemas"
+import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
 
 interface AIIntakeLadderProps {
   assetType: "single_guide" | "checklist"
@@ -51,82 +52,11 @@ function titleCaseGuideTitle(text: string): string {
 
 /**
  * Local heuristic parser for filling structured intake fields from rough ideas.
- * Uses simple keyword matching and text analysis instead of calling OpenAI.
+ * Uses parseRoughIdea from shared parser to extract all fields uniformly.
  */
-function parseRoughIdea(text: string): Record<string, string | number | boolean> {
-  const result: Record<string, string | number | boolean> = {}
-  const lowerText = text.toLowerCase()
-
-  // 4. EXTRACT AUDIENCE - from "for X" phrases or audience keywords (needed for purpose)
-  const audience = extractAudience(text)
-  if (audience) result.audience = audience
-
-  // 5. EXTRACT USE CASE / CONTEXT - from "when", "for publishing", etc. (needed for purpose and title fallback)
-  const useCase = extractUseCase(text)
-  if (useCase) result.useCase = useCase
-
-  // 1. EXTRACT TITLE - strip common prefix phrases and extract meaningful title
-  // Pass useCase as fallback if direct title extraction fails
-  const title = extractTitle(text, useCase)
-  if (title) result.title = title
-
-  // 2. EXTRACT PURPOSE - general intent/problem (now with audience and useCase)
-  const purpose = extractPurpose(text, title, audience, useCase)
-  if (purpose) result.purpose = purpose
-
-  // 3. EXTRACT GOAL - specific outcomes or what they should achieve
-  const goal = extractGoal(text)
-  if (goal) result.goal = goal
-
-  // 6. EXTRACT ADDITIONAL CONTEXT - topics covered, what's included
-  const additionalContext = extractAdditionalContext(text)
-  if (additionalContext) result.optionalContext = additionalContext
-
-  // 7. DETECT TONE from keywords
-  const tone = detectTone(lowerText)
-  if (tone) result.tone = tone
-
-  // 8. DETECT DIFFICULTY/AUDIENCE LEVEL
-  const difficulty = detectDifficulty(lowerText)
-  if (difficulty) result.difficulty = difficulty
-
-  // 9. DETECT GUIDE TYPE/FORMAT
-  const guideType = detectGuideType(lowerText)
-  if (guideType) result.guideType = guideType
-
-  // 10. DETECT WARNINGS AND PREREQUISITES
-  if (
-    lowerText.includes("warning") ||
-    lowerText.includes("caution") ||
-    lowerText.includes("safety") ||
-    lowerText.includes("dangerous") ||
-    lowerText.includes("avoid mistakes") ||
-    lowerText.includes("risk")
-  ) {
-    result.hasWarnings = true
-  }
-
-  if (
-    lowerText.includes("prerequisite") ||
-    lowerText.includes("requirement") ||
-    lowerText.includes("before you start") ||
-    lowerText.includes("need to have") ||
-    lowerText.includes("setup required")
-  ) {
-    result.hasPrerequisites = true
-  }
-
-  // 11. DETERMINE NUMBER OF STEPS (single guide)
-  const numberOfSteps = determineNumberOfSteps(lowerText, result.difficulty as string)
-  if (numberOfSteps) result.numberOfSteps = numberOfSteps
-
-  // 12. INFER CHECKLIST STRUCTURE - numberOfSections and itemsPerSection
-  const sections = inferNumberOfSections(lowerText)
-  if (sections) result.numberOfSections = sections
-  const items = inferItemsPerSection(lowerText)
-  if (items) result.itemsPerSection = items
-
-  return result
+function parseRoughIdeaLocal(text: string): Record<string, string | number | boolean> {
+  // Simply delegate to the shared parser
+  return parseRoughIdea(text)
 }
 
 /**

@@ -179,3 +179,24 @@ export function normalizeThemeId(themeId: string | undefined): ThemeDirection {
   }
   return themeId as ThemeDirection
 }
+
+/**
+ * Map a theme ID to a representative Lucide icon.
+ * Used in the welcome page and other UI components to visualize theme choices.
+ */
+export function getThemeIcon(themeId?: ThemeDirection): React.ComponentType<{ className?: string; 'aria-hidden'?: string }> {
+  const { Gamepad2, Wrench, Zap, Briefcase, Activity, ShieldCheck, Sparkles, BookOpen } =
+    require("lucide-react")
+  
+  const iconMap: Record<ThemeDirection, React.ComponentType<any>> = {
+    ember: Gamepad2,        // Gaming / energy
+    industrial: Wrench,     // Repair / technical
+    neutral: Briefcase,     // Business / professional
+    soft: Activity,         // Wellness / health
+    copper: ShieldCheck,    // Trust / refined
+    arcane: Sparkles,       // Personal / creative
+    parchment: BookOpen,    // Knowledge / education
+  }
+  
+  return iconMap[themeId || "parchment"] || BookOpen
+}

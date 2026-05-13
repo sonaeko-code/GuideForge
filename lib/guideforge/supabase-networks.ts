@@ -18,6 +18,7 @@
 import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
+import { resolveDbType } from "./network-types"
 
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
@@ -63,13 +64,21 @@ export function normalizeNetworkCreatePayload(
     normalized.slug = draft.slug.trim()
   }
 
-  // Validate and normalize type
-  const validTypes = ["gaming", "repair", "sop", "creator", "training", "community"]
-  if (!draft.type || !validTypes.includes(draft.type)) {
-    errors.push(`Invalid network type: ${draft.type}. Must be one of: ${validTypes.join(", ")}`)
-    normalized.type = "gaming" // Safe fallback
+  // Validate and normalize type.
+  // draft.type may be a registry UI id (e.g. "personal_knowledge") or a legacy DB value.
+  // resolveDbType maps both to a valid DB enum value (gaming|repair|sop|creator|training|community).
+  const validDbTypes = ["gaming", "repair", "sop", "creator", "training", "community"]
+  if (!draft.type) {
+    errors.push("Network type is required.")
+    normalized.type = "gaming"
   } else {
-    normalized.type = draft.type
+    const resolved = resolveDbType(draft.type)
+    if (!validDbTypes.includes(resolved)) {
+      errors.push(`Invalid network type: "${draft.type}". Could not resolve to a valid DB type.`)
+      normalized.type = "gaming"
+    } else {
+      normalized.type = resolved
+    }
   }
 
   // Validate and normalize theme
@@ -122,8 +131,8 @@ function normalizeNetwork(row: any): Network {
     hubIds: row.hubIds || [],
     createdAt: row.created_at || row.createdAt,
     updatedAt: row.updated_at || row.updatedAt,
-    // Ownership Phase 2: Map snake_case owner_user_id to camelCase ownerUserId
-    ownerUserId: row.owner_user_id || row.ownerUserId || null,
+    // Ownership Phase 2: Map snake_case owner_id to camelCase ownerUserId
+    ownerUserId: row.owner_id || row.ownerUserId || null,
   }
 }
 
@@ -202,10 +211,13 @@ export async function createNetwork(
     if (!draft.slug || !draft.slug.trim()) {
       throw new Error("Network slug/subdomain is required")
     }
-    if (!draft.type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(draft.type)) {
-      console.warn("[v0] Invalid network type:", draft.type, "— defaulting to 'gaming'")
-      // Fallback to valid type if invalid provided
+    // Resolve registry id → DB-safe NetworkType before insertion.
+    const resolvedType = resolveDbType(draft.type || "gaming")
+    if (!["gaming", "repair", "sop", "creator", "training", "community"].includes(resolvedType)) {
+      console.warn("[v0] Invalid network type after resolution:", draft.type, "→", resolvedType, "— defaulting to 'gaming'")
       draft.type = "gaming"
+    } else {
+      draft.type = resolvedType
     }
 
     const profileId = await getCurrentProfileId()
@@ -225,9 +237,9 @@ export async function createNetwork(
       theme: normalizedTheme,
     }
 
-    // Ownership Phase 2: Include owner_user_id if user is logged in
-    // If profileId is DEV_PROFILE_ID (no real user session), omit owner_user_id to save as null
-    if (profileId !== DEV_PROFILE_ID) {
+    // Ownership Phase 2: Include owner_id if user is logged in
+    // The owner_id column in networks table stores the profile ID of the network creator
+    if (profileId && profileId !== DEV_PROFILE_ID) {
       networkData.owner_id = profileId
       console.log("[v0] Network save with owner_id:", profileId)
     } else {
@@ -1457,12 +1469,12 @@ export async function claimOwnerlessNetwork(
   }
 
   try {
-    // Step 1: Update networks.owner_user_id only where it's currently NULL
+    // Step 1: Update networks.owner_id only where it's currently NULL
     const { data: updateData, error: updateError } = await supabase
       .from("networks")
-      .update({ owner_user_id: userId })
+      .update({ owner_id: userId })
       .eq("id", networkId)
-      .is("owner_user_id", null)
+      .is("owner_id", null)
       .select()
 
     if (updateError) {
@@ -1997,11 +2009,11 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
       // Check owner fallback: is this user the network owner?
       const { data: networkData } = await supabase
         .from("networks")
-        .select("owner_user_id")
+        .select("owner_id")
         .eq("id", networkId)
         .maybeSingle()
       
-      const isNetworkOwner = networkData?.owner_user_id === userId
+      const isNetworkOwner = networkData?.owner_id === userId
       
       if (!isNetworkOwner) {
         console.log("[v0] User is not a member of this network and not the owner")

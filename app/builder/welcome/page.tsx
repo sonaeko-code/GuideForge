@@ -1,86 +1,22 @@
 import Link from "next/link"
-import {
-  ArrowRight,
-  Gamepad2,
-  GraduationCap,
-  LifeBuoy,
-  Sparkles,
-  Users,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { WizardProgress } from "@/components/guideforge/shared"
+import { WelcomeIntakePanel } from "@/components/guideforge/builder/welcome-intake-panel"
 import {
   BUILDER_WIZARD_STEPS,
   getWizardIndex,
 } from "@/lib/guideforge/wizard"
-import type { NetworkType } from "@/lib/guideforge/types"
-
-interface DirectionOption {
-  type: NetworkType
-  title: string
-  blurb: string
-  icon: LucideIcon
-  href: string
-  recommended?: boolean
-  available?: boolean
-}
-
-const OPTIONS: DirectionOption[] = [
-  {
-    type: "gaming",
-    title: "Gaming Guide Network",
-    blurb:
-      "Builds, walkthroughs, raid mechanics, patch notes. The first demo path.",
-    icon: Gamepad2,
-    href: "/builder/network/new?type=gaming",
-    recommended: true,
-    available: true,
-  },
-  {
-    type: "repair",
-    title: "Repair / Support Platform",
-    blurb:
-      "Procedural repair guides with safety callouts and product targeting.",
-    icon: Wrench,
-    href: "/builder/network/new?type=repair",
-  },
-  {
-    type: "sop",
-    title: "Business SOP Portal",
-    blurb:
-      "Process owners, revisions, and structured SOPs your team will actually follow.",
-    icon: LifeBuoy,
-    href: "/builder/network/new?type=sop",
-  },
-  {
-    type: "creator",
-    title: "Creator Guide Hub",
-    blurb:
-      "Personal teaching networks: tutorials, courses, and reference material.",
-    icon: Sparkles,
-    href: "/builder/network/new?type=creator",
-  },
-  {
-    type: "training",
-    title: "Training Library",
-    blurb:
-      "Curriculum-shaped collections with audience targeting and prerequisites.",
-    icon: GraduationCap,
-    href: "/builder/network/new?type=training",
-  },
-  {
-    type: "community",
-    title: "Community Knowledge Base",
-    blurb:
-      "Structured community guides with trust tiers and contributor credit.",
-    icon: Users,
-    href: "/builder/network/new?type=community",
-  },
-]
+import {
+  getEnabledRegistryTypes,
+  getComingNextRegistryTypes,
+} from "@/lib/guideforge/network-types"
+import { getThemeIcon } from "@/lib/guideforge/network-themes"
 
 export default function BuilderWelcomePage() {
+  const enabledTypes = getEnabledRegistryTypes()
+  const comingNextTypes = getComingNextRegistryTypes()
+
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader hideCta />
@@ -106,61 +42,99 @@ export default function BuilderWelcomePage() {
           </p>
         </header>
 
+        {/* Quick Idea Intake */}
+        <WelcomeIntakePanel />
+
+        {/* Enabled Network Types */}
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {OPTIONS.map((option) => {
-            const Icon = option.icon
+          {enabledTypes.map((entry) => {
+            const Icon = getThemeIcon(entry.defaultTheme)
             const cardClasses = [
               "group relative flex h-full flex-col gap-4 rounded-xl border bg-card p-5 text-left transition-colors",
-              option.available
+              entry.id === "gaming"
                 ? "border-primary/30 ring-1 ring-primary/20 hover:border-primary/60"
                 : "border-border hover:border-primary/40 hover:bg-accent/40",
             ].join(" ")
 
             return (
-              <li key={option.type}>
+              <li key={entry.id}>
                 <Link
-                  href={option.available ? option.href : "#"}
-                  aria-disabled={!option.available}
+                  href={`/builder/network/new?type=${entry.id}`}
                   className={cardClasses}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <Icon className="size-5" aria-hidden="true" />
                     </div>
-                    {option.recommended ? (
+                    {entry.id === "gaming" && (
                       <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        Recommended
+                        Popular
                       </span>
-                    ) : !option.available ? (
-                      <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        Coming next
-                      </span>
-                    ) : null}
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
                     <h2 className="text-base font-semibold tracking-tight text-foreground">
-                      {option.title}
+                      {entry.label}
                     </h2>
                     <p className="text-sm leading-relaxed text-muted-foreground">
-                      {option.blurb}
+                      {entry.description}
                     </p>
                   </div>
 
                   <div className="mt-auto flex items-center gap-1.5 text-sm font-medium text-primary">
-                    {option.available ? "Continue" : "Available soon"}
-                    {option.available ? (
-                      <ArrowRight
-                        className="size-4 transition-transform group-hover:translate-x-0.5"
-                        aria-hidden="true"
-                      />
-                    ) : null}
+                    Continue
+                    <ArrowRight
+                      className="size-4 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
                   </div>
                 </Link>
               </li>
             )
           })}
         </ul>
+
+        {/* Coming Next Section */}
+        {comingNextTypes.length > 0 && (
+          <>
+            <div className="mt-12 mb-6">
+              <h2 className="text-lg font-semibold text-foreground">Coming Next</h2>
+              <p className="text-sm text-muted-foreground">
+                More network types coming soon as GuideForge expands.
+              </p>
+            </div>
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 opacity-60">
+              {comingNextTypes.map((entry) => {
+                const Icon = getThemeIcon(entry.defaultTheme)
+                return (
+                  <li
+                    key={entry.id}
+                    className="relative flex h-full flex-col gap-4 rounded-xl border border-border/50 bg-card/40 p-5 text-left"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <Icon className="size-5" aria-hidden="true" />
+                      </div>
+                      <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        Coming soon
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <h3 className="text-base font-semibold tracking-tight text-foreground">
+                        {entry.label}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {entry.description}
+                      </p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
+        )}
 
         <p className="mt-8 text-sm text-muted-foreground">
           Not sure yet? Start with{" "}

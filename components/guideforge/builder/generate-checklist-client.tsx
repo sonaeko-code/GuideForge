@@ -14,6 +14,8 @@ import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
+import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
+import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 
@@ -44,57 +46,95 @@ export function GenerateChecklistClient() {
   const [debugError, setDebugError] = useState<string | null>(null)
   const [canSeeDebugTools, setCanSeeDebugTools] = useState(false)
 
-  // On mount, check for pending proposal in sessionStorage and restore if valid
+  // On mount, check for pending proposal AND intake session from welcome
   useEffect(() => {
+    // First, try to restore pending proposal from auth/sign-in
     try {
       const pending = sessionStorage.getItem('guideforge.pendingAssetProposal')
-      if (!pending) {
-        console.log('[v0] GenerateChecklistClient: No pending proposal in sessionStorage')
-        return
+      if (pending) {
+        const parsed = JSON.parse(pending)
+        
+        // Validate the pending proposal
+        const isValid =
+          parsed &&
+          parsed.asset &&
+          parsed.assetType === 'checklist' &&
+          parsed.createdAt &&
+          parsed.returnRoute
+        
+        if (!isValid) {
+          console.warn('[v0] GenerateChecklistClient: Pending proposal failed validation', parsed)
+          sessionStorage.removeItem('guideforge.pendingAssetProposal')
+        } else {
+          // Check if proposal is recent (max 2 hours old)
+          const createdAt = new Date(parsed.createdAt)
+          const now = new Date()
+          const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
+          
+          if (ageMinutes <= 120) {
+            console.log('[v0] GenerateChecklistClient: Restoring pending proposal')
+            setProposal(parsed.asset as GeneratedChecklist)
+            setRestoredMessage('We restored your unsaved proposal after sign-in.')
+            return
+          } else {
+            sessionStorage.removeItem('guideforge.pendingAssetProposal')
+          }
+        }
       }
-
-      const parsed = JSON.parse(pending)
-      
-      // Validate the pending proposal
-      const isValid =
-        parsed &&
-        parsed.asset &&
-        parsed.assetType === 'checklist' &&
-        parsed.createdAt &&
-        parsed.returnRoute
-      
-      if (!isValid) {
-        console.warn('[v0] GenerateChecklistClient: Pending proposal failed validation', parsed)
-        sessionStorage.removeItem('guideforge.pendingAssetProposal')
-        return
-      }
-
-      // Check if proposal is recent (max 2 hours old)
-      const createdAt = new Date(parsed.createdAt)
-      const now = new Date()
-      const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
-      
-      if (ageMinutes > 120) {
-        console.log('[v0] GenerateChecklistClient: Pending proposal expired (age:', ageMinutes, 'minutes)')
-        sessionStorage.removeItem('guideforge.pendingAssetProposal')
-        return
-      }
-
-      // Restore the proposal
-      console.log('[v0] GenerateChecklistClient: Restoring pending proposal (age:', ageMinutes.toFixed(1), 'minutes)', {
-        assetType: parsed.assetType,
-        returnRoute: parsed.returnRoute,
-      })
-      
-      setProposal(parsed.asset as GeneratedChecklist)
-      setRestoredMessage('We restored your unsaved proposal after sign-in.')
     } catch (err) {
       console.warn('[v0] GenerateChecklistClient: Failed to restore pending proposal:', err instanceof Error ? err.message : String(err))
-      try {
-        sessionStorage.removeItem('guideforge.pendingAssetProposal')
-      } catch (_) {
-        // ignore
-      }
+    }
+
+    // Second, check for intake session from welcome intake panel
+    const intakeSession = readIntakeSession()
+    if (intakeSession.idea) {
+      console.log('[v0] GenerateChecklistClient: Hydrating from welcome intake')
+      
+      // Parse the rough idea to extract structured fields
+      const parsed = parseRoughIdea(intakeSession.idea)
+      
+      // Prefill form fields with both parsed data and router suggestions
+      setFormState((prev) => {
+        const updated = { ...prev }
+        
+        // Only prefill empty fields
+        if (!prev.title) {
+          updated.title = intakeSession.routerResult?.suggestedTitle || parsed.title || ""
+        }
+        if (!prev.useCase) {
+          updated.useCase = intakeSession.idea
+        }
+        if (!prev.audience && parsed.audience) {
+          updated.audience = parsed.audience
+        }
+        if (!prev.purpose && parsed.purpose) {
+          updated.purpose = parsed.purpose
+        } else if (!prev.purpose && intakeSession.routerResult?.detectedIntent) {
+          updated.purpose = intakeSession.routerResult.detectedIntent
+        }
+        if (!prev.goal && parsed.goal) {
+          updated.goal = parsed.goal
+        }
+        if (!prev.optionalContext && parsed.optionalContext) {
+          updated.optionalContext = parsed.optionalContext
+        }
+        if (!prev.tone && parsed.tone) {
+          updated.tone = parsed.tone
+        }
+        if (parsed.numberOfSections && parsed.numberOfSections > 0) {
+          updated.numberOfSections = Math.max(1, Math.min(5, parsed.numberOfSections))
+        }
+        if (parsed.itemsPerSection && parsed.itemsPerSection > 0) {
+          updated.itemsPerSection = Math.max(1, Math.min(10, parsed.itemsPerSection))
+        }
+        
+        return updated
+      })
+      
+      setRestoredMessage('Imported from your welcome prompt.')
+      
+      // Clear intake session after hydration
+      clearIntakeSession()
     }
   }, [])
 
@@ -495,6 +535,17 @@ export function GenerateChecklistClient() {
             rows={3}
           />
         </div>
+
+        {/* Repeatable Checklist Coming Soon */}
+        <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+          <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+            ✨ <span className="font-semibold">Repeatable Checklists Coming Soon</span>
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            Soon you'll be able to mark checklists as repeatable, set recurrence rules (daily, weekly), 
+            track completion history, and build habit streaks. Perfect for routines, recurring tasks, and habit tracking.
+          </p>
+        </Card>
 
         {/* Helper Copy */}
         {provider === "ai" && (

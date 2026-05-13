@@ -5,16 +5,7 @@ import {
   BUILDER_WIZARD_STEPS,
   getWizardIndex,
 } from "@/lib/guideforge/wizard"
-import type { NetworkType } from "@/lib/guideforge/types"
-
-const VALID_TYPES: NetworkType[] = [
-  "gaming",
-  "repair",
-  "sop",
-  "creator",
-  "training",
-  "community",
-]
+import { VALID_REGISTRY_IDS, getDefaultRegistryId } from "@/lib/guideforge/network-types"
 
 interface CreateNetworkPageProps {
   searchParams: Promise<{ type?: string }>
@@ -24,10 +15,8 @@ export default async function CreateNetworkPage({
   searchParams,
 }: CreateNetworkPageProps) {
   const { type } = await searchParams
-  const initialType: NetworkType =
-    type && (VALID_TYPES as string[]).includes(type)
-      ? (type as NetworkType)
-      : "gaming"
+  const initialType: string =
+    type && VALID_REGISTRY_IDS.has(type) ? type : getDefaultRegistryId()
 
   return (
     <main className="min-h-screen bg-background">
@@ -49,8 +38,7 @@ export default async function CreateNetworkPage({
             Set up your network
           </h1>
           <p className="text-pretty leading-relaxed text-muted-foreground">
-            Defaults are pre-filled for the {initialType === "gaming" ? "QuestLine demo" : "selected direction"}.
-            You can edit anything before continuing.
+            Start with a rough idea, choose a network type, and shape the scaffold before creating your network.
           </p>
         </header>
 

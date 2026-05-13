@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Check, Zap } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -31,84 +31,45 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
-import { createNetwork } from "@/lib/guideforge/supabase-networks"
-import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
-import { getEnabledNetworkTypes } from "@/lib/guideforge/network-types-config"
-import { getScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
+import { getScaffoldTemplate, type ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
-import { smartFillNetwork } from "@/lib/guideforge/smart-fill-network"
-import type {
-  NetworkType,
-  ThemeDirection,
-  Visibility,
-} from "@/lib/guideforge/types"
+import { smartFillNetwork, type SmartFillScaffoldSuggestion } from "@/lib/guideforge/smart-fill-network"
+import {
+  getDefaultForgeRulesDraft,
+  makeCollectionClientId,
+  makeHubClientId,
+  readWizardDraft,
+  writeWizardDraft,
+  type ScaffoldDraft,
+  type ScaffoldHubDraft,
+  type WizardDraft,
+} from "@/lib/guideforge/wizard-state"
+import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
+import {
+  getEnabledRegistryTypes,
+  getRegistryTypeById,
+  getDefaultRegistryId,
+  VALID_REGISTRY_IDS,
+  type NetworkTypeEntry,
+} from "@/lib/guideforge/network-types"
+import { slugify as slugifyUtil } from "@/lib/guideforge/utils"
+import type { ThemeDirection, Visibility } from "@/lib/guideforge/types"
 
-interface CreateNetworkFormProps {
-  initialType: NetworkType
-}
+// ---------------------------------------------------------------------------
+// Scaffold template map — keyed by registry type id, value = ScaffoldTemplate.id
+// ---------------------------------------------------------------------------
 
-const SCAFFOLD_TEMPLATE_MAP: Partial<Record<NetworkType, string>> = {
+const SCAFFOLD_TEMPLATE_MAP: Record<string, string> = {
   gaming: "gaming",
-  repair: "repair",
-  sop: "sop",
+  tech_repair: "repair",
+  home_systems: "repair",
+  small_business: "sop",
+  restaurant_training: "sop",
 }
 
-const NETWORK_TYPE_LABEL: Record<NetworkType, string> = {
-  gaming: "Gaming Guide Network",
-  repair: "Repair / Support Platform",
-  sop: "Business SOP Portal",
-  creator: "Creator Guide Hub",
-  training: "Training Library",
-  community: "Community Knowledge Base",
-}
-
-const DEFAULTS_BY_TYPE: Record<
-  NetworkType,
-  { name: string; description: string; theme: ThemeDirection; slug: string }
-> = {
-  gaming: {
-    name: "QuestLine",
-    description:
-      "A structured gaming guide network for builds, walkthroughs, news, and community knowledge.",
-    theme: "ember",
-    slug: "questline",
-  },
-  repair: {
-    name: "FieldFix",
-    description:
-      "Procedural repair guides with safety callouts, model targeting, and revision history.",
-    theme: "industrial",
-    slug: "fieldfix",
-  },
-  sop: {
-    name: "Runbook",
-    description:
-      "Process owners, revision numbers, and structured SOPs your team will actually follow.",
-    theme: "industrial",
-    slug: "runbook",
-  },
-  creator: {
-    name: "My Guide Hub",
-    description:
-      "A personal teaching network for tutorials, courses, and reference material.",
-    theme: "soft",
-    slug: "my-guide-hub",
-  },
-  training: {
-    name: "Atlas",
-    description:
-      "Curriculum-shaped collections with audience targeting and prerequisites.",
-    theme: "parchment",
-    slug: "atlas",
-  },
-  community: {
-    name: "Commons",
-    description:
-      "Structured community guides with trust tiers and contributor credit.",
-    theme: "copper",
-    slug: "commons",
-  },
-}
+// ---------------------------------------------------------------------------
+// Scaffold builder helpers
+// ---------------------------------------------------------------------------
 
 function slugify(value: string): string {
   return value
@@ -120,37 +81,284 @@ function slugify(value: string): string {
     .slice(0, 40)
 }
 
+/**
+ * Per-type generic hub+collection specs used when no rich ScaffoldTemplate exists.
+ * Keys are registry type ids.
+ */
+const GENERIC_HUBS_BY_TYPE: Record<string, { name: string; collections: string[] }[]> = {
+  gaming: [
+    { name: "Beginner Guides", collections: ["Getting Started", "Core Concepts"] },
+    { name: "Builds & Loadouts", collections: ["Starter Builds", "Endgame Builds"] },
+    { name: "Boss Guides", collections: ["Early Bosses", "Late Bosses"] },
+  ],
+  tech_repair: [
+    { name: "Common Issues", collections: ["Quick Fixes", "Recurring Problems"] },
+    { name: "Diagnostics", collections: ["Initial Triage", "Deep Diagnostics"] },
+    { name: "Tools & Safety", collections: ["Required Tools", "Safety Procedures"] },
+  ],
+  small_business: [
+    { name: "Launch Checklist", collections: ["Branding Basics", "Legal & Admin"] },
+    { name: "Client Onboarding", collections: ["Intro Workflow", "Contracts & Billing"] },
+    { name: "Operations", collections: ["Daily SOPs", "Team Handoffs"] },
+  ],
+  wellness_training: [
+    { name: "Programs", collections: ["Beginner Plans", "Intermediate Plans"] },
+    { name: "Nutrition", collections: ["Meal Planning", "Supplement Basics"] },
+    { name: "Habits & Mindset", collections: ["Daily Habits", "Recovery"] },
+  ],
+  home_systems: [
+    { name: "Seasonal Maintenance", collections: ["Spring Checklist", "Fall Checklist"] },
+    { name: "Home Systems", collections: ["HVAC", "Plumbing Basics"] },
+    { name: "Emergency Prep", collections: ["Power Outage Plan", "First-Aid Supplies"] },
+  ],
+  restaurant_training: [
+    { name: "Onboarding", collections: ["First Day", "First Week"] },
+    { name: "Daily Operations", collections: ["Opening Procedures", "Closing Procedures"] },
+    { name: "Food Safety", collections: ["Temperature Logs", "Sanitation Checklists"] },
+  ],
+  creator_workflow: [
+    { name: "Content Planning", collections: ["Content Calendar", "Topic Ideation"] },
+    { name: "Production", collections: ["Filming Checklist", "Editing Workflow"] },
+    { name: "Publishing", collections: ["Upload Checklist", "Promotion Workflow"] },
+  ],
+  personal_knowledge: [
+    { name: "Daily Planning", collections: ["Morning Routine", "Weekly Review"] },
+    { name: "Projects", collections: ["Active Projects", "On-Hold Projects"] },
+    { name: "Learning & Goals", collections: ["Learning Notes", "Long-Term Goals"] },
+  ],
+  general: [
+    { name: "Getting Started", collections: ["Quickstart", "Key Concepts"] },
+    { name: "Reference", collections: ["Data & Tables", "Glossary"] },
+    { name: "Resources", collections: ["Recommended Reading", "Tools & Templates"] },
+  ],
+}
+
+function scaffoldDraftFromTemplate(template: ScaffoldTemplate): ScaffoldDraft {
+  return {
+    hubs: template.hubs.map<ScaffoldHubDraft>((hubGroup) => ({
+      clientId: makeHubClientId(),
+      name: hubGroup.hub.name,
+      slug: hubGroup.hub.slug,
+      description: hubGroup.hub.description,
+      collections: hubGroup.collections.map((col) => ({
+        clientId: makeCollectionClientId(),
+        name: col.name,
+        slug: col.slug,
+        description: col.description,
+      })),
+    })),
+  }
+}
+
+function scaffoldDraftFromSmartFill(suggestion: SmartFillScaffoldSuggestion): ScaffoldDraft {
+  return {
+    hubs: suggestion.hubs.map<ScaffoldHubDraft>((hub) => ({
+      clientId: makeHubClientId(),
+      name: hub.name,
+      slug: hub.slug,
+      description: hub.description,
+      collections: hub.collections.map((col) => ({
+        clientId: makeCollectionClientId(),
+        name: col.name,
+        slug: col.slug,
+        description: col.description,
+      })),
+    })),
+  }
+}
+
+function scaffoldDraftFromGeneric(typeId: string): ScaffoldDraft {
+  const hubsSpec = GENERIC_HUBS_BY_TYPE[typeId] || GENERIC_HUBS_BY_TYPE.general
+  return {
+    hubs: hubsSpec.map<ScaffoldHubDraft>((spec) => ({
+      clientId: makeHubClientId(),
+      name: spec.name,
+      slug: slugifyUtil(spec.name),
+      description: `${spec.name} for your network.`,
+      collections: spec.collections.map((colName) => ({
+        clientId: makeCollectionClientId(),
+        name: colName,
+        slug: slugifyUtil(colName),
+        description: "",
+      })),
+    })),
+  }
+}
+
+function buildDefaultScaffoldDraft(typeId: string): ScaffoldDraft {
+  const scaffoldId = SCAFFOLD_TEMPLATE_MAP[typeId]
+  if (scaffoldId) {
+    const template = getScaffoldTemplate(scaffoldId)
+    if (template) return scaffoldDraftFromTemplate(template)
+  }
+  return scaffoldDraftFromGeneric(typeId)
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+interface CreateNetworkFormProps {
+  initialType: string
+}
+
 export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
-  // Future: Network Settings should allow editing network name, slug, description, hubs, and collections.
-  const defaults = DEFAULTS_BY_TYPE[initialType]
   const router = useRouter()
 
+  // Ensure initialType is always a valid registry id
+  const safeInitialType = VALID_REGISTRY_IDS.has(initialType)
+    ? initialType
+    : getDefaultRegistryId()
+
+  const initialEntry = getRegistryTypeById(safeInitialType)!
+
   const [step, setStep] = useState<"configure" | "preview">("configure")
-  const [name, setName] = useState(defaults.name)
-  const [type, setType] = useState<NetworkType>(initialType)
-  const [description, setDescription] = useState(defaults.description)
-  const [theme, setTheme] = useState<ThemeDirection>(defaults.theme)
+  const [name, setName] = useState(initialEntry.defaultName)
+  const [typeId, setTypeId] = useState<string>(safeInitialType)
+  const [description, setDescription] = useState(initialEntry.defaultDescription)
+  const [theme, setTheme] = useState<ThemeDirection>(initialEntry.defaultTheme)
   const [visibility, setVisibility] = useState<Visibility>("public")
-  const [domainPrefix, setDomainPrefix] = useState(defaults.slug)
+  const [domainPrefix, setDomainPrefix] = useState(initialEntry.defaultSlug)
   const [domainPrefixManuallyEdited, setDomainPrefixManuallyEdited] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [roughIdea, setRoughIdea] = useState("")
 
-  // Compute current scaffold template based on current type (not initialType)
-  const currentScaffoldId = SCAFFOLD_TEMPLATE_MAP[type]
-  const scaffoldTemplate = currentScaffoldId ? getScaffoldTemplate(currentScaffoldId) : null
+  const [scaffoldDraft, setScaffoldDraft] = useState<ScaffoldDraft>(() =>
+    buildDefaultScaffoldDraft(safeInitialType)
+  )
+  const [scaffoldIsDefaultForType, setScaffoldIsDefaultForType] = useState(true)
+  const [scaffoldSourceType, setScaffoldSourceType] = useState<string>(safeInitialType)
 
-  // Auto-sync slug from name unless user manually edited it
-  const slug = useMemo(() => {
-    if (domainPrefixManuallyEdited) {
-      return slugify(domainPrefix || name)
+  // Restore draft if returning from Step 3/4
+  const didHydrateRef = useRef(false)
+  const didAutoSmartFillRef = useRef(false)
+  
+  useEffect(() => {
+    if (didHydrateRef.current) return
+    didHydrateRef.current = true
+    const existing = readWizardDraft()
+    if (!existing) {
+      // No existing draft; check for intake session from welcome
+      const intakeSession = readIntakeSession()
+      
+      if (intakeSession.idea) {
+        setRoughIdea(intakeSession.idea)
+      }
+
+      if (intakeSession.routerResult) {
+        const routerResult = intakeSession.routerResult
+        // Auto-apply the recommended network type and theme if available
+        if (
+          routerResult.recommendedNetworkTypeId &&
+          VALID_REGISTRY_IDS.has(routerResult.recommendedNetworkTypeId)
+        ) {
+          setTypeId(routerResult.recommendedNetworkTypeId)
+        }
+        if (
+          routerResult.suggestedThemeId &&
+          ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+            routerResult.suggestedThemeId
+          )
+        ) {
+          setTheme(routerResult.suggestedThemeId)
+        }
+      }
+
+      // Clear intake session after hydration
+      clearIntakeSession()
+      return
     }
+    // readWizardDraft already sanitizes type to a valid registry id
+    setName(existing.name)
+    setTypeId(existing.type)
+    setDescription(existing.description)
+    setTheme(existing.theme)
+    setVisibility(existing.visibility)
+    setDomainPrefix(existing.slug)
+    setDomainPrefixManuallyEdited(true)
+    setScaffoldDraft(existing.scaffold)
+    setScaffoldIsDefaultForType(existing.scaffoldIsDefaultForType)
+    setScaffoldSourceType(existing.scaffoldSourceType ?? existing.type)
+    // Also restore roughIdea if it was stored in the draft
+    if (existing.roughIdea) {
+      setRoughIdea(existing.roughIdea)
+    }
+  }, [])
+
+  // Auto-run Smart Fill once on first mount if we just hydrated from welcome with an idea
+  // Do NOT run on existing wizard draft restores
+  useEffect(() => {
+    if (didAutoSmartFillRef.current) return
+    if (!didHydrateRef.current) return
+    
+    const existing = readWizardDraft()
+    if (existing) {
+      // Existing draft — do NOT auto-Smart-Fill
+      return
+    }
+
+    // Check if we have roughIdea from intake hydration
+    if (roughIdea.trim() && roughIdea.length > 10) {
+      didAutoSmartFillRef.current = true
+      console.log('[v0] CreateNetworkForm: Auto-running Smart Fill on welcome intake hydration')
+      
+      const result = smartFillNetwork(roughIdea)
+      if (!result.success) {
+        console.log('[v0] Auto-Smart-Fill could not parse the idea, leaving defaults')
+        return
+      }
+
+      if (result.name && result.name.trim()) setName(result.name)
+      if (result.description && result.description.trim()) setDescription(result.description)
+
+      // Apply detected type if valid
+      let nextTypeId = typeId
+      if (result.type && VALID_REGISTRY_IDS.has(result.type)) {
+        nextTypeId = result.type
+        setTypeId(result.type)
+      }
+
+      // Apply theme
+      if (
+        result.theme &&
+        ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+          result.theme
+        )
+      ) {
+        setTheme(result.theme)
+      }
+
+      // Apply slug
+      if (result.slug && result.slug.trim()) {
+        setDomainPrefix(result.slug)
+        setDomainPrefixManuallyEdited(false)
+      }
+
+      // Apply scaffold
+      if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
+        setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+        setScaffoldIsDefaultForType(true)
+        setScaffoldSourceType(nextTypeId)
+      } else if (nextTypeId !== scaffoldSourceType) {
+        setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
+        setScaffoldIsDefaultForType(true)
+        setScaffoldSourceType(nextTypeId)
+      }
+    }
+  }, [roughIdea, typeId, scaffoldSourceType])
+
+  const slug = useMemo(() => {
+    if (domainPrefixManuallyEdited) return slugify(domainPrefix || name)
     return slugify(name)
   }, [name, domainPrefix, domainPrefixManuallyEdited])
 
+  // Current registry entry (always defined — typeId is always valid)
+  const currentEntry: NetworkTypeEntry =
+    getRegistryTypeById(typeId) ?? getRegistryTypeById(getDefaultRegistryId())!
+
   function handleAutofill() {
-    const draft = generateMockNetworkDraft(type)
+    const draft = generateMockNetworkDraft(currentEntry.dbType)
     setName(draft.name)
     setDescription(draft.description)
     setTheme(draft.themeDirection)
@@ -165,43 +373,75 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     }
 
     const result = smartFillNetwork(roughIdea)
-    if (result.success) {
-      // Smart Fill: merge results, preserving manual selections for invalid Smart Fill outputs
-      // Only update fields where Smart Fill provided meaningful values
-      if (result.name && result.name.trim()) {
-        setName(result.name)
-      }
-      if (result.description && result.description.trim()) {
-        setDescription(result.description)
-      }
-      // Preserve manual type if Smart Fill didn't return valid one
-      if (result.type && ["gaming", "repair", "sop", "creator", "training", "community"].includes(result.type)) {
-        setType(result.type)
-      }
-      // Preserve manual theme if Smart Fill didn't return valid one
-      if (result.theme && ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(result.theme)) {
-        setTheme(result.theme)
-      }
-      if (result.slug && result.slug.trim()) {
-        setDomainPrefix(result.slug)
-        setDomainPrefixManuallyEdited(false)
-      }
-      setRoughIdea("")
-      setError(null)
-      console.log("[v0] Smart Fill Network: Applied results", { type: result.type, theme: result.theme, name: result.name })
-    } else {
+    if (!result.success) {
       setError("Could not parse your idea. Try being more specific.")
+      return
     }
+
+    if (result.name && result.name.trim()) setName(result.name)
+    if (result.description && result.description.trim()) setDescription(result.description)
+
+    // Smart Fill returns a registry id (after our update below).
+    // Only apply if it's a valid registry id; preserve the user's selection otherwise.
+    let nextTypeId = typeId
+    if (result.type && VALID_REGISTRY_IDS.has(result.type)) {
+      nextTypeId = result.type
+      setTypeId(result.type)
+    }
+
+    if (
+      result.theme &&
+      ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+        result.theme
+      )
+    ) {
+      setTheme(result.theme)
+    }
+
+    if (result.slug && result.slug.trim()) {
+      setDomainPrefix(result.slug)
+      setDomainPrefixManuallyEdited(false)
+    }
+
+    // Replace scaffold from Smart Fill suggestion, or regenerate for new type
+    if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
+      setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+      setScaffoldIsDefaultForType(true)
+      setScaffoldSourceType(nextTypeId)
+    } else if (nextTypeId !== scaffoldSourceType) {
+      setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
+      setScaffoldIsDefaultForType(true)
+      setScaffoldSourceType(nextTypeId)
+    }
+
+    setRoughIdea("")
+    setError(null)
   }
 
-  function handleTypeChange(newType: NetworkType) {
-    const newDefaults = DEFAULTS_BY_TYPE[newType]
-    setType(newType)
-    setName(newDefaults.name)
-    setDescription(newDefaults.description)
-    setTheme(newDefaults.theme)
-    setDomainPrefix(newDefaults.slug)
+  function handleTypeChange(newTypeId: string) {
+    if (!VALID_REGISTRY_IDS.has(newTypeId) || newTypeId === typeId) return
+
+    if (!scaffoldIsDefaultForType) {
+      const newEntry = getRegistryTypeById(newTypeId)
+      const confirmed =
+        typeof window === "undefined" ||
+        window.confirm(
+          `Reset scaffold to the "${newEntry?.label ?? newTypeId}" defaults? ` +
+            "Your current hub and collection edits will be replaced."
+        )
+      if (!confirmed) return
+    }
+
+    const newEntry = getRegistryTypeById(newTypeId)!
+    setTypeId(newTypeId)
+    setName(newEntry.defaultName)
+    setDescription(newEntry.defaultDescription)
+    setTheme(newEntry.defaultTheme)
+    setDomainPrefix(newEntry.defaultSlug)
     setDomainPrefixManuallyEdited(false)
+    setScaffoldDraft(buildDefaultScaffoldDraft(newTypeId))
+    setScaffoldIsDefaultForType(true)
+    setScaffoldSourceType(newTypeId)
     setStep("configure")
   }
 
@@ -214,6 +454,10 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
       setError("Subdomain is required")
       return
     }
+    if (!VALID_REGISTRY_IDS.has(typeId)) {
+      setError("Please select a valid network type.")
+      return
+    }
     setError(null)
     setStep("preview")
   }
@@ -224,81 +468,54 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setError(null)
 
     try {
-      // Validate required fields before save
-      if (!name.trim()) {
-        throw new Error("Network name is required")
+      if (!name.trim()) throw new Error("Network name is required")
+      if (!slug.trim()) throw new Error("Subdomain is required")
+      if (!VALID_REGISTRY_IDS.has(typeId)) {
+        throw new Error(`Please select a valid network type (received: "${typeId}").`)
       }
-      if (!slug.trim()) {
-        throw new Error("Subdomain is required")
+      if (
+        !theme ||
+        !["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+          theme
+        )
+      ) {
+        throw new Error(`Invalid theme: ${theme}.`)
       }
-      if (!type || !["gaming", "repair", "sop", "creator", "training", "community"].includes(type)) {
-        throw new Error(`Invalid network type: ${type}. Using default 'gaming'.`)
+      if (!scaffoldDraft.hubs || scaffoldDraft.hubs.length === 0) {
+        throw new Error(
+          "Scaffold has no hubs. Use Smart Fill or pick a different network type."
+        )
       }
-      if (!theme || !["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(theme)) {
-        throw new Error(`Invalid theme: ${theme}. Using default 'parchment'.`)
+
+      const existingDraft = readWizardDraft()
+      const draft: WizardDraft = {
+        version: 1,
+        roughIdea: roughIdea.trim(),
+        name: name.trim(),
+        slug: slug.trim(),
+        description: description.trim(),
+        type: typeId,
+        theme,
+        visibility,
+        scaffoldIsDefaultForType,
+        scaffoldSourceType,
+        scaffold: scaffoldDraft,
+        forgeRules: existingDraft?.forgeRules ?? getDefaultForgeRulesDraft(),
+        createdAt: existingDraft?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }
 
-      console.log("[v0] CreateNetworkForm: Pre-save validation:", { name, type, theme, slug })
-
-      // Check if this is a scaffold type
-      if (currentScaffoldId) {
-        if (!scaffoldTemplate) {
-          throw new Error(`Invalid scaffold template: ${currentScaffoldId}`)
-        }
-
-        console.log("[v0] CreateNetworkForm: Creating scaffold network:", { name, type, slug, scaffoldId: currentScaffoldId })
-
-        const result = await createNetworkScaffold(scaffoldTemplate, {
-          networkName: name,
-          networkSlug: slug,
-          networkDescription: description,
-        })
-
-        if (!result.success || !result.network?.id) {
-          console.error("[v0] CreateNetworkForm: Scaffold creation failed:", result.error)
-          setError(result.error || "Failed to create network scaffold")
-          return
-        }
-
-        console.log("[v0] CreateNetworkForm: Scaffold created:", result.network.id)
-        console.log("[v0] CreateNetworkForm: Created", result.hubs?.length || 0, "hubs and", result.collections?.length || 0, "collections")
-
-        // Route to the new network's dashboard
-        router.push(`/builder/network/${result.network.id}/dashboard`)
-      } else {
-        // Create blank network for non-scaffold types
-        console.log("[v0] CreateNetworkForm: Creating blank network:", { name, type, slug, theme })
-
-        const { network, error: createError } = await createNetwork({
-          name,
-          type,
-          description,
-          theme,
-          visibility,
-          slug,
-          primaryColor: theme === "ember" ? "#f97316" : "#6366f1",
-        })
-
-        if (createError || !network.id) {
-          console.error("[v0] CreateNetworkForm: Network creation error:", createError)
-          setError(createError || "Failed to create network")
-          return
-        }
-
-        console.log("[v0] CreateNetworkForm: Blank network created:", network.id)
-        console.log("[v0] CreateNetworkForm: Routing to network dashboard:", network.id)
-
-        // Route to the new network's dashboard
-        router.push(`/builder/network/${network.id}/dashboard`)
-      }
+      writeWizardDraft(draft)
+      router.push("/builder/network/starter-pages")
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
-      console.error("[v0] CreateNetworkForm: Creation exception:", message)
       setError(message)
     } finally {
       setSubmitting(false)
     }
   }
+
+  const enabledTypes = getEnabledRegistryTypes()
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -310,19 +527,22 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
       {step === "configure" && (
         <>
-          {/* Smart Fill Panel — always visible, primary flow */}
+          {/* Smart Fill Panel */}
           <Card className="p-5 border-amber-500/30 bg-amber-500/5">
             <div className="space-y-3">
               <div>
-                <p className="text-sm font-semibold text-foreground mb-1">Start with a rough idea</p>
+                <p className="text-sm font-semibold text-foreground mb-1">
+                  Start with a rough idea
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Describe the network you want to build and GuideForge will fill in the name, type, theme, hubs, and slug.
+                  Describe the network you want to build and GuideForge will fill in the name,
+                  type, theme, hubs, and slug.
                 </p>
               </div>
               <Textarea
                 value={roughIdea}
                 onChange={(e) => setRoughIdea(e.target.value)}
-                placeholder={`e.g. "A gaming guide network for a survival RPG — beginner guides, crafting, builds, boss fights, patch notes, and community strategies."`}
+                placeholder='e.g. "A personal knowledge network for organizing life, projects, routines, and learning goals"'
                 rows={3}
                 className="text-sm"
                 onKeyDown={(e) => {
@@ -340,7 +560,12 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 >
                   Quick Example
                 </button>
-                <Button type="button" size="sm" onClick={handleSmartFill} className="gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSmartFill}
+                  className="gap-1.5"
+                >
                   <Zap className="size-3.5" aria-hidden="true" />
                   Smart Fill Network
                 </Button>
@@ -348,7 +573,10 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
             </div>
           </Card>
 
-          <SectionCard title="Network basics" description="Name your network and tell readers what it covers.">
+          <SectionCard
+            title="Network basics"
+            description="Name your network and tell readers what it covers."
+          >
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="network-name">Network name</FieldLabel>
@@ -359,32 +587,49 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   placeholder="QuestLine"
                   required
                 />
-                <FieldDescription>
-                  Shown in the header of your hosted guide site.
-                </FieldDescription>
+                <FieldDescription>Shown in the header of your hosted guide site.</FieldDescription>
               </Field>
 
               <Field>
                 <FieldLabel htmlFor="network-type">Network type</FieldLabel>
-                <Select
-                  value={type}
-                  onValueChange={(value) => handleTypeChange(value as NetworkType)}
-                >
+                <Select value={typeId} onValueChange={handleTypeChange}>
                   <SelectTrigger id="network-type">
-                    <SelectValue />
+                    <SelectValue placeholder="Select a network type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {getEnabledNetworkTypes().map((networkType) => (
-                      <SelectItem key={networkType.id} value={networkType.id as NetworkType}>
-                        {networkType.label}
+                    {enabledTypes.map((entry) => (
+                      <SelectItem key={entry.id} value={entry.id}>
+                        {entry.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <FieldDescription>
-                  {SCAFFOLD_TEMPLATE_MAP[type] ? "Will create a scaffold with pre-configured hubs and collections." : "Determines starter Forge Rules and starter pages."}
+                  Determines the default scaffold, theme, and starter Forge Rules.
                 </FieldDescription>
               </Field>
+
+              {/* Type details panel — Best for examples */}
+              {currentEntry && (
+                <div className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-foreground">{currentEntry.label}</p>
+                  <p className="text-xs text-muted-foreground">{currentEntry.description}</p>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {currentEntry.bestFor.map((item) => (
+                      <Badge
+                        key={item}
+                        variant="secondary"
+                        className="text-xs font-normal px-1.5 py-0"
+                      >
+                        {item}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground pt-0.5">
+                    You can edit hubs and collections on the next step before anything is saved.
+                  </p>
+                </div>
+              )}
 
               <Field>
                 <FieldLabel htmlFor="network-description">Description</FieldLabel>
@@ -404,16 +649,16 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
           <SectionCard
             title="Theme and visibility"
-            description="Pick a starting theme. Visual themes help personalize your network's identity. You can fully customize branding later."
+            description="Pick a starting theme. You can fully customize branding later."
           >
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="network-theme">Theme direction</FieldLabel>
                 <FieldDescription className="mb-4">
-                  Select a visual direction for your network. Each theme has its own color palette and styling. The preview below updates as you select.
+                  Each theme has its own color palette and styling. The preview updates as you
+                  select.
                 </FieldDescription>
-                
-                {/* Visual Theme Cards */}
+
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mb-6">
                   {getAllNetworkThemes().map((themeOption) => (
                     <button
@@ -426,18 +671,22 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                           : "border-border/50 hover:border-foreground/30"
                       }`}
                     >
-                      {/* Preview background */}
-                      <div className={`absolute inset-0 rounded-lg ${themeOption.previewClasses} opacity-40 group-hover:opacity-60 transition-opacity`} />
-                      
-                      {/* Content */}
-                      <div className="relative flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-foreground">{themeOption.label}</h4>
-                          {theme === themeOption.id && (
-                            <Check className="size-4 text-foreground flex-shrink-0" aria-hidden="true" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground text-left">{themeOption.hint}</p>
+                      <div
+                        className={`absolute inset-0 rounded-lg ${themeOption.previewClasses} opacity-40 group-hover:opacity-60 transition-opacity`}
+                      />
+                      <div className="relative z-10 space-y-1">
+                        <p
+                          className={`text-xs font-semibold ${
+                            theme === themeOption.id
+                              ? themeOption.accentClasses
+                              : "text-foreground"
+                          }`}
+                        >
+                          {themeOption.label}
+                        </p>
+                        {theme === themeOption.id && (
+                          <p className="text-xs text-muted-foreground">Selected</p>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -445,43 +694,46 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
               </Field>
 
               {/* Theme Preview Panel */}
-              <div className="mt-6 p-4 rounded-lg border border-border/50 overflow-hidden">
+              <div className="mt-2 p-4 rounded-lg border border-border/50 overflow-hidden">
                 {(() => {
                   const selectedTheme = getAllNetworkThemes().find((t) => t.id === theme)
                   if (!selectedTheme) return null
-                  
                   return (
                     <div className="space-y-3">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Theme Preview</h4>
-                      
-                      {/* Sample Network Header */}
-                      <div className={`rounded-md p-4 ${selectedTheme.previewClasses} ${selectedTheme.borderClasses} border`}>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-full ${selectedTheme.bgClasses} border ${selectedTheme.borderClasses}`} />
-                            <div>
-                              <p className={`text-sm font-bold ${selectedTheme.accentClasses}`}>{name || "Network Name"}</p>
-                              <p className="text-xs text-muted-foreground">Sample network header</p>
-                            </div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Theme Preview
+                      </h4>
+                      <div
+                        className={`rounded-md p-4 ${selectedTheme.previewClasses} ${selectedTheme.borderClasses} border`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`w-8 h-8 rounded-full ${selectedTheme.bgClasses} border ${selectedTheme.borderClasses}`}
+                          />
+                          <div>
+                            <p
+                              className={`text-sm font-bold ${selectedTheme.accentClasses}`}
+                            >
+                              {name || "Network Name"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Sample network header</p>
                           </div>
                         </div>
                       </div>
-
-                      {/* Sample Cards */}
                       <div className="grid grid-cols-2 gap-2">
-                        {/* Hub Card */}
-                        <div className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}>
+                        <div
+                          className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}
+                        >
                           <p className="text-xs font-semibold text-foreground mb-1">Sample Hub</p>
                           <p className={`text-xs ${selectedTheme.accentClasses}`}>3 Collections</p>
                         </div>
-                        
-                        {/* Guide Card */}
-                        <div className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}>
+                        <div
+                          className={`rounded-md p-3 ${selectedTheme.cardClasses} border ${selectedTheme.borderClasses}`}
+                        >
                           <p className="text-xs font-semibold text-foreground mb-1">Sample Guide</p>
                           <Badge className={`text-xs ${selectedTheme.badgeClasses}`}>Draft</Badge>
                         </div>
                       </div>
-
                       <p className="text-xs text-muted-foreground">
                         <strong>Best for:</strong> {selectedTheme.bestFor.join(", ")}
                       </p>
@@ -492,9 +744,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
               <Field orientation="horizontal">
                 <FieldContent>
-                  <FieldLabel htmlFor="network-visibility">
-                    Public network
-                  </FieldLabel>
+                  <FieldLabel htmlFor="network-visibility">Public network</FieldLabel>
                   <FieldDescription>
                     {visibility === "public"
                       ? "Anyone with the link can read this network."
@@ -536,9 +786,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   }}
                   placeholder="questline"
                 />
-                <InputGroupAddon align="inline-end">
-                  .guideforge.app
-                </InputGroupAddon>
+                <InputGroupAddon align="inline-end">.guideforge.app</InputGroupAddon>
               </InputGroup>
               <FieldDescription>
                 You can connect a custom domain after publishing. Resolved slug:{" "}
@@ -549,33 +797,50 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         </>
       )}
 
-      {step === "preview" && scaffoldTemplate && (() => {
-        const previewTheme = getNetworkTheme(theme)
-        return (
-          <>
-            {/* Themed scaffold preview — matches what the created network page will look like */}
-            <div className={`rounded-xl border p-6 ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
+      {step === "preview" && scaffoldDraft.hubs.length > 0 &&
+        (() => {
+          const previewTheme = getNetworkTheme(theme)
+          const totalCollections = scaffoldDraft.hubs.reduce(
+            (sum, h) => sum + h.collections.length,
+            0
+          )
+          return (
+            <div
+              className={`rounded-xl border p-6 ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}
+            >
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
                 Scaffold Preview
               </p>
 
-              {/* Network header mock */}
-              <div className={`rounded-lg p-4 mb-4 ${previewTheme.previewClasses} border ${previewTheme.borderClasses}`}>
-                <p className={`text-lg font-black tracking-tight ${previewTheme.accentClasses}`}>{name || "Network Name"}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {slug}.guideforge.app
+              <div
+                className={`rounded-lg p-4 mb-4 ${previewTheme.previewClasses} border ${previewTheme.borderClasses}`}
+              >
+                <p
+                  className={`text-lg font-black tracking-tight ${previewTheme.accentClasses}`}
+                >
+                  {name || "Network Name"}
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{slug}.guideforge.app</p>
               </div>
 
-              {/* Hub list */}
               <div className="space-y-2 mb-4">
-                {scaffoldTemplate.hubs.map((hubGroup, hubIdx) => (
-                  <div key={hubIdx} className={`rounded-md p-3 border ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}>
-                    <p className={`text-sm font-semibold ${previewTheme.accentClasses}`}>{hubGroup.hub.name}</p>
+                {scaffoldDraft.hubs.map((hub) => (
+                  <div
+                    key={hub.clientId}
+                    className={`rounded-md p-3 border ${previewTheme.cardClasses} ${previewTheme.borderClasses}`}
+                  >
+                    <p className={`text-sm font-semibold ${previewTheme.accentClasses}`}>
+                      {hub.name}
+                    </p>
+                    {hub.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{hub.description}</p>
+                    )}
                     <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                      {hubGroup.collections.map((collection, colIdx) => (
-                        <li key={colIdx}>
-                          <span className={`inline-block rounded px-2 py-0.5 text-xs ${previewTheme.badgeClasses}`}>
+                      {hub.collections.map((collection) => (
+                        <li key={collection.clientId}>
+                          <span
+                            className={`inline-block rounded px-2 py-0.5 text-xs ${previewTheme.badgeClasses}`}
+                          >
                             {collection.name}
                           </span>
                         </li>
@@ -586,40 +851,51 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Will create:{" "}
-                <strong>{scaffoldTemplate.hubs.length}</strong> hubs and{" "}
-                <strong>{scaffoldTemplate.hubs.reduce((sum, h) => sum + h.collections.length, 0)}</strong> collections
+                Will create: <strong>{scaffoldDraft.hubs.length}</strong> hubs and{" "}
+                <strong>{totalCollections}</strong> collections
                 {" · "}Theme: <strong>{previewTheme.label}</strong>
+                {" · "}Type: <strong>{currentEntry.label}</strong>
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                You&apos;ll be able to edit, add, or remove hubs and collections on the next
+                step before anything is saved.
               </p>
             </div>
-          </>
-        )
-      })()}
+          )
+        })()}
 
       <div className="flex items-center justify-between gap-3 pt-2">
-        <Button asChild variant="ghost" type="button">
-          <Link href="/builder/welcome">
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back
-          </Link>
-        </Button>
+        <div>
+          {/* No back button from form to welcome - users should use browser back or go to dashboard */}
+        </div>
         <div className="flex gap-2">
           {step === "configure" && (
-            <>
-              <Button type="button" size="lg" className="gap-2" onClick={handleContinueToPreview} disabled={submitting || !name.trim()}>
-                {scaffoldTemplate ? "Preview Scaffold" : "Continue"}
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Button>
-            </>
+            <Button
+              type="button"
+              size="lg"
+              className="gap-2"
+              onClick={handleContinueToPreview}
+              disabled={submitting || !name.trim()}
+            >
+              Preview Scaffold
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Button>
           )}
           {step === "preview" && (
             <>
-              <Button type="button" size="lg" variant="outline" className="gap-2" onClick={() => setStep("configure")} disabled={submitting}>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setStep("configure")}
+                disabled={submitting}
+              >
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 Back
               </Button>
               <Button type="submit" size="lg" className="gap-2" disabled={submitting}>
-                {submitting ? (scaffoldTemplate ? "Creating Scaffold..." : "Creating Network...") : "Create Network"}
+                {submitting ? "Saving..." : "Continue to Starter Pages"}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
             </>
