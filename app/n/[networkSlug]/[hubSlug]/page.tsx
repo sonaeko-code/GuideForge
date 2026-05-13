@@ -3,8 +3,8 @@ import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, Compass, Shield } from "lucide-react"
 import { DifficultyBadge } from "@/components/guideforge/shared"
-import { QuestLineHeader } from "@/components/questline/site-header"
-import { QuestLineFooter } from "@/components/questline/site-footer"
+import { NetworkPublicHeader } from "@/components/guideforge/public/network-public-header"
+import { NetworkPublicFooter } from "@/components/guideforge/public/network-public-footer"
 import { MediaPlaceholder } from "@/components/questline/media/media-placeholder"
 import { CollectionIcon } from "@/components/questline/media/collection-icon"
 import { SectionHeading } from "@/components/guideforge/public/section-heading"
@@ -16,6 +16,8 @@ import {
   getCollectionsByHubId,
 } from "@/lib/guideforge/supabase-networks"
 import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
+import { getNetworkTheme } from "@/lib/guideforge/network-themes"
+import type { ThemeDirection } from "@/lib/guideforge/types"
 import {
   QUESTLINE_NETWORK,
   EMBERFALL_HUB,
@@ -99,12 +101,16 @@ export default async function PublicHubPage({
     (g) => !g.collectionId || !collections.some((c) => c.id === g.collectionId),
   )
 
+  // Resolve network theme for consistent styling across the hub page
+  const themeId = (network.branding?.theme ?? "neutral") as ThemeDirection
+  const theme = getNetworkTheme(themeId)
+
   return (
     <main className="min-h-screen bg-background">
-      <QuestLineHeader />
+      <NetworkPublicHeader network={network} />
 
       {/* HERO BANNER */}
-      <section className="border-b border-foreground/15 bg-muted/20">
+      <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
         {/* Breadcrumb / back nav */}
         <div className="mx-auto w-full max-w-6xl px-4 pt-6 md:px-6">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -420,7 +426,7 @@ export default async function PublicHubPage({
         </section>
       )}
 
-      <QuestLineFooter />
+      <NetworkPublicFooter network={network} />
     </main>
   )
 }

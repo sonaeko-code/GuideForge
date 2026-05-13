@@ -3,8 +3,8 @@ import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Compass } from "lucide-react"
 import { DifficultyBadge } from "@/components/guideforge/shared"
-import { QuestLineHeader } from "@/components/questline/site-header"
-import { QuestLineFooter } from "@/components/questline/site-footer"
+import { NetworkPublicHeader } from "@/components/guideforge/public/network-public-header"
+import { NetworkPublicFooter } from "@/components/guideforge/public/network-public-footer"
 import { MediaPlaceholder } from "@/components/questline/media/media-placeholder"
 import { SectionHeading } from "@/components/guideforge/public/section-heading"
 import { PublishedBadge } from "@/components/guideforge/public/published-badge"
@@ -85,7 +85,7 @@ export default async function PublicNetworkPage({
 
   return (
     <main className="min-h-screen bg-background">
-      <QuestLineHeader />
+      <NetworkPublicHeader network={network} />
 
       {/* MASTHEAD — themed by network.branding.theme */}
       <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
@@ -308,7 +308,7 @@ export default async function PublicNetworkPage({
         </section>
       )}
 
-      <QuestLineFooter />
+      <NetworkPublicFooter network={network} />
     </main>
   )
 }

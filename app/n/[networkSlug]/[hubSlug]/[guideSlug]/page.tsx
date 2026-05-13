@@ -4,11 +4,13 @@ import { notFound } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { DifficultyBadge } from "@/components/guideforge/shared"
-import { QuestLineHeader } from "@/components/questline/site-header"
-import { QuestLineFooter } from "@/components/questline/site-footer"
+import { NetworkPublicHeader } from "@/components/guideforge/public/network-public-header"
+import { NetworkPublicFooter } from "@/components/guideforge/public/network-public-footer"
 import { MOCK_GUIDES, MOCK_HUBS, getCollectionsByHub } from "@/lib/guideforge/mock-data"
 import { loadPublishedGuide, loadPublishedGuides } from "@/lib/guideforge/supabase-public"
 import { getHubBySlug, getCollectionsByHubId, getNetworkBySlug } from "@/lib/guideforge/supabase-networks"
+import { getNetworkTheme } from "@/lib/guideforge/network-themes"
+import type { ThemeDirection } from "@/lib/guideforge/types"
 
 export default async function PublicGuidePage({
   params,
@@ -84,14 +86,18 @@ export default async function PublicGuidePage({
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ")
 
+  // Resolve network theme for consistent styling across the guide page
+  const themeId = (network?.branding?.theme ?? "neutral") as ThemeDirection
+  const theme = getNetworkTheme(themeId)
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <QuestLineHeader />
+      <NetworkPublicHeader network={network || hub as any} />
 
       <main className="flex-1">
         {/* Article header (editorial style) */}
         <article>
-          <header className="border-b border-border/60 bg-muted/20">
+          <header className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
             <div className="mx-auto max-w-4xl px-4 md:px-6 pt-10 pb-12 md:pt-14 md:pb-16">
             {/* Breadcrumb */}
             <nav
@@ -385,7 +391,7 @@ export default async function PublicGuidePage({
         </article>
       </main>
 
-      <QuestLineFooter />
+      <NetworkPublicFooter network={network || hub as any} />
     </div>
   )
 }

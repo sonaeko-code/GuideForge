@@ -131,8 +131,8 @@ function normalizeNetwork(row: any): Network {
     hubIds: row.hubIds || [],
     createdAt: row.created_at || row.createdAt,
     updatedAt: row.updated_at || row.updatedAt,
-    // Ownership Phase 2: Map snake_case owner_user_id to camelCase ownerUserId
-    ownerUserId: row.owner_user_id || row.ownerUserId || null,
+    // Ownership Phase 2: Map snake_case owner_id to camelCase ownerUserId
+    ownerUserId: row.owner_id || row.ownerUserId || null,
   }
 }
 
@@ -237,9 +237,9 @@ export async function createNetwork(
       theme: normalizedTheme,
     }
 
-    // Ownership Phase 2: Include owner_user_id if user is logged in
-    // If profileId is DEV_PROFILE_ID (no real user session), omit owner_user_id to save as null
-    if (profileId !== DEV_PROFILE_ID) {
+    // Ownership Phase 2: Include owner_id if user is logged in
+    // The owner_id column in networks table stores the profile ID of the network creator
+    if (profileId && profileId !== DEV_PROFILE_ID) {
       networkData.owner_id = profileId
       console.log("[v0] Network save with owner_id:", profileId)
     } else {
@@ -1469,12 +1469,12 @@ export async function claimOwnerlessNetwork(
   }
 
   try {
-    // Step 1: Update networks.owner_user_id only where it's currently NULL
+    // Step 1: Update networks.owner_id only where it's currently NULL
     const { data: updateData, error: updateError } = await supabase
       .from("networks")
-      .update({ owner_user_id: userId })
+      .update({ owner_id: userId })
       .eq("id", networkId)
-      .is("owner_user_id", null)
+      .is("owner_id", null)
       .select()
 
     if (updateError) {
@@ -2009,11 +2009,11 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
       // Check owner fallback: is this user the network owner?
       const { data: networkData } = await supabase
         .from("networks")
-        .select("owner_user_id")
+        .select("owner_id")
         .eq("id", networkId)
         .maybeSingle()
       
-      const isNetworkOwner = networkData?.owner_user_id === userId
+      const isNetworkOwner = networkData?.owner_id === userId
       
       if (!isNetworkOwner) {
         console.log("[v0] User is not a member of this network and not the owner")
