@@ -15,6 +15,7 @@ import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
 import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
+import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 
@@ -89,16 +90,44 @@ export function GenerateChecklistClient() {
     if (intakeSession.idea) {
       console.log('[v0] GenerateChecklistClient: Hydrating from welcome intake')
       
-      // Prefill rough idea if form is empty
+      // Parse the rough idea to extract structured fields
+      const parsed = parseRoughIdea(intakeSession.idea)
+      
+      // Prefill form fields with both parsed data and router suggestions
       setFormState((prev) => {
         const updated = { ...prev }
+        
         // Only prefill empty fields
-        if (!prev.title && intakeSession.routerResult?.suggestedTitle) {
-          updated.title = intakeSession.routerResult.suggestedTitle
+        if (!prev.title) {
+          updated.title = intakeSession.routerResult?.suggestedTitle || parsed.title || ""
         }
         if (!prev.useCase) {
           updated.useCase = intakeSession.idea
         }
+        if (!prev.audience && parsed.audience) {
+          updated.audience = parsed.audience
+        }
+        if (!prev.purpose && parsed.purpose) {
+          updated.purpose = parsed.purpose
+        } else if (!prev.purpose && intakeSession.routerResult?.detectedIntent) {
+          updated.purpose = intakeSession.routerResult.detectedIntent
+        }
+        if (!prev.goal && parsed.goal) {
+          updated.goal = parsed.goal
+        }
+        if (!prev.optionalContext && parsed.optionalContext) {
+          updated.optionalContext = parsed.optionalContext
+        }
+        if (!prev.tone && parsed.tone) {
+          updated.tone = parsed.tone
+        }
+        if (parsed.numberOfSections && parsed.numberOfSections > 0) {
+          updated.numberOfSections = Math.max(1, Math.min(5, parsed.numberOfSections))
+        }
+        if (parsed.itemsPerSection && parsed.itemsPerSection > 0) {
+          updated.itemsPerSection = Math.max(1, Math.min(10, parsed.itemsPerSection))
+        }
+        
         return updated
       })
       

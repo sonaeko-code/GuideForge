@@ -232,6 +232,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
   // Restore draft if returning from Step 3/4
   const didHydrateRef = useRef(false)
+  const didAutoSmartFillRef = useRef(false)
+  
   useEffect(() => {
     if (didHydrateRef.current) return
     didHydrateRef.current = true
@@ -283,6 +285,68 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
       setRoughIdea(existing.roughIdea)
     }
   }, [])
+
+  // Auto-run Smart Fill once on first mount if we just hydrated from welcome with an idea
+  // Do NOT run on existing wizard draft restores
+  useEffect(() => {
+    if (didAutoSmartFillRef.current) return
+    if (!didHydrateRef.current) return
+    
+    const existing = readWizardDraft()
+    if (existing) {
+      // Existing draft — do NOT auto-Smart-Fill
+      return
+    }
+
+    // Check if we have roughIdea from intake hydration
+    if (roughIdea.trim() && roughIdea.length > 10) {
+      didAutoSmartFillRef.current = true
+      console.log('[v0] CreateNetworkForm: Auto-running Smart Fill on welcome intake hydration')
+      
+      const result = smartFillNetwork(roughIdea)
+      if (!result.success) {
+        console.log('[v0] Auto-Smart-Fill could not parse the idea, leaving defaults')
+        return
+      }
+
+      if (result.name && result.name.trim()) setName(result.name)
+      if (result.description && result.description.trim()) setDescription(result.description)
+
+      // Apply detected type if valid
+      let nextTypeId = typeId
+      if (result.type && VALID_REGISTRY_IDS.has(result.type)) {
+        nextTypeId = result.type
+        setTypeId(result.type)
+      }
+
+      // Apply theme
+      if (
+        result.theme &&
+        ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+          result.theme
+        )
+      ) {
+        setTheme(result.theme)
+      }
+
+      // Apply slug
+      if (result.slug && result.slug.trim()) {
+        setDomainPrefix(result.slug)
+        setDomainPrefixManuallyEdited(false)
+      }
+
+      // Apply scaffold
+      if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
+        setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+        setScaffoldIsDefaultForType(true)
+        setScaffoldSourceType(nextTypeId)
+      } else if (nextTypeId !== scaffoldSourceType) {
+        setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
+        setScaffoldIsDefaultForType(true)
+        setScaffoldSourceType(nextTypeId)
+      }
+    }
+  }, [roughIdea, typeId, scaffoldSourceType])
 
   const slug = useMemo(() => {
     if (domainPrefixManuallyEdited) return slugify(domainPrefix || name)

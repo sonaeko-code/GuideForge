@@ -1,0 +1,466 @@
+/**
+ * Shared intake field parser - safely extracts structured fields from rough idea text.
+ * Reusable by all destination builders (checklist, single guide, network).
+ * Uses local heuristics only—no API calls.
+ */
+
+import type { SingleGuideIntakeRequest, ChecklistIntakeRequest } from "./generation-schemas"
+
+/**
+ * Extract a clean title from rough idea, stripping common prefixes.
+ */
+export function extractTitle(text: string): string | null {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0)
+  const firstLine = lines[0]
+  if (!firstLine) return null
+
+  // Pattern for "A [adjective] guide/checklist for [topic]"
+  const guideOnMatch = firstLine.match(
+    /(?:guide|tutorial|checklist)\s+(?:for\s+[^o]+\s+)?on\s+([^.!?]+)/i
+  )
+  if (guideOnMatch) {
+    const topic = guideOnMatch[1].trim()
+    return titleCase(topic)
+  }
+
+  // Pattern for "A checklist for [topic]"
+  const checklistForMatch = firstLine.match(
+    /^a\s+(?:\w+\s+)?checklist\s+for\s+([^.!?,]+)/i
+  )
+  if (checklistForMatch) {
+    const topic = checklistForMatch[1].trim()
+    if (topic.length > 3 && topic.length < 100) {
+      return titleCase(topic) + " Checklist"
+    }
+  }
+
+  // Strip common prefixes
+  let cleaned = firstLine
+    .replace(
+      /^a\s+(?:beginner-?friendly\s+)?(?:technical\s+)?(?:practical\s+)?(?:guide|checklist)\s+(?:for|on|to)\s+/i,
+      ""
+    )
+    .replace(/^a\s+tutorial\s+(?:on|for|to)\s+/i, "")
+    .replace(/^how\s+to\s+/i, "")
+    .replace(/^tutorial\s+on\s+/i, "")
+    .replace(/^step-?by-?step\s+(?:guide\s+)?(?:on|for)\s+/i, "")
+    .replace(/\.$/, "")
+    .trim()
+
+  if (cleaned.length > 3 && cleaned.length < 120) {
+    return titleCase(cleaned)
+  }
+
+  return null
+}
+
+/**
+ * Extract audience from "for X" phrases or audience keywords.
+ */
+export function extractAudience(text: string): string | null {
+  const match = text.match(
+    /for\s+([a-z0-9\s\-&,()]+?)(?:\.|,|and|plus|including|to|to help)/i
+  )
+  if (match) {
+    const audience = match[1].trim()
+    if (audience.length > 2 && audience.length < 100) {
+      return titleCase(audience)
+    }
+  }
+
+  const audienceKeywords = [
+    "beginners",
+    "advanced users",
+    "professionals",
+    "teams",
+    "families",
+    "parents",
+    "developers",
+    "creators",
+  ]
+  const lowerText = text.toLowerCase()
+  for (const kw of audienceKeywords) {
+    if (lowerText.includes(kw)) {
+      return titleCase(kw)
+    }
+  }
+
+  return null
+}
+
+/**
+ * Extract use case from "when" or contextual phrases.
+ */
+export function extractUseCase(text: string): string | null {
+  // Match "when X" or "for publishing X" patterns
+  const whenMatch = text.match(
+    /when\s+([a-z0-9\s\-&,()]+?)(?:\.|,|and|or|to)/i
+  )
+  if (whenMatch) {
+    const useCase = whenMatch[1].trim()
+    if (useCase.length > 3 && useCase.length < 100) {
+      return useCase
+    }
+  }
+
+  const forMatch = text.match(
+    /for\s+(publishing|creating|building|setting up|making|learning|understanding)\s+([a-z0-9\s\-&,()]+?)(?:\.|,|and|to)/i
+  )
+  if (forMatch) {
+    const useCase = (forMatch[1] + " " + forMatch[2]).trim()
+    if (useCase.length > 3 && useCase.length < 100) {
+      return useCase
+    }
+  }
+
+  return null
+}
+
+/**
+ * Extract the general purpose/problem the guide solves.
+ */
+export function extractPurpose(
+  text: string,
+  title?: string | null,
+  audience?: string | null,
+  useCase?: string | null
+): string | null {
+  const lowerText = text.toLowerCase()
+
+  // If we have audience and useCase, build a personalized purpose
+  if (audience && useCase) {
+    if (
+      lowerText.includes("prepare") ||
+      lowerText.includes("get ready")
+    ) {
+      return `Help ${audience.toLowerCase()} prepare for ${useCase.toLowerCase()}.`
+    }
+    if (
+      lowerText.includes("teach") ||
+      lowerText.includes("learn") ||
+      lowerText.includes("understand")
+    ) {
+      return `Teach ${audience.toLowerCase()} how to ${useCase.toLowerCase()}.`
+    }
+    return `Guide ${audience.toLowerCase()} through ${useCase.toLowerCase()}.`
+  }
+
+  // If we have a title, use it as context
+  if (title && title.length > 5) {
+    return `A comprehensive guide about ${title.toLowerCase()}.`
+  }
+
+  return null
+}
+
+/**
+ * Extract goal/desired outcome from text.
+ */
+export function extractGoal(text: string): string | null {
+  const goalMatch = text.match(
+    /(?:so that|result in|outcome|achieve|goal|objective)\s+([^.!?]+)/i
+  )
+  if (goalMatch) {
+    const goal = goalMatch[1].trim()
+    if (goal.length > 5 && goal.length < 150) {
+      return goal
+    }
+  }
+
+  const shouldMatch = text.match(/should\s+([^.!?]+)/i)
+  if (shouldMatch) {
+    const goal = shouldMatch[1].trim()
+    if (goal.length > 5 && goal.length < 150) {
+      return goal
+    }
+  }
+
+  return null
+}
+
+/**
+ * Extract additional context from text about topics covered, features included, etc.
+ */
+export function extractAdditionalContext(text: string): string | null {
+  const includeMatch = text.match(/(?:include|cover|contain|topics?|feature|section)\s+([^.!?]+)/i)
+  if (includeMatch) {
+    const context = includeMatch[1].trim()
+    if (context.length > 5 && context.length < 200) {
+      return context
+    }
+  }
+
+  return null
+}
+
+/**
+ * Detect tone from keywords.
+ */
+export function detectTone(
+  lowerText: string
+): "casual" | "professional" | "helpful" | "technical" | "practical" | null {
+  if (
+    lowerText.includes("casual") ||
+    lowerText.includes("friendly") ||
+    lowerText.includes("conversational")
+  ) {
+    return "casual"
+  }
+  if (
+    lowerText.includes("professional") ||
+    lowerText.includes("formal") ||
+    lowerText.includes("corporate")
+  ) {
+    return "professional"
+  }
+  if (
+    lowerText.includes("helpful") ||
+    lowerText.includes("supportive") ||
+    lowerText.includes("gentle")
+  ) {
+    return "helpful"
+  }
+  if (
+    lowerText.includes("technical") ||
+    lowerText.includes("detailed") ||
+    lowerText.includes("in-depth")
+  ) {
+    return "technical"
+  }
+  if (
+    lowerText.includes("practical") ||
+    lowerText.includes("actionable") ||
+    lowerText.includes("direct")
+  ) {
+    return "practical"
+  }
+
+  return null
+}
+
+/**
+ * Detect difficulty level.
+ */
+export function detectDifficulty(
+  lowerText: string
+): "beginner" | "intermediate" | "advanced" | null {
+  if (
+    lowerText.includes("beginner") ||
+    lowerText.includes("basics") ||
+    lowerText.includes("introduction") ||
+    lowerText.includes("getting started")
+  ) {
+    return "beginner"
+  }
+  if (
+    lowerText.includes("intermediate") ||
+    lowerText.includes("beyond basics")
+  ) {
+    return "intermediate"
+  }
+  if (
+    lowerText.includes("advanced") ||
+    lowerText.includes("expert") ||
+    lowerText.includes("deep dive")
+  ) {
+    return "advanced"
+  }
+
+  return null
+}
+
+/**
+ * Detect guide type/format.
+ */
+export function detectGuideType(
+  lowerText: string
+): "guide" | "tutorial" | "reference" | "troubleshooting" | null {
+  if (
+    lowerText.includes("tutorial") ||
+    lowerText.includes("step-by-step") ||
+    lowerText.includes("walkthrough")
+  ) {
+    return "tutorial"
+  }
+  if (lowerText.includes("reference") || lowerText.includes("lookup")) {
+    return "reference"
+  }
+  if (
+    lowerText.includes("troubleshoot") ||
+    lowerText.includes("problem") ||
+    lowerText.includes("fix") ||
+    lowerText.includes("solve")
+  ) {
+    return "troubleshooting"
+  }
+  if (
+    lowerText.includes("guide") ||
+    lowerText.includes("how to") ||
+    lowerText.includes("explain")
+  ) {
+    return "guide"
+  }
+
+  return null
+}
+
+/**
+ * Determine number of steps from text.
+ */
+export function determineNumberOfSteps(
+  lowerText: string,
+  difficulty?: string
+): number | null {
+  // Look for explicit step counts
+  const stepMatch = lowerText.match(/(\d+)\s*(?:steps?|stages?|phases?)/i)
+  if (stepMatch) {
+    const num = parseInt(stepMatch[1], 10)
+    if (num >= 1 && num <= 20) {
+      return num
+    }
+  }
+
+  // Estimate based on difficulty
+  if (difficulty === "beginner") return 3
+  if (difficulty === "intermediate") return 5
+  if (difficulty === "advanced") return 8
+
+  // Default
+  return 5
+}
+
+/**
+ * Infer number of sections for checklists.
+ */
+export function inferNumberOfSections(lowerText: string): number | null {
+  const sectionMatch = lowerText.match(/(\d+)\s*(?:sections?|categories?|parts?)/i)
+  if (sectionMatch) {
+    const num = parseInt(sectionMatch[1], 10)
+    if (num >= 1 && num <= 10) {
+      return num
+    }
+  }
+
+  // Estimate: home/family systems often 4-5 sections
+  if (lowerText.includes("home") || lowerText.includes("family")) {
+    return 4
+  }
+
+  return 3
+}
+
+/**
+ * Infer items per section for checklists.
+ */
+export function inferItemsPerSection(lowerText: string): number | null {
+  const itemMatch = lowerText.match(/(\d+)\s*(?:items?|tasks?|steps?|checks?)/i)
+  if (itemMatch) {
+    const num = parseInt(itemMatch[1], 10)
+    if (num >= 1 && num <= 20) {
+      return num
+    }
+  }
+
+  return 5
+}
+
+/**
+ * Title-case a string while preserving common acronyms.
+ */
+function titleCase(text: string): string {
+  const preserveCasing: Record<string, string> = {
+    youtube: "YouTube",
+    api: "API",
+    ai: "AI",
+    seo: "SEO",
+    "ci/cd": "CI/CD",
+    next: "Next.js",
+    nextjs: "Next.js",
+    vercel: "Vercel",
+    discord: "Discord",
+    steam: "Steam",
+  }
+
+  let result = text
+  for (const [lower, proper] of Object.entries(preserveCasing)) {
+    const regex = new RegExp(`\\b${lower}\\b`, "gi")
+    result = result.replace(regex, proper)
+  }
+
+  return result
+    .split(" ")
+    .map((word) => {
+      if (/[A-Z]/.test(word)) return word
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    })
+    .join(" ")
+}
+
+/**
+ * Detect whether idea has warnings (safety concerns).
+ */
+export function hasWarnings(lowerText: string): boolean {
+  return /\b(warning|caution|safety|dangerous|avoid mistakes|risk)\b/i.test(
+    lowerText
+  )
+}
+
+/**
+ * Detect whether idea mentions prerequisites.
+ */
+export function hasPrerequisites(lowerText: string): boolean {
+  return /\b(prerequisite|requirement|before you start|need to have|setup required)\b/i.test(
+    lowerText
+  )
+}
+
+/**
+ * Parse rough idea and extract all structured fields at once.
+ */
+export function parseRoughIdea(
+  text: string
+): Partial<SingleGuideIntakeRequest> & Partial<ChecklistIntakeRequest> {
+  const lowerText = text.toLowerCase()
+  const result: Partial<SingleGuideIntakeRequest> & Partial<ChecklistIntakeRequest> = {}
+
+  const audience = extractAudience(text)
+  if (audience) result.audience = audience
+
+  const useCase = extractUseCase(text)
+  if (useCase) result.useCase = useCase
+
+  const title = extractTitle(text)
+  if (title) result.title = title
+
+  const purpose = extractPurpose(text, title, audience, useCase)
+  if (purpose) result.purpose = purpose
+
+  const goal = extractGoal(text)
+  if (goal) result.goal = goal
+
+  const context = extractAdditionalContext(text)
+  if (context) result.optionalContext = context
+
+  const tone = detectTone(lowerText)
+  if (tone) result.tone = tone
+
+  const difficulty = detectDifficulty(lowerText)
+  if (difficulty) result.difficulty = difficulty
+
+  const guideType = detectGuideType(lowerText)
+  if (guideType) result.guideType = guideType
+
+  if (hasWarnings(lowerText)) result.hasWarnings = true
+  if (hasPrerequisites(lowerText)) result.hasPrerequisites = true
+
+  const numberOfSteps = determineNumberOfSteps(lowerText, difficulty)
+  if (numberOfSteps) result.numberOfSteps = numberOfSteps
+
+  const numberOfSections = inferNumberOfSections(lowerText)
+  if (numberOfSections) result.numberOfSections = numberOfSections
+
+  const itemsPerSection = inferItemsPerSection(lowerText)
+  if (itemsPerSection) result.itemsPerSection = itemsPerSection
+
+  return result
+}

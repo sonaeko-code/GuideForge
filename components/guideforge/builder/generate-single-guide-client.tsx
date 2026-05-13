@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import type { SingleGuideIntakeRequest, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
 import { generateSingleGuideMock } from "@/lib/guideforge/mock-asset-generator"
 import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
+import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 import type { DifficultyLevel, GuideType } from "@/lib/guideforge/types"
@@ -44,19 +45,53 @@ export function GenerateSingleGuideClient() {
     if (intakeSession.idea) {
       console.log('[v0] GenerateSingleGuideClient: Hydrating from welcome intake')
       
-      // Prefill form fields with intake data
+      // Parse the rough idea to extract structured fields
+      const parsed = parseRoughIdea(intakeSession.idea)
+      
+      // Prefill form fields with both parsed data and router suggestions
       setFormState((prev) => {
         const updated = { ...prev }
+        
         // Only prefill empty fields to not overwrite user edits
-        if (!prev.title && intakeSession.routerResult?.suggestedTitle) {
-          updated.title = intakeSession.routerResult.suggestedTitle
+        if (!prev.title) {
+          updated.title = intakeSession.routerResult?.suggestedTitle || parsed.title || ""
         }
         if (!prev.useCase) {
           updated.useCase = intakeSession.idea
         }
-        if (!prev.purpose && intakeSession.routerResult?.detectedIntent) {
+        if (!prev.purpose && parsed.purpose) {
+          updated.purpose = parsed.purpose
+        } else if (!prev.purpose && intakeSession.routerResult?.detectedIntent) {
           updated.purpose = intakeSession.routerResult.detectedIntent
         }
+        if (!prev.audience && parsed.audience) {
+          updated.audience = parsed.audience
+        }
+        if (!prev.goal && parsed.goal) {
+          updated.goal = parsed.goal
+        }
+        if (!prev.optionalContext && parsed.optionalContext) {
+          updated.optionalContext = parsed.optionalContext
+        }
+        if (!prev.tone && parsed.tone) {
+          updated.tone = parsed.tone
+        }
+        if (!prev.difficulty && parsed.difficulty) {
+          updated.difficulty = parsed.difficulty as DifficultyLevel
+        }
+        if (!prev.guideType && parsed.guideType) {
+          updated.guideType = parsed.guideType as GuideType
+        }
+        if (parsed.numberOfSteps && parsed.numberOfSteps > 0) {
+          updated.numberOfSteps = Math.max(1, Math.min(20, parsed.numberOfSteps))
+        }
+        if (parsed.hasWarnings) {
+          updated.hasWarnings = true
+        }
+        if (parsed.hasPrerequisites) {
+          updated.hasPrerequisites = true
+        }
+        
         return updated
       })
       
