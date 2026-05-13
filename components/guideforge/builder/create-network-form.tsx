@@ -424,6 +424,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
       // Persist the wizard draft to sessionStorage and hand off to Step 3.
       // The actual Supabase create happens at the end of Step 4.
+      // Preserve forge rules if the user has already visited Step 4 and come back.
+      const existingDraft = readWizardDraft()
       const draft: WizardDraft = {
         version: 1,
         name: name.trim(),
@@ -435,8 +437,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         scaffoldIsDefaultForType,
         scaffoldSourceType,
         scaffold: scaffoldDraft,
-        forgeRules: getDefaultForgeRulesDraft(),
-        createdAt: new Date().toISOString(),
+        forgeRules: existingDraft?.forgeRules ?? getDefaultForgeRulesDraft(),
+        createdAt: existingDraft?.createdAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
 
