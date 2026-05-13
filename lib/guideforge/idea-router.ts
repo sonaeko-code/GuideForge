@@ -375,6 +375,18 @@ function detectNetworkType(idea: string): string | undefined {
 }
 
 /**
+ * Count how many keywords from a list appear in the text (case-insensitive).
+ */
+function countKeywords(text: string, keywords: string[]): number {
+  const lowerText = text.toLowerCase()
+  return keywords.reduce((count, kw) => {
+    const wordBoundaryRegex = new RegExp(`\\b${kw}\\b`, "gi")
+    const matches = lowerText.match(wordBoundaryRegex)
+    return count + (matches ? matches.length : 0)
+  }, 0)
+}
+
+/**
  * Suggest a theme based on detected type and tone.
  */
 function suggestTheme(typeId?: string): ThemeDirection | undefined {
@@ -388,190 +400,4 @@ function suggestTheme(typeId?: string): ThemeDirection | undefined {
     personal_knowledge: "copper",
   }
   return typeId ? themeMap[typeId] : undefined
-}
-
-/**
- * Main idea router function with improved routing priority.
- *
- * Priority rules:
- * 1. NETWORK: Multi-domain systems, household/family management, or broad organization needs
- * 2. CHECKLIST: Single, bounded task/routine/workflow
- * 3. SINGLE_GUIDE: Instructional/tutorial for one topic
- */
-export function routeIdea(roughIdea: string): IdeaRouterResult {
-  const idea = roughIdea.trim()
-  if (!idea) {
-    return {
-      recommendedPath: "network",
-      confidence: "low",
-      detectedIntent: "Unclear intent",
-      reasoning: ["No idea provided. Defaulting to network creation."],
-      routeOptions: [
-        {
-          path: "network",
-          label: "Build a network",
-          description: "Full guide network with hubs and collections",
-        },
-        {
-          path: "single_guide",
-          label: "Create a guide",
-          description: "Single how-to guide or tutorial",
-        },
-        {
-          path: "checklist",
-          label: "Create a checklist",
-          description: "Task or routine checklist",
-        },
-      ],
-    }
-  }
-
-  const checklistScore = countKeywords(idea, CHECKLIST_KEYWORDS)
-  const networkScore = countKeywords(idea, NETWORK_KEYWORDS)
-  const guideScore = countKeywords(idea, GUIDE_KEYWORDS)
-  
-  // Check for multi-domain/system signals that force NETWORK
-  const hasMultipleDomains = /(\+|and|,|\s(plus|also)\s)/.test(idea) && idea.length > 100
-  const hasSystemKeywords = /\b(system|network|hub|organize|family|household|emergency|maintenance)\b/i.test(idea)
-  const hasMultipleChecklists = /\b(checklists?|lists?|routines?)\b/i.test(idea) && checklistScore < 3
-
-  // Rule: Multi-domain systems always route to NETWORK
-  if (hasMultipleDomains && hasSystemKeywords) {
-    return {
-      recommendedPath: "network",
-      confidence: "high",
-      detectedIntent: "Multi-domain household or organizational system",
-      recommendedNetworkTypeId: detectNetworkType(idea),
-      suggestedThemeId: suggestTheme(detectNetworkType(idea)),
-      reasoning: [
-        "Detected multiple interrelated domains and system-building intent.",
-        "This is best served as a comprehensive network with organized hubs.",
-      ],
-      routeOptions: [
-        {
-          path: "network",
-          label: `Build a ${detectNetworkType(idea)?.replace(/_/g, " ") || "multi-domain"} network`,
-          description: "Organize all related guides and resources together",
-        },
-        {
-          path: "checklist",
-          label: "Create a Checklist Instead",
-          description: "Focus on one repeatable task or routine",
-        },
-        {
-          path: "single_guide",
-          label: "Create a Single Guide Instead",
-          description: "Standalone tutorial for one topic",
-        },
-      ],
-    }
-  }
-
-  // Rule: High checklist score + low network score + short/bounded scope = CHECKLIST
-  // But NOT if it mentions multiple items/categories
-  if (
-    checklistScore >= 2 &&
-    checklistScore > networkScore &&
-    checklistScore >= guideScore &&
-    !hasMultipleDomains &&
-    idea.length < 300
-  ) {
-    return {
-      recommendedPath: "checklist",
-      confidence: checklistScore >= 3 ? "high" : "medium",
-      detectedIntent: "Repeatable or one-time task checklist",
-      reasoning: [
-        `Found ${checklistScore} checklist-related keywords.`,
-        "Single focused task workflow detected.",
-      ],
-      routeOptions: [
-        {
-          path: "checklist",
-          label: "Create a Checklist",
-          description: "One-time or repeatable task list",
-        },
-        {
-          path: "network",
-          label: "Build a Network Instead",
-          description: "Full guide ecosystem with hubs and collections",
-        },
-        {
-          path: "single_guide",
-          label: "Create a Single Guide Instead",
-          description: "Standalone tutorial",
-        },
-      ],
-    }
-  }
-
-  // Rule: Guide keywords + short scope + instructional tone = SINGLE_GUIDE
-  if (
-    guideScore >= 2 &&
-    guideScore > networkScore &&
-    guideScore > checklistScore &&
-    idea.length < 200
-  ) {
-    return {
-      recommendedPath: "single_guide",
-      confidence: "medium",
-      detectedIntent: "Single how-to guide or tutorial",
-      reasoning: ["Detected instructional intent with focused scope."],
-      routeOptions: [
-        {
-          path: "single_guide",
-          label: "Create a Guide",
-          description: "Single tutorial or how-to",
-        },
-        {
-          path: "network",
-          label: "Build a Network Instead",
-          description: "Full guide ecosystem with hubs and collections",
-        },
-        {
-          path: "checklist",
-          label: "Create a Checklist Instead",
-          description: "Task list or routine",
-        },
-      ],
-    }
-  }
-
-  // Default: NETWORK (most powerful and flexible)
-  const typeId = detectNetworkType(idea)
-  const confidence =
-    networkScore >= 2 ? "high" : hasMultipleDomains ? "high" : "medium"
-
-  return {
-    recommendedPath: "network",
-    confidence,
-    detectedIntent: "Comprehensive guide network or system",
-    recommendedNetworkTypeId: typeId,
-    suggestedThemeId: suggestTheme(typeId),
-    reasoning: [
-      hasMultipleDomains
-        ? "Multiple related domains detected—network provides best structure."
-        : hasSystemKeywords
-          ? "System-building intent detected."
-          : "Longer scope or structured organization intent detected.",
-    ],
-    routeOptions: [
-      {
-        path: "network",
-        label: typeId
-          ? `Build a ${typeId.replace(/_/g, " ")} Network`
-          : "Build a Network",
-        description: typeId ? `Create a ${typeId.replace(/_/g, " ")} with hubs and guides` : "Full guide network",
-      },
-      {
-        path: "checklist",
-        label: "Create a Checklist Instead",
-        description: "Task list or routine",
-      },
-      {
-        path: "single_guide",
-        label: "Create a Single Guide Instead",
-        description: "Standalone tutorial",
-      },
-    ].slice(0, 3),
-  }
 }
