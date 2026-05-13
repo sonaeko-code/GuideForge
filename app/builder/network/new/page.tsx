@@ -38,8 +38,7 @@ export default async function CreateNetworkPage({
             Set up your network
           </h1>
           <p className="text-pretty leading-relaxed text-muted-foreground">
-            Defaults are pre-filled for the {initialType === "gaming" ? "QuestLine demo" : "selected direction"}.
-            You can edit anything before continuing.
+            Start with a rough idea, choose a network type, and shape the scaffold before creating your network.
           </p>
         </header>
 
