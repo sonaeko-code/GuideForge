@@ -14,7 +14,7 @@ export type AssetType = "single_guide" | "recipe" | "checklist" | "sop" | "troub
  * Asset Draft Status — Maps to guide status workflow
  * draft: Private workspace, not on public site
  * pending_review: Submitted for review, not on public site
- * published: Visible on public site (Lane 2B+)
+ * published: Potentially visible on public site (Lane 2D: single_guide and checklist only)
  * archived: Preserved for reference, not visible
  */
 export type AssetDraftStatus = "draft" | "pending_review" | "published" | "archived"
