@@ -36,12 +36,14 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2.5 font-semibold tracking-tight shrink-0 hover:opacity-80 transition-opacity"
+          className="group flex items-center gap-2.5 font-semibold tracking-tight shrink-0 transition-opacity hover:opacity-90"
         >
-          <div className="p-1.5 bg-gradient-to-br from-primary to-primary/70 rounded-lg">
-            <GuideMark className="size-5 [&_svg]:size-4 text-primary-foreground" />
+          <div className="forge-seal flex size-8 items-center justify-center rounded-md text-[oklch(0.18_0.02_50)]">
+            <GuideMark bare className="size-4" />
           </div>
-          <span className="text-base font-bold tracking-tight">GuideForge</span>
+          <span className="text-base font-bold tracking-tight">
+            Guide<span className="text-primary">Forge</span>
+          </span>
         </Link>
 
         {/* Desktop nav */}
@@ -53,7 +55,7 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
             <Link
               key={link.href}
               href={link.href}
-              className="transition-colors hover:text-foreground"
+              className="relative py-1 transition-colors hover:text-foreground after:absolute after:left-0 after:right-0 after:-bottom-0.5 after:h-px after:scale-x-0 after:bg-primary after:transition-transform after:duration-200 hover:after:scale-x-100"
             >
               {link.label}
             </Link>

@@ -1,7 +1,6 @@
 'use client'
 
 import { Shield } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 
 interface ForgedBadgeProps {
   /** Whether the guide has forged/verified status */
@@ -30,11 +29,11 @@ export function ForgedBadge({ isForged = false, showLabel = true, className = ''
   }
 
   return (
-    <Badge 
-      className={`gap-1.5 border-amber-500/40 bg-gradient-to-br from-amber-500/8 to-amber-600/5 text-amber-700 dark:from-amber-700/15 dark:to-amber-800/10 dark:text-amber-300 font-semibold ${className}`}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border border-[oklch(0.45_0.08_45)] bg-[oklch(0.22_0.014_55)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[oklch(0.86_0.1_70)] shadow-[inset_0_1px_0_0_color-mix(in_oklch,var(--brass-300)_70%,transparent),inset_0_-1px_0_0_color-mix(in_oklch,var(--brass-900)_70%,transparent)] ${className}`}
     >
-      <Shield className="size-3.5" aria-hidden="true" />
+      <Shield className="size-3 fill-[oklch(0.66_0.13_45)] text-[oklch(0.22_0.014_55)]" aria-hidden="true" strokeWidth={2.5} />
       {showLabel && 'Forged'}
-    </Badge>
+    </span>
   )
 }

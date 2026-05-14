@@ -27,10 +27,10 @@ export function PublicSingleGuideAsset({
   estimatedMinutes,
 }: PublicSingleGuideAssetProps) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-6 md:py-12">
+    <div className="min-h-screen surface-parchment">
+      <div className="mx-auto w-full max-w-3xl px-4 py-10 md:px-6 md:py-14">
         {/* Header */}
-        <article className="space-y-6">
+        <article className="space-y-8">
           {/* Featured image placeholder */}
           <MediaPlaceholder
             label="Guide"
@@ -39,8 +39,22 @@ export function PublicSingleGuideAsset({
             aspect="aspect-[16/9]"
           />
 
-          {/* Title and metadata */}
-          <div className="space-y-4">
+          {/* Title block — editorial masthead */}
+          <div className="space-y-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--brass-700)]">
+              Published Guide &middot; {asset.difficulty}
+            </p>
+
+            <h1 className="text-balance text-4xl font-bold tracking-tight md:text-5xl">
+              {title}
+            </h1>
+
+            <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
+              {summary}
+            </p>
+
+            <div className="divider-brass" aria-hidden="true" />
+
             <div className="flex flex-wrap items-center gap-2">
               <DifficultyBadge difficulty={asset.difficulty} />
               <PublishedBadge verification={undefined} />
@@ -51,14 +65,6 @@ export function PublicSingleGuideAsset({
                 </Badge>
               )}
             </div>
-
-            <h1 className="text-balance text-4xl font-bold tracking-tight md:text-5xl">
-              {title}
-            </h1>
-
-            <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
-              {summary}
-            </p>
 
             {/* Audience */}
             {asset.audience && (
@@ -74,8 +80,8 @@ export function PublicSingleGuideAsset({
 
           {/* Requirements */}
           {asset.requirements && asset.requirements.length > 0 && (
-            <Card className="border-border/40 bg-gradient-to-br from-card to-card/50 p-5">
-              <h2 className="font-bold text-foreground mb-4 text-base">Requirements</h2>
+            <Card className="card-foundry p-6">
+              <h2 className="mb-4 text-base font-bold uppercase tracking-[0.12em] text-foreground">Requirements</h2>
               <ul className="space-y-3">
                 {asset.requirements.map((req, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm leading-relaxed">
@@ -107,15 +113,21 @@ export function PublicSingleGuideAsset({
           )}
 
           {/* Steps */}
-          <div className="space-y-8">
-            <h2 className="text-2xl font-bold tracking-tight">Steps</h2>
-            <div className="space-y-6">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold tracking-tight">Steps</h2>
+              <span className="flex-1 divider-brass" aria-hidden="true" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                {asset.steps.length} {asset.steps.length === 1 ? 'step' : 'steps'}
+              </span>
+            </div>
+            <div className="space-y-5">
               {asset.steps.map((step, index) => (
-                <Card key={index} className="border-border/40 bg-gradient-to-br from-card to-card/50 p-6">
+                <Card key={index} className="card-foundry p-6">
                   <div className="flex gap-5">
-                    {/* Step number */}
-                    <div className="flex size-11 flex-shrink-0 items-center justify-center rounded-full bg-primary/12 border border-primary/20">
-                      <span className="font-bold text-lg text-primary">{index + 1}</span>
+                    {/* Step number — forged coin */}
+                    <div className="forge-seal flex size-11 flex-shrink-0 items-center justify-center rounded-full text-[oklch(0.18_0.02_50)]">
+                      <span className="text-lg font-bold">{index + 1}</span>
                     </div>
 
                     {/* Step content */}

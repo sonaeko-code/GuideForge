@@ -27,10 +27,10 @@ export function PublicChecklistAsset({
   asset,
 }: PublicChecklistAssetProps) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-6 md:py-12">
+    <div className="min-h-screen surface-parchment">
+      <div className="mx-auto w-full max-w-3xl px-4 py-10 md:px-6 md:py-14">
         {/* Header */}
-        <article className="space-y-6">
+        <article className="space-y-8">
           {/* Featured image placeholder */}
           <MediaPlaceholder
             label="Checklist"
@@ -39,14 +39,11 @@ export function PublicChecklistAsset({
             aspect="aspect-[16/9]"
           />
 
-          {/* Title and metadata */}
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="text-xs font-normal">
-                Checklist
-              </Badge>
-              <PublishedBadge verification={undefined} />
-            </div>
+          {/* Title block — editorial masthead */}
+          <div className="space-y-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--brass-700)]">
+              Published Checklist
+            </p>
 
             <h1 className="text-balance text-4xl font-bold tracking-tight md:text-5xl">
               {title}
@@ -55,15 +52,29 @@ export function PublicChecklistAsset({
             <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
               {summary}
             </p>
+
+            <div className="divider-brass" aria-hidden="true" />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-xs font-normal">
+                Checklist
+              </Badge>
+              <PublishedBadge verification={undefined} />
+            </div>
           </div>
 
           {/* Sections */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             {asset.sections.map((section, sectionIndex) => (
-              <Card key={sectionIndex} className="border-border/50 p-6">
-                <h2 className="text-xl font-semibold text-foreground mb-4">
-                  {section.title}
-                </h2>
+              <Card key={sectionIndex} className="card-foundry p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="forge-seal flex size-8 items-center justify-center rounded-full text-[oklch(0.18_0.02_50)] text-xs font-bold">
+                    {sectionIndex + 1}
+                  </span>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">
+                    {section.title}
+                  </h2>
+                </div>
 
                 <div className="space-y-3">
                   {section.items.map((item, itemIndex) => (

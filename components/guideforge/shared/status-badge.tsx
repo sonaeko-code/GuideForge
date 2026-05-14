@@ -21,10 +21,18 @@ const GUIDE_STATUS_LABEL: Record<GuideStatus, string> = {
 }
 
 const GUIDE_STATUS_STYLE: Record<GuideStatus, string> = {
-  draft: "bg-muted text-muted-foreground border-border",
-  "in-review": "bg-accent text-accent-foreground border-accent",
-  ready: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
-  published: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  // Draft: warm parchment/amber — soft and unfinished
+  draft:
+    "bg-[color-mix(in_oklch,var(--brass-100)_85%,var(--background))] text-[oklch(0.42_0.08_55)] border-[color-mix(in_oklch,var(--brass-500)_30%,transparent)]",
+  // In Review: steel blue
+  "in-review":
+    "bg-[oklch(0.94_0.018_240)] dark:bg-[oklch(0.28_0.04_240)] text-[oklch(0.36_0.07_240)] dark:text-[oklch(0.82_0.06_240)] border-[oklch(0.55_0.07_240)]/40",
+  // Ready: muted teal — vetted, awaiting publish
+  ready:
+    "bg-[oklch(0.92_0.04_180)] dark:bg-[oklch(0.28_0.05_180)] text-[oklch(0.38_0.07_180)] dark:text-[oklch(0.82_0.07_180)] border-[oklch(0.55_0.08_180)]/40",
+  // Published: emerald/brass — live
+  published:
+    "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border-emerald-500/35",
   "needs-update":
     "bg-destructive/10 text-destructive border-destructive/30",
   deprecated:
@@ -44,10 +52,16 @@ const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
 const VERIFICATION_STYLE: Record<VerificationStatus, string> = {
   unverified: "bg-muted text-muted-foreground border-border",
   reviewed: "bg-secondary text-secondary-foreground border-border",
-  "expert-reviewed": "bg-accent text-accent-foreground border-accent",
-  "community-proven": "bg-accent text-accent-foreground border-accent",
-  "forge-verified": "bg-primary/10 text-primary border-primary/30",
-  forged: "bg-primary text-primary-foreground border-primary",
+  "expert-reviewed":
+    "bg-[color-mix(in_oklch,var(--brass-100)_85%,var(--card))] text-[var(--brass-700)] border-[color-mix(in_oklch,var(--brass-500)_40%,transparent)]",
+  "community-proven":
+    "bg-[color-mix(in_oklch,var(--brass-100)_85%,var(--card))] text-[var(--brass-700)] border-[color-mix(in_oklch,var(--brass-500)_40%,transparent)]",
+  // Forge-verified: brass on parchment
+  "forge-verified":
+    "bg-[color-mix(in_oklch,var(--brass-100)_70%,var(--card))] text-[var(--brass-700)] border-[var(--brass-500)] font-semibold",
+  // Forged: graphite plate with brass text — the premium status
+  forged:
+    "bg-[oklch(0.22_0.014_55)] text-[oklch(0.86_0.1_70)] border-[oklch(0.45_0.08_45)] font-bold uppercase tracking-[0.1em] shadow-[inset_0_1px_0_0_color-mix(in_oklch,var(--brass-300)_70%,transparent)]",
 }
 
 export function StatusBadge({

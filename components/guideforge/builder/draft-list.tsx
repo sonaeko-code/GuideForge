@@ -99,17 +99,22 @@ export function DraftList({ networkId, scopedDrafts, scopedPublished }: DraftLis
 
   if (drafts.length === 0) {
     return (
-      <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
-        <BookMarked className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
-        <p className="font-semibold text-foreground">No guides</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Start by creating or generating your first guide.
-        </p>
-        <Button size="sm" asChild className="mt-4">
-          <Link href={`/builder/network/${networkId}/generate`}>
-            Generate First Guide
-          </Link>
-        </Button>
+      <div className="card-foundry relative overflow-hidden rounded-xl p-10 text-center">
+        <div className="absolute inset-0 bg-constellation opacity-25 pointer-events-none" aria-hidden="true" />
+        <div className="relative">
+          <div className="forge-seal mx-auto mb-3 flex size-12 items-center justify-center rounded-full text-[oklch(0.18_0.02_50)]">
+            <BookMarked className="size-5" aria-hidden="true" />
+          </div>
+          <p className="font-bold text-foreground">No guides yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Start by creating or generating your first guide.
+          </p>
+          <Button size="sm" asChild className="mt-4">
+            <Link href={`/builder/network/${networkId}/generate`}>
+              Generate First Guide
+            </Link>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -144,7 +149,7 @@ function GuideCard({ draft, networkId, draftSource, onDelete }: any) {
   return (
     <Card
       key={draft.id}
-      className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors"
+      className="card-foundry px-4 py-3 transition-colors"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1 min-w-0">

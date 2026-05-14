@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Lock, Settings } from 'lucide-react'
+import { ArrowRight, Lock, Settings, Layers, FolderTree, BookMarked } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { useAuth } from '@/lib/guideforge/auth-context'
 import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
 import type { Network } from '@/lib/guideforge/types'
@@ -12,6 +11,7 @@ import type { Network } from '@/lib/guideforge/types'
 interface NetworkWithCounts extends Network {
   hubCount: number
   collectionCount: number
+  guideCount?: number
 }
 
 interface NetworksClientListProps {
@@ -189,100 +189,134 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
   // Don't show loading state - render cards immediately with fallback data
   if (sortedNetworks.length === 0 && isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {networks.map((network) => (
-          <Card key={network.id} className="flex flex-col gap-4 p-5 animate-pulse opacity-50">
+          <div key={network.id} className="card-foundry rounded-xl p-5 animate-pulse opacity-60">
             <div className="h-6 bg-muted rounded" />
-          </Card>
+          </div>
         ))}
       </div>
     )
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {sortedNetworks.map((network) => (
-        <Card
-          key={network.id}
-          className="flex flex-col gap-4 p-5 card-interactive hover:border-primary/30"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <h3 className="text-base font-bold text-foreground leading-snug">
+    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      {sortedNetworks.map((network) => {
+        const isOwned = network.relationshipBadge === 'Owned by you'
+        const guideCount = network.guideCount ?? 0
+        return (
+          <article
+            key={network.id}
+            className="card-foundry group relative flex flex-col gap-4 rounded-xl p-5"
+          >
+            {/* Owner pill — top right */}
+            {network.relationshipBadge && (
+              <div className="absolute right-4 top-4">
+                <span
+                  className={
+                    isOwned
+                      ? "pill-warm inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider"
+                      : "inline-flex whitespace-nowrap rounded-full border border-border/40 bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                  }
+                >
+                  {network.relationshipBadge}
+                </span>
+              </div>
+            )}
+
+            {/* Title block */}
+            <div className="pr-24">
+              <h3 className="text-lg font-bold leading-tight text-foreground text-balance">
                 {network.name}
               </h3>
-              <p className="text-xs text-muted-foreground font-mono mt-1">
+              <p className="mt-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 /{network.slug}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {network.relationshipBadge && (
-                <span className="text-xs font-medium text-foreground bg-muted/60 px-2 py-1 rounded-full border border-border/30 whitespace-nowrap">
-                  {network.relationshipBadge}
+
+            {/* Description */}
+            {network.description && (
+              <p className="flex-1 text-sm leading-relaxed text-muted-foreground line-clamp-3">
+                {network.description}
+              </p>
+            )}
+
+            {/* Counts row */}
+            <div className="divider-brass" aria-hidden="true" />
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="flex items-center gap-1 text-foreground">
+                  <BookMarked className="size-3.5 text-primary" aria-hidden="true" />
+                  <span className="text-lg font-bold leading-none tabular-nums">{guideCount}</span>
+                </div>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {guideCount === 1 ? 'Guide' : 'Guides'}
                 </span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 border-x border-border/40">
+                <div className="flex items-center gap-1 text-foreground">
+                  <Layers className="size-3.5 text-primary" aria-hidden="true" />
+                  <span className="text-lg font-bold leading-none tabular-nums">{network.hubCount}</span>
+                </div>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {network.hubCount === 1 ? 'Hub' : 'Hubs'}
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="flex items-center gap-1 text-foreground">
+                  <FolderTree className="size-3.5 text-primary" aria-hidden="true" />
+                  <span className="text-lg font-bold leading-none tabular-nums">{network.collectionCount}</span>
+                </div>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {network.collectionCount === 1 ? 'Collection' : 'Collections'}
+                </span>
+              </div>
+            </div>
+
+            {/* Grouped actions */}
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex gap-2">
+                <Button asChild size="sm" className="flex-1">
+                  <Link href={`/builder/network/${network.id}/dashboard`}>
+                    Dashboard
+                  </Link>
+                </Button>
+                {network.canManageNetwork ? (
+                  <Button asChild size="sm" variant="outline" className="flex-1">
+                    <Link href={`/builder/network/${network.id}/hub/new`}>
+                      New Hub
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    className="flex-1 opacity-50 cursor-not-allowed"
+                    title="Only owners/admins can add hubs"
+                  >
+                    <Lock className="size-3 mr-1" aria-hidden="true" />
+                    New Hub
+                  </Button>
+                )}
+                <Button asChild size="sm" variant="outline" aria-label="Settings">
+                  <Link href={`/builder/network/${network.id}/settings`}>
+                    <Settings className="size-3.5" aria-hidden="true" />
+                  </Link>
+                </Button>
+              </div>
+              {network.slug && (
+                <Button asChild size="sm" variant="ghost" className="w-full justify-center gap-2 text-xs">
+                  <Link href={`/n/${network.slug}`}>
+                    View Public Site
+                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                  </Link>
+                </Button>
               )}
             </div>
-          </div>
-
-          {network.description && (
-            <p className="text-sm text-muted-foreground flex-1 leading-relaxed">
-              {network.description}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground py-3 border-t border-border/30">
-            <div>
-              <span className="font-semibold text-foreground">{network.hubCount}</span>{" "}
-              <span className="text-muted-foreground">{network.hubCount === 1 ? 'hub' : 'hubs'}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-foreground">{network.collectionCount}</span>{" "}
-              <span className="text-muted-foreground">{network.collectionCount === 1 ? 'collection' : 'collections'}</span>
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button asChild size="sm" variant="outline" className="flex-1">
-              <Link href={`/builder/network/${network.id}/dashboard`}>
-                Dashboard
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/builder/network/${network.id}/settings`}>
-                <Settings className="size-3.5" aria-hidden="true" />
-                <span className="sr-only">Settings</span>
-              </Link>
-            </Button>
-            {network.canManageNetwork ? (
-              <Button asChild size="sm" variant="outline" className="flex-1">
-                <Link href={`/builder/network/${network.id}/hub/new`}>
-                  New Hub
-                </Link>
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                className="flex-1 opacity-50 cursor-not-allowed"
-                title="Only owners/admins can add hubs"
-              >
-                <Lock className="size-3 mr-1" aria-hidden="true" />
-                New Hub
-              </Button>
-            )}
-          </div>
-
-          {network.slug && (
-            <Button asChild size="sm" variant="ghost" className="w-full gap-2">
-              <Link href={`/n/${network.slug}`}>
-                View Site
-                <ArrowRight className="size-3.5" aria-hidden="true" />
-              </Link>
-            </Button>
-          )}
-        </Card>
-      ))}
+          </article>
+        )
+      })}
     </div>
   )
 }
