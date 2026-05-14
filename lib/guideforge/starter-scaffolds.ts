@@ -398,10 +398,187 @@ export const SOP_SCAFFOLD: ScaffoldTemplate = {
 }
 
 /**
+ * Home Systems / Family Management Network Template
+ * For household routines, medications, emergency contacts, seasonal tasks, baby supplies
+ */
+export const HOME_SYSTEMS_SCAFFOLD: ScaffoldTemplate = {
+  id: "home_systems",
+  name: "Home Systems & Family Management",
+  description: "Organize family routines, household management, and emergency planning",
+  icon: "🏠",
+  networkTemplate: {
+    name: "Home Systems & Family Guide",
+    slug: "home-systems-family",
+    description: "A comprehensive guide for family routines, household management, and emergency planning",
+  },
+  hubs: [
+    {
+      hub: {
+        name: "Family Routines",
+        slug: "family-routines",
+        description: "Daily, weekly, and seasonal family routines and schedules",
+      },
+      collections: [
+        {
+          name: "Daily Routines",
+          slug: "daily-routines",
+          description: "Morning, afternoon, and evening routines",
+        },
+        {
+          name: "School & Activities",
+          slug: "school-activities",
+          description: "School schedules, extracurriculars, and drop-off procedures",
+        },
+        {
+          name: "Household Chores",
+          slug: "household-chores",
+          description: "Chore assignments, cleaning schedules, and maintenance tasks",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Medications & Health",
+        slug: "medications-health",
+        description: "Medication schedules, allergies, and health management",
+      },
+      collections: [
+        {
+          name: "Medication Schedules",
+          slug: "medication-schedules",
+          description: "Daily medication reminders and tracking",
+        },
+        {
+          name: "Allergies & Restrictions",
+          slug: "allergies-restrictions",
+          description: "Known allergies, dietary restrictions, and sensitivities",
+        },
+        {
+          name: "Doctor & Provider Info",
+          slug: "doctor-provider-info",
+          description: "Contact information for healthcare providers",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Emergency & Safety",
+        slug: "emergency-safety",
+        description: "Emergency contacts, plans, and safety procedures",
+      },
+      collections: [
+        {
+          name: "Emergency Contacts",
+          slug: "emergency-contacts",
+          description: "Family contacts, emergency services, and backup caregivers",
+        },
+        {
+          name: "Emergency Plans",
+          slug: "emergency-plans",
+          description: "Evacuation procedures, severe weather plans, and disaster prep",
+        },
+        {
+          name: "First Aid & CPR",
+          slug: "first-aid-cpr",
+          description: "First aid supplies location, CPR procedures, and medical info",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Seasonal Maintenance",
+        slug: "seasonal-maintenance",
+        description: "Seasonal home tasks and maintenance schedules",
+      },
+      collections: [
+        {
+          name: "Spring Tasks",
+          slug: "spring-tasks",
+          description: "Spring cleaning, yard prep, and system checks",
+        },
+        {
+          name: "Summer Tasks",
+          slug: "summer-tasks",
+          description: "Air conditioning maintenance, outdoor care, and vacation prep",
+        },
+        {
+          name: "Fall Tasks",
+          slug: "fall-tasks",
+          description: "Heating prep, gutter cleaning, and winterization",
+        },
+        {
+          name: "Winter Tasks",
+          slug: "winter-tasks",
+          description: "Snow removal, heating maintenance, and winter safety",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Baby & Infant Care",
+        slug: "baby-infant-care",
+        description: "Supplies, feeding, sleep, and care schedules for babies",
+      },
+      collections: [
+        {
+          name: "Supplies & Inventory",
+          slug: "supplies-inventory",
+          description: "Diaper sizes, formula, clothing sizes, and restock lists",
+        },
+        {
+          name: "Feeding & Nutrition",
+          slug: "feeding-nutrition",
+          description: "Feeding schedules, bottle prep, and food allergies",
+        },
+        {
+          name: "Sleep & Routines",
+          slug: "sleep-routines",
+          description: "Sleep schedules, nap times, and bedtime routines",
+        },
+        {
+          name: "Travel & On-The-Go",
+          slug: "travel-on-the-go",
+          description: "Travel bag checklist, car seat info, and portable supplies",
+        },
+      ],
+    },
+    {
+      hub: {
+        name: "Home Systems",
+        slug: "home-systems",
+        description: "HVAC, plumbing, electrical, and other home system info",
+      },
+      collections: [
+        {
+          name: "HVAC & Climate",
+          slug: "hvac-climate",
+          description: "Thermostat settings, filter replacement, and maintenance schedule",
+        },
+        {
+          name: "Plumbing",
+          slug: "plumbing",
+          description: "Shut-off locations, common fixes, and emergency procedures",
+        },
+        {
+          name: "Electrical",
+          slug: "electrical",
+          description: "Circuit breaker map, outlet info, and safety procedures",
+        },
+        {
+          name: "Appliances",
+          slug: "appliances",
+          description: "Appliance manuals, warranty info, and maintenance schedules",
+        },
+      ],
+    },
+  ],
+}
+
+/**
  * Get all available scaffold templates
  */
 export function getAllScaffoldTemplates(): ScaffoldTemplate[] {
-  return [GAMING_SCAFFOLD, REPAIR_SCAFFOLD, SOP_SCAFFOLD]
+  return [GAMING_SCAFFOLD, REPAIR_SCAFFOLD, SOP_SCAFFOLD, HOME_SYSTEMS_SCAFFOLD]
 }
 
 /**

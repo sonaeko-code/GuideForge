@@ -373,6 +373,23 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
     "troubleshoot": "Troubleshooting",
     "maintenance": "Preventive Maintenance",
     "installation": "Installation Guides",
+    // Home Systems / Family
+    "routine": "Family Routines",
+    "routines": "Family Routines",
+    "medication": "Medications & Health",
+    "allergies": "Medications & Health",
+    "allergy": "Medications & Health",
+    "emergency": "Emergency & Safety",
+    "contact": "Emergency & Safety",
+    "contacts": "Emergency & Safety",
+    "seasonal": "Seasonal Maintenance",
+    "baby": "Baby & Infant Care",
+    "infant": "Baby & Infant Care",
+    "supply": "Baby & Infant Care",
+    "hvac": "Home Systems",
+    "plumbing": "Home Systems",
+    "electrical": "Home Systems",
+    "appliance": "Home Systems",
     // Training / SOP
     "onboarding": "Onboarding",
     "compliance": "Compliance & Policies",
@@ -406,7 +423,7 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
   const defaults: Record<string, string[]> = {
     gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Community Highlights"],
     tech_repair: ["Diagnostics & Testing", "Safety Procedures", "Tools & Equipment", "Troubleshooting", "Preventive Maintenance"],
-    home_systems: ["Seasonal Maintenance", "Home Systems", "Emergency Prep", "Tools & Equipment", "Common Issues"],
+    home_systems: ["Family Routines", "Medications & Health", "Emergency & Safety", "Seasonal Maintenance", "Baby & Infant Care"],
     small_business: ["Launch Checklist", "Client Onboarding", "Daily Operations", "Compliance & Policies", "Team Resources"],
     restaurant_training: ["Onboarding", "Daily Operations", "Food Safety", "Compliance & Policies", "Team Resources"],
     wellness_training: ["Programs", "Nutrition", "Habits & Mindset", "Assessments & Quizzes", "Resources"],
@@ -617,6 +634,38 @@ const HUB_TO_COLLECTIONS: Record<string, SmartFillCollectionSuggestion[]> = {
   "Best Practices": [
     { name: "Do This", slug: "do-this", description: "Recommended patterns." },
     { name: "Avoid This", slug: "avoid-this", description: "Anti-patterns to skip." },
+  ],
+
+  // Home Systems / Family
+  "Family Routines": [
+    { name: "Daily Routines", slug: "daily-routines", description: "Morning, afternoon, and evening routines." },
+    { name: "School & Activities", slug: "school-activities", description: "School schedules and extracurriculars." },
+    { name: "Household Chores", slug: "household-chores", description: "Chore assignments and cleaning schedules." },
+  ],
+  "Medications & Health": [
+    { name: "Medication Schedules", slug: "medication-schedules", description: "Daily medication reminders and tracking." },
+    { name: "Allergies & Restrictions", slug: "allergies-restrictions", description: "Known allergies and dietary restrictions." },
+    { name: "Doctor & Provider Info", slug: "doctor-provider-info", description: "Healthcare provider contact information." },
+  ],
+  "Emergency & Safety": [
+    { name: "Emergency Contacts", slug: "emergency-contacts", description: "Family contacts and emergency services." },
+    { name: "Emergency Plans", slug: "emergency-plans", description: "Evacuation procedures and disaster prep." },
+    { name: "First Aid & CPR", slug: "first-aid-cpr", description: "First aid supplies and medical procedures." },
+  ],
+  "Seasonal Maintenance": [
+    { name: "Spring Tasks", slug: "spring-tasks", description: "Spring cleaning and yard preparation." },
+    { name: "Fall Tasks", slug: "fall-tasks", description: "Heating prep and winterization." },
+    { name: "Summer & Winter", slug: "summer-winter-tasks", description: "Summer AC care and winter maintenance." },
+  ],
+  "Baby & Infant Care": [
+    { name: "Supplies & Inventory", slug: "supplies-inventory", description: "Diaper sizes and restock lists." },
+    { name: "Feeding & Nutrition", slug: "feeding-nutrition", description: "Feeding schedules and food allergies." },
+    { name: "Sleep & Routines", slug: "sleep-routines", description: "Sleep schedules and bedtime routines." },
+  ],
+  "Home Systems": [
+    { name: "HVAC & Climate", slug: "hvac-climate", description: "Thermostat settings and filter replacement." },
+    { name: "Plumbing & Electrical", slug: "plumbing-electrical", description: "Shut-offs, circuit breakers, and procedures." },
+    { name: "Appliances", slug: "appliances", description: "Appliance manuals and maintenance schedules." },
   ],
 }
 

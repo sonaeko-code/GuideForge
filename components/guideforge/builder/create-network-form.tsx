@@ -62,7 +62,7 @@ import type { ThemeDirection, Visibility } from "@/lib/guideforge/types"
 const SCAFFOLD_TEMPLATE_MAP: Record<string, string> = {
   gaming: "gaming",
   tech_repair: "repair",
-  home_systems: "repair",
+  home_systems: "home_systems",
   small_business: "sop",
   restaurant_training: "sop",
 }
@@ -107,9 +107,11 @@ const GENERIC_HUBS_BY_TYPE: Record<string, { name: string; collections: string[]
     { name: "Habits & Mindset", collections: ["Daily Habits", "Recovery"] },
   ],
   home_systems: [
-    { name: "Seasonal Maintenance", collections: ["Spring Checklist", "Fall Checklist"] },
-    { name: "Home Systems", collections: ["HVAC", "Plumbing Basics"] },
-    { name: "Emergency Prep", collections: ["Power Outage Plan", "First-Aid Supplies"] },
+    { name: "Family Routines", collections: ["Daily Routines", "School & Activities"] },
+    { name: "Medications & Health", collections: ["Medication Schedules", "Allergies"] },
+    { name: "Emergency & Safety", collections: ["Emergency Contacts", "Emergency Plans"] },
+    { name: "Seasonal Maintenance", collections: ["Spring Tasks", "Fall Tasks"] },
+    { name: "Baby & Infant Care", collections: ["Supplies", "Feeding & Nutrition"] },
   ],
   restaurant_training: [
     { name: "Onboarding", collections: ["First Day", "First Week"] },
