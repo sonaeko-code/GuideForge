@@ -204,38 +204,40 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
       {sortedNetworks.map((network) => (
         <Card
           key={network.id}
-          className="flex flex-col gap-4 p-5 hover:border-primary/50 transition-colors"
+          className="flex flex-col gap-4 p-5 card-interactive hover:border-primary/30"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">
+              <h3 className="text-base font-bold text-foreground leading-snug">
                 {network.name}
               </h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground font-mono mt-1">
                 /{network.slug}
               </p>
             </div>
             <div className="flex items-center gap-2">
               {network.relationshipBadge && (
-                <div className="text-xs font-medium text-foreground bg-muted px-2 py-1 rounded whitespace-nowrap">
+                <span className="text-xs font-medium text-foreground bg-muted/60 px-2 py-1 rounded-full border border-border/30 whitespace-nowrap">
                   {network.relationshipBadge}
-                </div>
+                </span>
               )}
             </div>
           </div>
 
           {network.description && (
-            <p className="text-sm text-muted-foreground flex-1">
+            <p className="text-sm text-muted-foreground flex-1 leading-relaxed">
               {network.description}
             </p>
           )}
 
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground py-2 border-t border-border/50">
+          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground py-3 border-t border-border/30">
             <div>
-              <span className="font-semibold text-foreground">{network.hubCount}</span> {network.hubCount === 1 ? 'hub' : 'hubs'}
+              <span className="font-semibold text-foreground">{network.hubCount}</span>{" "}
+              <span className="text-muted-foreground">{network.hubCount === 1 ? 'hub' : 'hubs'}</span>
             </div>
             <div>
-              <span className="font-semibold text-foreground">{network.collectionCount}</span> {network.collectionCount === 1 ? 'collection' : 'collections'}
+              <span className="font-semibold text-foreground">{network.collectionCount}</span>{" "}
+              <span className="text-muted-foreground">{network.collectionCount === 1 ? 'collection' : 'collections'}</span>
             </div>
           </div>
 

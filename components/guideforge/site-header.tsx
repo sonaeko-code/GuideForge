@@ -36,10 +36,12 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2 font-semibold tracking-tight shrink-0"
+          className="flex items-center gap-2.5 font-semibold tracking-tight shrink-0 hover:opacity-80 transition-opacity"
         >
-          <GuideMark className="size-7 [&_svg]:size-4" />
-          <span className="text-base">GuideForge</span>
+          <div className="p-1.5 bg-gradient-to-br from-primary to-primary/70 rounded-lg">
+            <GuideMark className="size-5 [&_svg]:size-4 text-primary-foreground" />
+          </div>
+          <span className="text-base font-bold tracking-tight">GuideForge</span>
         </Link>
 
         {/* Desktop nav */}

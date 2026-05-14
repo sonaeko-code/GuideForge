@@ -44,60 +44,60 @@ export function GovernanceSummary({ network }: GovernanceSummaryProps) {
   }
 
   return (
-    <Card className="border-border/50 p-5">
+    <Card className="border-border/40 bg-gradient-to-br from-card to-card/50 p-5">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Governance</h3>
+          <h3 className="text-base font-bold text-foreground leading-tight">Governance</h3>
           <p className="text-xs text-muted-foreground mt-1">Network rules and settings</p>
         </div>
-        <Shield className="size-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+        <Shield className="size-5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {/* Verification Level */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Verification
           </p>
-          <Badge variant="secondary" className="text-xs">
+          <span className="inline-flex rounded-full border border-border/40 bg-muted/40 px-2.5 py-1 text-xs font-medium">
             {verificationLabelMap[governance.verificationLevel]}
-          </Badge>
+          </span>
         </div>
 
         {/* Content Standard */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Standard
           </p>
-          <Badge variant="secondary" className="text-xs">
+          <span className="inline-flex rounded-full border border-border/40 bg-muted/40 px-2.5 py-1 text-xs font-medium">
             {contentStandardMap[governance.contentStandard]}
-          </Badge>
+          </span>
         </div>
 
         {/* AI Policy */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             AI Policy
           </p>
-          <Badge variant="secondary" className="text-xs">
+          <span className="inline-flex rounded-full border border-border/40 bg-muted/40 px-2.5 py-1 text-xs font-medium">
             {aiPolicyMap[governance.aiPolicy]}
-          </Badge>
+          </span>
         </div>
 
         {/* Contributor Mode */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Contributors
           </p>
-          <Badge variant="secondary" className="text-xs">
+          <span className="inline-flex rounded-full border border-border/40 bg-muted/40 px-2.5 py-1 text-xs font-medium">
             {contributorModeMap[governance.contributorMode]}
-          </Badge>
+          </span>
         </div>
       </div>
 
       {/* Trust Badges */}
-      <div className="mt-4 pt-4 border-t border-border/50">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+      <div className="mt-4 pt-4 border-t border-border/30">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           Trust Badges
         </p>
         <div className="flex flex-wrap gap-2">

@@ -8,7 +8,11 @@
    Foreground: deep graphite (warm-leaning).
    Primary: copper (less saturated than amber, no flame feel).
    Accent: muted amber highlight (used sparingly).
-   Five-color discipline: background, foreground, primary, muted, border. */
+   Five-color discipline: background, foreground, primary, muted, border.
+   
+   Visual brand intent: structured knowledge foundry feeling with warm,
+   premium copper accents, soft parchment surfaces, and dark-mode support
+   using graphite and charcoal. Inspired by constellation/forged themes. */
 
 :root {
   --background: oklch(0.972 0.014 85);
@@ -44,6 +48,14 @@
   --sidebar-accent-foreground: oklch(0.32 0.05 50);
   --sidebar-border: oklch(0.88 0.012 78);
   --sidebar-ring: oklch(0.555 0.115 42);
+  
+  /* Semantic copper/brass brand accents for Forged/premium features */
+  --brass-50: oklch(0.97 0.008 90);
+  --brass-100: oklch(0.945 0.015 85);
+  --brass-300: oklch(0.78 0.08 55);
+  --brass-500: oklch(0.615 0.125 48);
+  --brass-700: oklch(0.45 0.08 45);
+  --brass-900: oklch(0.25 0.05 40);
 }
 
 .dark {
@@ -79,6 +91,14 @@
   --sidebar-accent-foreground: oklch(0.95 0.018 75);
   --sidebar-border: oklch(0.285 0.016 55);
   --sidebar-ring: oklch(0.66 0.13 45);
+  
+  /* Dark-mode brass accents */
+  --brass-50: oklch(0.25 0.05 40);
+  --brass-100: oklch(0.32 0.06 42);
+  --brass-300: oklch(0.55 0.12 50);
+  --brass-500: oklch(0.66 0.13 45);
+  --brass-700: oklch(0.78 0.08 55);
+  --brass-900: oklch(0.95 0.015 85);
 }
 
 @theme inline {
@@ -146,5 +166,21 @@
       transparent 1px
     );
     background-size: 18px 18px;
+  }
+  
+  /* Premium card shadows — structured depth */
+  .shadow-card-sm {
+    @apply shadow-[0_1px_2px_rgba(0,0,0,0.05)];
+  }
+  .shadow-card {
+    @apply shadow-[0_4px_12px_rgba(0,0,0,0.08)];
+  }
+  .shadow-card-lg {
+    @apply shadow-[0_8px_24px_rgba(0,0,0,0.12)];
+  }
+  
+  /* Subtle hover elevation for interactive cards */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-card active:shadow-card-sm;
   }
 }
