@@ -186,6 +186,8 @@ export function ForgeRulesEditor() {
         networkTheme: draft.theme,
         networkVisibility: draft.visibility,
         networkPrimaryColor: draft.theme === "ember" ? "#f97316" : "#6366f1",
+        // Lane 2A: Pass governance settings from wizard step 4
+        networkGovernanceSettings: rules,
       })
 
       if (!result.success || !result.network?.id) {
@@ -246,17 +248,16 @@ export function ForgeRulesEditor() {
   return (
     <form className="space-y-8" onSubmit={handleSubmit}>
       {/* Persistence-deferred banner */}
-      <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-        <Info className="mt-0.5 size-4 flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+      <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+        <Info className="mt-0.5 size-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
         <div className="flex-1 text-sm">
           <p className="font-semibold text-foreground">
-            Forge Rules are saved as setup metadata for now.
+            Governance settings will be saved with your network.
           </p>
           <p className="mt-1 text-muted-foreground">
-            Full governance persistence will be added later. Your choices below
-            will be applied to the network you&apos;re about to create and stored
-            locally for now &mdash; they won&apos;t roundtrip from the database
-            until that schema lands.
+            Your choices below (verification level, content standards, AI policy, and contributor mode)
+            will be persisted with the network you&apos;re creating. You can edit these settings
+            anytime from the network settings page.
           </p>
         </div>
       </div>

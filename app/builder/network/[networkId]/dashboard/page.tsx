@@ -5,6 +5,7 @@ import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
+import { GovernanceSummary } from "@/components/guideforge/builder/governance-summary"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
 import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
 import {
@@ -93,6 +94,11 @@ export default async function NetworkDashboardPage({
              Guides flow: networkId → hubs → collections → collection IDs → Supabase WHERE collection_id IN (ids)
              Attached assets flow: collections → collection IDs → Supabase asset_drafts WHERE attached_collection_id IN (ids)
              Do not change this data loading path. */}
+
+          {/* Lane 2A: Governance Summary Card */}
+          <div className="mb-6">
+            <GovernanceSummary network={network} />
+          </div>
 
           {/* Tabs Section - Wrapped in Error Boundary */}
           <DashboardErrorBoundary networkId={network.id}>

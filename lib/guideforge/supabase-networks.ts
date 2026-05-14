@@ -15,7 +15,7 @@
  * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
-import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership } from "./types"
+import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership, NetworkGovernanceSettings } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
 import { resolveDbType } from "./network-types"
@@ -111,6 +111,7 @@ export function normalizeNetworkCreatePayload(
  * Normalize a raw Supabase network row to the Network type
  * Maps snake_case columns to camelCase properties
  * Handles Ownership Phase 2: owner_user_id → ownerUserId
+ * Handles governance_settings JSON column
  */
 function normalizeNetwork(row: any): Network {
   return {
@@ -129,6 +130,7 @@ function normalizeNetwork(row: any): Network {
     },
     forgeRuleIds: row.forgeRuleIds || [],
     hubIds: row.hubIds || [],
+    governanceSettings: row.governance_settings || row.governanceSettings,
     createdAt: row.created_at || row.createdAt,
     updatedAt: row.updated_at || row.updatedAt,
     // Ownership Phase 2: Map snake_case owner_id to camelCase ownerUserId
@@ -237,6 +239,17 @@ export async function createNetwork(
       theme: normalizedTheme,
     }
 
+    // Lane 2A: Include governance settings if provided
+    if (draft.governanceSettings) {
+      networkData.governance_settings = draft.governanceSettings
+      console.log("[v0] Network save with governance settings:", {
+        verification: draft.governanceSettings.verificationLevel,
+        contentStandard: draft.governanceSettings.contentStandard,
+        aiPolicy: draft.governanceSettings.aiPolicy,
+        contributorMode: draft.governanceSettings.contributorMode,
+      })
+    }
+
     // Ownership Phase 2: Include owner_id if user is logged in
     // The owner_id column in networks table stores the profile ID of the network creator
     if (profileId && profileId !== DEV_PROFILE_ID) {
@@ -336,6 +349,76 @@ export async function updateNetwork(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Network update error:", message)
+    return { network: null, error: message }
+  }
+}
+
+/**
+ * Update network governance settings (Lane 2A)
+ */
+export async function updateNetworkGovernance(
+  networkId: string,
+  governanceSettings: NetworkGovernanceSettings
+): Promise<{ network: Network | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, cannot update governance")
+    return { network: null, error: "Supabase not configured" }
+  }
+
+  if (!networkId) {
+    return { network: null, error: "No network ID provided" }
+  }
+
+  try {
+    // Normalize networkId to UUID if needed
+    let normalizedId = networkId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(networkId)) {
+      // Try to look up by slug
+      const bySlug = await getNetworkBySlug(networkId)
+      if (bySlug) {
+        normalizedId = bySlug.id
+      } else {
+        return { network: null, error: `No network found for id: ${networkId}` }
+      }
+    }
+
+    const updateData: Record<string, any> = {
+      governance_settings: governanceSettings,
+      updated_at: new Date().toISOString(),
+    }
+
+    console.log("[v0] Network governance update payload:", {
+      verification: governanceSettings.verificationLevel,
+      contentStandard: governanceSettings.contentStandard,
+      aiPolicy: governanceSettings.aiPolicy,
+      contributorMode: governanceSettings.contributorMode,
+    })
+
+    const { data, error } = await supabase
+      .from("networks")
+      .update(updateData)
+      .eq("id", normalizedId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Network governance update error:", error.message)
+      return { network: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No network found for id: ${networkId}`
+      console.error("[v0] Network governance update error:", notFoundError)
+      return { network: null, error: notFoundError }
+    }
+
+    console.log("[v0] Network governance updated:", data.id)
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return { network: normalizeNetwork(data) }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Network governance update error:", message)
     return { network: null, error: message }
   }
 }

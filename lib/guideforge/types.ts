@@ -90,6 +90,30 @@ export type Visibility = "public" | "private" | "unlisted"
 // ---------- Governance (Phase 2+) ----------
 
 /**
+ * Governance settings for a Network.
+ * These settings define how guides are reviewed, published, and verified.
+ * Persisted as governance_settings JSON on the networks table.
+ */
+export interface NetworkGovernanceSettings {
+  /** Controls how strictly new guides must be reviewed before verified status. */
+  verificationLevel: "open" | "moderated" | "verified-only"
+  /** Content quality expectations. */
+  contentStandard: "lenient" | "standard" | "strict"
+  /** AI-generated content policy. */
+  aiPolicy: "allowed" | "disclosed" | "disallowed"
+  /** Which trust badges are displayed on published guides. */
+  trustBadges: {
+    showVerified: boolean
+    showLastUpdated: boolean
+    showAuthor: boolean
+  }
+  /** Who can submit guides to this network. */
+  contributorMode: "owner-only" | "invite" | "open"
+  /** Per-rule enable map, keyed by ForgeRule.id. */
+  ruleEnableMap?: Record<string, boolean>
+}
+
+/**
  * Canonical roles used across network governance.
  * Each network can customize display_name (e.g., "Owner" → "Guildmaster").
  */
@@ -314,10 +338,31 @@ export interface Network {
   branding: NetworkBranding
   forgeRuleIds: string[]
   hubIds: string[]
+  /** Governance settings (verification, content standards, AI policy, contributor mode). */
+  governanceSettings?: NetworkGovernanceSettings
   createdAt: string
   updatedAt: string
   /** Ownership Phase 2: Owner user ID from auth.users(id). Nullable for legacy networks and signed-out creation. */
   ownerUserId?: string | null
+}
+
+/**
+ * Get default governance settings for a new network.
+ * Balanced defaults suitable for most use cases.
+ */
+export function getDefaultNetworkGovernanceSettings(): NetworkGovernanceSettings {
+  return {
+    verificationLevel: "moderated",
+    contentStandard: "standard",
+    aiPolicy: "disclosed",
+    trustBadges: {
+      showVerified: true,
+      showLastUpdated: true,
+      showAuthor: true,
+    },
+    contributorMode: "invite",
+    ruleEnableMap: {},
+  }
 }
 
 // ---------- Wizard / builder helpers ----------
@@ -340,6 +385,8 @@ export interface NetworkDraft {
   theme: ThemeDirection
   visibility: Visibility
   domain?: string
+  /** Governance settings to apply when network is created. */
+  governanceSettings?: NetworkGovernanceSettings
 }
 
 // ---------- Starter pages ----------
