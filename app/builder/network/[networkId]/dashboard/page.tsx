@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ArrowLeft, AlertCircle, Settings, Globe } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
+import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
@@ -9,6 +10,7 @@ import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboar
 import {
   loadNetworkBuilderContext,
   getGuidesForNetworkCollections,
+  getAttachedAssetsForCollection,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -44,6 +46,12 @@ export default async function NetworkDashboardPage({
 
     // Load guides for the network's collections
     const guides = await getGuidesForNetworkCollections(collections)
+
+    // Load attached draft assets for all collections in the network
+    const attachedAssetsMap: Record<string, AssetDraft[]> = {}
+    for (const collection of collections) {
+      attachedAssetsMap[collection.id] = await getAttachedAssetsForCollection(collection.id)
+    }
 
     // Ensure arrays are safe
     const safeHubs = Array.isArray(hubs) ? hubs : []
@@ -83,6 +91,7 @@ export default async function NetworkDashboardPage({
           {/* GuideForge Data Spine Contract - Dashboard Guide Loading
              The dashboard loads guides directly from Supabase filtered by collection IDs.
              Guides flow: networkId → hubs → collections → collection IDs → Supabase WHERE collection_id IN (ids)
+             Attached assets flow: collections → collection IDs → Supabase asset_drafts WHERE attached_collection_id IN (ids)
              Do not change this data loading path. */}
 
           {/* Tabs Section - Wrapped in Error Boundary */}
@@ -94,6 +103,7 @@ export default async function NetworkDashboardPage({
               hubs={safeHubs}
               collections={safeCollections}
               guides={safeGuides}
+              attachedAssetsMap={attachedAssetsMap}
             />
           </DashboardErrorBoundary>
         </div>

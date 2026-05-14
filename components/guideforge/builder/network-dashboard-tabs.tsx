@@ -15,8 +15,10 @@ import {
   Sparkles,
   Edit2,
   Trash2,
+  Package,
 } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
+import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +36,7 @@ interface NetworkDashboardTabsProps {
   hubs: NormalizedHub[]
   collections: NormalizedCollection[]
   guides: Guide[]
+  attachedAssetsMap?: Record<string, AssetDraft[]>
 }
 
 export function NetworkDashboardTabs({
@@ -43,6 +46,7 @@ export function NetworkDashboardTabs({
   hubs,
   collections,
   guides,
+  attachedAssetsMap = {},
 }: NetworkDashboardTabsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -331,6 +335,47 @@ export function NetworkDashboardTabs({
         )}
 
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
+
+        {/* Lane 1C: Attached Draft Assets */}
+        {Object.values(attachedAssetsMap || {}).flat().length > 0 && (
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Attached Draft Assets
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              {Object.entries(attachedAssetsMap || {}).map(([collectionId, assets]) =>
+                (assets || []).map((asset: AssetDraft) => (
+                  <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-start gap-2">
+                        <Package className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-foreground line-clamp-2">{asset.title}</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
+                      <Badge variant="outline" className="text-xs font-normal capitalize">
+                        {asset.assetType.replace(/_/g, " ")}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs font-normal text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                        Draft
+                      </Badge>
+                      <Button size="sm" asChild variant="outline" className="ml-auto">
+                        <Link href={`/builder/assets/${asset.id}`}>
+                          Edit
+                        </Link>
+                      </Button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </TabsContent>
 
   {/* Ready tab */}
@@ -857,6 +902,8 @@ export function NetworkDashboardTabs({
                       
                       // Calculate guide count for this collection from loaded guides
                       const collectionGuideCount = safeGuides.filter((g: Guide) => g.collectionId === col.id).length
+                      // Calculate attached asset count
+                      const collectionAssetCount = (attachedAssetsMap?.[col.id] || []).length
                       
                       if (hubIdValid && colIdValid) {
                         return (
@@ -915,9 +962,18 @@ export function NetworkDashboardTabs({
                                   </p>
                                 </div>
                                 <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
-                                  <p className="text-xs font-medium text-muted-foreground">
-                                    {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
-                                  </p>
+                                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                    <span>{collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}</span>
+                                    {collectionAssetCount > 0 && (
+                                      <>
+                                        <span className="text-border/50">·</span>
+                                        <span className="flex items-center gap-1">
+                                          <Package className="size-3" aria-hidden="true" />
+                                          {collectionAssetCount} {collectionAssetCount === 1 ? "asset" : "assets"}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
                                   <div className="flex gap-2">
                                     <Button size="sm" variant="outline" onClick={() => startEditCollection(col)}>
                                       <Edit2 className="size-3.5 mr-1" aria-hidden="true" />

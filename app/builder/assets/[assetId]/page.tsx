@@ -594,8 +594,13 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               <div>
                 <h3 className="font-semibold text-green-900 dark:text-green-100">Attached to Network</h3>
                 <p className="text-sm text-green-800 dark:text-green-200 mt-1">
-                  This asset is attached to a collection. It will appear in your network dashboard.
+                  This asset is attached to a collection and will appear in your network&apos;s private workspace.
                 </p>
+                {asset.attachedNetworkId && asset.attachedCollectionId && (
+                  <p className="text-xs text-green-700 dark:text-green-300 mt-2 font-mono bg-green-900/20 px-2 py-1 rounded inline-block">
+                    Collection ID: {asset.attachedCollectionId.slice(0, 8)}...
+                  </p>
+                )}
               </div>
             </div>
             <Button

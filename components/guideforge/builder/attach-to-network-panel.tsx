@@ -142,9 +142,47 @@ export function AttachToNetworkPanel({
 
   const handleAttach = async () => {
     if (!selectedNetworkId || !selectedHubId || !selectedCollectionId) {
-      setError("Please select a network, hub, and collection.")
+      setError("Please select a network, hub, and collection")
       return
     }
+
+    // Check for duplicate attachment (same collection)
+    if (
+      currentNetworkId === selectedNetworkId &&
+      currentHubId === selectedHubId &&
+      currentCollectionId === selectedCollectionId
+    ) {
+      setError("This asset is already attached to that collection. Select a different collection to move it.")
+      return
+    }
+
+    setIsAttaching(true)
+    setError(null)
+    try {
+      const result = await updateAssetDraft(assetId, {
+        attachedNetworkId: selectedNetworkId,
+        attachedHubId: selectedHubId,
+        attachedCollectionId: selectedCollectionId,
+      })
+
+      if (!result.success) {
+        setError(result.error || "Failed to attach asset")
+        setIsAttaching(false)
+        return
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        onSuccess?.()
+        onClose()
+      }, 1500)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      setError(msg)
+      console.error("[v0] Attach error:", err)
+      setIsAttaching(false)
+    }
+  }
 
     setIsAttaching(true)
     setError(null)
