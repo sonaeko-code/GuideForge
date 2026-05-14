@@ -2147,3 +2147,105 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
     }
   }
 }
+
+/**
+ * Delete a hub after checking for child collections (with confirmation UX handling).
+ * If the hub has collections, return a friendly error message instead of cascading delete.
+ * Task 2 - Add Hub Management Actions
+ */
+export async function deleteHub(hubId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    // Check if hub has any collections
+    const { data: collections, error: collError } = await supabase
+      .from("collections")
+      .select("id")
+      .eq("hub_id", hubId)
+      .limit(1)
+
+    if (collError) {
+      console.error("[v0] Error checking hub collections:", collError.message)
+      return { success: false, error: "Failed to check for child collections" }
+    }
+
+    if (collections && collections.length > 0) {
+      console.warn("[v0] Cannot delete hub with collections:", hubId)
+      return {
+        success: false,
+        error: "Remove or archive all collections in this hub before deleting it."
+      }
+    }
+
+    // Safe to delete: no child collections
+    const { error: deleteError } = await supabase
+      .from("hubs")
+      .delete()
+      .eq("id", hubId)
+
+    if (deleteError) {
+      console.error("[v0] Hub delete error:", deleteError.message)
+      return { success: false, error: deleteError.message }
+    }
+
+    console.log("[v0] Hub deleted successfully:", hubId)
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception deleting hub:", message)
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * Delete a collection after checking for child guides (with confirmation UX handling).
+ * If the collection has guides, return a friendly error message instead of cascading delete.
+ * Task 3 - Add Collection Management Actions
+ */
+export async function deleteCollection(collectionId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    // Check if collection has any guides
+    const { data: guides, error: guideError } = await supabase
+      .from("guides")
+      .select("id")
+      .eq("collection_id", collectionId)
+      .limit(1)
+
+    if (guideError) {
+      console.error("[v0] Error checking collection guides:", guideError.message)
+      return { success: false, error: "Failed to check for child guides" }
+    }
+
+    if (guides && guides.length > 0) {
+      console.warn("[v0] Cannot delete collection with guides:", collectionId)
+      return {
+        success: false,
+        error: "Remove or archive all guides in this collection before deleting it."
+      }
+    }
+
+    // Safe to delete: no child guides
+    const { error: deleteError } = await supabase
+      .from("collections")
+      .delete()
+      .eq("id", collectionId)
+
+    if (deleteError) {
+      console.error("[v0] Collection delete error:", deleteError.message)
+      return { success: false, error: deleteError.message }
+    }
+
+    console.log("[v0] Collection deleted successfully:", collectionId)
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception deleting collection:", message)
+    return { success: false, error: message }
+  }
+}

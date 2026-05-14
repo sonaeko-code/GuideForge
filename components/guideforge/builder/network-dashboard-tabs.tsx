@@ -13,6 +13,8 @@ import {
   BookMarked,
   Flame,
   Sparkles,
+  Edit2,
+  Trash2,
 } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import { Button } from "@/components/ui/button"
@@ -22,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { normalizeGuideStatus, filterGuidesByStatus, filterOutArchived } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
+import { deleteHub, deleteCollection, updateHub, updateCollection } from "@/lib/guideforge/supabase-networks"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 
 interface NetworkDashboardTabsProps {
@@ -46,6 +49,17 @@ export function NetworkDashboardTabs({
   
   const [activeTab, setActiveTab] = useState<string>(initialTab)
   
+  // Hub/collection management state
+  const [editingHubId, setEditingHubId] = useState<string | null>(null)
+  const [editHubName, setEditHubName] = useState("")
+  const [editHubDescription, setEditHubDescription] = useState("")
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null)
+  const [editCollectionName, setEditCollectionName] = useState("")
+  const [editCollectionDescription, setEditCollectionDescription] = useState("")
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
   // Sync URL changes to tab state
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab") || "drafts"
@@ -62,6 +76,104 @@ export function NetworkDashboardTabs({
       params.set("collection", initialCollectionId)
     }
     router.push(`/builder/network/${networkId}/dashboard?${params.toString()}`)
+  }
+
+  // Hub management handlers
+  const startEditHub = (hub: NormalizedHub) => {
+    setEditingHubId(hub.id)
+    setEditHubName(hub.name)
+    setEditHubDescription(hub.description || "")
+    setError(null)
+  }
+
+  const cancelEditHub = () => {
+    setEditingHubId(null)
+    setEditHubName("")
+    setEditHubDescription("")
+    setError(null)
+  }
+
+  const saveEditHub = async () => {
+    if (!editingHubId || !editHubName.trim()) return
+    setIsLoading(true)
+    setError(null)
+
+    const result = await updateHub(editingHubId, {
+      name: editHubName.trim(),
+      description: editHubDescription.trim(),
+    })
+
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setEditingHubId(null)
+      router.refresh()
+    }
+    setIsLoading(false)
+  }
+
+  const confirmDeleteHub = async () => {
+    if (!deletingId) return
+    setIsLoading(true)
+    setError(null)
+
+    const result = await deleteHub(deletingId)
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setDeletingId(null)
+      router.refresh()
+    }
+    setIsLoading(false)
+  }
+
+  // Collection management handlers
+  const startEditCollection = (col: NormalizedCollection) => {
+    setEditingCollectionId(col.id)
+    setEditCollectionName(col.name)
+    setEditCollectionDescription(col.description || "")
+    setError(null)
+  }
+
+  const cancelEditCollection = () => {
+    setEditingCollectionId(null)
+    setEditCollectionName("")
+    setEditCollectionDescription("")
+    setError(null)
+  }
+
+  const saveEditCollection = async () => {
+    if (!editingCollectionId || !editCollectionName.trim()) return
+    setIsLoading(true)
+    setError(null)
+
+    const result = await updateCollection(editingCollectionId, {
+      name: editCollectionName.trim(),
+      description: editCollectionDescription.trim(),
+    })
+
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setEditingCollectionId(null)
+      router.refresh()
+    }
+    setIsLoading(false)
+  }
+
+  const confirmDeleteCollection = async () => {
+    if (!deletingId) return
+    setIsLoading(true)
+    setError(null)
+
+    const result = await deleteCollection(deletingId)
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setDeletingId(null)
+      router.refresh()
+    }
+    setIsLoading(false)
   }
 
   // Prepare data
@@ -582,6 +694,12 @@ export function NetworkDashboardTabs({
           </Button>
         </div>
 
+        {error && (
+          <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-900 dark:text-red-100">
+            {error}
+          </div>
+        )}
+
         {safeHubs.length === 0 ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
             <Gamepad2 className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
@@ -601,28 +719,79 @@ export function NetworkDashboardTabs({
               const hubCollectionCount = safeCollections.filter(
                 (c: NormalizedCollection) => c.hubId === hub.id
               ).length
+              const isEditing = editingHubId === hub.id
+              const isDeleting = deletingId === hub.id
 
               return (
                 <Card key={hub.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between gap-2 flex-1">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-foreground flex items-center gap-2">
-                        <Gamepad2 className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
-                        <span className="truncate">{hub.name}</span>
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-1">{hub.description}</p>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={editHubName}
+                        onChange={(e) => setEditHubName(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background"
+                        placeholder="Hub name"
+                      />
+                      <textarea
+                        value={editHubDescription}
+                        onChange={(e) => setEditHubDescription(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background resize-none"
+                        rows={2}
+                        placeholder="Description"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={cancelEditHub} disabled={isLoading}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={saveEditHub} disabled={isLoading}>
+                          {isLoading ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-border/50">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
-                    </p>
-                    <Button size="sm" asChild variant="outline">
-                      <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
-                        View
-                      </Link>
-                    </Button>
-                  </div>
+                  ) : isDeleting ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-foreground">Delete this hub?</p>
+                      <p className="text-xs text-muted-foreground">
+                        This action cannot be undone. Make sure all collections are removed first.
+                      </p>
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => setDeletingId(null)} disabled={isLoading}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={confirmDeleteHub} disabled={isLoading}>
+                          {isLoading ? "Deleting..." : "Delete"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-2 flex-1">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-foreground flex items-center gap-2">
+                            <Gamepad2 className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                            <span className="truncate">{hub.name}</span>
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-1">{hub.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-border/50">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => startEditHub(hub)}>
+                            <Edit2 className="size-3.5 mr-1" aria-hidden="true" />
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setDeletingId(hub.id)}>
+                            <Trash2 className="size-3.5 mr-1" aria-hidden="true" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </Card>
               )
             })}
@@ -646,6 +815,12 @@ export function NetworkDashboardTabs({
           )}
         </div>
 
+        {error && (
+          <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-900 dark:text-red-100">
+            {error}
+          </div>
+        )}
+
         {safeCollections.length === 0 ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
             <FolderOpen className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
@@ -665,61 +840,112 @@ export function NetworkDashboardTabs({
           </div>
         ) : (
           <div className="space-y-4">
-              {safeHubs.map((hub: NormalizedHub) => {
-                const hubCollections = safeCollections.filter((c: NormalizedCollection) => c.hubId === hub.id)
+            {safeHubs.map((hub: NormalizedHub) => {
+              const hubCollections = safeCollections.filter((c: NormalizedCollection) => c.hubId === hub.id)
 
-                if (hubCollections.length === 0) return null
+              if (hubCollections.length === 0) return null
 
-                return (
-                  <div key={hub.id}>
-                    <h3 className="text-sm font-semibold text-muted-foreground mb-3">{hub.name}</h3>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {hubCollections.map((col: NormalizedCollection) => {
-                        const hubIdValid = col.hubId && col.hubId !== "undefined"
-                        const colIdValid = col.id && col.id !== "undefined"
-                        
-                        // Calculate guide count for this collection from loaded guides
-                        const collectionGuideCount = safeGuides.filter((g: Guide) => g.collectionId === col.id).length
-                        
-                        if (hubIdValid && colIdValid) {
-                          return (
-                            <Card key={col.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
-                              <div className="space-y-2 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className="flex items-center gap-2 font-semibold text-foreground truncate">
-                                    <FolderOpen className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
-                                    <span className="truncate">{col.name}</span>
-                                  </h4>
+              return (
+                <div key={hub.id}>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-3">{hub.name}</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {hubCollections.map((col: NormalizedCollection) => {
+                      const hubIdValid = col.hubId && col.hubId !== "undefined"
+                      const colIdValid = col.id && col.id !== "undefined"
+                      const isEditingCol = editingCollectionId === col.id
+                      const isDeletingCol = deletingId === col.id
+                      
+                      // Calculate guide count for this collection from loaded guides
+                      const collectionGuideCount = safeGuides.filter((g: Guide) => g.collectionId === col.id).length
+                      
+                      if (hubIdValid && colIdValid) {
+                        return (
+                          <Card key={col.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
+                            {isEditingCol ? (
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  value={editCollectionName}
+                                  onChange={(e) => setEditCollectionName(e.target.value)}
+                                  className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background"
+                                  placeholder="Collection name"
+                                />
+                                <textarea
+                                  value={editCollectionDescription}
+                                  onChange={(e) => setEditCollectionDescription(e.target.value)}
+                                  className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background resize-none"
+                                  rows={2}
+                                  placeholder="Description"
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <Button size="sm" variant="outline" onClick={cancelEditCollection} disabled={isLoading}>
+                                    Cancel
+                                  </Button>
+                                  <Button size="sm" onClick={saveEditCollection} disabled={isLoading}>
+                                    {isLoading ? "Saving..." : "Save Changes"}
+                                  </Button>
                                 </div>
+                              </div>
+                            ) : isDeletingCol ? (
+                              <div className="space-y-3">
+                                <p className="text-sm font-semibold text-foreground">Delete this collection?</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {col.description || "No description yet"}
+                                  This action cannot be undone. Make sure all guides are removed first.
                                 </p>
+                                <div className="flex gap-2 justify-end">
+                                  <Button size="sm" variant="outline" onClick={() => setDeletingId(null)} disabled={isLoading}>
+                                    Cancel
+                                  </Button>
+                                  <Button size="sm" variant="destructive" onClick={confirmDeleteCollection} disabled={isLoading}>
+                                    {isLoading ? "Deleting..." : "Delete"}
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
-                                </p>
-                                <Button size="sm" asChild variant="outline">
-                                  <Link href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}>
-                                    View
-                                  </Link>
-                                </Button>
-                              </div>
-                            </Card>
-                          )
-                        } else {
-                          return (
-                            <span key={col.id} className="text-xs text-red-600 dark:text-red-400">
-                              Missing hub/collection link
-                            </span>
-                          )
-                        }
-                      })}
-                    </div>
+                            ) : (
+                              <>
+                                <div className="space-y-2 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h4 className="flex items-center gap-2 font-semibold text-foreground truncate">
+                                      <FolderOpen className="size-4 text-primary flex-shrink-0" aria-hidden="true" />
+                                      <span className="truncate">{col.name}</span>
+                                    </h4>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {col.description || "No description yet"}
+                                  </p>
+                                </div>
+                                <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {collectionGuideCount} {collectionGuideCount === 1 ? "guide" : "guides"}
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => startEditCollection(col)}>
+                                      <Edit2 className="size-3.5 mr-1" aria-hidden="true" />
+                                      Edit
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setDeletingId(col.id)}>
+                                      <Trash2 className="size-3.5 mr-1" aria-hidden="true" />
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </Card>
+                        )
+                      } else {
+                        return (
+                          <span key={col.id} className="text-xs text-red-600 dark:text-red-400">
+                            Missing hub/collection link
+                          </span>
+                        )
+                      }
+                    })}
                   </div>
-                )
-              })}
-            </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </TabsContent>
     </Tabs>
