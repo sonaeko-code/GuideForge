@@ -21,7 +21,7 @@ export default async function NetworkSettingsPage({
     const network = ctx.network
 
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6 md:py-14">
           <Button asChild variant="ghost" size="sm" className="mb-6">
@@ -50,7 +50,7 @@ export default async function NetworkSettingsPage({
     )
   } catch (error) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6 md:py-14">
           <Button asChild variant="ghost" size="sm" className="mb-6">

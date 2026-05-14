@@ -12,12 +12,12 @@ export default async function NetworksDirectoryPage() {
   // Load all networks from Supabase
   let networks = await getAllNetworks()
   
-  console.log("[v0] Networks directory loaded networks:", networks.length)
+
 
   // If no real networks exist, show empty state
   if (networks.length === 0) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         
         <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
@@ -27,8 +27,8 @@ export default async function NetworksDirectoryPage() {
                 ← Back to Workspace
               </Link>
             </Button>
-            <div className="text-xs text-muted-foreground">
-              Builder / My Networks
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Builder &middot; My Networks
             </div>
             <Button asChild variant="outline" size="sm">
               <Link href="/builder/assets">
@@ -38,25 +38,30 @@ export default async function NetworksDirectoryPage() {
             </Button>
           </div>
 
-          <div className="rounded-lg border-2 border-dashed border-border bg-secondary/40 p-12">
-            <Folder className="mx-auto size-12 text-muted-foreground mb-4" aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-foreground mb-2 text-center">No networks yet</h2>
-            <p className="text-muted-foreground mb-6 text-center">
-              Create your first network or generate a single structured asset draft.
-            </p>
-            <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-4">
-              <Button asChild variant="outline">
-                <Link href="/builder/generate-asset">
-                  <Wand2 className="mr-2 size-4" aria-hidden="true" />
-                  Generate Asset
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href="/builder/network/new">
-                  <Plus className="mr-2 size-4" aria-hidden="true" />
-                  Create Network
-                </Link>
-              </Button>
+          <div className="card-foundry relative overflow-hidden rounded-xl p-12 text-center">
+            <div className="absolute inset-0 bg-constellation opacity-25 pointer-events-none" aria-hidden="true" />
+            <div className="relative">
+              <div className="forge-seal mx-auto mb-4 flex size-14 items-center justify-center rounded-full text-[oklch(0.18_0.02_50)]">
+                <Folder className="size-6" aria-hidden="true" />
+              </div>
+              <h2 className="text-lg font-bold text-foreground mb-2 text-balance">No networks yet</h2>
+              <p className="text-muted-foreground mb-6 text-pretty text-sm">
+                Create your first network or generate a single structured asset draft.
+              </p>
+              <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-4">
+                <Button asChild variant="outline">
+                  <Link href="/builder/generate-asset">
+                    <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                    Generate Asset
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/builder/network/new">
+                    <Plus className="mr-2 size-4" aria-hidden="true" />
+                    Create Network
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -73,7 +78,6 @@ export default async function NetworksDirectoryPage() {
       try {
         const hubs = await getHubsByNetworkId(network.id)
         hubCount = hubs?.length || 0
-        console.log("[v0] Network card counts:", network.id, "hubs:", hubCount)
         
         if (hubs && hubs.length > 0) {
           try {
@@ -81,7 +85,6 @@ export default async function NetworksDirectoryPage() {
               hubs.map(hub => getCollectionsByHubId(hub.id).catch(() => []))
             )
             collectionCount = collectionArrays.reduce((sum, arr) => sum + (arr?.length || 0), 0)
-            console.log("[v0] Network card counts:", network.id, "collections:", collectionCount)
           } catch (collErr) {
             console.warn("[v0] Network count error (collections for", network.id, "):", collErr)
             collectionCount = 0
@@ -102,18 +105,18 @@ export default async function NetworksDirectoryPage() {
   )
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen surface-parchment">
       <SiteHeader hideCta />
       
       <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-        <div className="mb-10 flex justify-between items-center gap-4 flex-wrap">
+        <div className="mb-8 flex justify-between items-center gap-4 flex-wrap">
           <Button asChild variant="ghost" size="sm">
             <Link href="/builder">
               ← Back to Workspace
             </Link>
           </Button>
-          <div className="text-xs text-muted-foreground">
-            Builder / My Networks
+          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Builder &middot; My Networks
           </div>
           <Button asChild variant="outline" size="sm">
             <Link href="/builder/assets">
@@ -123,34 +126,41 @@ export default async function NetworksDirectoryPage() {
           </Button>
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex-1">
-            <h1 className="text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-              All Networks
-            </h1>
-            <p className="mt-2 text-pretty text-lg text-muted-foreground">
-              {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 md:flex-row md:gap-3">
-            <Button asChild variant="outline">
-              <Link href="/builder/network/scaffold">
-                <Plus className="mr-2 size-4" aria-hidden="true" />
-                From Template
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/builder/generate-asset">
-                <Wand2 className="mr-2 size-4" aria-hidden="true" />
-                Generate Asset
-              </Link>
-            </Button>
-            <Button asChild size="lg">
-              <Link href="/builder/network/new">
-                <Plus className="mr-2 size-4" aria-hidden="true" />
-                Create Network
-              </Link>
-            </Button>
+        {/* Networks masthead */}
+        <div className="surface-masthead relative mb-8 overflow-hidden rounded-xl p-7 md:p-9 shadow-forge">
+          <div className="absolute inset-0 bg-constellation opacity-25 pointer-events-none" aria-hidden="true" />
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--brass-700)]">
+                Workspace &middot; Knowledge Networks
+              </p>
+              <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+                All Networks
+              </h1>
+              <p className="mt-2 text-pretty text-base text-muted-foreground">
+                {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 md:flex-nowrap md:gap-3">
+              <Button asChild variant="outline">
+                <Link href="/builder/network/scaffold">
+                  <Plus className="mr-2 size-4" aria-hidden="true" />
+                  From Template
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/builder/generate-asset">
+                  <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                  Generate Asset
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/builder/network/new">
+                  <Plus className="mr-2 size-4" aria-hidden="true" />
+                  Create Network
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
 

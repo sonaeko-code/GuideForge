@@ -92,7 +92,7 @@ export default async function PublicNetworkPage({
   const forgedGuides = allPublishedGuides.filter(g => g.verification === "forge-verified")
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen surface-parchment">
       <NetworkPublicHeader network={network} />
 
       {/* MASTHEAD — themed by network.branding.theme */}
@@ -304,7 +304,7 @@ export default async function PublicNetworkPage({
                   <Link
                     key={guide.id}
                     href={`/n/${networkSlug}/${hub?.slug || ""}/${guide.slug}`}
-                    className={`group flex flex-col rounded-lg border p-5 transition-colors h-full ${theme.cardClasses} ${theme.borderClasses} hover:opacity-90`}
+                    className="group card-foundry flex flex-col rounded-xl p-5 h-full"
                   >
                     <div className="mb-3 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider">
                       <span className={theme.accentClasses}>Verified</span>
@@ -337,7 +337,7 @@ export default async function PublicNetworkPage({
                 <Link
                   key={asset.id}
                   href={`/n/${networkSlug}/asset/${asset.id}`}
-                  className="group flex flex-col rounded-lg border border-border/50 p-5 transition-colors hover:bg-muted/50 h-full"
+                  className="group card-foundry flex flex-col rounded-xl p-5 h-full"
                 >
                   <div className="mb-3 flex items-center gap-2">
                     <Badge variant="outline" className="text-xs font-normal capitalize">

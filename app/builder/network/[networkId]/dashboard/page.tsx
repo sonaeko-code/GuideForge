@@ -60,7 +60,7 @@ export default async function NetworkDashboardPage({
     const safeGuides = Array.isArray(guides) ? guides : []
 
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
         <div className="mb-6 flex items-center justify-between gap-3">
@@ -69,8 +69,8 @@ export default async function NetworkDashboardPage({
               <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
               <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
             </div>
-            <p className="text-sm text-muted-foreground">
-              <span className="font-mono text-foreground">{network.slug}</span>.guideforge.app
+            <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              /n/{network.slug}
             </p>
           </div>
           <div className="flex gap-2">
@@ -121,7 +121,7 @@ export default async function NetworkDashboardPage({
     const errorStack = error instanceof Error ? error.stack : ""
 
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
           <div className="flex flex-col items-center gap-4 text-center">

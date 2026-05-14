@@ -75,7 +75,7 @@ export default async function PublicAssetPage({
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen surface-parchment">
       <NetworkPublicHeader network={network} />
       {content}
       <NetworkPublicFooter network={network} />

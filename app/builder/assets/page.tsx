@@ -65,7 +65,7 @@ export default function AssetsPage() {
   // Show sign-in required state if not authenticated
   if (!isLoading && !isAuthenticated) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-8 md:py-16">
           <div className="space-y-8">
             <div className="flex justify-between items-center gap-4 flex-wrap">
@@ -112,7 +112,7 @@ export default function AssetsPage() {
   // Show loading state while auth is initializing
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-8 md:py-16">
           <div className="space-y-8">
             <div className="flex justify-between items-center gap-4 flex-wrap">

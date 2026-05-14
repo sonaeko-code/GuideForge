@@ -341,7 +341,7 @@ export function NetworkDashboardTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-6 mb-6 h-auto p-1 surface-ivory shadow-forge">
+      <TabsList className="grid w-full grid-cols-6 mb-6 h-auto p-1 shadow-forge" style={{backgroundImage: 'linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%, var(--card) 100%)', border: '1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border))'}}>
         <TabsTrigger value="drafts">
           Drafts
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
