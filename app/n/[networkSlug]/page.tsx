@@ -16,7 +16,7 @@ import {
   getCollectionsByHubId,
 } from "@/lib/guideforge/supabase-networks"
 import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
-import { QUESTLINE_NETWORK, getHubsByNetwork, MOCK_GUIDES } from "@/lib/guideforge/mock-data"
+import { QUESTLINE_NETWORK, getHubsByNetwork } from "@/lib/guideforge/mock-data"
 import { getNetworkTheme } from "@/lib/guideforge/network-themes"
 import type { ThemeDirection } from "@/lib/guideforge/types"
 
@@ -41,19 +41,23 @@ export default async function PublicNetworkPage({
     notFound()
   }
 
-  // Load hubs - safe with empty fallback
+  // Load hubs - only from Supabase, no mock fallback for created networks
   let hubs = []
   if (network.id) {
     hubs = await getHubsByNetworkId(network.id)
   }
   
-  if (hubs.length === 0 && networkSlug === "questline") {
-    hubs = getHubsByNetwork(network.id)
-  }
+  // IMPORTANT: Do NOT fall back to getHubsByNetwork() for created networks.
+  // QuestLine mock hubs are handled separately via the hardcoded QUESTLINE_NETWORK.
+  // Created networks must load real hubs from Supabase only.
 
-  // Load published guides - only published status shown
+  // Load published guides - only from Supabase, no mock fallback for created networks
   const supabaseGuides = await loadPublishedGuides()
-  const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : MOCK_GUIDES.filter(g => g.status === "published")
+  
+  // IMPORTANT: Do NOT fall back to MOCK_GUIDES for created networks.
+  // Only use actual published guides from Supabase.
+  // QuestLine mock data is handled separately via the hardcoded QUESTLINE_NETWORK fallback.
+  const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : []
 
   // Load collections - get from all hubs in network with error handling
   const allCollections = []
@@ -136,8 +140,8 @@ export default async function PublicNetworkPage({
         </div>
       </section>
 
-      {/* FEATURED GUIDE */}
-      {featured && featuredHub && (
+      {/* FEATURED GUIDE or NO GUIDES EMPTY STATE */}
+      {featured && featuredHub ? (
         <section className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Featured" title="The best from this network" />
@@ -192,7 +196,18 @@ export default async function PublicNetworkPage({
             </Link>
           </div>
         </section>
-      )}
+      ) : hubs.length > 0 ? (
+        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
+          <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 text-center">
+            <div className="space-y-3">
+              <p className="text-lg font-medium text-foreground">No published guides yet</p>
+              <p className="text-sm text-muted-foreground">
+                This network is being built. Check back soon for published guides.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* HUBS SECTION */}
       {hubs.length === 0 ? (
