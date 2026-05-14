@@ -10,7 +10,14 @@ import type { GeneratedStructuredAsset } from "./generation-schemas"
 
 export type AssetType = "single_guide" | "recipe" | "checklist" | "sop" | "troubleshooting_flow"
 
-export type AssetDraftStatus = "draft" | "archived"
+/**
+ * Asset Draft Status — Maps to guide status workflow
+ * draft: Private workspace, not on public site
+ * pending_review: Submitted for review, not on public site
+ * published: Visible on public site (Lane 2B+)
+ * archived: Preserved for reference, not visible
+ */
+export type AssetDraftStatus = "draft" | "pending_review" | "published" | "archived"
 
 export type AssetDraftSource = "generated" | "manual" | "imported"
 

@@ -16,6 +16,9 @@ import {
   Edit2,
   Trash2,
   Package,
+  Send,
+  CheckCircle2,
+  ArrowLeft,
 } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
@@ -28,6 +31,12 @@ import { normalizeGuideStatus, filterGuidesByStatus, filterOutArchived } from "@
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import { deleteHub, deleteCollection, updateHub, updateCollection } from "@/lib/guideforge/supabase-networks"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
+import {
+  submitAssetDraftForReview,
+  returnAssetDraftToDraft,
+  publishAssetDraft,
+  getAssetDraftStatusLabel,
+} from "@/lib/guideforge/asset-draft-reviews"
 
 interface NetworkDashboardTabsProps {
   networkId: string
@@ -63,6 +72,11 @@ export function NetworkDashboardTabs({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Lane 2B: Asset review action state
+  const [assetActionLoading, setAssetActionLoading] = useState<string | null>(null)
+  const [assetActionError, setAssetActionError] = useState<Record<string, string>>({})
+  const [assetActionSuccess, setAssetActionSuccess] = useState<Record<string, boolean>>({})
   
   // Sync URL changes to tab state
   useEffect(() => {
@@ -180,6 +194,64 @@ export function NetworkDashboardTabs({
     setIsLoading(false)
   }
 
+  // Lane 2B: Asset draft action handlers
+  const handleSubmitAssetForReview = async (assetId: string) => {
+    setAssetActionLoading(assetId)
+    setAssetActionError((prev) => ({ ...prev, [assetId]: "" }))
+
+    const result = await submitAssetDraftForReview(assetId)
+
+    if (!result.success) {
+      setAssetActionError((prev) => ({ ...prev, [assetId]: result.error || "Failed to submit" }))
+    } else {
+      setAssetActionSuccess((prev) => ({ ...prev, [assetId]: true }))
+      setTimeout(() => {
+        setAssetActionSuccess((prev) => ({ ...prev, [assetId]: false }))
+        router.refresh()
+      }, 1500)
+    }
+
+    setAssetActionLoading(null)
+  }
+
+  const handleReturnAssetToDraft = async (assetId: string) => {
+    setAssetActionLoading(assetId)
+    setAssetActionError((prev) => ({ ...prev, [assetId]: "" }))
+
+    const result = await returnAssetDraftToDraft(assetId)
+
+    if (!result.success) {
+      setAssetActionError((prev) => ({ ...prev, [assetId]: result.error || "Failed to return to draft" }))
+    } else {
+      setAssetActionSuccess((prev) => ({ ...prev, [assetId]: true }))
+      setTimeout(() => {
+        setAssetActionSuccess((prev) => ({ ...prev, [assetId]: false }))
+        router.refresh()
+      }, 1500)
+    }
+
+    setAssetActionLoading(null)
+  }
+
+  const handlePublishAsset = async (assetId: string) => {
+    setAssetActionLoading(assetId)
+    setAssetActionError((prev) => ({ ...prev, [assetId]: "" }))
+
+    const result = await publishAssetDraft(assetId)
+
+    if (!result.success) {
+      setAssetActionError((prev) => ({ ...prev, [assetId]: result.error || "Failed to publish" }))
+    } else {
+      setAssetActionSuccess((prev) => ({ ...prev, [assetId]: true }))
+      setTimeout(() => {
+        setAssetActionSuccess((prev) => ({ ...prev, [assetId]: false }))
+        router.refresh()
+      }, 1500)
+    }
+
+    setAssetActionLoading(null)
+  }
+
   // Prepare data
   const safeHubs = Array.isArray(hubs) ? hubs : []
   const safeCollections = Array.isArray(collections) ? collections : []
@@ -260,25 +332,31 @@ export function NetworkDashboardTabs({
     })),
   })
 
+  // Lane 2B: Filter attached assets by status
+  const allAttachedAssets = Object.values(attachedAssetsMap || {}).flat() as AssetDraft[]
+  const draftAssets = allAttachedAssets.filter((a) => a.status === "draft")
+  const pendingReviewAssets = allAttachedAssets.filter((a) => a.status === "pending_review")
+  const publishedAssets = allAttachedAssets.filter((a) => a.status === "published")
+
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-6 mb-6">
         <TabsTrigger value="drafts">
           Drafts
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-            {safeDrafts.length}
+            {safeDrafts.length + draftAssets.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="ready">
           Pending Review
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
-            {safeReady.length}
+            {safeReady.length + pendingReviewAssets.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="published">
           Published
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-            {safePublished.length}
+            {safePublished.length + publishedAssets.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="guides">
@@ -336,43 +414,64 @@ export function NetworkDashboardTabs({
 
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
 
-        {/* Lane 1C: Attached Draft Assets */}
-        {Object.values(attachedAssetsMap || {}).flat().length > 0 && (
+        {/* Lane 2B: Attached Draft Assets with Submit for Review */}
+        {draftAssets.length > 0 && (
           <div className="mt-6 space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Attached Draft Assets
             </h3>
             <div className="grid gap-3 md:grid-cols-2">
-              {Object.entries(attachedAssetsMap || {}).map(([collectionId, assets]) =>
-                (assets || []).map((asset: AssetDraft) => (
-                  <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-start gap-2">
-                        <Package className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-foreground line-clamp-2">{asset.title}</h4>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
-                          </p>
-                        </div>
+              {draftAssets.map((asset: AssetDraft) => (
+                <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-start gap-2">
+                      <Package className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-foreground line-clamp-2">{asset.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
+                        </p>
                       </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
-                      <Badge variant="outline" className="text-xs font-normal capitalize">
-                        {asset.assetType.replace(/_/g, " ")}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
+                    <Badge variant="outline" className="text-xs font-normal capitalize">
+                      {asset.assetType.replace(/_/g, " ")}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs font-normal text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                      Draft
+                    </Badge>
+                    {assetActionSuccess[asset.id] && (
+                      <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 ml-auto">
+                        <CheckCircle2 className="size-3 mr-1" aria-hidden="true" />
+                        Success
                       </Badge>
-                      <Badge variant="outline" className="text-xs font-normal text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
-                        Draft
-                      </Badge>
-                      <Button size="sm" asChild variant="outline" className="ml-auto">
+                    )}
+                    {assetActionError[asset.id] && (
+                      <div className="text-xs text-red-600 dark:text-red-400 ml-auto">
+                        {assetActionError[asset.id]}
+                      </div>
+                    )}
+                    <div className="ml-auto flex gap-2 items-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSubmitAssetForReview(asset.id)}
+                        disabled={assetActionLoading === asset.id || assetActionSuccess[asset.id]}
+                        className="whitespace-nowrap"
+                      >
+                        <Send className="size-3 mr-1" aria-hidden="true" />
+                        {assetActionLoading === asset.id ? "Submitting..." : "Submit"}
+                      </Button>
+                      <Button size="sm" asChild variant="outline">
                         <Link href={`/builder/assets/${asset.id}`}>
                           Edit
                         </Link>
                       </Button>
                     </div>
-                  </Card>
-                ))
-              )}
+                  </div>
+                </Card>
+              ))}
             </div>
           </div>
         )}
@@ -384,21 +483,22 @@ export function NetworkDashboardTabs({
   <div>
   <h2 className="text-lg font-semibold text-foreground">Pending Review</h2>
   <p className="mt-1 text-sm text-muted-foreground">
-  Guides submitted for review and awaiting publication.
+  Guides and assets submitted for review and awaiting publication.
   </p>
           </div>
         </div>
 
-        {safeReady.length === 0 ? (
+        {safeReady.length === 0 && pendingReviewAssets.length === 0 ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
             <Clock className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
-            <p className="font-semibold text-foreground">No guides ready yet</p>
+            <p className="font-semibold text-foreground">No items pending review yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mark a draft guide as ready to see it here.
+              Submit a draft guide or asset for review to see it here.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
+            {/* Guide items */}
             {safeReady.map((guide: Guide) => (
               <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex-1 min-w-0 mb-3 sm:mb-0">
@@ -439,6 +539,66 @@ export function NetworkDashboardTabs({
                 </div>
               </Card>
             ))}
+            
+            {/* Lane 2B: Asset items pending review */}
+            {pendingReviewAssets.map((asset: AssetDraft) => (
+              <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-muted/50 transition-colors">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <Package className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0" aria-hidden="true" />
+                    <h4 className="font-semibold text-foreground truncate">{asset.title}</h4>
+                    <Badge variant="outline" className="text-[10px] font-normal capitalize">
+                      {asset.assetType.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className="text-xs font-normal text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
+                      {getAssetDraftStatusLabel(asset.status).displayName}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {assetActionSuccess[asset.id] && (
+                    <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                      <CheckCircle2 className="size-3 mr-1" aria-hidden="true" />
+                      Success
+                    </Badge>
+                  )}
+                  {assetActionError[asset.id] && (
+                    <div className="text-xs text-red-600 dark:text-red-400">
+                      {assetActionError[asset.id]}
+                    </div>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handlePublishAsset(asset.id)}
+                    disabled={assetActionLoading === asset.id || assetActionSuccess[asset.id]}
+                    className="whitespace-nowrap"
+                  >
+                    <CheckCircle2 className="size-3 mr-1" aria-hidden="true" />
+                    {assetActionLoading === asset.id ? "Publishing..." : "Publish"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleReturnAssetToDraft(asset.id)}
+                    disabled={assetActionLoading === asset.id || assetActionSuccess[asset.id]}
+                  >
+                    <ArrowLeft className="size-3 mr-1" aria-hidden="true" />
+                    Return
+                  </Button>
+                  <Button size="sm" asChild variant="outline">
+                    <Link href={`/builder/assets/${asset.id}`}>
+                      Edit
+                    </Link>
+                  </Button>
+                </div>
+              </Card>
+            ))}
           </div>
         )}
       </TabsContent>
@@ -447,7 +607,7 @@ export function NetworkDashboardTabs({
       <TabsContent value="published" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">
-            Published Guides ({safePublished.length})
+            Published ({safePublished.length + publishedAssets.length})
           </h2>
         </div>
 
@@ -463,6 +623,95 @@ export function NetworkDashboardTabs({
               revisionNumber: g.revisionNumber,
             })),
           })
+        )}
+
+        {safePublished.length === 0 && publishedAssets.length === 0 ? (
+          <div className="rounded-lg border border-border/50 bg-muted/30 p-8 text-center">
+            <Eye className="mx-auto size-12 text-muted-foreground/50 mb-3" aria-hidden="true" />
+            <p className="font-semibold text-foreground">No published guides or assets yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Publish draft guides and assets to see them here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* Guide items */}
+            {safePublished.map((guide: Guide) => (
+              <Card key={guide.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
+                    {/* Phase 10D/10E: Badge for published guides */}
+                    {!guide.revisionOf ? (
+                      <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                        Original
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                        Rev #{guide.revisionNumber || 1}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {guide.summary ? guide.summary.slice(0, 100) + (guide.summary.length > 100 ? "..." : "") : "No summary yet"}
+                  </p>
+                  {/* Hierarchy context for original published guides */}
+                  {!guide.revisionOf && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {getHierarchyNames(guide).hubName} / {getHierarchyNames(guide).collectionName}
+                    </p>
+                  )}
+                  {/* Revision context */}
+                  {guide.revisionOf && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge status={guide.status} />
+                    {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
+                    {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Link
+                    href={`/n/published/${guide.id}`}
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs"
+                  >
+                    View
+                  </Link>
+                </div>
+              </Card>
+            ))}
+
+            {/* Lane 2B: Published assets */}
+            {publishedAssets.map((asset: AssetDraft) => (
+              <Card key={asset.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex-1 min-w-0 mb-3 sm:mb-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <Package className="size-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
+                    <h4 className="font-semibold text-foreground truncate">{asset.title}</h4>
+                    <Badge variant="outline" className="text-[10px] font-normal capitalize">
+                      {asset.assetType.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                      {getAssetDraftStatusLabel(asset.status).displayName}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button size="sm" asChild variant="outline">
+                    <Link href={`/builder/assets/${asset.id}`}>
+                      Edit
+                    </Link>
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
         )}
 
         {safePublished.length === 0 ? (
