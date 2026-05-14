@@ -119,8 +119,23 @@ export async function submitAssetDraftForReview(
       .select("id, status")
       .maybeSingle()
 
-    if (updateError || !updateResult) {
+    if (updateError) {
       console.error("[v0] submitAssetDraftForReview: Update error:", updateError?.message)
+      
+      // Check for common database constraint errors
+      if (updateError.message?.includes("asset_drafts_status_check") || 
+          updateError.message?.includes("check constraint") ||
+          updateError.message?.includes("domain") ||
+          updateError.code === "23514") {
+        return {
+          success: false,
+          error: "Asset status update not supported yet. Please ensure your database schema supports pending_review status.",
+          assetId,
+          previousStatus: asset.status,
+          networkId: asset.attached_network_id,
+        }
+      }
+      
       return {
         success: false,
         error: `Failed to submit asset: ${updateError?.message}`,
@@ -349,6 +364,21 @@ export async function publishAssetDraft(
 
     if (updateError) {
       console.error("[v0] publishAssetDraft: Update error:", updateError.message)
+      
+      // Check for common database constraint errors
+      if (updateError.message?.includes("asset_drafts_status_check") || 
+          updateError.message?.includes("check constraint") ||
+          updateError.message?.includes("domain") ||
+          updateError.code === "23514") {
+        return {
+          success: false,
+          error: "Asset status update not supported yet. Please ensure your database schema supports published status.",
+          assetId,
+          previousStatus: asset.status,
+          networkId: asset.attached_network_id,
+        }
+      }
+      
       return {
         success: false,
         error: `Failed to publish asset: ${updateError.message}`,
@@ -415,8 +445,8 @@ export function getAssetDraftStatusLabel(status: string): {
       return {
         label: "published",
         displayName: "Published",
-        description: "Visible on public site",
-        isPublic: true,
+        description: "Approved in workspace. Public guide rendering will be added in a future lane.",
+        isPublic: false,
       }
     case "archived":
       return {

@@ -19,6 +19,7 @@ import {
   Send,
   CheckCircle2,
   ArrowLeft,
+  Info,
 } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
@@ -420,6 +421,9 @@ export function NetworkDashboardTabs({
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Attached Draft Assets
             </h3>
+            <p className="text-xs text-muted-foreground">
+              Submit assets for review to move them to the Pending Review tab. Once published, they will appear in the Published tab but remain workspace-only until public guide conversion is implemented.
+            </p>
             <div className="grid gap-3 md:grid-cols-2">
               {draftAssets.map((asset: AssetDraft) => (
                 <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
@@ -610,6 +614,20 @@ export function NetworkDashboardTabs({
             Published ({safePublished.length + publishedAssets.length})
           </h2>
         </div>
+
+        {/* Lane 2C: Note that published assets are workspace-only pending public rendering */}
+        {publishedAssets.length > 0 && (
+          <div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+            <Info className="mt-0.5 size-4 flex-shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-foreground">Published Assets — Workspace Only</p>
+              <p className="mt-1 text-muted-foreground">
+                Published assets are approved in your workspace. Public guide rendering will be added in a future lane. 
+                For now, they appear only in this dashboard.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Phase 10H: Debug log for visible guides in published tab */}
         {safePublished.length > 0 && (
