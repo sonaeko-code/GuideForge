@@ -181,6 +181,6 @@
   
   /* Subtle hover elevation for interactive cards */
   .card-interactive {
-    @apply transition-all duration-200 hover:shadow-card active:shadow-card-sm;
+    @apply transition-all duration-200 hover:shadow-md active:shadow-sm;
   }
 }
