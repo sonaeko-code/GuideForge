@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Compass } from "lucide-react"
 import { DifficultyBadge } from "@/components/guideforge/shared"
 import { NetworkPublicHeader } from "@/components/guideforge/public/network-public-header"
@@ -15,7 +16,7 @@ import {
   getHubsByNetworkId,
   getCollectionsByHubId,
 } from "@/lib/guideforge/supabase-networks"
-import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
+import { loadPublishedGuides, loadPublishedAssetsForNetwork } from "@/lib/guideforge/supabase-public"
 import { QUESTLINE_NETWORK, getHubsByNetwork } from "@/lib/guideforge/mock-data"
 import { getNetworkTheme } from "@/lib/guideforge/network-themes"
 import type { ThemeDirection } from "@/lib/guideforge/types"
@@ -58,6 +59,9 @@ export default async function PublicNetworkPage({
   // Only use actual published guides from Supabase.
   // QuestLine mock data is handled separately via the hardcoded QUESTLINE_NETWORK fallback.
   const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : []
+
+  // Lane 2D: Load published assets (single_guide and checklist only) for this network
+  const publishedAssets = network.id ? await loadPublishedAssetsForNetwork(network.id) : []
 
   // Load collections - get from all hubs in network with error handling
   const allCollections = []
@@ -127,7 +131,7 @@ export default async function PublicNetworkPage({
                 <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
                   Total published
                 </dt>
-                <dd className="mt-1 text-2xl font-bold">{allPublishedGuides.length}</dd>
+                <dd className="mt-1 text-2xl font-bold">{allPublishedGuides.length + publishedAssets.length}</dd>
               </div>
               <div>
                 <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
@@ -318,6 +322,42 @@ export default async function PublicNetworkPage({
                   </Link>
                 )
               })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Lane 2D: PUBLISHED ASSETS */}
+      {publishedAssets.length > 0 && (
+        <section className="border-b border-foreground/15">
+          <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
+            <SectionHeading eyebrow="Resources" title="Published assets" />
+            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {publishedAssets.map((asset) => (
+                <Link
+                  key={asset.id}
+                  href={`/n/${networkSlug}/asset/${asset.id}`}
+                  className="group flex flex-col rounded-lg border border-border/50 p-5 transition-colors hover:bg-muted/50 h-full"
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs font-normal capitalize">
+                      {asset.assetType.replace(/_/g, " ")}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                      Published
+                    </Badge>
+                  </div>
+                  <h4 className="line-clamp-2 text-base font-bold leading-snug transition-colors group-hover:text-primary">
+                    {asset.title}
+                  </h4>
+                  <p className="mt-2 line-clamp-3 flex-1 text-xs leading-relaxed text-muted-foreground">
+                    {asset.summary || "No summary"}
+                  </p>
+                  <div className="mt-3 flex items-center justify-end text-xs text-muted-foreground">
+                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </section>

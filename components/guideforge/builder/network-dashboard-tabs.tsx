@@ -615,15 +615,15 @@ export function NetworkDashboardTabs({
           </h2>
         </div>
 
-        {/* Lane 2C: Note that published assets are workspace-only pending public rendering */}
+        {/* Lane 2D: Published assets are now visible on public network */}
         {publishedAssets.length > 0 && (
-          <div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
-            <Info className="mt-0.5 size-4 flex-shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+          <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <Info className="mt-0.5 size-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
             <div className="flex-1 text-sm">
-              <p className="font-semibold text-foreground">Published Assets — Workspace Only</p>
+              <p className="font-semibold text-foreground">Published Assets — Now Public</p>
               <p className="mt-1 text-muted-foreground">
-                Published assets are approved in your workspace. Public guide rendering will be added in a future lane. 
-                For now, they appear only in this dashboard.
+                Checklists and single guides are automatically visible on your public network page. 
+                Other asset types (recipes, SOPs) will be added in future phases.
               </p>
             </div>
           </div>

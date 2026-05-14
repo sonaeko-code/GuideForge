@@ -445,8 +445,8 @@ export function getAssetDraftStatusLabel(status: string): {
       return {
         label: "published",
         displayName: "Published",
-        description: "Approved in workspace. Public guide rendering will be added in a future lane.",
-        isPublic: false,
+        description: "Visible on public network. Checklists and single guides are rendered publicly.",
+        isPublic: true,
       }
     case "archived":
       return {
