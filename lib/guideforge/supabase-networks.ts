@@ -262,11 +262,40 @@ export async function createNetwork(
     console.log("[v0] Network save payload:", networkData)
     console.log("[v0] Network save validation: type=", networkData.type, "slug=", networkData.slug, "theme=", networkData.theme)
 
-    const { data, error } = await supabase
+    let data: any = null
+    let error: any = null
+
+    // Try insert with governance_settings first
+    const firstAttempt = await supabase
       .from("networks")
       .insert([networkData])
       .select()
       .single()
+
+    if (firstAttempt.error) {
+      // If error is about governance_settings column missing, retry without it
+      const isGovernanceColumnError =
+        firstAttempt.error.message?.toLowerCase().includes("governance_settings") ||
+        firstAttempt.error.code === "PGRST204"
+
+      if (isGovernanceColumnError && networkData.governance_settings !== undefined) {
+        console.warn("[v0] governance_settings column not found — retrying without it")
+        const { governance_settings: _omitted, ...payloadWithoutGov } = networkData
+        const secondAttempt = await supabase
+          .from("networks")
+          .insert([payloadWithoutGov])
+          .select()
+          .single()
+        data = secondAttempt.data
+        error = secondAttempt.error
+      } else {
+        data = firstAttempt.data
+        error = firstAttempt.error
+      }
+    } else {
+      data = firstAttempt.data
+      error = firstAttempt.error
+    }
 
     if (error) {
       console.error("[v0] Network save error:", error.message, error.code)
@@ -2344,11 +2373,12 @@ export async function getAttachedAssetsForCollection(collectionId: string): Prom
   }
 
   try {
+    // Include draft, pending_review, and published — exclude only archived
     const { data, error } = await supabase
       .from("asset_drafts")
       .select("*")
       .eq("attached_collection_id", collectionId)
-      .eq("status", "draft") // Only show draft assets, not archived
+      .in("status", ["draft", "pending_review", "published"])
       .order("updated_at", { ascending: false })
 
     if (error) {
@@ -2358,16 +2388,61 @@ export async function getAttachedAssetsForCollection(collectionId: string): Prom
 
     return data.map((row) => ({
       id: row.id,
+      ownerId: row.owner_id,
       assetType: row.asset_type,
       title: row.title,
       summary: row.summary,
+      payload: row.payload,
+      status: row.status,
+      source: row.source,
       attachedNetworkId: row.attached_network_id,
       attachedHubId: row.attached_hub_id,
       attachedCollectionId: row.attached_collection_id,
+      createdAt: row.created_at,
       updatedAt: row.updated_at,
     }))
   } catch (err) {
     console.error("[v0] Exception fetching attached assets:", err)
+    return []
+  }
+}
+
+/**
+ * Get networks owned by the currently authenticated user.
+ * Used by AttachToNetworkPanel to scope networks to those the user can attach to.
+ * Falls back to all networks (client-side filtered by ownerUserId) when owner_id column
+ * lookup is not available.
+ */
+export async function getNetworksForCurrentUser(): Promise<Network[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const profileId = await getCurrentProfileId()
+
+    // If no real user (dev or signed out), return all networks as fallback
+    if (!profileId || profileId === DEV_PROFILE_ID) {
+      return getAllNetworks()
+    }
+
+    // Query networks where owner_id matches the current user
+    const { data, error } = await supabase
+      .from("networks")
+      .select("*")
+      .eq("owner_id", profileId)
+
+    if (error) {
+      // owner_id column might not exist or RLS blocking - fall back to all then filter client-side
+      console.warn("[v0] getNetworksForCurrentUser: owner_id query failed:", error.message, "— falling back to getAllNetworks with client filter")
+      const all = await getAllNetworks()
+      return all.filter((n) => n.ownerUserId === profileId || !n.ownerUserId)
+    }
+
+    console.log("[v0] getNetworksForCurrentUser: loaded", data?.length || 0, "owned networks")
+    return (data || []).map(normalizeNetwork)
+  } catch (err) {
+    console.warn("[v0] getNetworksForCurrentUser exception:", err)
     return []
   }
 }

@@ -62,18 +62,18 @@ export function NetworkPublicHeader({ network, className }: NetworkPublicHeaderP
           >
             Home
           </Link>
-          <Link
-            href={`/n/${network.slug}#hubs`}
+          <a
+            href="#hubs"
             className="relative py-1 transition-colors hover:text-foreground after:absolute after:left-0 after:right-0 after:-bottom-0.5 after:h-px after:scale-x-0 after:bg-[var(--brass-500)] after:transition-transform after:duration-200 hover:after:scale-x-100"
           >
             Hubs
-          </Link>
-          <Link
-            href={`/n/${network.slug}#guides`}
+          </a>
+          <a
+            href="#guides"
             className="relative py-1 transition-colors hover:text-foreground after:absolute after:left-0 after:right-0 after:-bottom-0.5 after:h-px after:scale-x-0 after:bg-[var(--brass-500)] after:transition-transform after:duration-200 hover:after:scale-x-100"
           >
             Guides
-          </Link>
+          </a>
         </nav>
 
         <div className="hidden items-center gap-2 sm:flex">

@@ -995,9 +995,14 @@ export function NetworkDashboardTabs({
       {/* Hubs tab */}
       <TabsContent value="hubs" className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">
-            Hubs ({safeHubs.length})
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              Hubs ({safeHubs.length})
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Hubs contain collections. Collections hold guides and attached draft assets.
+            </p>
+          </div>
           <Button size="sm" asChild>
             <Link href={`/builder/network/${networkId}/hub/new`}>
               <Plus className="size-4 mr-1" aria-hidden="true" />
@@ -1092,6 +1097,12 @@ export function NetworkDashboardTabs({
                           {hubCollectionCount} collection{hubCollectionCount !== 1 ? "s" : ""}
                         </p>
                         <div className="flex gap-2">
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/builder/network/${networkId}/dashboard?tab=collections`}>
+                              <FolderOpen className="size-3.5 mr-1" aria-hidden="true" />
+                              View Collections
+                            </Link>
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => startEditHub(hub)}>
                             <Edit2 className="size-3.5 mr-1" aria-hidden="true" />
                             Edit
@@ -1114,9 +1125,14 @@ export function NetworkDashboardTabs({
       {/* Collections tab */}
       <TabsContent value="collections" className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">
-            Collections ({safeCollections.length})
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              Collections ({safeCollections.length})
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Collections hold guides and attached draft assets. Click &ldquo;View Content&rdquo; to see guides in a collection.
+            </p>
+          </div>
           {safeHubs.length > 0 && (
             <Button size="sm" asChild>
               <Link href={`/builder/network/${networkId}/collection/new`}>
@@ -1242,6 +1258,12 @@ export function NetworkDashboardTabs({
                                     )}
                                   </div>
                                   <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" asChild>
+                                      <Link href={`/builder/network/${networkId}/dashboard?tab=guides&collection=${col.id}`}>
+                                        <BookMarked className="size-3.5 mr-1" aria-hidden="true" />
+                                        View Content
+                                      </Link>
+                                    </Button>
                                     <Button size="sm" variant="outline" onClick={() => startEditCollection(col)}>
                                       <Edit2 className="size-3.5 mr-1" aria-hidden="true" />
                                       Edit

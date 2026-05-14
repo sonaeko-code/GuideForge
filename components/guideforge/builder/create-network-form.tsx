@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Zap } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Loader2, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -225,6 +225,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [roughIdea, setRoughIdea] = useState("")
+  const [isSmartFilling, setIsSmartFilling] = useState(false)
 
   const [scaffoldDraft, setScaffoldDraft] = useState<ScaffoldDraft>(() =>
     buildDefaultScaffoldDraft(safeInitialType)
@@ -374,50 +375,63 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
       return
     }
 
-    const result = smartFillNetwork(roughIdea)
-    if (!result.success) {
-      setError("Could not parse your idea. Try being more specific.")
-      return
-    }
-
-    if (result.name && result.name.trim()) setName(result.name)
-    if (result.description && result.description.trim()) setDescription(result.description)
-
-    // Smart Fill returns a registry id (after our update below).
-    // Only apply if it's a valid registry id; preserve the user's selection otherwise.
-    let nextTypeId = typeId
-    if (result.type && VALID_REGISTRY_IDS.has(result.type)) {
-      nextTypeId = result.type
-      setTypeId(result.type)
-    }
-
-    if (
-      result.theme &&
-      ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
-        result.theme
-      )
-    ) {
-      setTheme(result.theme)
-    }
-
-    if (result.slug && result.slug.trim()) {
-      setDomainPrefix(result.slug)
-      setDomainPrefixManuallyEdited(false)
-    }
-
-    // Replace scaffold from Smart Fill suggestion, or regenerate for new type
-    if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
-      setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
-      setScaffoldIsDefaultForType(true)
-      setScaffoldSourceType(nextTypeId)
-    } else if (nextTypeId !== scaffoldSourceType) {
-      setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
-      setScaffoldIsDefaultForType(true)
-      setScaffoldSourceType(nextTypeId)
-    }
-
-    setRoughIdea("")
+    setIsSmartFilling(true)
     setError(null)
+
+    // Defer to next tick so the loading state renders before the synchronous work
+    setTimeout(() => {
+      try {
+        const result = smartFillNetwork(roughIdea)
+        if (!result.success) {
+          setError("Could not parse your idea. Try being more specific.")
+          setIsSmartFilling(false)
+          return
+        }
+
+        if (result.name && result.name.trim()) setName(result.name)
+        if (result.description && result.description.trim()) setDescription(result.description)
+
+        // Smart Fill returns a registry id (after our update below).
+        // Only apply if it's a valid registry id; preserve the user's selection otherwise.
+        let nextTypeId = typeId
+        if (result.type && VALID_REGISTRY_IDS.has(result.type)) {
+          nextTypeId = result.type
+          setTypeId(result.type)
+        }
+
+        if (
+          result.theme &&
+          ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"].includes(
+            result.theme
+          )
+        ) {
+          setTheme(result.theme)
+        }
+
+        if (result.slug && result.slug.trim()) {
+          setDomainPrefix(result.slug)
+          setDomainPrefixManuallyEdited(false)
+        }
+
+        // Replace scaffold from Smart Fill suggestion, or regenerate for new type
+        if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
+          setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+          setScaffoldIsDefaultForType(true)
+          setScaffoldSourceType(nextTypeId)
+        } else if (nextTypeId !== scaffoldSourceType) {
+          setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
+          setScaffoldIsDefaultForType(true)
+          setScaffoldSourceType(nextTypeId)
+        }
+
+        setRoughIdea("")
+        setError(null)
+      } catch (err) {
+        setError("Smart Fill failed. Please try again or fill in the fields manually.")
+      } finally {
+        setIsSmartFilling(false)
+      }
+    }, 0)
   }
 
   function handleTypeChange(newTypeId: string) {
@@ -566,10 +580,15 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   type="button"
                   size="sm"
                   onClick={handleSmartFill}
+                  disabled={isSmartFilling || !roughIdea.trim()}
                   className="gap-1.5"
                 >
-                  <Zap className="size-3.5" aria-hidden="true" />
-                  Smart Fill Network
+                  {isSmartFilling ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Zap className="size-3.5" aria-hidden="true" />
+                  )}
+                  {isSmartFilling ? "Filling..." : "Smart Fill Network"}
                 </Button>
               </div>
             </div>

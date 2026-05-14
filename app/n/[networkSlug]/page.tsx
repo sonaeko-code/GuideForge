@@ -215,13 +215,13 @@ export default async function PublicNetworkPage({
 
       {/* HUBS SECTION */}
       {hubs.length === 0 ? (
-        <section className="border-b border-foreground/15">
+        <section id="hubs" className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 text-center">
             <p className="text-lg text-muted-foreground">No hubs published yet for this network.</p>
           </div>
         </section>
       ) : (
-        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
+        <section id="hubs" className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Explore" title="Available hubs" />
             <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -247,7 +247,7 @@ export default async function PublicNetworkPage({
 
       {/* RECENTLY PUBLISHED */}
       {recentGuides.length > 0 && (
-        <section className="border-b border-foreground/15">
+        <section id="guides" className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Latest" title="Recently published" />
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -329,7 +329,7 @@ export default async function PublicNetworkPage({
 
       {/* Lane 2D: PUBLISHED ASSETS */}
       {publishedAssets.length > 0 && (
-        <section className="border-b border-foreground/15">
+        <section id={recentGuides.length === 0 ? "guides" : "assets"} className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Resources" title="Published assets" />
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

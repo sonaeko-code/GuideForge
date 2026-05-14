@@ -53,38 +53,39 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
 
       try {
         // Fetch enrichment data: memberships, roles, owner profiles
+        const ownerIds = networks
+          .filter((n) => n.ownerUserId)
+          .map((n) => n.ownerUserId!)
+
         const [membershipRows, ownerProfiles, roleDefinitions] = await Promise.all([
-          // Get current user's memberships
+          // Get current user's memberships (snake_case column names)
           isAuthenticated && user?.id
             ? supabase
                 .from('network_members')
-                .select('networkId, roleId')
-                .eq('userId', user.id)
+                .select('network_id, role_id')
+                .eq('user_id', user.id)
                 .then((r) => r.data || [])
             : Promise.resolve([]),
-          // Get profiles for all owners
-          networks.length > 0
+          // Get profiles for all owners — only if there are ownerIds to look up
+          ownerIds.length > 0
             ? supabase
                 .from('profiles')
                 .select('id, display_name, handle')
-                .in(
-                  'id',
-                  networks
-                    .filter((n) => n.ownerUserId)
-                    .map((n) => n.ownerUserId!)
-                )
+                .in('id', ownerIds)
                 .then((r) => r.data || [])
             : Promise.resolve([]),
-          // Get all role definitions for permission checks
-          supabase
-            .from('network_role_definitions')
-            .select('id, networkId, can_manage_network')
-            .then((r) => r.data || []),
+          // Get role definitions — only if user is authenticated
+          isAuthenticated && user?.id
+            ? supabase
+                .from('network_role_definitions')
+                .select('id, network_id, can_manage_network')
+                .then((r) => r.data || [])
+            : Promise.resolve([]),
         ])
 
-        // Build lookup maps
+        // Build lookup maps (use snake_case keys from Supabase response)
         const membershipMap = new Map(
-          membershipRows.map((m: any) => [m.networkId, m.roleId])
+          membershipRows.map((m: any) => [m.network_id, m.role_id])
         )
         const profileMap = new Map(
           ownerProfiles.map((p: any) => [p.id, p])
@@ -125,9 +126,14 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
               canManageNetwork = false
             }
           } else if (!network.ownerUserId) {
-            // No owner assigned
-            relationshipBadge = 'No owner assigned'
-            canManageNetwork = false
+            // No owner_id in DB — if user is authenticated, assume they can manage it
+            if (isAuthenticated && user?.id) {
+              relationshipBadge = 'Network'
+              canManageNetwork = true
+            } else {
+              relationshipBadge = 'Network'
+              canManageNetwork = false
+            }
           } else if (ownerProfile) {
             // Owned by another user - use display name or handle
             const ownerName = ownerProfile.display_name || ownerProfile.handle
@@ -153,7 +159,7 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
           const getPriority = (net: NetworkCardData) => {
             if (isAuthenticated && user?.id === net.ownerUserId) return 0 // Owned by you
             if (net.relationshipBadge?.startsWith('Member')) return 1 // Member
-            if (net.relationshipBadge === 'No owner assigned') return 2 // Ownerless
+            if (!net.ownerUserId) return 2 // Ownerless / network (user likely owns)
             if (net.ownerUserId) return 3 // Owned by another
             return 4 // Other
           }

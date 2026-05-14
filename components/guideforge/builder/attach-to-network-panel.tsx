@@ -5,7 +5,7 @@ import { Loader2, ChevronRight, AlertCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getAllNetworks } from "@/lib/guideforge/supabase-networks"
+import { getNetworksForCurrentUser } from "@/lib/guideforge/supabase-networks"
 import { getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 import { updateAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { Network, Hub, Collection } from "@/lib/guideforge/types"
@@ -43,16 +43,16 @@ export function AttachToNetworkPanel({
   const [success, setSuccess] = useState(false)
   const [isAttaching, setIsAttaching] = useState(false)
 
-  // Load networks on mount
+  // Load networks on mount — scoped to networks the current user owns or manages
   useEffect(() => {
     const loadNetworks = async () => {
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getAllNetworks()
+        const data = await getNetworksForCurrentUser()
         setNetworks(data)
         if (data.length === 0) {
-          setError("You don't have any networks yet. Create a network first.")
+          setError("You can only attach assets to networks you own or manage. Create a network first.")
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load networks"
@@ -175,7 +175,7 @@ export function AttachToNetworkPanel({
       setTimeout(() => {
         onSuccess?.()
         onClose()
-      }, 1500)
+      }, 4000)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
       setError(msg)
@@ -196,11 +196,17 @@ export function AttachToNetworkPanel({
             <CheckCircle className="size-12 text-green-600" aria-hidden="true" />
           </div>
           <div>
-            <p className="font-semibold text-foreground">Asset attached successfully!</p>
+            <p className="font-semibold text-foreground">Attached successfully.</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Your asset is now part of the {selectedCollection?.name} collection.
+              You can find it in the network dashboard under Drafts.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Collection: {selectedCollection?.name}
             </p>
           </div>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">
