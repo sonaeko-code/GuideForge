@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, AlertCircle, Loader2, Trash2, Eye, Edit } from "lucide-react"
+import { ArrowLeft, Plus, AlertCircle, Loader2, Trash2, Eye, Edit, LinkIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { useAuth } from "@/lib/guideforge/auth-context"
 import { listMyAssetDrafts, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { AssetTypeBadge } from "@/components/guideforge/builder/asset-type-badge"
+import { AttachToNetworkPanel } from "@/components/guideforge/builder/attach-to-network-panel"
 
 export default function AssetsPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
@@ -17,6 +18,7 @@ export default function AssetsPage() {
   const [isFetching, setIsFetching] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [attachingAssetId, setAttachingAssetId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) {
@@ -213,7 +215,14 @@ export default function AssetsPage() {
                       <AlertCircle className="size-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-red-900 dark:text-red-100">Delete "{asset.title}"?</p>
-                        <p className="text-xs text-red-800 dark:text-red-200 mt-1">This cannot be undone.</p>
+                        {asset.attachedCollectionId && (
+                          <p className="text-xs text-red-800 dark:text-red-200 mt-1">
+                            This draft is attached to a network collection. Deleting it will remove it from that network&apos;s private dashboard.
+                          </p>
+                        )}
+                        <p className={`text-xs ${asset.attachedCollectionId ? 'text-red-800 dark:text-red-200 mt-1' : 'text-red-800 dark:text-red-200 mt-1'}`}>
+                          {asset.attachedCollectionId ? "This action cannot be undone." : "This cannot be undone."}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -238,6 +247,37 @@ export default function AssetsPage() {
                     </Button>
                   </div>
                 </Card>
+              ) : attachingAssetId === asset.id ? (
+                <Card className="p-4 border-blue-500/20 bg-blue-500/5 h-full flex flex-col">
+                  <div className="space-y-3 flex-1 min-h-96">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-foreground">Attach to Network</h3>
+                      <button
+                        onClick={() => setAttachingAssetId(null)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Close attachment panel"
+                      >
+                        <span className="text-lg">×</span>
+                      </button>
+                    </div>
+                    <AttachToNetworkPanel
+                      assetId={asset.id}
+                      currentNetworkId={asset.attachedNetworkId}
+                      currentHubId={asset.attachedHubId}
+                      currentCollectionId={asset.attachedCollectionId}
+                      onClose={() => setAttachingAssetId(null)}
+                      onSuccess={() => {
+                        // Refresh assets list to show updated attachment
+                        const fetchAssets = async () => {
+                          const data = await listMyAssetDrafts()
+                          setAssets(data)
+                          setAttachingAssetId(null)
+                        }
+                        fetchAssets()
+                      }}
+                    />
+                  </div>
+                </Card>
               ) : (
                 <Card className="p-5 border-border/50 hover:border-primary/30 transition-all hover:shadow-sm flex flex-col h-full">
                   <div className="space-y-3 flex-1">
@@ -251,29 +291,49 @@ export default function AssetsPage() {
                     {asset.summary && (
                       <p className="text-sm text-muted-foreground line-clamp-2">{asset.summary}</p>
                     )}
+                    {asset.attachedCollectionId && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                        <LinkIcon className="size-3" aria-hidden="true" />
+                        Attached to network
+                      </p>
+                    )}
                   </div>
                   
-                  <div className="flex gap-2 mt-5 pt-4 border-t border-border/50">
-                    <Button asChild variant="outline" size="sm" className="flex-1">
-                      <Link href={`/builder/assets/${asset.id}`}>
-                        <Eye className="mr-1.5 size-4" aria-hidden="true" />
-                        <span className="hidden sm:inline">View</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" size="sm" className="flex-1">
-                      <Link href={`/builder/assets/${asset.id}?edit=true`}>
-                        <Edit className="mr-1.5 size-4" aria-hidden="true" />
-                        <span className="hidden sm:inline">Edit</span>
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setDeleteConfirm(asset.id)}
-                    >
-                      <Trash2 className="size-4" aria-hidden="true" />
-                    </Button>
+                  <div className="space-y-2 mt-5 pt-4 border-t border-border/50">
+                    <div className="flex gap-2">
+                      <Button asChild variant="outline" size="sm" className="flex-1">
+                        <Link href={`/builder/assets/${asset.id}`}>
+                          <Eye className="mr-1.5 size-4" aria-hidden="true" />
+                          <span className="hidden sm:inline">View</span>
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="flex-1">
+                        <Link href={`/builder/assets/${asset.id}?edit=true`}>
+                          <Edit className="mr-1.5 size-4" aria-hidden="true" />
+                          <span className="hidden sm:inline">Edit</span>
+                        </Link>
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setAttachingAssetId(asset.id)}
+                      >
+                        <LinkIcon className="mr-1.5 size-4" aria-hidden="true" />
+                        <span className="hidden sm:inline">{asset.attachedCollectionId ? 'Change' : 'Attach'}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteConfirm(asset.id)}
+                        title="Delete draft"
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               )}

@@ -335,24 +335,42 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
         </div>
         
         {isEditMode ? (
-          <div className="space-y-4 border border-border rounded-lg p-5 bg-muted/40">
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">Edit Asset</h1>
+            <p className="text-muted-foreground">Update the title, summary, and content below. Changes will be saved to your workspace.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">{asset?.title}</h1>
+            {asset?.summary && (
+              <p className="text-lg text-muted-foreground">{asset.summary}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isEditMode && (
+        <Card className="p-6 space-y-6 border-border rounded-lg bg-muted/40">
+          <div className="space-y-6">
             {/* Title/summary inputs are shown for non-single_guide assets.
                 For single_guide, SingleGuideEditor renders its own title/summary fields. */}
             {asset?.assetType !== "single_guide" && (
               <>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Title</label>
+                <div className="space-y-2">
+                  <label htmlFor="asset-title" className="text-sm font-semibold text-foreground">Title</label>
                   <input
+                    id="asset-title"
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-2xl font-bold"
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-lg font-semibold"
                     placeholder="Asset title..."
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-2 block">Summary</label>
+                <div className="space-y-2">
+                  <label htmlFor="asset-summary" className="text-sm font-semibold text-foreground">Summary</label>
                   <textarea
+                    id="asset-summary"
                     value={editSummary}
                     onChange={(e) => setEditSummary(e.target.value)}
                     rows={3}
@@ -380,19 +398,28 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
                 editTabLabel="Edit Draft"
               />
             )}
+          </div>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-border">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditTitle(asset?.title || "")
-                  setEditSummary(asset?.summary || "")
-                  setEditPayload(JSON.parse(JSON.stringify(asset?.payload)))
-                  setIsEditMode(false)
-                }}
-              >
-                Cancel
-              </Button>
+          {/* Save/Cancel Actions - Sticky at bottom */}
+          <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-muted/40 to-transparent pt-6 mt-6 flex gap-2 justify-between border-t border-border/50">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditTitle(asset?.title || "")
+                setEditSummary(asset?.summary || "")
+                setEditPayload(JSON.parse(JSON.stringify(asset?.payload)))
+                setIsEditMode(false)
+              }}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <div className="flex items-center gap-3">
+              {saveMessage && (
+                <div className={`text-xs font-medium ${saveMessage.type === 'error' ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  {saveMessage.text}
+                </div>
+              )}
               <Button
                 onClick={handleSaveChanges}
                 disabled={isSaving}
@@ -401,22 +428,6 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               </Button>
             </div>
           </div>
-        ) : (
-          <>
-            <h1 className="text-3xl font-bold tracking-tight">{asset?.title}</h1>
-            {asset?.summary && (
-              <p className="text-base text-muted-foreground">{asset.summary}</p>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Save Message */}
-      {saveMessage && (
-        <Card className={`p-4 ${saveMessage.type === 'success' ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-          <p className={`text-sm ${saveMessage.type === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-            {saveMessage.text}
-          </p>
         </Card>
       )}
 
@@ -428,9 +439,15 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               <AlertCircle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
               <div>
                 <h3 className="font-semibold text-red-900 dark:text-red-100">Delete this asset draft?</h3>
-                <p className="text-sm text-red-800 dark:text-red-200 mt-1">
-                  This cannot be undone. The draft and all its content will be permanently deleted.
-                </p>
+                {asset?.attachedCollectionId ? (
+                  <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                    This draft is attached to a network collection. Deleting it will remove it from that network&apos;s private dashboard. This action cannot be undone.
+                  </p>
+                ) : (
+                  <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+                    This cannot be undone. The draft and all its content will be permanently deleted.
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-4 border-t border-red-500/20">
@@ -504,48 +521,53 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       })()}
 
       {/* Asset Content Preview */}
-      <Card className="p-6 space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Asset Content</h2>
+      {!isEditMode && (
+        <Card className="p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Eye className="size-5 text-muted-foreground" aria-hidden="true" />
+              Preview
+            </h2>
 
-          {asset.assetType === "single_guide" && (
-            <SingleGuideEditor
-              value={asset.payload as GeneratedSingleGuide}
-              onChange={() => {}}
-              mode="preview"
-              showModeTabs={false}
-            />
-          )}
+            {asset.assetType === "single_guide" && (
+              <SingleGuideEditor
+                value={asset.payload as GeneratedSingleGuide}
+                onChange={() => {}}
+                mode="preview"
+                showModeTabs={false}
+              />
+            )}
 
-          {asset.assetType === "recipe" && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-2">
-                  Ingredients ({asset.payload.ingredients.length})
-                </h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {asset.payload.ingredients.slice(0, 10).map((ing, idx) => (
-                    <li key={idx}>
-                      • {ing.name}
-                      {ing.amount && ` (${ing.amount})`}
-                      {ing.notes && ` - ${ing.notes}`}
-                    </li>
-                  ))}
-                </ul>
+            {asset.assetType === "recipe" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">
+                    Ingredients ({asset.payload.ingredients.length})
+                  </h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {asset.payload.ingredients.slice(0, 10).map((ing, idx) => (
+                      <li key={idx}>
+                        • {ing.name}
+                        {ing.amount && ` (${ing.amount})`}
+                        {ing.notes && ` - ${ing.notes}`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {asset.assetType === "checklist" && (
-            <ChecklistEditor
-              value={asset.payload as GeneratedChecklist}
-              onChange={() => {}}
-              mode="preview"
-              showModeTabs={false}
-            />
-          )}
-        </div>
-      </Card>
+            {asset.assetType === "checklist" && (
+              <ChecklistEditor
+                value={asset.payload as GeneratedChecklist}
+                onChange={() => {}}
+                mode="preview"
+                showModeTabs={false}
+              />
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Future Actions */}
       {/* Attachment Panel or Coming Soon */}
@@ -592,9 +614,9 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             <div className="flex items-start gap-3">
               <LinkIcon className="size-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <h3 className="font-semibold text-green-900 dark:text-green-100">Attached to Network</h3>
+                <h3 className="font-semibold text-green-900 dark:text-green-100">Attached as Private Draft</h3>
                 <p className="text-sm text-green-800 dark:text-green-200 mt-1">
-                  This asset is attached to a collection and will appear in your network&apos;s private workspace.
+                  This asset is attached to a collection in your network's private workspace. It will not appear publicly until explicitly published.
                 </p>
                 {asset.attachedNetworkId && asset.attachedCollectionId && (
                   <p className="text-xs text-green-700 dark:text-green-300 mt-2 font-mono bg-green-900/20 px-2 py-1 rounded inline-block">

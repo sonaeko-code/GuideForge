@@ -5,7 +5,7 @@ import { Loader2, ChevronRight, AlertCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { listMyNetworks } from "@/lib/guideforge/supabase-networks"
+import { getAllNetworks } from "@/lib/guideforge/supabase-networks"
 import { getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 import { updateAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import type { Network, Hub, Collection } from "@/lib/guideforge/types"
@@ -49,7 +49,7 @@ export function AttachToNetworkPanel({
       setIsLoading(true)
       setError(null)
       try {
-        const data = await listMyNetworks()
+        const data = await getAllNetworks()
         setNetworks(data)
         if (data.length === 0) {
           setError("You don't have any networks yet. Create a network first.")
@@ -184,56 +184,26 @@ export function AttachToNetworkPanel({
     }
   }
 
-    setIsAttaching(true)
-    setError(null)
-    try {
-      const result = await updateAssetDraft(assetId, {
-        attachedNetworkId: selectedNetworkId,
-        attachedHubId: selectedHubId,
-        attachedCollectionId: selectedCollectionId,
-      })
-
-      if (!result.success) {
-        setError(result.error || "Failed to attach asset")
-        setIsAttaching(false)
-        return
-      }
-
-      setSuccess(true)
-      setTimeout(() => {
-        onSuccess?.()
-        onClose()
-      }, 1500)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error"
-      setError(msg)
-      console.error("[v0] Attach error:", err)
-      setIsAttaching(false)
-    }
-  }
-
   const selectedNetwork = networks.find(n => n.id === selectedNetworkId)
   const selectedHub = hubs.find(h => h.id === selectedHubId)
   const selectedCollection = collections.find(c => c.id === selectedCollectionId)
 
-  if (success) {
-    return (
-      <div className="space-y-4 py-6 text-center">
-        <div className="flex justify-center">
-          <CheckCircle className="size-12 text-green-600" aria-hidden="true" />
-        </div>
-        <div>
-          <p className="font-semibold text-foreground">Asset attached successfully!</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Your asset is now part of the {selectedCollection?.name} collection.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-4">
+    <>
+      {success ? (
+        <div className="space-y-4 py-6 text-center">
+          <div className="flex justify-center">
+            <CheckCircle className="size-12 text-green-600" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">Asset attached successfully!</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your asset is now part of the {selectedCollection?.name} collection.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
       {/* Breadcrumb/Progress */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span className={selectedNetworkId ? "font-semibold text-foreground" : ""}>
@@ -361,6 +331,8 @@ export function AttachToNetworkPanel({
           {isAttaching ? "Attaching..." : "Attach to Collection"}
         </Button>
       </div>
-    </div>
+        </div>
+      )}
+    </>
   )
 }
