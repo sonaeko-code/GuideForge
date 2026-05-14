@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, AlertCircle, Trash2, CheckSquare2, ListTodo, BarChart3 } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Trash2, CheckSquare2, ListTodo, BarChart3, LinkIcon, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,7 @@ import type { GeneratedSingleGuide, GeneratedChecklist } from "@/lib/guideforge/
 import { SingleGuideEditor } from "@/components/guideforge/builder/single-guide-editor"
 import { ChecklistEditor } from "@/components/guideforge/builder/checklist-editor"
 import { AssetTypeBadge } from "@/components/guideforge/builder/asset-type-badge"
+import { AttachToNetworkPanel } from "@/components/guideforge/builder/attach-to-network-panel"
 
 interface AssetDetailPageProps {
   params: Promise<{ assetId: string }>
@@ -35,6 +36,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [editPayload, setEditPayload] = useState<any>(null)
+  const [showAttachPanel, setShowAttachPanel] = useState(false)
 
   // Extract assetId from params
   useEffect(() => {
@@ -546,11 +548,84 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       </Card>
 
       {/* Future Actions */}
-      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
-        <p className="text-sm text-blue-900 dark:text-blue-100">
-          <strong>Coming soon:</strong> You'll be able to attach this asset to a network, convert it to a full guide, or publish it separately.
-        </p>
-      </Card>
+      {/* Attachment Panel or Coming Soon */}
+      {showAttachPanel ? (
+        <Card className="p-6 border-blue-500/20 bg-blue-500/5">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground">Attach to Network</h2>
+              <button
+                onClick={() => setShowAttachPanel(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Close attachment panel"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            <AttachToNetworkPanel
+              assetId={asset!.id}
+              currentNetworkId={asset?.attachedNetworkId}
+              currentHubId={asset?.attachedHubId}
+              currentCollectionId={asset?.attachedCollectionId}
+              onClose={() => setShowAttachPanel(false)}
+              onSuccess={() => {
+                // Refresh asset to show updated attachment
+                const fetchAsset = async () => {
+                  const updated = await getAssetDraft(assetId)
+                  if (updated) {
+                    setAsset(updated)
+                    setSaveMessage({
+                      type: 'success',
+                      text: 'Asset attached successfully!'
+                    })
+                    setTimeout(() => setSaveMessage(null), 3000)
+                  }
+                }
+                fetchAsset()
+              }}
+            />
+          </div>
+        </Card>
+      ) : asset?.attachedCollectionId ? (
+        <Card className="p-6 border-green-500/20 bg-green-500/5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <LinkIcon className="size-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <div>
+                <h3 className="font-semibold text-green-900 dark:text-green-100">Attached to Network</h3>
+                <p className="text-sm text-green-800 dark:text-green-200 mt-1">
+                  This asset is attached to a collection. It will appear in your network dashboard.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowAttachPanel(true)}
+            >
+              Change
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-6 border-blue-500/20 bg-blue-500/5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold text-foreground">Attach to Network</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add this asset to one of your networks to make it part of a collection.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowAttachPanel(true)}
+            >
+              <LinkIcon className="mr-2 size-4" aria-hidden="true" />
+              Attach
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3">

@@ -2249,3 +2249,42 @@ export async function deleteCollection(collectionId: string): Promise<{ success:
     return { success: false, error: message }
   }
 }
+
+/**
+ * Get attached assets (drafts) for a collection.
+ * Lane 1C: Asset-to-Network attachment support.
+ * Returns asset drafts that are attached to this specific collection.
+ */
+export async function getAttachedAssetsForCollection(collectionId: string): Promise<any[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("asset_drafts")
+      .select("*")
+      .eq("attached_collection_id", collectionId)
+      .eq("status", "draft") // Only show draft assets, not archived
+      .order("updated_at", { ascending: false })
+
+    if (error) {
+      console.error("[v0] Error fetching attached assets:", error.message)
+      return []
+    }
+
+    return data.map((row) => ({
+      id: row.id,
+      assetType: row.asset_type,
+      title: row.title,
+      summary: row.summary,
+      attachedNetworkId: row.attached_network_id,
+      attachedHubId: row.attached_hub_id,
+      attachedCollectionId: row.attached_collection_id,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    console.error("[v0] Exception fetching attached assets:", err)
+    return []
+  }
+}
