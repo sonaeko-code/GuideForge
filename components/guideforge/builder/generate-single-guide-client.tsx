@@ -193,9 +193,17 @@ export function GenerateSingleGuideClient() {
             This creates a structured draft guide. Nothing is published automatically.
           </p>
         </Card>
+
+        {restoredMessage && (
+          <Card className="p-3 border-emerald-500/20 bg-emerald-500/5">
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+              {restoredMessage}
+            </p>
+          </Card>
+        )}
       </div>
 
-      {/* AI Intake Ladder */}
+      {/* AI Intake Ladder — Smart Fill / Quick Fill */}
       <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} initialIdea={importedIdea} />
 
       <form
@@ -208,12 +216,6 @@ export function GenerateSingleGuideClient() {
         {error && (
           <Card className="border-red-500/30 bg-red-500/5 p-4">
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-          </Card>
-        )}
-
-        {restoredMessage && (
-          <Card className="border-green-500/30 bg-green-500/5 p-4">
-            <p className="text-sm text-green-700 dark:text-green-300">{restoredMessage}</p>
           </Card>
         )}
 

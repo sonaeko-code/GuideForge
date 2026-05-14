@@ -245,6 +245,9 @@ export function GenerateChecklistClient() {
       if (msg.includes("Unexpected token")) {
         displayError = "AI generation failed. The server returned an invalid response."
       }
+      if (msg.includes("timeout") || msg.includes("took too long") || msg.includes("AbortError")) {
+        displayError = "AI generation took too long. Try again, switch to Mock Preview, or reduce the checklist size."
+      }
       
       setError(displayError)
     } finally {
