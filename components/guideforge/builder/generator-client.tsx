@@ -63,6 +63,19 @@ export function GeneratorClient({
   const initialHubId =
     validHubFromParam || (hubs.length === 1 ? hubs[0].id : "")
 
+  // Validate collection param if hub is valid
+  let validCollectionFromParam = ""
+  let initialCollectionId = ""
+  if (initialHubId) {
+    const collectionsForInitialHub = collectionsByHub[initialHubId] || []
+    validCollectionFromParam =
+      collectionParam && collectionsForInitialHub.some((c) => c.id === collectionParam)
+        ? collectionParam
+        : ""
+    initialCollectionId =
+      validCollectionFromParam || (collectionsForInitialHub.length === 1 ? collectionsForInitialHub[0].id : "")
+  }
+
   const [selectedHubId, setSelectedHubId] = useState<string>(initialHubId)
   const [selectedCollectionId, setSelectedCollectionId] =
     useState<string>(initialCollectionId)
