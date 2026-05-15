@@ -24,20 +24,20 @@ export default async function BuilderPage() {
         {/* Primary Actions: Workspace Access (2x2 grid) */}
         <section className="space-y-4">
           <h2 className="text-xl font-semibold text-foreground">Your Workspace</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* All Networks */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {/* My Networks */}
             <Card className="flex flex-col gap-4 p-5 border-border/50 hover:border-primary/50 transition-colors">
               <div className="flex size-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Folder className="size-4" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">All Networks</h3>
+                <h3 className="font-semibold text-foreground">My Networks</h3>
                 <p className="text-sm text-muted-foreground">
-                  Guide networks with hubs, collections, and reviews.
+                  Guide networks you own or manage with hubs and collections.
                 </p>
               </div>
               <Button asChild size="sm" variant="outline" className="w-full mt-auto">
-                <Link href="/builder/networks">Open Networks</Link>
+                <Link href="/builder/networks?scope=mine">Open My Networks</Link>
               </Button>
             </Card>
 

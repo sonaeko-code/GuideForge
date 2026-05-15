@@ -3,7 +3,7 @@ import { Plus, Folder, Wand2, FileText, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
-import { getAllNetworks, getNetworksForCurrentUser, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
+import { getAllNetworks, getNetworksForCurrentUser, getHubsByNetworkId, getCollectionsByHubId, countGuidesByNetworkId } from "@/lib/guideforge/supabase-networks"
 
 // Disable caching for this page so it always fetches fresh network data from Supabase
 export const dynamic = "force-dynamic"
@@ -14,12 +14,12 @@ export default async function NetworksDirectoryPage({
   searchParams: Promise<{ scope?: string }>
 }) {
   const params = await searchParams
-  const scope = params.scope || 'all'
+  const scope = params.scope || 'mine'
   
-  // Load networks based on scope parameter
-  let networks = scope === 'mine' 
-    ? await getNetworksForCurrentUser()
-    : await getAllNetworks()
+  // Load networks based on scope parameter — default to 'mine' for creator workspace
+  let networks = scope === 'all' 
+    ? await getAllNetworks()
+    : await getNetworksForCurrentUser()
   
 
 
@@ -83,6 +83,7 @@ export default async function NetworksDirectoryPage({
     networks.map(async (network) => {
       let hubCount = 0
       let collectionCount = 0
+      let guideCount = 0
       
       try {
         const hubs = await getHubsByNetworkId(network.id)
@@ -99,16 +100,26 @@ export default async function NetworksDirectoryPage({
             collectionCount = 0
           }
         }
+
+        // Get guide count for the network
+        try {
+          guideCount = await countGuidesByNetworkId(network.id)
+        } catch (guideErr) {
+          console.warn("[v0] Network count error (guides for", network.id, "):", guideErr)
+          guideCount = 0
+        }
       } catch (err) {
         console.warn("[v0] Network count error (hubs for", network.id, "):", err)
         hubCount = 0
         collectionCount = 0
+        guideCount = 0
       }
 
       return {
         ...network,
         hubCount,
         collectionCount,
+        guideCount,
       }
     })
   )
@@ -124,9 +135,9 @@ export default async function NetworksDirectoryPage({
               ← Back to Workspace
             </Link>
           </Button>
-          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-            Builder &middot; My Networks
-          </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Builder &middot; {scope === 'mine' ? 'My Networks' : 'All Networks'}
+            </div>
           <Button asChild variant="outline" size="sm">
             <Link href="/builder/assets">
               <FileText className="mr-2 size-4" aria-hidden="true" />
@@ -152,7 +163,7 @@ export default async function NetworksDirectoryPage({
             </div>
             <div className="flex flex-col gap-3 w-full md:w-auto">
               {/* Scope toggle */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   asChild
                   variant={scope === 'mine' ? 'default' : 'outline'}
@@ -175,22 +186,22 @@ export default async function NetworksDirectoryPage({
               
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" size="sm">
                   <Link href="/builder/network/scaffold">
                     <Plus className="mr-2 size-4" aria-hidden="true" />
-                    From Template
+                    Template
                   </Link>
                 </Button>
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" size="sm">
                   <Link href="/builder/generate-asset">
                     <Wand2 className="mr-2 size-4" aria-hidden="true" />
-                    Generate Asset
+                    Generate
                   </Link>
                 </Button>
-                <Button asChild>
+                <Button asChild size="sm">
                   <Link href="/builder/network/new">
                     <Plus className="mr-2 size-4" aria-hidden="true" />
-                    Create Network
+                    New Network
                   </Link>
                 </Button>
               </div>

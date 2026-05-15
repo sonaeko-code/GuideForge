@@ -11,11 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import type { ChecklistIntakeRequest, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
-import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
 import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
+import { generateGuideForgeDraft } from "@/lib/guideforge/ai-builder-core"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 
@@ -35,6 +35,9 @@ export function GenerateChecklistClient() {
     useCase: "",
     optionalContext: "",
   })
+
+  const [prompt, setPrompt] = useState("")
+  const [quickFillFeedback, setQuickFillFeedback] = useState<string | null>(null)
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [proposal, setProposal] = useState<GeneratedChecklist | null>(null)
@@ -168,6 +171,8 @@ export function GenerateChecklistClient() {
    * fields into the checklist form state. Numeric fields are clamped to the
    * form's own validation limits so the generate button never receives
    * out-of-range values.
+   * 
+   * IMPORTANT: Never erase the original prompt when filling fields.
    */
   const handleApplyIntakeLadderFields = (fields: Partial<ChecklistIntakeRequest>) => {
     setFormState((prev) => ({
@@ -184,6 +189,10 @@ export function GenerateChecklistClient() {
           ? Math.max(1, Math.min(5, Number(fields.itemsPerSection)))
           : prev.itemsPerSection,
     }))
+    // Show feedback that fields were filled from the prompt
+    setQuickFillFeedback("Fields filled from your prompt")
+    // Clear feedback after 5 seconds
+    setTimeout(() => setQuickFillFeedback(null), 5000)
     setError(null)
   }
 
@@ -209,29 +218,21 @@ export function GenerateChecklistClient() {
 
     setIsGenerating(true)
     try {
-      // Clamp values to validation limits before generation
-      const clampedRequest = {
-        ...formState,
-        numberOfSections: Math.max(1, Math.min(8, formState.numberOfSections)),
-        itemsPerSection: Math.max(1, Math.min(12, formState.itemsPerSection)),
+      // Call shared AI Builder Core with the prompt
+      const result = await generateGuideForgeDraft({
+        kind: "checklist_asset",
+        mode: provider === "mock" ? "mock" : "ai",
+        prompt: prompt || formState.useCase || formState.goal,
+        formData: formState,
+      })
+
+      if (!result.success) {
+        throw new Error(result.error || "Generation failed")
       }
 
-      // Show message if values were adjusted
-      if (
-        clampedRequest.numberOfSections !== formState.numberOfSections ||
-        clampedRequest.itemsPerSection !== formState.itemsPerSection
-      ) {
-        console.log("[v0] Clamped generation request sizes:", {
-          original: { sections: formState.numberOfSections, items: formState.itemsPerSection },
-          clamped: { sections: clampedRequest.numberOfSections, items: clampedRequest.itemsPerSection },
-        })
-      }
-
-      const response = await generateChecklist(clampedRequest, provider)
-      if (!response.success) {
-        throw new Error(response.error || "Generation failed")
-      }
-      setProposal(response.asset as GeneratedChecklist)
+      // Extract checklist from result
+      const checklist = result.structuredPayload as any
+      setProposal(checklist)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
       console.error("[v0] Checklist generation error:", err)
@@ -239,7 +240,6 @@ export function GenerateChecklistClient() {
       // Clean up technical error messages for display
       let displayError = msg
       if (msg.includes("Generation error:")) {
-        // Remove "Generation error: " prefix for cleaner display
         displayError = msg.replace("Generation error: ", "")
       }
       if (msg.includes("Unexpected token")) {
@@ -358,8 +358,35 @@ export function GenerateChecklistClient() {
         onApplyFields={(fields) =>
           handleApplyIntakeLadderFields(fields as Partial<ChecklistIntakeRequest>)
         }
-        initialIdea={importedIdea}
+        initialIdea={prompt || importedIdea}
       />
+
+      {quickFillFeedback && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5 p-3">
+          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+            {quickFillFeedback}
+          </p>
+        </Card>
+      )}
+
+      {/* Main Prompt — Always visible, never erased by Quick Fill */}
+      <div className="space-y-3">
+        <div>
+          <Label htmlFor="prompt" className="font-semibold">Describe Your Checklist</Label>
+          <p className="text-xs text-muted-foreground mt-1">This is your source of truth. Quick Fill and Smart Fill will read this to fill form fields.</p>
+        </div>
+        <Textarea
+          id="prompt"
+          placeholder="Example: Create a pre-launch checklist for mobile app releases. Should help the QA team, product managers, and devs prepare the marketing materials, run final tests, coordinate with analytics, and deploy."
+          value={prompt}
+          onChange={(e) => {
+            setPrompt(e.target.value)
+            setError(null)
+          }}
+          rows={4}
+          className="font-mono text-sm"
+        />
+      </div>
 
       <form
         onSubmit={(e) => {

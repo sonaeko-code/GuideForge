@@ -71,6 +71,7 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
 
     if (result.success && result.summary) {
       setSummary(result.summary)
+      setVoteError(null)
       onVoteSuccess?.()
     } else {
       setVoteError(result.error || 'Failed to cast vote')
@@ -91,14 +92,6 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
       setPublishStatus("success")
       setPublishError(null)
       
-      // Log publish result for debugging
-      console.log('[v0] publish UI result', {
-        success: result.success,
-        stage: result.stage,
-        guideId: result.guideId,
-        shouldUpdateLocalPublishedState: result.success,
-      })
-      
       // Notify parent that publish succeeded - parent should refetch
       onPublishSuccess?.()
       
@@ -109,15 +102,6 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
     } else {
       setPublishStatus("error")
       setPublishError(result.error || "Failed to publish guide")
-      
-      // Phase 10I: On failure, log the stage where it failed
-      console.log('[v0] publish UI result', {
-        success: result.success,
-        stage: result.stage,
-        guideId: result.guideId,
-        error: result.error,
-        shouldUpdateLocalPublishedState: false,
-      })
     }
 
     setIsPublishing(false)

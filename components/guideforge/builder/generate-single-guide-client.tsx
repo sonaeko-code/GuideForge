@@ -39,6 +39,8 @@ export function GenerateSingleGuideClient() {
   const [error, setError] = useState<string | null>(null)
   const [restoredMessage, setRestoredMessage] = useState<string | null>(null)
   const [importedIdea, setImportedIdea] = useState<string>("")
+  const [prompt, setPrompt] = useState("")
+  const [quickFillFeedback, setQuickFillFeedback] = useState<string | null>(null)
 
   // On mount, check for intake session from welcome intake panel
   useEffect(() => {
@@ -113,6 +115,8 @@ export function GenerateSingleGuideClient() {
 
   const handleApplyIntakeLadderFields = (fields: Partial<SingleGuideIntakeRequest>) => {
     setFormState((prev) => ({ ...prev, ...fields }))
+    setQuickFillFeedback("Fields filled from your prompt")
+    setTimeout(() => setQuickFillFeedback(null), 5000)
     // Scroll to form for visual feedback
     setTimeout(() => {
       const formElement = document.querySelector("form")
@@ -140,11 +144,14 @@ export function GenerateSingleGuideClient() {
 
     setIsGenerating(true)
     try {
-      // Attempt AI generation first
+      // Attempt AI generation first with prompt
       const aiResponse = await fetch("/api/guideforge/generate-single-guide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formState),
+        body: JSON.stringify({
+          ...formState,
+          prompt: prompt || formState.useCase || formState.goal,
+        }),
       })
 
       const aiData = await aiResponse.json()
@@ -204,7 +211,34 @@ export function GenerateSingleGuideClient() {
       </div>
 
       {/* AI Intake Ladder — Smart Fill / Quick Fill */}
-      <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} initialIdea={importedIdea} />
+      <AIIntakeLadder assetType="single_guide" onApplyFields={handleApplyIntakeLadderFields} initialIdea={prompt || importedIdea} />
+
+      {quickFillFeedback && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5 p-3">
+          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+            {quickFillFeedback}
+          </p>
+        </Card>
+      )}
+
+      {/* Main Prompt — Always visible */}
+      <div className="space-y-3">
+        <div>
+          <Label htmlFor="prompt" className="font-semibold">Describe Your Guide</Label>
+          <p className="text-xs text-muted-foreground mt-1">This is your source of truth. Quick Fill and Smart Fill will read this to fill form fields.</p>
+        </div>
+        <Textarea
+          id="prompt"
+          placeholder="Example: Create a comprehensive guide for deploying Next.js applications to Vercel. Should help beginner developers understand the entire process including env setup, domain config, and troubleshooting."
+          value={prompt}
+          onChange={(e) => {
+            setPrompt(e.target.value)
+            setError(null)
+          }}
+          rows={4}
+          className="font-mono text-sm"
+        />
+      </div>
 
       <form
         onSubmit={(e) => {
