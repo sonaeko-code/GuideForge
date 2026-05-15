@@ -36,6 +36,9 @@ export function GenerateChecklistClient() {
     optionalContext: "",
   })
 
+  const [prompt, setPrompt] = useState("")
+  const [quickFillFeedback, setQuickFillFeedback] = useState<string | null>(null)
+
   const [isGenerating, setIsGenerating] = useState(false)
   const [proposal, setProposal] = useState<GeneratedChecklist | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -168,6 +171,8 @@ export function GenerateChecklistClient() {
    * fields into the checklist form state. Numeric fields are clamped to the
    * form's own validation limits so the generate button never receives
    * out-of-range values.
+   * 
+   * IMPORTANT: Never erase the original prompt when filling fields.
    */
   const handleApplyIntakeLadderFields = (fields: Partial<ChecklistIntakeRequest>) => {
     setFormState((prev) => ({
@@ -184,6 +189,10 @@ export function GenerateChecklistClient() {
           ? Math.max(1, Math.min(5, Number(fields.itemsPerSection)))
           : prev.itemsPerSection,
     }))
+    // Show feedback that fields were filled from the prompt
+    setQuickFillFeedback("Fields filled from your prompt")
+    // Clear feedback after 5 seconds
+    setTimeout(() => setQuickFillFeedback(null), 5000)
     setError(null)
   }
 
@@ -209,11 +218,11 @@ export function GenerateChecklistClient() {
 
     setIsGenerating(true)
     try {
-      // Call shared AI Builder Core
+      // Call shared AI Builder Core with the prompt
       const result = await generateGuideForgeDraft({
         kind: "checklist_asset",
         mode: provider === "mock" ? "mock" : "ai",
-        prompt: formState.useCase || formState.goal,
+        prompt: prompt || formState.useCase || formState.goal,
         formData: formState,
       })
 
@@ -349,8 +358,35 @@ export function GenerateChecklistClient() {
         onApplyFields={(fields) =>
           handleApplyIntakeLadderFields(fields as Partial<ChecklistIntakeRequest>)
         }
-        initialIdea={importedIdea}
+        initialIdea={prompt || importedIdea}
       />
+
+      {quickFillFeedback && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5 p-3">
+          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+            {quickFillFeedback}
+          </p>
+        </Card>
+      )}
+
+      {/* Main Prompt — Always visible, never erased by Quick Fill */}
+      <div className="space-y-3">
+        <div>
+          <Label htmlFor="prompt" className="font-semibold">Describe Your Checklist</Label>
+          <p className="text-xs text-muted-foreground mt-1">This is your source of truth. Quick Fill and Smart Fill will read this to fill form fields.</p>
+        </div>
+        <Textarea
+          id="prompt"
+          placeholder="Example: Create a pre-launch checklist for mobile app releases. Should help the QA team, product managers, and devs prepare the marketing materials, run final tests, coordinate with analytics, and deploy."
+          value={prompt}
+          onChange={(e) => {
+            setPrompt(e.target.value)
+            setError(null)
+          }}
+          rows={4}
+          className="font-mono text-sm"
+        />
+      </div>
 
       <form
         onSubmit={(e) => {

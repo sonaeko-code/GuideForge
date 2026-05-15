@@ -359,42 +359,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         </div>
       )}
 
-      {/* Refinement Section */}
-      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Improve This Draft</p>
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            Add context or refinement notes to improve the proposal before saving.
-          </p>
-
-          <textarea
-            value={refinementNotes}
-            onChange={(e) => setRefinementNotes(e.target.value)}
-            placeholder="Example: Make it safer, more beginner-friendly, add specific examples, or clarify assumptions..."
-            rows={3}
-            className="w-full px-3 py-2 border border-blue-500/30 rounded-md bg-background text-foreground text-sm"
-            disabled={refinementApplied}
-          />
-
-          {refinementApplied && (
-            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded text-sm text-green-700 dark:text-green-300">
-              ✓ Refinement notes added. These will be saved with your draft.
-            </div>
-          )}
-
-          <Button
-            onClick={handleApplyRefinement}
-            size="sm"
-            variant="outline"
-            disabled={!refinementNotes.trim() || refinementApplied}
-            className="w-full"
-          >
-            {refinementApplied ? "Refinement Applied" : "Apply Refinement"}
-          </Button>
-        </div>
-      </Card>
-
-      {/* Asset-Specific Content Preview */}
+      {/* Asset-Specific Content Preview (BEFORE refinement) */}
       <Card className="p-6 space-y-4">
         {asset.assetType === "single_guide" && (
           <div className="space-y-4">
@@ -483,6 +448,43 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
           <p className="text-sm text-red-800 dark:text-red-200">{saveError}</p>
         </Card>
       )}
+
+      {/* Refinement Section (AFTER preview) */}
+      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Improve This Draft</p>
+            <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+              Tell GuideForge what to adjust after reviewing the preview above.
+            </p>
+          </div>
+
+          <textarea
+            value={refinementNotes}
+            onChange={(e) => setRefinementNotes(e.target.value)}
+            placeholder="Example: Make it safer, more beginner-friendly, add specific examples, or clarify assumptions..."
+            rows={3}
+            className="w-full px-3 py-2 border border-blue-500/30 rounded-md bg-background text-foreground text-sm"
+            disabled={refinementApplied}
+          />
+
+          {refinementApplied && (
+            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded text-sm text-green-700 dark:text-green-300">
+              ✓ Refinement notes added. These will be saved with your draft.
+            </div>
+          )}
+
+          <Button
+            onClick={handleApplyRefinement}
+            size="sm"
+            variant="outline"
+            disabled={!refinementNotes.trim() || refinementApplied}
+            className="w-full"
+          >
+            {refinementApplied ? "Refinement Applied" : "Apply Refinement"}
+          </Button>
+        </div>
+      </Card>
 
       {/* Actions */}
       <div className="flex gap-3">

@@ -199,7 +199,16 @@ export function GeneratorClient({
       }
 
       if (!response.ok || !data.success) {
-        setSendError(data.error || "AI generation failed. Try the Mock Preview instead.")
+        // Provide specific error messages
+        let errorMsg = data.error || "AI generation failed"
+        if (!response.ok && response.status === 500) {
+          errorMsg = "AI service temporarily unavailable. Try Mock Preview or simplify your prompt."
+        } else if (!response.ok && response.status === 429) {
+          errorMsg = "Rate limit reached. Please wait a moment and try again."
+        } else if (errorMsg.includes("timeout") || errorMsg.includes("took too long")) {
+          errorMsg = "Generation took too long. Try a shorter prompt or use Mock Preview."
+        }
+        setSendError(errorMsg)
         setSession((prev) => (prev ? { ...prev, status: "error" } : null))
         return
       }
@@ -406,12 +415,30 @@ export function GeneratorClient({
             <div>
               <h1 className="text-3xl font-bold">Generate a Guide</h1>
               <p className="mt-2 text-muted-foreground">
-                Use AI to create structured guide data. Preview the JSON, then
-                send to the editor for customization.
+                Describe the guide you want to create, and we'll generate structured content. Use Mock Preview for testing or AI Generate for real context.
               </p>
             </div>
 
             <Card className="border-border/50 p-6 space-y-4">
+              {/* PROMPT FIRST */}
+              <div>
+                <label className="text-sm font-semibold mb-2 block">
+                  Describe Your Guide
+                </label>
+                <Textarea
+                  placeholder="Example: Create a beginner-friendly Fire Warden build guide that focuses on survivability and crowd control. Include gear recommendations and stat priorities."
+                  value={formState.prompt}
+                  onChange={(e) =>
+                    setFormState({ ...formState, prompt: e.target.value })
+                  }
+                  className="min-h-32"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  This is your source of truth. AI can help infer guide type, difficulty, and placement.
+                </p>
+              </div>
+
+              {/* Guide Type */}
               <div>
                 <label className="text-sm font-semibold mb-2 block">
                   Guide Type
@@ -442,6 +469,7 @@ export function GeneratorClient({
                 </Select>
               </div>
 
+              {/* Difficulty */}
               <div>
                 <label className="text-sm font-semibold mb-2 block">
                   Difficulty
@@ -467,6 +495,7 @@ export function GeneratorClient({
                 </Select>
               </div>
 
+              {/* Hub */}
               <div>
                 <label className="text-sm font-semibold mb-2 block">Hub</label>
                 <Select value={selectedHubId} onValueChange={setSelectedHubId}>
@@ -521,20 +550,6 @@ export function GeneratorClient({
                   )}
                 </div>
               )}
-
-              <div>
-                <label className="text-sm font-semibold mb-2 block">
-                  Prompt
-                </label>
-                <Textarea
-                  placeholder="Describe the guide you want to generate. E.g., 'Create a beginner-friendly Fire Warden build guide that focuses on survivability and crowd control.'"
-                  value={formState.prompt}
-                  onChange={(e) =>
-                    setFormState({ ...formState, prompt: e.target.value })
-                  }
-                  className="min-h-32"
-                />
-              </div>
 
               <div className="rounded-lg bg-muted/30 border border-border/50 p-3">
                 <p className="text-xs text-muted-foreground">
