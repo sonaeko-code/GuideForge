@@ -2489,7 +2489,8 @@ export async function getNetworksForCurrentUser(): Promise<Network[]> {
       // owner_id column might not exist or RLS blocking - fall back to all then filter client-side
       console.warn("[v0] getNetworksForCurrentUser: owner_id query failed:", error.message, "— falling back to getAllNetworks with client filter")
       const all = await getAllNetworks()
-      return all.filter((n) => n.ownerUserId === profileId || !n.ownerUserId)
+      // Only show networks where owner_id matches current user (exclude null owner networks)
+      return all.filter((n) => n.ownerUserId === profileId)
     }
 
     console.log("[v0] getNetworksForCurrentUser: loaded", data?.length || 0, "owned networks")

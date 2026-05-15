@@ -58,28 +58,10 @@ export function GeneratorClient({
   const hubParam = sanitizeParam(hubParamRaw)
   const collectionParam = sanitizeParam(collectionParamRaw)
 
-  console.log("[v0] Generate query params:", { hubParam, collectionParam })
-
   // Validate query params against the loaded context
   const validHubFromParam = hubParam && hubs.some((h) => h.id === hubParam) ? hubParam : ""
   const initialHubId =
     validHubFromParam || (hubs.length === 1 ? hubs[0].id : "")
-
-  const initialCollectionId = (() => {
-    if (!initialHubId) return ""
-    const hubCollections = collectionsByHub[initialHubId] || []
-    if (
-      collectionParam &&
-      hubCollections.some((c) => c.id === collectionParam)
-    ) {
-      return collectionParam
-    }
-    if (hubCollections.length === 1) return hubCollections[0].id
-    return ""
-  })()
-
-  console.log("[v0] Generate valid selected hub:", initialHubId)
-  console.log("[v0] Generate valid selected collection:", initialCollectionId)
 
   const [selectedHubId, setSelectedHubId] = useState<string>(initialHubId)
   const [selectedCollectionId, setSelectedCollectionId] =
@@ -94,6 +76,7 @@ export function GeneratorClient({
   const [session, setSession] = useState<GenerationSession | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [generationMode, setGenerationMode] = useState<"mock" | "ai">("mock")
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const collectionsForHub = useMemo(
@@ -125,7 +108,6 @@ export function GeneratorClient({
     if (totalCollections === 0) return "needs-collection"
     return "ready"
   })()
-  console.log("[v0] Generate prerequisite decision:", prereqDecision)
 
   const handleGenerateMock = async () => {
     if (!formState.prompt.trim()) {
@@ -152,6 +134,70 @@ export function GeneratorClient({
     await new Promise((resolve) => setTimeout(resolve, 600))
     const response: GenerationResponse = generateMockResponse(request)
     setSession((prev) => (prev ? { ...prev, response, status: "done" } : null))
+  }
+
+  const handleGenerateAI = async () => {
+    if (!formState.prompt.trim()) {
+      alert("Please enter a prompt")
+      return
+    }
+    if (!selectedHubId || !selectedCollectionId) {
+      setSendError("Please select a hub and collection before generating.")
+      return
+    }
+
+    const sessionId = `session_ai_${Date.now()}`
+    const request: GenerationRequest = {
+      ...formState,
+      targetHubId: selectedHubId,
+    }
+    setSession({
+      id: sessionId,
+      createdAt: new Date().toISOString(),
+      request,
+      status: "generating",
+    })
+    setSendError(null)
+
+    try {
+      // Call AI generation API
+      const response = await fetch("/api/guideforge/generate-guide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      })
+
+      let responseText: string
+      try {
+        responseText = await response.text()
+      } catch (readErr) {
+        setSendError("AI generation failed. Please try again.")
+        setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+        return
+      }
+
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch (parseErr) {
+        setSendError("AI generation failed. Server returned invalid response.")
+        setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+        return
+      }
+
+      if (!response.ok || !data.success) {
+        setSendError(data.error || "AI generation failed. Try the Mock Preview instead.")
+        setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+        return
+      }
+
+      // Success - update session with response
+      setSession((prev) => (prev ? { ...prev, response: data, status: "done" } : null))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      setSendError(`Generation error: ${msg}`)
+      setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+    }
   }
 
   const handleSendToEditor = async () => {
@@ -484,8 +530,31 @@ export function GeneratorClient({
                 </p>
               </div>
 
+              {/* Generation mode selector */}
+              <div>
+                <label className="text-sm font-semibold mb-2 block">
+                  Generation Mode
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={generationMode === "mock" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGenerationMode("mock")}
+                  >
+                    Mock Preview
+                  </Button>
+                  <Button
+                    variant={generationMode === "ai" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGenerationMode("ai")}
+                  >
+                    AI Generate
+                  </Button>
+                </div>
+              </div>
+
               <Button
-                onClick={handleGenerateMock}
+                onClick={generationMode === "mock" ? handleGenerateMock : handleGenerateAI}
                 disabled={
                   session?.status === "generating" ||
                   !selectedHubId ||
@@ -501,7 +570,7 @@ export function GeneratorClient({
                 ) : (
                   <>
                     <Flame className="mr-2 size-4" />
-                    Generate Mock Structured Guide
+                    {generationMode === "mock" ? "Generate Mock Structured Guide" : "Generate AI Guide"}
                   </>
                 )}
               </Button>
@@ -608,12 +677,26 @@ export function GeneratorClient({
                       </div>
                     )}
                   </Card>
+                ) : session.status === "error" ? (
+                  <Card className="border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-6">
+                    <div className="text-center">
+                      <p className="text-red-600 dark:text-red-400 font-semibold mb-2">
+                        Generation failed
+                      </p>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        {sendError || "An error occurred during generation"}
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => setSession(null)}>
+                        Try again
+                      </Button>
+                    </div>
+                  </Card>
                 ) : null}
               </>
             ) : (
               <Card className="border-border/50 p-8 text-center">
                 <p className="text-muted-foreground">
-                  Fill out the form and click &quot;Generate Mock Structured
+                  Fill out the form and click &quot;Generate {generationMode === "mock" ? "Mock" : "AI"} Structured
                   Guide&quot; to preview the output.
                 </p>
               </Card>

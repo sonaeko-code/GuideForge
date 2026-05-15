@@ -11,17 +11,8 @@ export default async function GeneratorPage({
   params: Promise<{ networkId: string }>
 }) {
   const { networkId } = await params
-  console.log("[v0] Generate route networkId:", networkId)
 
   const ctx = await loadNetworkBuilderContext(networkId)
-  console.log("[v0] Generate context summary:", {
-    networkId: ctx.networkId,
-    networkName: ctx.network?.name,
-    hubs: ctx.hubs.length,
-    collections: ctx.collections.length,
-    source: ctx.source,
-    errors: ctx.errors,
-  })
 
   // Network not found at all
   if (!ctx.network) {
