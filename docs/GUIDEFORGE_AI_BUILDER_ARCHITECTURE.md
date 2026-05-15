@@ -160,21 +160,32 @@ All builder flows use the same language and patterns:
 
 ## Migration Path
 
-### Phase 1 (Current)
-- Network guide generator continues using local state
-- Checklist generator uses `generateChecklist()` helper
-- Single guide generator uses mock only
-- Core provides contract but handlers not yet implemented
+### Phase 1: Establish Core (✅ COMPLETE)
+- Core created with unified contract in `ai-builder-core.ts`
+- Unified `GuideForgeBuilderRequest` and `GuideForgeBuilderResult` contracts defined
+- Placeholder handlers exist for all builder kinds
 
-### Phase 2 (Next)
-- Network guide generator fully migrates to core
-- Core handler implements actual generation logic
-- Single guide generator adds AI mode via core
+### Phase 2: Migrate Checklist (✅ COMPLETE — Migration Pass 1)
+- **Checklist Asset Builder** fully migrated to core
+- `generateChecklistClient.tsx` calls `generateGuideForgeDraft({ kind: "checklist_asset", ... })`
+- Handler `generateChecklistAsset()` reuses existing mock and AI generators
+- All features preserved: Mock Preview ✅, AI Generate ✅, Smart Fill ✅, Save ✅
+- No breaking changes, backward compatible
 
-### Phase 3 (Future)
-- Checklist generator migrates to core
-- Network scaffold generation uses core
-- Recipe/SOP/Troubleshooting generators plug into core
+### Phase 3: Migrate Single Guide Asset (PLANNED)
+- Similar complexity to checklist but smaller scope
+- Location: `/builder/generate-asset/single_guide`
+- Component: `generate-single-guide-client.tsx`
+
+### Phase 4: Migrate Network Guide (PLANNED)
+- Largest migration, most complex generation logic
+- Location: `/builder/network/[networkId]/generate`
+- Component: `generator-client.tsx`
+
+### Phase 5: Future Builders (PLANNED)
+- Network Scaffold Smart Fill (heuristic-based prefill)
+- Recipe Asset generation
+- SOP and Troubleshooting Asset generation
 
 ## Advantages
 

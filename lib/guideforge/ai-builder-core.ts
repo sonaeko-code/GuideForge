@@ -214,13 +214,85 @@ async function generateSingleGuideAsset(
 async function generateChecklistAsset(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
-  // To be implemented: call existing checklist generation logic
-  // This will gradually migrate generate-checklist-client.tsx
-  return {
-    kind: "checklist_asset",
-    mode: request.mode,
-    success: false,
-    error: "Not yet migrated to core",
+  try {
+    // Extract form data from request
+    const formData = request.formData as any || {}
+    
+    // Build checklist intake request from form data
+    const checklistRequest = {
+      title: formData.title || request.prompt.split('\n')[0],
+      audience: formData.audience || "",
+      goal: formData.goal || "",
+      purpose: formData.purpose || request.prompt,
+      tone: formData.tone || "practical",
+      numberOfSections: formData.numberOfSections || 3,
+      itemsPerSection: formData.itemsPerSection || 5,
+      useCase: formData.useCase || "",
+      optionalContext: formData.optionalContext || "",
+    }
+
+    let asset: any = null
+
+    if (request.mode === "mock") {
+      // Use mock generator directly
+      const { generateChecklistMock } = await import("./mock-asset-generator")
+      const mockResult = await generateChecklistMock(checklistRequest)
+      if (!mockResult.success) {
+        return {
+          kind: "checklist_asset",
+          mode: "mock",
+          success: false,
+          error: mockResult.error || "Mock generation failed",
+        }
+      }
+      asset = mockResult.asset
+    } else if (request.mode === "ai") {
+      // Use existing AI generation client
+      const { generateChecklist } = await import("./ai-generation-client")
+      const aiResult = await generateChecklist(checklistRequest, "ai")
+      if (!aiResult.success) {
+        return {
+          kind: "checklist_asset",
+          mode: "ai",
+          success: false,
+          error: aiResult.error || "AI generation failed",
+        }
+      }
+      asset = aiResult.asset
+    } else {
+      return {
+        kind: "checklist_asset",
+        mode: request.mode,
+        success: false,
+        error: `Unknown generation mode: ${request.mode}`,
+      }
+    }
+
+    // Return normalized result
+    return {
+      kind: "checklist_asset",
+      mode: request.mode,
+      success: true,
+      title: asset.title,
+      summary: asset.summary,
+      structuredPayload: asset,
+      assumptions: asset.assumptions || [],
+      missingInfo: asset.missingInfo || [],
+      warnings: asset.warnings || [],
+      saveTargetHint: {
+        type: "workspace_asset",
+        context: { assetType: "checklist" },
+      },
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return {
+      kind: "checklist_asset",
+      mode: request.mode,
+      success: false,
+      error: message,
+      stage: "generation",
+    }
   }
 }
 

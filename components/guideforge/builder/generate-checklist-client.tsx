@@ -11,11 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import type { ChecklistIntakeRequest, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
-import { generateChecklist } from "@/lib/guideforge/ai-generation-client"
 import { getCurrentUserProfile } from "@/lib/guideforge/supabase-profiles"
 import { canUseDebugTools } from "@/lib/guideforge/role-capabilities"
 import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
+import { generateGuideForgeDraft } from "@/lib/guideforge/ai-builder-core"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 
@@ -209,29 +209,21 @@ export function GenerateChecklistClient() {
 
     setIsGenerating(true)
     try {
-      // Clamp values to validation limits before generation
-      const clampedRequest = {
-        ...formState,
-        numberOfSections: Math.max(1, Math.min(8, formState.numberOfSections)),
-        itemsPerSection: Math.max(1, Math.min(12, formState.itemsPerSection)),
+      // Call shared AI Builder Core
+      const result = await generateGuideForgeDraft({
+        kind: "checklist_asset",
+        mode: provider === "mock" ? "mock" : "ai",
+        prompt: formState.useCase || formState.goal,
+        formData: formState,
+      })
+
+      if (!result.success) {
+        throw new Error(result.error || "Generation failed")
       }
 
-      // Show message if values were adjusted
-      if (
-        clampedRequest.numberOfSections !== formState.numberOfSections ||
-        clampedRequest.itemsPerSection !== formState.itemsPerSection
-      ) {
-        console.log("[v0] Clamped generation request sizes:", {
-          original: { sections: formState.numberOfSections, items: formState.itemsPerSection },
-          clamped: { sections: clampedRequest.numberOfSections, items: clampedRequest.itemsPerSection },
-        })
-      }
-
-      const response = await generateChecklist(clampedRequest, provider)
-      if (!response.success) {
-        throw new Error(response.error || "Generation failed")
-      }
-      setProposal(response.asset as GeneratedChecklist)
+      // Extract checklist from result
+      const checklist = result.structuredPayload as any
+      setProposal(checklist)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
       console.error("[v0] Checklist generation error:", err)
@@ -239,7 +231,6 @@ export function GenerateChecklistClient() {
       // Clean up technical error messages for display
       let displayError = msg
       if (msg.includes("Generation error:")) {
-        // Remove "Generation error: " prefix for cleaner display
         displayError = msg.replace("Generation error: ", "")
       }
       if (msg.includes("Unexpected token")) {
