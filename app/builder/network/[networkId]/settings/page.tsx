@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
 import { NetworkGovernancePanel } from "@/components/guideforge/builder/network-governance-panel"
+import { GovernanceSettingsEditor } from "@/components/guideforge/builder/governance-settings-editor"
 import { NetworkSettingsForm } from "@/components/guideforge/builder/network-settings-form"
 import { NetworkStructureManager } from "@/components/guideforge/builder/network-structure-manager"
 import { loadNetworkBuilderContext } from "@/lib/guideforge/supabase-networks"
@@ -20,7 +21,7 @@ export default async function NetworkSettingsPage({
     const network = ctx.network
 
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6 md:py-14">
           <Button asChild variant="ghost" size="sm" className="mb-6">
@@ -40,6 +41,7 @@ export default async function NetworkSettingsPage({
 
           <div className="space-y-8">
             <NetworkSettingsForm network={network} networkId={networkId} />
+            <GovernanceSettingsEditor network={network} networkId={networkId} />
             <NetworkGovernancePanel networkId={networkId} network={network} />
             <NetworkStructureManager network={network} networkId={networkId} />
           </div>
@@ -48,7 +50,7 @@ export default async function NetworkSettingsPage({
     )
   } catch (error) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6 md:py-14">
           <Button asChild variant="ghost" size="sm" className="mb-6">

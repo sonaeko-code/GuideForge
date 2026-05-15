@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Compass } from "lucide-react"
 import { DifficultyBadge } from "@/components/guideforge/shared"
 import { NetworkPublicHeader } from "@/components/guideforge/public/network-public-header"
@@ -15,8 +16,8 @@ import {
   getHubsByNetworkId,
   getCollectionsByHubId,
 } from "@/lib/guideforge/supabase-networks"
-import { loadPublishedGuides } from "@/lib/guideforge/supabase-public"
-import { QUESTLINE_NETWORK, getHubsByNetwork, MOCK_GUIDES } from "@/lib/guideforge/mock-data"
+import { loadPublishedGuides, loadPublishedAssetsForNetwork } from "@/lib/guideforge/supabase-public"
+import { QUESTLINE_NETWORK, getHubsByNetwork } from "@/lib/guideforge/mock-data"
 import { getNetworkTheme } from "@/lib/guideforge/network-themes"
 import type { ThemeDirection } from "@/lib/guideforge/types"
 
@@ -41,19 +42,26 @@ export default async function PublicNetworkPage({
     notFound()
   }
 
-  // Load hubs - safe with empty fallback
+  // Load hubs - only from Supabase, no mock fallback for created networks
   let hubs = []
   if (network.id) {
     hubs = await getHubsByNetworkId(network.id)
   }
   
-  if (hubs.length === 0 && networkSlug === "questline") {
-    hubs = getHubsByNetwork(network.id)
-  }
+  // IMPORTANT: Do NOT fall back to getHubsByNetwork() for created networks.
+  // QuestLine mock hubs are handled separately via the hardcoded QUESTLINE_NETWORK.
+  // Created networks must load real hubs from Supabase only.
 
-  // Load published guides - only published status shown
+  // Load published guides - only from Supabase, no mock fallback for created networks
   const supabaseGuides = await loadPublishedGuides()
-  const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : MOCK_GUIDES.filter(g => g.status === "published")
+  
+  // IMPORTANT: Do NOT fall back to MOCK_GUIDES for created networks.
+  // Only use actual published guides from Supabase.
+  // QuestLine mock data is handled separately via the hardcoded QUESTLINE_NETWORK fallback.
+  const allPublishedGuides = supabaseGuides.length > 0 ? supabaseGuides : []
+
+  // Lane 2D: Load published assets (single_guide and checklist only) for this network
+  const publishedAssets = network.id ? await loadPublishedAssetsForNetwork(network.id) : []
 
   // Load collections - get from all hubs in network with error handling
   const allCollections = []
@@ -84,7 +92,7 @@ export default async function PublicNetworkPage({
   const forgedGuides = allPublishedGuides.filter(g => g.verification === "forge-verified")
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen surface-parchment">
       <NetworkPublicHeader network={network} />
 
       {/* MASTHEAD — themed by network.branding.theme */}
@@ -123,7 +131,7 @@ export default async function PublicNetworkPage({
                 <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
                   Total published
                 </dt>
-                <dd className="mt-1 text-2xl font-bold">{allPublishedGuides.length}</dd>
+                <dd className="mt-1 text-2xl font-bold">{allPublishedGuides.length + publishedAssets.length}</dd>
               </div>
               <div>
                 <dt className={`text-xs font-mono uppercase tracking-wider ${theme.accentClasses} opacity-80`}>
@@ -136,8 +144,8 @@ export default async function PublicNetworkPage({
         </div>
       </section>
 
-      {/* FEATURED GUIDE */}
-      {featured && featuredHub && (
+      {/* FEATURED GUIDE or NO GUIDES EMPTY STATE */}
+      {featured && featuredHub ? (
         <section className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Featured" title="The best from this network" />
@@ -192,17 +200,28 @@ export default async function PublicNetworkPage({
             </Link>
           </div>
         </section>
-      )}
+      ) : hubs.length > 0 ? (
+        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
+          <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 text-center">
+            <div className="space-y-3">
+              <p className="text-lg font-medium text-foreground">No published guides yet</p>
+              <p className="text-sm text-muted-foreground">
+                This network is being built. Check back soon for published guides.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* HUBS SECTION */}
       {hubs.length === 0 ? (
-        <section className="border-b border-foreground/15">
+        <section id="hubs" className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 text-center">
             <p className="text-lg text-muted-foreground">No hubs published yet for this network.</p>
           </div>
         </section>
       ) : (
-        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
+        <section id="hubs" className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Explore" title="Available hubs" />
             <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -228,7 +247,7 @@ export default async function PublicNetworkPage({
 
       {/* RECENTLY PUBLISHED */}
       {recentGuides.length > 0 && (
-        <section className="border-b border-foreground/15">
+        <section id="guides" className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
             <SectionHeading eyebrow="Latest" title="Recently published" />
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -285,7 +304,7 @@ export default async function PublicNetworkPage({
                   <Link
                     key={guide.id}
                     href={`/n/${networkSlug}/${hub?.slug || ""}/${guide.slug}`}
-                    className={`group flex flex-col rounded-lg border p-5 transition-colors h-full ${theme.cardClasses} ${theme.borderClasses} hover:opacity-90`}
+                    className="group card-foundry flex flex-col rounded-xl p-5 h-full"
                   >
                     <div className="mb-3 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider">
                       <span className={theme.accentClasses}>Verified</span>
@@ -303,6 +322,42 @@ export default async function PublicNetworkPage({
                   </Link>
                 )
               })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Lane 2D: PUBLISHED ASSETS */}
+      {publishedAssets.length > 0 && (
+        <section id={recentGuides.length === 0 ? "guides" : "assets"} className="border-b border-foreground/15">
+          <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
+            <SectionHeading eyebrow="Resources" title="Published assets" />
+            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {publishedAssets.map((asset) => (
+                <Link
+                  key={asset.id}
+                  href={`/n/${networkSlug}/asset/${asset.id}`}
+                  className="group card-foundry flex flex-col rounded-xl p-5 h-full"
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs font-normal capitalize">
+                      {asset.assetType.replace(/_/g, " ")}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                      Published
+                    </Badge>
+                  </div>
+                  <h4 className="line-clamp-2 text-base font-bold leading-snug transition-colors group-hover:text-primary">
+                    {asset.title}
+                  </h4>
+                  <p className="mt-2 line-clamp-3 flex-1 text-xs leading-relaxed text-muted-foreground">
+                    {asset.summary || "No summary"}
+                  </p>
+                  <div className="mt-3 flex items-center justify-end text-xs text-muted-foreground">
+                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </section>

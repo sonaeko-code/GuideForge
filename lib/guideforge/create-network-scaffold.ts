@@ -17,7 +17,7 @@ import {
   createCollection,
 } from "./supabase-networks"
 import { ScaffoldTemplate, validateScaffoldTemplate } from "./starter-scaffolds"
-import type { Network, Hub, Collection, NetworkType, ThemeDirection, Visibility } from "./types"
+import type { Network, Hub, Collection, NetworkType, ThemeDirection, Visibility, NetworkGovernanceSettings } from "./types"
 
 export interface CreateScaffoldResult {
   success: boolean
@@ -60,6 +60,8 @@ export async function createNetworkScaffold(
     networkVisibility?: Visibility
     /** Network primary brand color override (hex). */
     networkPrimaryColor?: string
+    /** Lane 2A: Network governance settings to persist. */
+    networkGovernanceSettings?: NetworkGovernanceSettings
   }
 ): Promise<CreateScaffoldResult> {
   console.log("[v0] createNetworkScaffold: Starting scaffold creation for template:", template.id)
@@ -87,6 +89,8 @@ export async function createNetworkScaffold(
       theme: overrides?.networkTheme ?? "parchment",
       visibility: overrides?.networkVisibility ?? "private",
       primaryColor: overrides?.networkPrimaryColor || "#6366f1",
+      // Lane 2A: Include governance settings from wizard step 4
+      governanceSettings: overrides?.networkGovernanceSettings,
     }
 
     console.log("[v0] createNetworkScaffold: Creating network with payload:", {

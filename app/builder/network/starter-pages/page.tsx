@@ -28,8 +28,8 @@ export default function StarterPagesPage() {
           </h1>
           <p className="text-pretty leading-relaxed text-muted-foreground">
             These are the starter pages for your network. Rename, reorder, add, or remove
-            anything below before continuing. Nothing is saved yet &mdash; the network is
-            created after the next step.
+            anything below before continuing. Your edits are saved in this setup draft and
+            won&apos;t be lost if you navigate back &mdash; the network is created after the next step.
           </p>
         </header>
 

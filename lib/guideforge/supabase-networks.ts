@@ -15,7 +15,7 @@
  * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
-import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership } from "./types"
+import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership, NetworkGovernanceSettings } from "./types"
 import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
 import { LocalStoragePersistenceAdapter } from "./persistence"
 import { resolveDbType } from "./network-types"
@@ -111,6 +111,7 @@ export function normalizeNetworkCreatePayload(
  * Normalize a raw Supabase network row to the Network type
  * Maps snake_case columns to camelCase properties
  * Handles Ownership Phase 2: owner_user_id → ownerUserId
+ * Handles governance_settings JSON column
  */
 function normalizeNetwork(row: any): Network {
   return {
@@ -129,6 +130,7 @@ function normalizeNetwork(row: any): Network {
     },
     forgeRuleIds: row.forgeRuleIds || [],
     hubIds: row.hubIds || [],
+    governanceSettings: row.governance_settings || row.governanceSettings,
     createdAt: row.created_at || row.createdAt,
     updatedAt: row.updated_at || row.updatedAt,
     // Ownership Phase 2: Map snake_case owner_id to camelCase ownerUserId
@@ -237,6 +239,17 @@ export async function createNetwork(
       theme: normalizedTheme,
     }
 
+    // Lane 2A: Include governance settings if provided
+    if (draft.governanceSettings) {
+      networkData.governance_settings = draft.governanceSettings
+      console.log("[v0] Network save with governance settings:", {
+        verification: draft.governanceSettings.verificationLevel,
+        contentStandard: draft.governanceSettings.contentStandard,
+        aiPolicy: draft.governanceSettings.aiPolicy,
+        contributorMode: draft.governanceSettings.contributorMode,
+      })
+    }
+
     // Ownership Phase 2: Include owner_id if user is logged in
     // The owner_id column in networks table stores the profile ID of the network creator
     if (profileId && profileId !== DEV_PROFILE_ID) {
@@ -249,11 +262,40 @@ export async function createNetwork(
     console.log("[v0] Network save payload:", networkData)
     console.log("[v0] Network save validation: type=", networkData.type, "slug=", networkData.slug, "theme=", networkData.theme)
 
-    const { data, error } = await supabase
+    let data: any = null
+    let error: any = null
+
+    // Try insert with governance_settings first
+    const firstAttempt = await supabase
       .from("networks")
       .insert([networkData])
       .select()
       .single()
+
+    if (firstAttempt.error) {
+      // If error is about governance_settings column missing, retry without it
+      const isGovernanceColumnError =
+        firstAttempt.error.message?.toLowerCase().includes("governance_settings") ||
+        firstAttempt.error.code === "PGRST204"
+
+      if (isGovernanceColumnError && networkData.governance_settings !== undefined) {
+        console.warn("[v0] governance_settings column not found — retrying without it")
+        const { governance_settings: _omitted, ...payloadWithoutGov } = networkData
+        const secondAttempt = await supabase
+          .from("networks")
+          .insert([payloadWithoutGov])
+          .select()
+          .single()
+        data = secondAttempt.data
+        error = secondAttempt.error
+      } else {
+        data = firstAttempt.data
+        error = firstAttempt.error
+      }
+    } else {
+      data = firstAttempt.data
+      error = firstAttempt.error
+    }
 
     if (error) {
       console.error("[v0] Network save error:", error.message, error.code)
@@ -336,6 +378,76 @@ export async function updateNetwork(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("[v0] Network update error:", message)
+    return { network: null, error: message }
+  }
+}
+
+/**
+ * Update network governance settings (Lane 2A)
+ */
+export async function updateNetworkGovernance(
+  networkId: string,
+  governanceSettings: NetworkGovernanceSettings
+): Promise<{ network: Network | null; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    console.log("[v0] Supabase not configured, cannot update governance")
+    return { network: null, error: "Supabase not configured" }
+  }
+
+  if (!networkId) {
+    return { network: null, error: "No network ID provided" }
+  }
+
+  try {
+    // Normalize networkId to UUID if needed
+    let normalizedId = networkId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(networkId)) {
+      // Try to look up by slug
+      const bySlug = await getNetworkBySlug(networkId)
+      if (bySlug) {
+        normalizedId = bySlug.id
+      } else {
+        return { network: null, error: `No network found for id: ${networkId}` }
+      }
+    }
+
+    const updateData: Record<string, any> = {
+      governance_settings: governanceSettings,
+      updated_at: new Date().toISOString(),
+    }
+
+    console.log("[v0] Network governance update payload:", {
+      verification: governanceSettings.verificationLevel,
+      contentStandard: governanceSettings.contentStandard,
+      aiPolicy: governanceSettings.aiPolicy,
+      contributorMode: governanceSettings.contributorMode,
+    })
+
+    const { data, error } = await supabase
+      .from("networks")
+      .update(updateData)
+      .eq("id", normalizedId)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      console.error("[v0] Network governance update error:", error.message)
+      return { network: null, error: error.message }
+    }
+
+    if (!data) {
+      const notFoundError = `No network found for id: ${networkId}`
+      console.error("[v0] Network governance update error:", notFoundError)
+      return { network: null, error: notFoundError }
+    }
+
+    console.log("[v0] Network governance updated:", data.id)
+    // Normalize snake_case Supabase columns to camelCase Network type
+    return { network: normalizeNetwork(data) }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Network governance update error:", message)
     return { network: null, error: message }
   }
 }
@@ -2044,7 +2156,8 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
         .maybeSingle()
       
       if (!ownerRoleData) {
-        console.warn("[v0] Owner role definition not found for network")
+        // Role definition is optional; owners have implicit permissions
+        console.log("[v0] Owner role definition not found for network — using implicit permissions")
         return {
           isSignedIn: true,
           userId,
@@ -2145,5 +2258,192 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
       canVoteOnReviews: false,
       canPublishOverride: false,
     }
+  }
+}
+
+/**
+ * Delete a hub after checking for child collections (with confirmation UX handling).
+ * If the hub has collections, return a friendly error message instead of cascading delete.
+ * Task 2 - Add Hub Management Actions
+ */
+export async function deleteHub(hubId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    // Check if hub has any collections
+    const { data: collections, error: collError } = await supabase
+      .from("collections")
+      .select("id")
+      .eq("hub_id", hubId)
+      .limit(1)
+
+    if (collError) {
+      console.error("[v0] Error checking hub collections:", collError.message)
+      return { success: false, error: "Failed to check for child collections" }
+    }
+
+    if (collections && collections.length > 0) {
+      console.warn("[v0] Cannot delete hub with collections:", hubId)
+      return {
+        success: false,
+        error: "Remove or archive all collections in this hub before deleting it."
+      }
+    }
+
+    // Safe to delete: no child collections
+    const { error: deleteError } = await supabase
+      .from("hubs")
+      .delete()
+      .eq("id", hubId)
+
+    if (deleteError) {
+      console.error("[v0] Hub delete error:", deleteError.message)
+      return { success: false, error: deleteError.message }
+    }
+
+    console.log("[v0] Hub deleted successfully:", hubId)
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception deleting hub:", message)
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * Delete a collection after checking for child guides (with confirmation UX handling).
+ * If the collection has guides, return a friendly error message instead of cascading delete.
+ * Task 3 - Add Collection Management Actions
+ */
+export async function deleteCollection(collectionId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Supabase not configured" }
+  }
+
+  try {
+    // Check if collection has any guides
+    const { data: guides, error: guideError } = await supabase
+      .from("guides")
+      .select("id")
+      .eq("collection_id", collectionId)
+      .limit(1)
+
+    if (guideError) {
+      console.error("[v0] Error checking collection guides:", guideError.message)
+      return { success: false, error: "Failed to check for child guides" }
+    }
+
+    if (guides && guides.length > 0) {
+      console.warn("[v0] Cannot delete collection with guides:", collectionId)
+      return {
+        success: false,
+        error: "Remove or archive all guides in this collection before deleting it."
+      }
+    }
+
+    // Safe to delete: no child guides
+    const { error: deleteError } = await supabase
+      .from("collections")
+      .delete()
+      .eq("id", collectionId)
+
+    if (deleteError) {
+      console.error("[v0] Collection delete error:", deleteError.message)
+      return { success: false, error: deleteError.message }
+    }
+
+    console.log("[v0] Collection deleted successfully:", collectionId)
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    console.error("[v0] Exception deleting collection:", message)
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * Get attached assets (drafts) for a collection.
+ * Lane 1C: Asset-to-Network attachment support.
+ * Returns asset drafts that are attached to this specific collection.
+ */
+export async function getAttachedAssetsForCollection(collectionId: string): Promise<any[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    // Include draft, pending_review, and published — exclude only archived
+    const { data, error } = await supabase
+      .from("asset_drafts")
+      .select("*")
+      .eq("attached_collection_id", collectionId)
+      .in("status", ["draft", "pending_review", "published"])
+      .order("updated_at", { ascending: false })
+
+    if (error) {
+      console.error("[v0] Error fetching attached assets:", error.message)
+      return []
+    }
+
+    return data.map((row) => ({
+      id: row.id,
+      ownerId: row.owner_id,
+      assetType: row.asset_type,
+      title: row.title,
+      summary: row.summary,
+      payload: row.payload,
+      status: row.status,
+      source: row.source,
+      attachedNetworkId: row.attached_network_id,
+      attachedHubId: row.attached_hub_id,
+      attachedCollectionId: row.attached_collection_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    console.error("[v0] Exception fetching attached assets:", err)
+    return []
+  }
+}
+
+/**
+ * Get networks owned by the currently authenticated user.
+ * Used by AttachToNetworkPanel to scope networks to those the user can attach to.
+ * Falls back to all networks (client-side filtered by ownerUserId) when owner_id column
+ * lookup is not available.
+ */
+export async function getNetworksForCurrentUser(): Promise<Network[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const profileId = await getCurrentProfileId()
+
+    // If no real user (dev or signed out), return all networks as fallback
+    if (!profileId || profileId === DEV_PROFILE_ID) {
+      return getAllNetworks()
+    }
+
+    // Query networks where owner_id matches the current user
+    const { data, error } = await supabase
+      .from("networks")
+      .select("*")
+      .eq("owner_id", profileId)
+
+    if (error) {
+      // owner_id column might not exist or RLS blocking - fall back to all then filter client-side
+      console.warn("[v0] getNetworksForCurrentUser: owner_id query failed:", error.message, "— falling back to getAllNetworks with client filter")
+      const all = await getAllNetworks()
+      return all.filter((n) => n.ownerUserId === profileId || !n.ownerUserId)
+    }
+
+    console.log("[v0] getNetworksForCurrentUser: loaded", data?.length || 0, "owned networks")
+    return (data || []).map(normalizeNetwork)
+  } catch (err) {
+    console.warn("[v0] getNetworksForCurrentUser exception:", err)
+    return []
   }
 }

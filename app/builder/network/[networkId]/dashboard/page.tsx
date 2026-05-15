@@ -1,14 +1,17 @@
 import Link from "next/link"
 import { ArrowLeft, AlertCircle, Settings, Globe } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
+import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworkOwnershipBadge } from "@/components/guideforge/builder/network-ownership-badge"
+import { GovernanceSummary } from "@/components/guideforge/builder/governance-summary"
 import { NetworkDashboardTabs } from "@/components/guideforge/builder/network-dashboard-tabs"
 import { DashboardErrorBoundary } from "@/components/guideforge/builder/dashboard-error-boundary"
 import {
   loadNetworkBuilderContext,
   getGuidesForNetworkCollections,
+  getAttachedAssetsForCollection,
   type NormalizedHub,
   type NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
@@ -45,13 +48,19 @@ export default async function NetworkDashboardPage({
     // Load guides for the network's collections
     const guides = await getGuidesForNetworkCollections(collections)
 
+    // Load attached draft assets for all collections in the network
+    const attachedAssetsMap: Record<string, AssetDraft[]> = {}
+    for (const collection of collections) {
+      attachedAssetsMap[collection.id] = await getAttachedAssetsForCollection(collection.id)
+    }
+
     // Ensure arrays are safe
     const safeHubs = Array.isArray(hubs) ? hubs : []
     const safeCollections = Array.isArray(collections) ? collections : []
     const safeGuides = Array.isArray(guides) ? guides : []
 
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
         <div className="mb-6 flex items-center justify-between gap-3">
@@ -60,8 +69,8 @@ export default async function NetworkDashboardPage({
               <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
               <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
             </div>
-            <p className="text-sm text-muted-foreground">
-              <span className="font-mono text-foreground">{network.slug}</span>.guideforge.app
+            <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              /n/{network.slug}
             </p>
           </div>
           <div className="flex gap-2">
@@ -83,7 +92,13 @@ export default async function NetworkDashboardPage({
           {/* GuideForge Data Spine Contract - Dashboard Guide Loading
              The dashboard loads guides directly from Supabase filtered by collection IDs.
              Guides flow: networkId → hubs → collections → collection IDs → Supabase WHERE collection_id IN (ids)
+             Attached assets flow: collections → collection IDs → Supabase asset_drafts WHERE attached_collection_id IN (ids)
              Do not change this data loading path. */}
+
+          {/* Lane 2A: Governance Summary Card */}
+          <div className="mb-6">
+            <GovernanceSummary network={network} />
+          </div>
 
           {/* Tabs Section - Wrapped in Error Boundary */}
           <DashboardErrorBoundary networkId={network.id}>
@@ -94,6 +109,7 @@ export default async function NetworkDashboardPage({
               hubs={safeHubs}
               collections={safeCollections}
               guides={safeGuides}
+              attachedAssetsMap={attachedAssetsMap}
             />
           </DashboardErrorBoundary>
         </div>
@@ -105,7 +121,7 @@ export default async function NetworkDashboardPage({
     const errorStack = error instanceof Error ? error.stack : ""
 
     return (
-      <main className="min-h-screen bg-background">
+      <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
         <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
           <div className="flex flex-col items-center gap-4 text-center">

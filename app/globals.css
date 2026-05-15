@@ -8,7 +8,11 @@
    Foreground: deep graphite (warm-leaning).
    Primary: copper (less saturated than amber, no flame feel).
    Accent: muted amber highlight (used sparingly).
-   Five-color discipline: background, foreground, primary, muted, border. */
+   Five-color discipline: background, foreground, primary, muted, border.
+   
+   Visual brand intent: structured knowledge foundry feeling with warm,
+   premium copper accents, soft parchment surfaces, and dark-mode support
+   using graphite and charcoal. Inspired by constellation/forged themes. */
 
 :root {
   --background: oklch(0.972 0.014 85);
@@ -44,6 +48,14 @@
   --sidebar-accent-foreground: oklch(0.32 0.05 50);
   --sidebar-border: oklch(0.88 0.012 78);
   --sidebar-ring: oklch(0.555 0.115 42);
+  
+  /* Semantic copper/brass brand accents for Forged/premium features */
+  --brass-50: oklch(0.97 0.008 90);
+  --brass-100: oklch(0.945 0.015 85);
+  --brass-300: oklch(0.78 0.08 55);
+  --brass-500: oklch(0.615 0.125 48);
+  --brass-700: oklch(0.45 0.08 45);
+  --brass-900: oklch(0.25 0.05 40);
 }
 
 .dark {
@@ -79,6 +91,14 @@
   --sidebar-accent-foreground: oklch(0.95 0.018 75);
   --sidebar-border: oklch(0.285 0.016 55);
   --sidebar-ring: oklch(0.66 0.13 45);
+  
+  /* Dark-mode brass accents */
+  --brass-50: oklch(0.25 0.05 40);
+  --brass-100: oklch(0.32 0.06 42);
+  --brass-300: oklch(0.55 0.12 50);
+  --brass-500: oklch(0.66 0.13 45);
+  --brass-700: oklch(0.78 0.08 55);
+  --brass-900: oklch(0.95 0.015 85);
 }
 
 @theme inline {
@@ -146,5 +166,231 @@
       transparent 1px
     );
     background-size: 18px 18px;
+  }
+
+  /* ============================================================
+     FOUNDRY SURFACE SYSTEM (Visual Pass B)
+     Visible parchment, ivory, graphite, and brass treatments.
+     ============================================================ */
+
+  /* Parchment page background — warm cream with a faint vellum tone */
+  .surface-parchment {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        ellipse at top left,
+        color-mix(in oklch, var(--brass-500) 7%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse at bottom right,
+        color-mix(in oklch, var(--brass-700) 5%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--brass-100) 35%, var(--background)) 0%,
+        var(--background) 60%
+      );
+  }
+
+  /* Editorial parchment masthead — used on public mastheads and dashboard headers */
+  .surface-masthead {
+    background-color: var(--card);
+    background-image:
+      linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--brass-300) 12%, transparent) 0%,
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 85% 20%,
+        color-mix(in oklch, var(--brass-500) 10%, transparent),
+        transparent 50%
+      );
+    border: 1px solid color-mix(in oklch, var(--brass-500) 25%, var(--border));
+  }
+
+  /* Ivory card — premium light surface (slightly lifted from page bg) */
+  .surface-ivory {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%,
+      var(--card) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+  }
+
+  /* Graphite premium panel — dark even in light mode (used selectively) */
+  .surface-graphite {
+    background-color: oklch(0.22 0.014 55);
+    background-image:
+      radial-gradient(
+        circle at 12% 18%,
+        color-mix(in oklch, var(--brass-500) 22%, transparent),
+        transparent 35%
+      ),
+      radial-gradient(
+        circle at 88% 82%,
+        color-mix(in oklch, var(--brass-700) 15%, transparent),
+        transparent 40%
+      ),
+      linear-gradient(
+        180deg,
+        oklch(0.24 0.016 55) 0%,
+        oklch(0.18 0.012 55) 100%
+      );
+    color: oklch(0.95 0.012 85);
+    border: 1px solid oklch(0.32 0.04 50);
+  }
+  .surface-graphite .text-muted-foreground {
+    color: oklch(0.72 0.018 75) !important;
+  }
+  .surface-graphite .text-foreground {
+    color: oklch(0.97 0.012 85) !important;
+  }
+
+  /* Copper top accent — 2px brass top edge on a card */
+  .accent-copper-top {
+    box-shadow: inset 0 2px 0 0 var(--brass-500);
+  }
+
+  /* Brass corner mark — small diagonal flourish in the top-right corner */
+  .accent-brass-corner {
+    position: relative;
+  }
+  .accent-brass-corner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(
+      225deg,
+      var(--brass-500) 0%,
+      var(--brass-500) 48%,
+      transparent 49%
+    );
+    border-top-right-radius: inherit;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  /* Warm brass divider — horizontal gradient hairline */
+  .divider-brass {
+    height: 1px;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--brass-500) 65%, transparent) 20%,
+      color-mix(in oklch, var(--brass-500) 65%, transparent) 80%,
+      transparent 100%
+    );
+  }
+
+  /* Constellation/node motif — subtle dotted grid with crossed lines */
+  .bg-constellation {
+    background-image:
+      radial-gradient(
+        circle,
+        color-mix(in oklch, var(--brass-500) 22%, transparent) 1.1px,
+        transparent 1.4px
+      ),
+      linear-gradient(
+        90deg,
+        transparent 49%,
+        color-mix(in oklch, var(--brass-500) 8%, transparent) 50%,
+        transparent 51%
+      );
+    background-size: 36px 36px, 220px 220px;
+    background-position: 0 0, 0 0;
+  }
+
+  /* Premium layered forge shadow */
+  .shadow-forge {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklch, var(--brass-500) 25%, transparent),
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 8px 24px -8px color-mix(in oklch, var(--brass-700) 22%, transparent);
+  }
+  .shadow-forge-lg {
+    box-shadow:
+      0 1px 0 0 color-mix(in oklch, var(--brass-500) 30%, transparent),
+      0 2px 4px rgba(0, 0, 0, 0.06),
+      0 14px 32px -10px color-mix(in oklch, var(--brass-700) 28%, transparent);
+  }
+
+  /* Premium card shadows — structured depth */
+  .shadow-card-sm {
+    @apply shadow-[0_1px_2px_rgba(0,0,0,0.05)];
+  }
+  .shadow-card {
+    @apply shadow-[0_4px_12px_rgba(0,0,0,0.08)];
+  }
+  .shadow-card-lg {
+    @apply shadow-[0_8px_24px_rgba(0,0,0,0.12)];
+  }
+
+  /* Composite premium card — ivory surface, copper top, forge shadow, hover lift */
+  .card-foundry {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%,
+      var(--card) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    box-shadow:
+      inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 8px 20px -10px color-mix(in oklch, var(--brass-700) 18%, transparent);
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+  .card-foundry:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+    box-shadow:
+      inset 0 2px 0 0 var(--brass-500),
+      0 2px 4px rgba(0, 0, 0, 0.06),
+      0 14px 28px -10px color-mix(in oklch, var(--brass-700) 28%, transparent);
+  }
+
+  /* Warm pill (e.g. "Owned by you") */
+  .pill-warm {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--brass-100) 80%, var(--card)) 0%,
+      color-mix(in oklch, var(--brass-50) 90%, var(--card)) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--brass-500) 35%, transparent);
+    color: var(--brass-700);
+  }
+
+  /* Subtle hover elevation for interactive cards */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-md active:shadow-sm;
+  }
+
+  /* Forged seal logo wrapper — replaces flat gradient with a coined feel */
+  .forge-seal {
+    background-image:
+      radial-gradient(
+        circle at 30% 25%,
+        color-mix(in oklch, var(--brass-300) 70%, transparent),
+        transparent 55%
+      ),
+      linear-gradient(
+        135deg,
+        var(--brass-700) 0%,
+        var(--brass-500) 50%,
+        var(--brass-700) 100%
+      );
+    border: 1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent),
+      inset 0 -1px 0 0 color-mix(in oklch, var(--brass-900) 50%, transparent),
+      0 1px 2px rgba(0, 0, 0, 0.15);
   }
 }

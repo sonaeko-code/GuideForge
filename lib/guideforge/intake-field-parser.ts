@@ -58,6 +58,7 @@ export function extractTitle(text: string): string | null {
  * Extract audience from "for X" phrases or audience keywords.
  */
 export function extractAudience(text: string): string | null {
+  // Exact "for [audience]" pattern
   const match = text.match(
     /for\s+([a-z0-9\s\-&,()]+?)(?:\.|,|and|plus|including|to|to help)/i
   )
@@ -66,6 +67,21 @@ export function extractAudience(text: string): string | null {
     if (audience.length > 2 && audience.length < 100) {
       return titleCase(audience)
     }
+  }
+
+  // Detect specific audience from keywords (checklist-specific)
+  const lowerText = text.toLowerCase()
+  
+  if (
+    lowerText.includes("medication") ||
+    lowerText.includes("medication checklist") ||
+    lowerText.includes("daily medication")
+  ) {
+    // For medication checklists, infer audience
+    if (lowerText.includes("caregiver")) return "Caregivers and family members"
+    if (lowerText.includes("nurse")) return "Healthcare professionals"
+    if (lowerText.includes("personal") || lowerText.includes("self")) return "Personal use"
+    return "People managing daily medication"
   }
 
   const audienceKeywords = [
@@ -77,8 +93,10 @@ export function extractAudience(text: string): string | null {
     "parents",
     "developers",
     "creators",
+    "youtube creators",
+    "video creators",
+    "content creators",
   ]
-  const lowerText = text.toLowerCase()
   for (const kw of audienceKeywords) {
     if (lowerText.includes(kw)) {
       return titleCase(kw)
@@ -126,6 +144,35 @@ export function extractPurpose(
   useCase?: string | null
 ): string | null {
   const lowerText = text.toLowerCase()
+  
+  // Medication-specific purpose detection
+  if (lowerText.includes("medication") || lowerText.includes("medicin")) {
+    if (audience && audience.toLowerCase().includes("caregiver")) {
+      return `Help ${audience.toLowerCase()} track and manage daily medication for their loved ones.`
+    }
+    if (lowerText.includes("reminder")) {
+      return "Help track daily medication tasks with reminders and maintain a completion streak."
+    }
+    return "Help manage and track daily medication consistently."
+  }
+
+  // YouTube/video creator-specific purpose detection
+  if (
+    lowerText.includes("youtube") ||
+    lowerText.includes("publish") ||
+    lowerText.includes("uploading") ||
+    lowerText.includes("gameplay")
+  ) {
+    if (audience && (audience.toLowerCase().includes("creator") || audience.toLowerCase().includes("video"))) {
+      return `Guide ${audience.toLowerCase()} through publishing and optimizing their content.`
+    }
+    if (lowerText.includes("gameplay")) {
+      return "Guide creators through publishing a YouTube gameplay video with proper setup and metadata."
+    }
+    if (lowerText.includes("publish") || lowerText.includes("upload")) {
+      return `Help ${audience ? audience.toLowerCase() : "creators"} publish video content to YouTube successfully.`
+    }
+  }
 
   // If we have audience and useCase, build a personalized purpose
   if (audience && useCase) {
@@ -157,6 +204,31 @@ export function extractPurpose(
  * Extract goal/desired outcome from text.
  */
 export function extractGoal(text: string): string | null {
+  const lowerText = text.toLowerCase()
+  
+  // Medication-specific goal extraction
+  if (lowerText.includes("medication") || lowerText.includes("medicin")) {
+    if (lowerText.includes("streak") || lowerText.includes("consistency")) {
+      return "Complete daily medication tasks consistently and maintain a completion streak."
+    }
+    if (lowerText.includes("reminder") || lowerText.includes("remember")) {
+      return "Track daily medication with reminders and never miss a dose."
+    }
+    return "Ensure medications are taken on schedule daily without missing doses."
+  }
+
+  // YouTube/video creator goal extraction
+  if (lowerText.includes("youtube") || lowerText.includes("gameplay") || lowerText.includes("publish")) {
+    if (lowerText.includes("metadata") || lowerText.includes("thumbnail") || lowerText.includes("description")) {
+      return "Publish a gameplay video with proper metadata, tags, and optimized description."
+    }
+    if (lowerText.includes("setup") || lowerText.includes("optimization")) {
+      return "Publish a gameplay video with the right setup, metadata, and pre-launch checks."
+    }
+    return "Successfully publish a gameplay video to YouTube with proper optimization."
+  }
+
+  // Pattern-based extraction (fallback)
   const goalMatch = text.match(
     /(?:so that|result in|outcome|achieve|goal|objective)\s+([^.!?]+)/i
   )
@@ -199,6 +271,16 @@ export function extractAdditionalContext(text: string): string | null {
 export function detectTone(
   lowerText: string
 ): "casual" | "professional" | "helpful" | "technical" | "practical" | null {
+  // YouTube/video creation → practical tone
+  if (lowerText.includes("youtube") || lowerText.includes("gameplay") || lowerText.includes("publish")) {
+    return "practical"
+  }
+  
+  // Medication/health context → helpful tone
+  if (lowerText.includes("medication") || lowerText.includes("daily") && lowerText.includes("health")) {
+    return "helpful"
+  }
+  
   if (
     lowerText.includes("casual") ||
     lowerText.includes("friendly") ||
@@ -244,6 +326,18 @@ export function detectTone(
 export function detectDifficulty(
   lowerText: string
 ): "beginner" | "intermediate" | "advanced" | null {
+  // YouTube/video publishing is typically beginner-friendly
+  if (lowerText.includes("youtube") || lowerText.includes("gameplay") || lowerText.includes("publish")) {
+    if (lowerText.includes("advanced") || lowerText.includes("expert")) return "advanced"
+    if (lowerText.includes("professional") || lowerText.includes("pro")) return "intermediate"
+    return "beginner" // Default for publishing tutorials
+  }
+  
+  // Medication checklists are for general/beginner audience
+  if (lowerText.includes("medication")) {
+    return "beginner"
+  }
+  
   if (
     lowerText.includes("beginner") ||
     lowerText.includes("basics") ||
@@ -275,6 +369,11 @@ export function detectDifficulty(
 export function detectGuideType(
   lowerText: string
 ): "guide" | "tutorial" | "reference" | "troubleshooting" | null {
+  // YouTube/video publishing is typically a tutorial
+  if (lowerText.includes("youtube") || lowerText.includes("gameplay") || lowerText.includes("publish")) {
+    return "tutorial"
+  }
+  
   if (
     lowerText.includes("tutorial") ||
     lowerText.includes("step-by-step") ||

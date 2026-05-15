@@ -45,6 +45,7 @@ export function GenerateChecklistClient() {
   const [debugResult, setDebugResult] = useState<Record<string, any> | null>(null)
   const [debugError, setDebugError] = useState<string | null>(null)
   const [canSeeDebugTools, setCanSeeDebugTools] = useState(false)
+  const [importedIdea, setImportedIdea] = useState<string>("")
 
   // On mount, check for pending proposal AND intake session from welcome
   useEffect(() => {
@@ -89,6 +90,9 @@ export function GenerateChecklistClient() {
     const intakeSession = readIntakeSession()
     if (intakeSession.idea) {
       console.log('[v0] GenerateChecklistClient: Hydrating from welcome intake')
+      
+      // Store the original idea for AIIntakeLadder to display
+      setImportedIdea(intakeSession.idea)
       
       // Parse the rough idea to extract structured fields
       const parsed = parseRoughIdea(intakeSession.idea)
@@ -241,6 +245,9 @@ export function GenerateChecklistClient() {
       if (msg.includes("Unexpected token")) {
         displayError = "AI generation failed. The server returned an invalid response."
       }
+      if (msg.includes("timeout") || msg.includes("took too long") || msg.includes("AbortError")) {
+        displayError = "AI generation took too long. Try again, switch to Mock Preview, or reduce the checklist size."
+      }
       
       setError(displayError)
     } finally {
@@ -351,6 +358,7 @@ export function GenerateChecklistClient() {
         onApplyFields={(fields) =>
           handleApplyIntakeLadderFields(fields as Partial<ChecklistIntakeRequest>)
         }
+        initialIdea={importedIdea}
       />
 
       <form

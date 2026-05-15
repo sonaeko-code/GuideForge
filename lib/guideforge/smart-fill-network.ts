@@ -340,63 +340,118 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
 
 /**
  * Generate suggested hubs based on network type and idea.
- * Prefers explicit topics mentioned in the rough idea over generic defaults.
+ * TYPE-AWARE: "build"/"builds" only map to Builds & Loadouts for gaming.
+ * For home_systems, "build" is ignored to prevent gaming hub leakage.
  */
 function generateHubSuggestions(type: string, idea: string, words: string[]): string[] {
-  // Map of keyword → hub display name. More complete than before.
-  const keywordToHub: Record<string, string> = {
-    // Gaming / RPG
-    "survival": "Survival Mechanics",
-    "crafting": "Crafting & Materials",
-    "pvp": "PvP & Combat",
-    "build": "Builds & Loadouts",
-    "builds": "Builds & Loadouts",
-    "boss": "Boss Guides",
-    "bosses": "Boss Guides",
-    "patch": "Patch Notes",
-    "beginner": "Beginner Guides",
-    "progression": "Progression Guides",
-    "economy": "Economy & Trading",
-    "farming": "Farming & Resources",
-    "multiplayer": "Multiplayer & Co-op",
-    "lore": "Lore & World Building",
-    "quest": "Quests & Missions",
-    "strategy": "Strategy & Tactics",
-    "strategies": "Strategy & Tactics",
-    "community": "Community Highlights",
-    "tier": "Tier Lists",
-    "map": "Maps & Locations",
-    // Repair / Technical
-    "diagnostic": "Diagnostics & Testing",
-    "safety": "Safety Procedures",
-    "tools": "Tools & Equipment",
-    "troubleshoot": "Troubleshooting",
-    "maintenance": "Preventive Maintenance",
-    "installation": "Installation Guides",
-    // Training / SOP
-    "onboarding": "Onboarding",
-    "compliance": "Compliance & Policies",
-    "workflow": "Workflows & Processes",
-    "assessment": "Assessments & Quizzes",
-    "curriculum": "Core Curriculum",
-    "advanced": "Advanced Topics",
-    // General
-    "news": "News & Updates",
-    "faq": "FAQ",
-    "reference": "Reference",
-    "getting started": "Getting Started",
-    "resource": "Resources",
-    "resources": "Resources",
-    "settings": "Configuration & Settings",
-    "performance": "Performance & Optimization",
-    "security": "Security",
+  const lowerIdea = idea.toLowerCase()
+
+  // Type-aware keyword-to-hub map: each network type has its own keyword set
+  const typeSpecificKeywordToHub: Record<string, Record<string, string>> = {
+    gaming: {
+      "survival": "Survival Mechanics",
+      "crafting": "Crafting & Materials",
+      "pvp": "PvP & Combat",
+      "pve": "PvE & Combat",
+      "build": "Builds & Loadouts",
+      "builds": "Builds & Loadouts",
+      "loadout": "Builds & Loadouts",
+      "boss": "Boss Guides",
+      "bosses": "Boss Guides",
+      "raid": "Boss Guides",
+      "patch": "Patch Notes",
+      "beginner": "Beginner Guides",
+      "progression": "Progression Guides",
+      "economy": "Economy & Trading",
+      "farming": "Farming & Resources",
+      "multiplayer": "Multiplayer & Co-op",
+      "lore": "Lore & World Building",
+      "quest": "Quests & Missions",
+      "strategy": "Strategy & Tactics",
+      "map": "Maps & Locations",
+      "tier": "Tier Lists",
+      "community": "Community Highlights",
+    },
+    tech_repair: {
+      "diagnostic": "Diagnostics & Testing",
+      "diagnostics": "Diagnostics & Testing",
+      "safety": "Safety Procedures",
+      "tools": "Tools & Equipment",
+      "troubleshoot": "Troubleshooting",
+      "maintenance": "Preventive Maintenance",
+      "installation": "Installation Guides",
+    },
+    home_systems: {
+      "routine": "Family Routines",
+      "routines": "Family Routines",
+      "medication": "Medications & Health",
+      "medicin": "Medications & Health",
+      "allergies": "Medications & Health",
+      "allergy": "Medications & Health",
+      "emergency": "Emergency & Safety",
+      "contact": "Emergency & Safety",
+      "contacts": "Emergency & Safety",
+      "seasonal": "Seasonal Maintenance",
+      "baby": "Baby & Infant Care",
+      "infant": "Baby & Infant Care",
+      "supply": "Baby & Infant Care",
+      "supplies": "Baby & Infant Care",
+      "hvac": "Home Systems",
+      "plumbing": "Home Systems",
+      "electrical": "Home Systems",
+      "appliance": "Home Systems",
+      "household": "Family Routines",
+      "kids": "Family Routines",
+      "children": "Family Routines",
+      "family": "Family Routines",
+      // Note: "build" is intentionally NOT mapped to prevent leakage of gaming hubs
+    },
+    small_business: {
+      "onboarding": "Onboarding",
+      "compliance": "Compliance & Policies",
+      "workflow": "Workflows & Processes",
+      "assessment": "Assessments & Quizzes",
+      "curriculum": "Core Curriculum",
+      "launch": "Launch Checklist",
+      "client": "Client Onboarding",
+    },
+    restaurant_training: {
+      "onboarding": "Onboarding",
+      "operations": "Daily Operations",
+      "food safety": "Food Safety",
+      "compliance": "Compliance & Policies",
+    },
+    wellness_training: {
+      "program": "Programs",
+      "nutrition": "Nutrition",
+      "habit": "Habits & Mindset",
+      "assessment": "Assessments & Quizzes",
+      "wellness": "Programs",
+    },
+    creator_workflow: {
+      "content": "Content Planning",
+      "production": "Production Workflow",
+      "publish": "Publishing",
+      "analytics": "Analytics & Growth",
+      "resource": "Resources",
+    },
+    personal_knowledge: {
+      "planning": "Daily Planning",
+      "project": "Projects",
+      "learning": "Learning & Goals",
+      "goal": "Learning & Goals",
+      "review": "Reviews & Reflections",
+    },
   }
 
-  // Pull hubs detected directly from the idea
+  // Pull hubs detected directly from the idea (type-aware only)
   const detected: string[] = []
   const seen = new Set<string>()
-  for (const [keyword, hubName] of Object.entries(keywordToHub)) {
-    if (idea.includes(keyword) && !seen.has(hubName)) {
+  
+  // Only check keywords relevant to this network type
+  const relevantKeywords = typeSpecificKeywordToHub[type] || {}
+  for (const [keyword, hubName] of Object.entries(relevantKeywords)) {
+    if (lowerIdea.includes(keyword) && !seen.has(hubName)) {
       detected.push(hubName)
       seen.add(hubName)
     }
@@ -406,7 +461,7 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
   const defaults: Record<string, string[]> = {
     gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Community Highlights"],
     tech_repair: ["Diagnostics & Testing", "Safety Procedures", "Tools & Equipment", "Troubleshooting", "Preventive Maintenance"],
-    home_systems: ["Seasonal Maintenance", "Home Systems", "Emergency Prep", "Tools & Equipment", "Common Issues"],
+    home_systems: ["Family Routines", "Medications & Health", "Emergency & Safety", "Seasonal Maintenance", "Baby & Infant Care"],
     small_business: ["Launch Checklist", "Client Onboarding", "Daily Operations", "Compliance & Policies", "Team Resources"],
     restaurant_training: ["Onboarding", "Daily Operations", "Food Safety", "Compliance & Policies", "Team Resources"],
     wellness_training: ["Programs", "Nutrition", "Habits & Mindset", "Assessments & Quizzes", "Resources"],
@@ -617,6 +672,38 @@ const HUB_TO_COLLECTIONS: Record<string, SmartFillCollectionSuggestion[]> = {
   "Best Practices": [
     { name: "Do This", slug: "do-this", description: "Recommended patterns." },
     { name: "Avoid This", slug: "avoid-this", description: "Anti-patterns to skip." },
+  ],
+
+  // Home Systems / Family
+  "Family Routines": [
+    { name: "Daily Routines", slug: "daily-routines", description: "Morning, afternoon, and evening routines." },
+    { name: "School & Activities", slug: "school-activities", description: "School schedules and extracurriculars." },
+    { name: "Household Chores", slug: "household-chores", description: "Chore assignments and cleaning schedules." },
+  ],
+  "Medications & Health": [
+    { name: "Medication Schedules", slug: "medication-schedules", description: "Daily medication reminders and tracking." },
+    { name: "Allergies & Restrictions", slug: "allergies-restrictions", description: "Known allergies and dietary restrictions." },
+    { name: "Doctor & Provider Info", slug: "doctor-provider-info", description: "Healthcare provider contact information." },
+  ],
+  "Emergency & Safety": [
+    { name: "Emergency Contacts", slug: "emergency-contacts", description: "Family contacts and emergency services." },
+    { name: "Emergency Plans", slug: "emergency-plans", description: "Evacuation procedures and disaster prep." },
+    { name: "First Aid & CPR", slug: "first-aid-cpr", description: "First aid supplies and medical procedures." },
+  ],
+  "Seasonal Maintenance": [
+    { name: "Spring Tasks", slug: "spring-tasks", description: "Spring cleaning and yard preparation." },
+    { name: "Fall Tasks", slug: "fall-tasks", description: "Heating prep and winterization." },
+    { name: "Summer & Winter", slug: "summer-winter-tasks", description: "Summer AC care and winter maintenance." },
+  ],
+  "Baby & Infant Care": [
+    { name: "Supplies & Inventory", slug: "supplies-inventory", description: "Diaper sizes and restock lists." },
+    { name: "Feeding & Nutrition", slug: "feeding-nutrition", description: "Feeding schedules and food allergies." },
+    { name: "Sleep & Routines", slug: "sleep-routines", description: "Sleep schedules and bedtime routines." },
+  ],
+  "Home Systems": [
+    { name: "HVAC & Climate", slug: "hvac-climate", description: "Thermostat settings and filter replacement." },
+    { name: "Plumbing & Electrical", slug: "plumbing-electrical", description: "Shut-offs, circuit breakers, and procedures." },
+    { name: "Appliances", slug: "appliances", description: "Appliance manuals and maintenance schedules." },
   ],
 }
 

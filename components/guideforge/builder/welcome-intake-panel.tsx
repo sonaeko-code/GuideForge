@@ -109,26 +109,25 @@ export function WelcomeIntakePanel() {
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
 
-              {/* Alternative paths */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {result.routeOptions
-                  .filter((opt) => opt.path !== result.recommendedPath)
-                  .map((opt) => (
-                    <Button
-                      key={opt.path}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSelectPath(opt.path)}
-                      disabled={isSubmitting}
-                      className="text-left"
-                    >
-                      <div className="flex flex-col gap-0.5 items-start">
-                        <span className="font-medium">{opt.label}</span>
-                        <span className="text-xs text-muted-foreground">{opt.description}</span>
-                      </div>
-                    </Button>
-                  ))}
-              </div>
+            {/* Alternative paths */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {result.routeOptions
+                .filter((opt) => opt.path !== result.recommendedPath)
+                .map((opt) => (
+                  <Button
+                    key={opt.path}
+                    variant="outline"
+                    onClick={() => handleSelectPath(opt.path)}
+                    disabled={isSubmitting}
+                    className="h-auto min-h-[80px] text-left whitespace-normal p-3"
+                  >
+                    <div className="flex flex-col gap-1.5 items-start w-full">
+                      <span className="font-medium text-sm leading-snug">{opt.label}</span>
+                      <span className="text-xs text-muted-foreground leading-snug">{opt.description}</span>
+                    </div>
+                  </Button>
+                ))}
+            </div>
             </div>
 
             {/* Back to edit */}

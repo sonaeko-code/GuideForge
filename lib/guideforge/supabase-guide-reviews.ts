@@ -390,7 +390,20 @@ export async function castGuideReviewVote(
         })
 
       if (insertError) {
-        console.error('[v0] castGuideReviewVote: Insert error:', insertError.message)
+        console.error('[v0] castGuideReviewVote: Insert error:', insertError.message, insertError.code)
+        
+        // Handle RLS policy errors gracefully
+        const isRLSError = insertError.message?.toLowerCase().includes('row-level security') || 
+                          insertError.code === 'PGRST100' ||
+                          insertError.code === 'PGRST205'
+        
+        if (isRLSError) {
+          return { 
+            success: false, 
+            error: 'Your account is recognized as network owner, but review voting is not yet enabled by the database. Please contact support or try again shortly.' 
+          }
+        }
+        
         return { success: false, error: `Failed to cast vote: ${insertError.message}` }
       }
 

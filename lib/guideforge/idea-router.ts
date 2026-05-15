@@ -70,7 +70,9 @@ const NETWORK_KEYWORDS = [
 const GUIDE_KEYWORDS = [
   "tutorial",
   "how to",
+  "how-to",
   "step-by-step",
+  "walkthrough",
   "walkthrough",
   "instructions",
   "single guide",
@@ -78,6 +80,16 @@ const GUIDE_KEYWORDS = [
   "standalone",
   "reference",
   "quick guide",
+  "guide for",
+  "create a guide",
+  "create a tutorial",
+  "make a tutorial",
+  "publishing",
+  "uploading",
+  "create a",
+  "make a",
+  "teach",
+  "explain",
 ]
 
 const GAMING_KEYWORDS = [
@@ -145,9 +157,14 @@ const CREATOR_KEYWORDS = [
   "content",
   "podcast",
   "publish",
+  "publishing",
   "write",
   "create",
   "produce",
+  "upload",
+  "uploading",
+  "video",
+  "channel",
 ]
 
 /**
@@ -283,34 +300,48 @@ export function routeIdea(roughIdea: string): IdeaRouterResult {
   }
 
   // RULE 3: High guide score + instructional intent + short scope → SINGLE_GUIDE
+  // Guide keywords should beat Network for tutorial/instructional prompts
+  // UNLESS the prompt clearly asks for a system/network
   if (
     guideScore >= 2 &&
-    guideScore > networkScore &&
     guideScore > checklistScore &&
-    idea.length < 200
+    !hasSystemKeywords &&
+    idea.length < 300
   ) {
-    return {
-      recommendedPath: "single_guide",
-      confidence: "medium",
-      detectedIntent: "Single how-to guide or tutorial",
-      reasoning: ["Detected instructional intent with focused scope."],
-      routeOptions: [
-        {
-          path: "single_guide",
-          label: "Create a Guide",
-          description: "Single tutorial or how-to",
-        },
-        {
-          path: "network",
-          label: "Build a Network Instead",
-          description: "Full guide ecosystem with hubs and collections",
-        },
-        {
-          path: "checklist",
-          label: "Create a Checklist Instead",
-          description: "Task list or routine",
-        },
-      ],
+    // If guide score is significantly higher than network score, it's a guide
+    // Or if guide keywords appear with tutorial/create signals and no system signals
+    const isStrongGuide =
+      guideScore > networkScore ||
+      (/\b(tutorial|how to|walkthrough|create a guide|publishing|uploading)\b/i.test(lowerIdea) &&
+        !hasMultipleCategories)
+    
+    if (isStrongGuide) {
+      return {
+        recommendedPath: "single_guide",
+        confidence: guideScore >= 3 ? "high" : "medium",
+        detectedIntent: "Single how-to guide or tutorial",
+        reasoning: [
+          "Detected instructional intent with focused scope.",
+          "No system-building signals detected."
+        ],
+        routeOptions: [
+          {
+            path: "single_guide",
+            label: "Create a Guide",
+            description: "Single tutorial or how-to",
+          },
+          {
+            path: "network",
+            label: "Build a Network Instead",
+            description: "Full guide ecosystem with hubs and collections",
+          },
+          {
+            path: "checklist",
+            label: "Create a Checklist Instead",
+            description: "Task list or routine",
+          },
+        ],
+      }
     }
   }
 

@@ -61,14 +61,17 @@ export function GuideCard({
 
   if (variant === "minimal") {
     return (
-      <Link href={href} className="group flex items-center gap-4 rounded-lg border border-foreground/15 bg-background p-4 transition-colors hover:border-primary/40 hover:bg-muted/50">
+      <Link
+        href={href}
+        className="group card-foundry flex items-center gap-4 rounded-lg p-4 transition-colors"
+      >
         <MediaPlaceholder
           label="Guide"
-          aspect="size-20 shrink-0"
+          aspect="size-20 shrink-0 rounded-md"
           tone="cyan"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--brass-700)]">
             {guide.type.replace("-", " ")}
             {guide.estimatedMinutes && ` · ${guide.estimatedMinutes} min`}
           </p>
@@ -86,23 +89,29 @@ export function GuideCard({
   // variant === "grid" (default)
   return (
     <Link href={href} className="group block">
-      <article className="flex flex-col gap-3">
+      <article className="card-foundry flex h-full flex-col gap-3 overflow-hidden rounded-xl p-4">
         <MediaPlaceholder
           label="Guide Thumbnail"
           variant={imageVariant}
           tone={guide.verification === "forge-verified" ? "primary" : "default"}
           aspect={imageAspect}
         />
-        <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider">
-          <span className="text-muted-foreground">{guide.type.replace("-", " ")}</span>
+        <div className="flex items-center gap-2 px-1 font-mono text-[10px] uppercase tracking-[0.15em]">
+          <span className="text-[var(--brass-700)]">{guide.type.replace("-", " ")}</span>
+          {guide.estimatedMinutes && (
+            <>
+              <span className="text-muted-foreground/50">&middot;</span>
+              <span className="text-muted-foreground">{guide.estimatedMinutes} min</span>
+            </>
+          )}
         </div>
-        <h3 className="text-balance text-lg font-bold leading-snug transition-colors group-hover:text-primary line-clamp-2">
+        <h3 className="px-1 text-balance text-lg font-bold leading-snug transition-colors group-hover:text-primary line-clamp-2">
           {guide.title}
         </h3>
-        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground flex-1">
+        <p className="flex-1 px-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
           {guide.summary}
         </p>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 px-1 pt-1 text-xs">
           <DifficultyBadge difficulty={guide.difficulty} />
           <PublishedBadge verification={guide.verification} showLabel={false} />
         </div>
