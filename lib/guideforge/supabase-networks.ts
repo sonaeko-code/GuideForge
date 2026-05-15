@@ -2156,7 +2156,8 @@ export async function getCurrentUserNetworkAuthority(networkId: string): Promise
         .maybeSingle()
       
       if (!ownerRoleData) {
-        console.warn("[v0] Owner role definition not found for network")
+        // Role definition is optional; owners have implicit permissions
+        console.log("[v0] Owner role definition not found for network — using implicit permissions")
         return {
           isSignedIn: true,
           userId,

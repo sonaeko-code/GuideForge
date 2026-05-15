@@ -3,14 +3,23 @@ import { Plus, Folder, Wand2, FileText, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
-import { getAllNetworks, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
+import { getAllNetworks, getNetworksForCurrentUser, getHubsByNetworkId, getCollectionsByHubId } from "@/lib/guideforge/supabase-networks"
 
 // Disable caching for this page so it always fetches fresh network data from Supabase
 export const dynamic = "force-dynamic"
 
-export default async function NetworksDirectoryPage() {
-  // Load all networks from Supabase
-  let networks = await getAllNetworks()
+export default async function NetworksDirectoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string }>
+}) {
+  const params = await searchParams
+  const scope = params.scope || 'all'
+  
+  // Load networks based on scope parameter
+  let networks = scope === 'mine' 
+    ? await getNetworksForCurrentUser()
+    : await getAllNetworks()
   
 
 
@@ -28,7 +37,7 @@ export default async function NetworksDirectoryPage() {
               </Link>
             </Button>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              Builder &middot; My Networks
+              Builder &middot; {scope === 'mine' ? 'My Networks' : 'All Networks'}
             </div>
             <Button asChild variant="outline" size="sm">
               <Link href="/builder/assets">
@@ -135,31 +144,56 @@ export default async function NetworksDirectoryPage() {
                 Workspace &middot; Knowledge Networks
               </p>
               <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-                All Networks
+                {scope === 'mine' ? 'My Networks' : 'All Networks'}
               </h1>
               <p className="mt-2 text-pretty text-base text-muted-foreground">
-                {networks.length} {networks.length === 1 ? 'network' : 'networks'} created
+                {networks.length} {networks.length === 1 ? 'network' : 'networks'} {scope === 'mine' ? 'you own or manage' : 'visible'}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 md:flex-nowrap md:gap-3">
-              <Button asChild variant="outline">
-                <Link href="/builder/network/scaffold">
-                  <Plus className="mr-2 size-4" aria-hidden="true" />
-                  From Template
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/builder/generate-asset">
-                  <Wand2 className="mr-2 size-4" aria-hidden="true" />
-                  Generate Asset
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href="/builder/network/new">
-                  <Plus className="mr-2 size-4" aria-hidden="true" />
-                  Create Network
-                </Link>
-              </Button>
+            <div className="flex flex-col gap-3 w-full md:w-auto">
+              {/* Scope toggle */}
+              <div className="flex gap-2">
+                <Button 
+                  asChild
+                  variant={scope === 'mine' ? 'default' : 'outline'}
+                  size="sm"
+                >
+                  <Link href="/builder/networks?scope=mine">
+                    My Networks
+                  </Link>
+                </Button>
+                <Button 
+                  asChild
+                  variant={scope === 'all' || !scope ? 'default' : 'outline'}
+                  size="sm"
+                >
+                  <Link href="/builder/networks?scope=all">
+                    All Networks
+                  </Link>
+                </Button>
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline">
+                  <Link href="/builder/network/scaffold">
+                    <Plus className="mr-2 size-4" aria-hidden="true" />
+                    From Template
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/builder/generate-asset">
+                    <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                    Generate Asset
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/builder/network/new">
+                    <Plus className="mr-2 size-4" aria-hidden="true" />
+                    Create Network
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>

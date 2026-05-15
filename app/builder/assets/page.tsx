@@ -152,8 +152,8 @@ export default function AssetsPage() {
               Builder &middot; My Assets
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link href="/builder/networks">
-                View Networks
+              <Link href="/builder/networks?scope=mine">
+                View My Networks
               </Link>
             </Button>
           </div>
@@ -298,10 +298,10 @@ export default function AssetsPage() {
                       </span>
                     </div>
 
-                    {/* Status row — Draft + AI Generated when applicable */}
+                    {/* Status row — Draft + AI Generated + Owner attribution */}
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--brass-500)_30%,transparent)] bg-[color-mix(in_oklch,var(--brass-100)_85%,var(--card))] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.42_0.08_55)]">
-                        Draft
+                        Owned by you
                       </span>
                       {asset.generationSource === 'ai' && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.55_0.05_280)]/35 bg-[oklch(0.94_0.012_280)] dark:bg-[oklch(0.28_0.03_280)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.42_0.05_280)] dark:text-[oklch(0.82_0.04_280)]">
