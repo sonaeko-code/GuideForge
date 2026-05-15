@@ -1141,6 +1141,58 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
 }
 
 /**
+ * Get the count of guides in a network without fetching full guide objects.
+ * Safely returns 0 if network has no hubs/collections or Supabase errors.
+ */
+export async function countGuidesByNetworkId(networkId: string): Promise<number> {
+  if (!isSupabaseConfigured()) {
+    return 0
+  }
+
+  try {
+    // First get all hubs for this network
+    const { data: hubs, error: hubsError } = await supabase
+      .from("hubs")
+      .select("id", { count: "exact" })
+      .eq("network_id", networkId)
+
+    if (hubsError || !hubs || hubs.length === 0) {
+      return 0
+    }
+
+    const hubIds = hubs.map(h => h.id)
+
+    // Get all collections for those hubs
+    const { data: collections, error: collectionsError } = await supabase
+      .from("collections")
+      .select("id")
+      .in("hub_id", hubIds)
+
+    if (collectionsError || !collections || collections.length === 0) {
+      return 0
+    }
+
+    const collectionIds = collections.map(c => c.id)
+
+    // Count guides in those collections
+    const { count, error: countError } = await supabase
+      .from("guides")
+      .select("id", { count: "exact", head: true })
+      .in("collection_id", collectionIds)
+
+    if (countError) {
+      console.warn("[v0] Error counting guides:", countError.message)
+      return 0
+    }
+
+    return count || 0
+  } catch (err) {
+    console.warn("[v0] Exception counting network guides:", err)
+    return 0
+  }
+}
+
+/**
  * Diagnostic helper: Check if guides table is readable at all
  * Useful for detecting RLS issues where guides exist but cannot be selected
  */
