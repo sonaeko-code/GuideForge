@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Flame, ChevronRight, Copy, Check, ArrowLeft, Loader2 } from "lucide-react"
+import { Flame, ChevronRight, Copy, Check, ArrowLeft, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -26,6 +26,7 @@ import type {
   NormalizedHub,
   NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
+import { classifyNetworkGuidePrompt } from "@/lib/guideforge/network-guide-classifier"
 
 interface GeneratorClientProps {
   networkId: string
@@ -91,6 +92,10 @@ export function GeneratorClient({
   const [sendError, setSendError] = useState<string | null>(null)
   const [generationMode, setGenerationMode] = useState<"mock" | "ai">("mock")
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [suggestionBanner, setSuggestionBanner] = useState<{
+    confidence: "high" | "medium" | "low"
+    note: string | null
+  } | null>(null)
 
   const collectionsForHub = useMemo(
     () => (selectedHubId ? collectionsByHub[selectedHubId] || [] : []),
@@ -121,6 +126,28 @@ export function GeneratorClient({
     if (totalCollections === 0) return "needs-collection"
     return "ready"
   })()
+
+  const handleSuggestStructure = () => {
+    if (formState.prompt.trim().length < 20) return
+
+    const result = classifyNetworkGuidePrompt(formState.prompt, hubs, collectionsByHub)
+
+    // Apply suggestions — never touch the prompt itself
+    if (result.guideType) {
+      setFormState((prev) => ({ ...prev, guideType: result.guideType! }))
+    }
+    if (result.difficulty) {
+      setFormState((prev) => ({ ...prev, preferredDifficulty: result.difficulty! }))
+    }
+    if (result.hubId) {
+      setSelectedHubId(result.hubId)
+    }
+    if (result.collectionId) {
+      setSelectedCollectionId(result.collectionId)
+    }
+
+    setSuggestionBanner({ confidence: result.confidence, note: result.confidenceNote })
+  }
 
   const handleGenerateMock = async () => {
     if (!formState.prompt.trim()) {
@@ -173,11 +200,16 @@ export function GeneratorClient({
     setSendError(null)
 
     try {
-      // Call AI generation API
+      // Call AI generation API — enrich with network/collection context
       const response = await fetch("/api/guideforge/generate-guide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          ...request,
+          networkId,
+          networkName,
+          targetCollectionId: selectedCollectionId,
+        }),
       })
 
       let responseText: string
@@ -193,7 +225,9 @@ export function GeneratorClient({
       try {
         data = JSON.parse(responseText)
       } catch (parseErr) {
-        setSendError("AI generation failed. Server returned invalid response.")
+        setSendError(
+          "AI generation failed. The server returned a non-JSON response. Try Mock Preview, or use the Single Guide asset builder."
+        )
         setSession((prev) => (prev ? { ...prev, status: "error" } : null))
         return
       }
@@ -271,7 +305,7 @@ export function GeneratorClient({
       
       // Defensive: ensure required fields have defaults
       const guideTypeToUse = formState.guideType || "reference"
-      const difficultyToUse = generatedGuide.difficulty || "Beginner"
+      const difficultyToUse = generatedGuide.difficulty || "intermediate"
       const summaryToUse = generatedGuide.summary || generatedGuide.title?.substring(0, 100) || "AI-generated guide"
       
       console.log("[v0] Generated guide save target:", {
@@ -436,6 +470,29 @@ export function GeneratorClient({
                 <p className="text-xs text-muted-foreground mt-2">
                   This is your source of truth. AI can help infer guide type, difficulty, and placement.
                 </p>
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSuggestStructure}
+                    disabled={formState.prompt.trim().length < 20}
+                  >
+                    <Sparkles className="mr-1.5 size-3.5" aria-hidden="true" />
+                    Suggest structure
+                  </Button>
+                </div>
+                {suggestionBanner && (
+                  <div
+                    className={
+                      suggestionBanner.confidence === "low"
+                        ? "mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+                        : "mt-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
+                    }
+                  >
+                    {suggestionBanner.note ?? "Structure suggested — review and adjust before generating."}
+                  </div>
+                )}
               </div>
 
               {/* Guide Type */}
@@ -465,6 +522,11 @@ export function GeneratorClient({
                     </SelectItem>
                     <SelectItem value="walkthrough">Walkthrough</SelectItem>
                     <SelectItem value="patch-notes">Patch Notes</SelectItem>
+                    <SelectItem value="tutorial">Tutorial</SelectItem>
+                    <SelectItem value="reference">Reference</SelectItem>
+                    <SelectItem value="news">News</SelectItem>
+                    <SelectItem value="repair-procedure">Repair Procedure</SelectItem>
+                    <SelectItem value="sop">Standard Operating Procedure</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -553,8 +615,8 @@ export function GeneratorClient({
 
               <div className="rounded-lg bg-muted/30 border border-border/50 p-3">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Forge Rules:</strong> The network&apos;s forge rules
-                  will be applied as context to the generator.
+                  <strong>Forge Rules:</strong>{" "}
+                  The network&apos;s forge rules will be applied as context to the generator.
                 </p>
               </div>
 
@@ -598,7 +660,7 @@ export function GeneratorClient({
                 ) : (
                   <>
                     <Flame className="mr-2 size-4" />
-                    {generationMode === "mock" ? "Generate Mock Structured Guide" : "Generate AI Guide"}
+                    {generationMode === "mock" ? "Generate Mock Guide" : "Generate AI Guide"}
                   </>
                 )}
               </Button>
@@ -614,7 +676,7 @@ export function GeneratorClient({
           {/* Right: preview */}
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-bold">Generated JSON Preview</h2>
+              <h2 className="text-xl font-bold">Generated Draft Preview</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Review the generated guide structure before sending to editor.
               </p>
@@ -724,8 +786,9 @@ export function GeneratorClient({
             ) : (
               <Card className="border-border/50 p-8 text-center">
                 <p className="text-muted-foreground">
-                  Fill out the form and click &quot;Generate {generationMode === "mock" ? "Mock" : "AI"} Structured
-                  Guide&quot; to preview the output.
+                  Fill out the form and click{" "}
+                  &quot;{generationMode === "mock" ? "Generate Mock Guide" : "Generate AI Guide"}&quot;{" "}
+                  to preview the output.
                 </p>
               </Card>
             )}

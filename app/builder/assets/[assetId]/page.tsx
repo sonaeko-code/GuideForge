@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, AlertCircle, Trash2, CheckSquare2, ListTodo, BarChart3, LinkIcon, X } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Trash2, CheckSquare2, ListTodo, BarChart3, LinkIcon, X, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"

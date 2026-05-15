@@ -217,6 +217,114 @@ EXAMPLE OF GOOD STEP QUALITY (for a YouTube upload guide):
 Generate a complete, domain-specific guide with meaningful steps relevant to the title, audience, and context above. Do not use generic or placeholder content.`
 }
 
+// ========== Network Guide Prompt ==========
+
+export interface NetworkGuidePromptRequest {
+  prompt: string
+  guideType: string
+  preferredDifficulty: string
+  networkName?: string
+  targetHubId?: string
+  forgeRuleContext?: string
+}
+
+const NETWORK_GUIDE_SCHEMA = `{
+  "title": "string - guide title (5-80 characters)",
+  "summary": "string - 1-2 sentence description of what this guide covers and who it is for",
+  "type": "one of: character-build | walkthrough | boss-guide | beginner-guide | patch-notes | news | repair-procedure | sop | tutorial | reference",
+  "difficulty": "one of: beginner | intermediate | advanced | expert",
+  "estimatedMinutes": number (5-120),
+  "sections": [
+    {
+      "title": "string - meaningful section title, 3-60 characters",
+      "kind": "one of: overview | strengths | weaknesses | gear | skill-priority | rotation | leveling | mistakes | patch-notes | final-tips | requirements | warning | custom",
+      "body": "string - at least 3 full sentences of detailed, actionable content"
+    }
+  ],
+  "requirements": ["string - prerequisite (empty array if none)"],
+  "warnings": ["string - safety warning or important caveat (empty array if none)"],
+  "tags": ["string - lowercase tags for categorization"],
+  "version": "string or null - patch/version this guide is current for"
+}`
+
+const GUIDE_TYPE_DESCRIPTIONS: Record<string, string> = {
+  "character-build": "Character Build Guide — covers stats, gear, skills, and rotation",
+  "walkthrough": "Walkthrough — step-by-step progression guide",
+  "boss-guide": "Boss Guide — mechanics, phase breakdown, strategies, and execution",
+  "beginner-guide": "Beginner Guide — foundational concepts for new players or users",
+  "patch-notes": "Patch Notes Analysis — summarizes recent changes and their impact",
+  "tutorial": "Tutorial — teaches a specific system, mechanic, or skill",
+  "reference": "Reference Guide — quick-lookup facts and data tables",
+  "repair-procedure": "Repair Procedure — technical step-by-step repair instructions",
+  "sop": "Standard Operating Procedure — formal documented process",
+  "news": "News / Update Post — announcement or news coverage",
+}
+
+const SECTION_COUNT_BY_TYPE: Record<string, number> = {
+  "character-build": 7,
+  "boss-guide": 6,
+  "beginner-guide": 6,
+  "walkthrough": 7,
+  "patch-notes": 3,
+  "tutorial": 6,
+  "reference": 5,
+  "repair-procedure": 6,
+  "sop": 5,
+  "news": 3,
+}
+
+const SUGGESTED_KINDS_BY_TYPE: Record<string, string> = {
+  "character-build": "overview, strengths, weaknesses, gear, skill-priority, rotation, final-tips",
+  "boss-guide": "overview, requirements, gear, rotation, mistakes, final-tips",
+  "beginner-guide": "overview, requirements, leveling, gear, mistakes, final-tips",
+  "walkthrough": "overview, requirements, leveling, gear, rotation, mistakes, final-tips",
+  "patch-notes": "patch-notes, overview, final-tips",
+  "tutorial": "overview, requirements, leveling, rotation, mistakes, final-tips",
+  "reference": "overview, gear, skill-priority, requirements, final-tips",
+  "repair-procedure": "overview, requirements, warning, leveling, rotation, final-tips",
+  "sop": "overview, requirements, rotation, warning, final-tips",
+  "news": "patch-notes, overview, final-tips",
+}
+
+export function buildNetworkGuidePrompt(request: NetworkGuidePromptRequest): string {
+  const guideTypeDesc = GUIDE_TYPE_DESCRIPTIONS[request.guideType] || `Guide (type: ${request.guideType})`
+  const targetSections = SECTION_COUNT_BY_TYPE[request.guideType] || 5
+  const suggestedKinds = SUGGESTED_KINDS_BY_TYPE[request.guideType] || "overview, custom, final-tips"
+  const networkLine = request.networkName ? `- Network: ${request.networkName}` : ""
+  const forgeRulesSection = request.forgeRuleContext
+    ? `\nFORGE RULES (apply these to the guide):\n${request.forgeRuleContext}\n`
+    : ""
+
+  return `You are a structured guide generator for GuideForge. Generate a high-quality, well-organized guide based on the user's idea.
+
+CRITICAL RULES — DO NOT VIOLATE:
+1. Return ONLY valid JSON matching the schema below. No markdown, no explanations, no text outside JSON.
+2. "title" must be 5-80 characters — specific to the topic, never a generic placeholder.
+3. "summary" must be 1-2 natural sentences. Avoid starting with "A comprehensive guide for [verb phrase]".
+4. "sections" must have exactly ${targetSections} sections (±1 allowed for natural fit).
+5. The first section "kind" MUST be "overview". The last section "kind" MUST be "final-tips".
+6. Every section "body" must be at least 3 full sentences of specific, actionable content. No placeholder text.
+7. Section "title" must be specific and descriptive (e.g., "Combat Rotation", "Required Gear") — never "Section 1".
+8. "difficulty" must exactly be one of: beginner, intermediate, advanced, expert.
+9. "type" must exactly match the requested guide type.
+10. NEVER use placeholder text like "TODO", "[fill in]", "This section covers X", "Follow this carefully".
+${forgeRulesSection}
+GUIDE REQUEST:
+- Guide Type: ${guideTypeDesc}
+- Difficulty: ${request.preferredDifficulty}
+${networkLine}
+- Target Section Count: ${targetSections}
+- Suggested Section Kinds (in order): ${suggestedKinds}
+
+USER'S GUIDE IDEA:
+${request.prompt}
+
+REQUIRED JSON SCHEMA:
+${NETWORK_GUIDE_SCHEMA}
+
+Generate a complete, specific guide directly based on the user's idea. Content must be relevant to the topic described — not generic filler.`
+}
+
 /**
  * Example response that validates - for reference/testing.
  */

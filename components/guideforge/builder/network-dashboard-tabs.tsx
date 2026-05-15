@@ -344,19 +344,19 @@ export function NetworkDashboardTabs({
       <TabsList className="grid w-full grid-cols-6 mb-6 h-auto p-1 shadow-forge" style={{backgroundImage: 'linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%, var(--card) 100%)', border: '1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border))'}}>
         <TabsTrigger value="drafts">
           Drafts
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-brass-100 dark:bg-[oklch(0.30_0.05_55)] px-2 py-0.5 text-xs font-semibold text-brass-700 dark:text-brass-300">
             {safeDrafts.length + draftAssets.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="ready">
           Pending Review
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[oklch(0.94_0.015_225)] dark:bg-[oklch(0.24_0.04_225)] px-2 py-0.5 text-xs font-semibold text-[oklch(0.34_0.055_225)] dark:text-[oklch(0.78_0.065_225)]">
             {safeReady.length + pendingReviewAssets.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="published">
           Published
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[oklch(0.93_0.03_185)] dark:bg-[oklch(0.24_0.05_185)] px-2 py-0.5 text-xs font-semibold text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)]">
             {safePublished.length + publishedAssets.length}
           </span>
         </TabsTrigger>
@@ -429,7 +429,7 @@ export function NetworkDashboardTabs({
                 <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col hover:bg-muted/50 transition-colors">
                   <div className="space-y-2 flex-1">
                     <div className="flex items-start gap-2">
-                      <Package className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <Package className="size-4 text-[oklch(0.50_0.065_225)] dark:text-[oklch(0.72_0.06_225)] flex-shrink-0 mt-0.5" aria-hidden="true" />
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-foreground line-clamp-2">{asset.title}</h4>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -442,11 +442,11 @@ export function NetworkDashboardTabs({
                     <Badge variant="outline" className="text-xs font-normal capitalize">
                       {asset.assetType.replace(/_/g, " ")}
                     </Badge>
-                    <Badge variant="outline" className="text-xs font-normal text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                    <Badge variant="outline" className="text-xs font-normal text-brass-700 dark:text-brass-300 border-brass-300 dark:border-brass-700">
                       Draft
                     </Badge>
                     {assetActionSuccess[asset.id] && (
-                      <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 ml-auto">
+                      <Badge variant="outline" className="text-xs font-normal text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)] border-[oklch(0.55_0.09_185)]/40 ml-auto">
                         <CheckCircle2 className="size-3 mr-1" aria-hidden="true" />
                         Success
                       </Badge>
@@ -510,7 +510,7 @@ export function NetworkDashboardTabs({
                     <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
                     {/* Phase 10C: Revision badge on card */}
                     {guide.revisionOf && (
-                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-[oklch(0.45_0.10_330)]/50 text-[oklch(0.28_0.12_330)] dark:border-[oklch(0.55_0.10_330)]/50 dark:text-[oklch(0.78_0.10_330)] flex-shrink-0">
                         Rev #{guide.revisionNumber || 1}
                       </Badge>
                     )}
@@ -520,7 +520,7 @@ export function NetworkDashboardTabs({
                   </p>
                   {/* Phase 10C: Revision context helper text */}
                   {guide.revisionOf && (
-                    <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
+                    <p className="text-xs text-[oklch(0.28_0.12_330)] dark:text-[oklch(0.78_0.10_330)] italic mb-2">Revision of another guide</p>
                   )}
                   {/* Hierarchy context */}
                   {!guide.revisionOf && (
@@ -549,7 +549,7 @@ export function NetworkDashboardTabs({
               <Card key={asset.id} className="border-border/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-muted/50 transition-colors">
                 <div className="flex-1 min-w-0 mb-3 sm:mb-0">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <Package className="size-4 text-blue-600 dark:text-blue-400 flex-shrink-0" aria-hidden="true" />
+                    <Package className="size-4 text-[oklch(0.50_0.065_225)] dark:text-[oklch(0.72_0.06_225)] flex-shrink-0" aria-hidden="true" />
                     <h4 className="font-semibold text-foreground truncate">{asset.title}</h4>
                     <Badge variant="outline" className="text-[10px] font-normal capitalize">
                       {asset.assetType.replace(/_/g, " ")}
@@ -559,14 +559,14 @@ export function NetworkDashboardTabs({
                     {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline" className="text-xs font-normal text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
+                    <Badge variant="outline" className="text-xs font-normal text-[oklch(0.34_0.055_225)] dark:text-[oklch(0.78_0.065_225)] border-[oklch(0.37_0.05_225)]/40">
                       {getAssetDraftStatusLabel(asset.status).displayName}
                     </Badge>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {assetActionSuccess[asset.id] && (
-                    <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                    <Badge variant="outline" className="text-xs font-normal text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)] border-[oklch(0.55_0.09_185)]/40">
                       <CheckCircle2 className="size-3 mr-1" aria-hidden="true" />
                       Success
                     </Badge>
@@ -617,8 +617,8 @@ export function NetworkDashboardTabs({
 
         {/* Lane 2D: Published assets are now visible on public network */}
         {publishedAssets.length > 0 && (
-          <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-            <Info className="mt-0.5 size-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+          <div className="flex items-start gap-3 rounded-lg border border-[oklch(0.55_0.09_185)]/30 bg-[oklch(0.55_0.09_185)]/5 p-3">
+            <Info className="mt-0.5 size-4 flex-shrink-0 text-[oklch(0.50_0.09_185)] dark:text-[oklch(0.72_0.08_185)]" aria-hidden="true" />
             <div className="flex-1 text-sm">
               <p className="font-semibold text-foreground">Published Assets — Now Public</p>
               <p className="mt-1 text-muted-foreground">
@@ -661,11 +661,11 @@ export function NetworkDashboardTabs({
                     <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
                     {/* Phase 10D/10E: Badge for published guides */}
                     {!guide.revisionOf ? (
-                      <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-[oklch(0.55_0.09_185)]/40 text-[oklch(0.40_0.09_185)] dark:border-[oklch(0.55_0.09_185)]/55 dark:text-[oklch(0.82_0.07_185)] flex-shrink-0">
                         Original
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-[oklch(0.45_0.10_330)]/50 text-[oklch(0.28_0.12_330)] dark:border-[oklch(0.55_0.10_330)]/50 dark:text-[oklch(0.78_0.10_330)] flex-shrink-0">
                         Rev #{guide.revisionNumber || 1}
                       </Badge>
                     )}
@@ -681,7 +681,7 @@ export function NetworkDashboardTabs({
                   )}
                   {/* Revision context */}
                   {guide.revisionOf && (
-                    <p className="text-xs text-purple-600 dark:text-purple-400 italic mb-2">Revision of another guide</p>
+                    <p className="text-xs text-[oklch(0.28_0.12_330)] dark:text-[oklch(0.78_0.10_330)] italic mb-2">Revision of another guide</p>
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     <StatusBadge status={guide.status} />
@@ -692,7 +692,7 @@ export function NetworkDashboardTabs({
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Link
                     href={`/n/published/${guide.id}`}
-                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs"
+                    className="text-brand-steel-blue hover:text-[oklch(0.32_0.055_225)] dark:text-[oklch(0.78_0.065_225)] dark:hover:text-[oklch(0.88_0.05_225)] text-xs"
                   >
                     View
                   </Link>
@@ -705,7 +705,7 @@ export function NetworkDashboardTabs({
               <Card key={asset.id} className="border-border/50 px-4 py-3 hover:bg-muted/50 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex-1 min-w-0 mb-3 sm:mb-0">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <Package className="size-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
+                    <Package className="size-4 text-[oklch(0.50_0.09_185)] dark:text-[oklch(0.72_0.08_185)] flex-shrink-0" aria-hidden="true" />
                     <h4 className="font-semibold text-foreground truncate">{asset.title}</h4>
                     <Badge variant="outline" className="text-[10px] font-normal capitalize">
                       {asset.assetType.replace(/_/g, " ")}
@@ -715,7 +715,7 @@ export function NetworkDashboardTabs({
                     {asset.summary ? asset.summary.slice(0, 100) + (asset.summary.length > 100 ? "..." : "") : "No summary yet"}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="outline" className="text-xs font-normal text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                    <Badge variant="outline" className="text-xs font-normal text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)] border-[oklch(0.55_0.09_185)]/40">
                       {getAssetDraftStatusLabel(asset.status).displayName}
                     </Badge>
                   </div>
@@ -749,11 +749,11 @@ export function NetworkDashboardTabs({
                     <h4 className="font-semibold text-foreground truncate">{guide.title}</h4>
                     {/* Phase 10D/10E: Badge for published guides */}
                     {!guide.revisionOf ? (
-                      <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-[oklch(0.55_0.09_185)]/40 text-[oklch(0.40_0.09_185)] dark:border-[oklch(0.55_0.09_185)]/55 dark:text-[oklch(0.82_0.07_185)] flex-shrink-0">
                         Original
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px] border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 flex-shrink-0">
+                      <Badge variant="outline" className="text-[10px] border-[oklch(0.45_0.10_330)]/50 text-[oklch(0.28_0.12_330)] dark:border-[oklch(0.55_0.10_330)]/50 dark:text-[oklch(0.78_0.10_330)] flex-shrink-0">
                         Rev #{guide.revisionNumber || 1}
                       </Badge>
                     )}
@@ -963,7 +963,7 @@ export function NetworkDashboardTabs({
                                 Rev #{guide.revisionNumber}
                               </Badge>
                             )}
-                            <Badge variant="outline" className="text-[10px] border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 flex-shrink-0">
+                            <Badge variant="outline" className="text-[10px] border-brass-300 dark:border-brass-700 text-brass-700 dark:text-brass-300 flex-shrink-0">
                               Archived
                             </Badge>
                           </div>

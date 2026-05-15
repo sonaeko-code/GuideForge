@@ -47,7 +47,11 @@ export function extractTitle(text: string): string | null {
     .replace(/\.$/, "")
     .trim()
 
-  if (cleaned.length > 3 && cleaned.length < 120) {
+  // Only adopt the first line as a title if it's plausibly a concise title.
+  // Anything longer than 80 chars is almost certainly the prompt body, not a title;
+  // returning null lets the form leave the title empty and keeps the prompt textarea
+  // intact for the user to read.
+  if (cleaned.length > 3 && cleaned.length <= 80) {
     return titleCase(cleaned)
   }
 

@@ -24,15 +24,15 @@ const GUIDE_STATUS_STYLE: Record<GuideStatus, string> = {
   // Draft: warm parchment/amber — soft and unfinished
   draft:
     "bg-[color-mix(in_oklch,var(--brass-100)_85%,var(--background))] text-[oklch(0.42_0.08_55)] border-[color-mix(in_oklch,var(--brass-500)_30%,transparent)]",
-  // In Review: steel blue
+  // In Review: brand steel blue (--brand-steel-blue #35546B, hue 225)
   "in-review":
-    "bg-[oklch(0.94_0.018_240)] dark:bg-[oklch(0.28_0.04_240)] text-[oklch(0.36_0.07_240)] dark:text-[oklch(0.82_0.06_240)] border-[oklch(0.55_0.07_240)]/40",
-  // Ready: muted teal — vetted, awaiting publish
+    "bg-[oklch(0.94_0.015_225)] dark:bg-[oklch(0.24_0.04_225)] text-[oklch(0.34_0.055_225)] dark:text-[oklch(0.78_0.065_225)] border-[oklch(0.37_0.05_225)]/40",
+  // Ready: brand teal (--brand-teal #2F8A87, hue 185) — vetted, awaiting publish
   ready:
-    "bg-[oklch(0.92_0.04_180)] dark:bg-[oklch(0.28_0.05_180)] text-[oklch(0.38_0.07_180)] dark:text-[oklch(0.82_0.07_180)] border-[oklch(0.55_0.08_180)]/40",
-  // Published: emerald/brass — live
+    "bg-[oklch(0.93_0.03_185)] dark:bg-[oklch(0.24_0.05_185)] text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)] border-[oklch(0.55_0.09_185)]/40",
+  // Published: brand teal — live and verified
   published:
-    "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border-emerald-500/35",
+    "bg-[oklch(0.93_0.03_185)]/70 text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)] border-[oklch(0.55_0.09_185)]/40",
   "needs-update":
     "bg-destructive/10 text-destructive border-destructive/30",
   deprecated:

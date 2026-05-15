@@ -271,6 +271,23 @@ export interface GuideDNASuggestions {
   badgeLanguage: string
 }
 
+// ---------- Generation Request / Response ----------
+
+export interface GenerationRequest {
+  prompt: string
+  guideType: GuideType
+  preferredDifficulty: DifficultyLevel
+  targetHubId: string
+  targetCollectionId?: string
+  forgeRuleContext?: string
+}
+
+export interface GenerationResponse {
+  guide: GeneratedGuide
+  success: boolean
+  error?: string
+}
+
 // ---------- Generation Session ----------
 
 /**

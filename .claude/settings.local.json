@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\" -Depth 1)",
+      "Bash(Select-Object Name, FullName)"
+    ]
+  }
+}

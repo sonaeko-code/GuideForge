@@ -104,8 +104,6 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     }
   }
 
-  // Single Guide uses its own dedicated proposal component with Edit/Preview tabs
-  if (asset.assetType === "single_guide") {
   // Checklist uses shared ChecklistEditor component
   if (asset.assetType === "checklist" && checklistDraft) {
     const handleChecklistSave = async () => {
@@ -217,7 +215,9 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     )
   }
 
-  return (
+  // Single Guide uses its own dedicated proposal component with Edit/Preview tabs
+  if (asset.assetType === "single_guide") {
+    return (
       <SingleGuideProposal
         asset={asset as GeneratedSingleGuide}
         isSaving={isSaving}
@@ -453,7 +453,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       <Card className="p-4 border-blue-500/20 bg-blue-500/5">
         <div className="space-y-3">
           <div>
-            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Improve This Draft</p>
+            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Improve this Draft</p>
             <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
               Tell GuideForge what to adjust after reviewing the preview above.
             </p>
