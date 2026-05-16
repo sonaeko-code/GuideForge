@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Components · Buttons</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 24px 28px; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; margin: 0 0 16px; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+
+  .row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .legend { width: 90px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-3); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 36px; padding: 0 18px;
+    border-radius: 8px;
+    font-family: var(--font-sans); font-weight: 500; font-size: 14px;
+    border: 1px solid transparent; cursor: pointer; outline: 0;
+    transition: all 160ms cubic-bezier(.2,.7,.2,1);
+  }
+  .btn svg { width: 14px; height: 14px; }
+  .btn.lg { height: 42px; padding: 0 22px; font-size: 15px; }
+  .btn.sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+  .btn.primary { background: var(--gf-copper); color: #fff; }
+  .btn.primary.hover { background: var(--gf-copper-deep); }
+  .btn.primary:hover { background: var(--gf-copper-deep); }
+  .btn.secondary { background: color-mix(in oklch, var(--brass-100) 80%, var(--card)); color: var(--gf-graphite); border-color: color-mix(in oklch, var(--brass-500) 30%, var(--border)); }
+  .btn.outline { background: var(--gf-soft-ivory); color: var(--gf-graphite); border-color: color-mix(in oklch, var(--brass-500) 35%, var(--border)); box-shadow: 0 1px 0 rgba(0,0,0,.02); }
+  .btn.ghost { background: transparent; color: var(--fg-2); }
+  .btn.ghost:hover { background: color-mix(in oklch, var(--brass-100) 60%, var(--card)); color: var(--fg-1); }
+  .btn.link { background: transparent; color: var(--gf-copper); padding: 0; height: auto; border-radius: 0; border-bottom: 1px solid transparent; }
+  .btn.link:hover { border-bottom-color: var(--gf-copper); }
+  .btn.danger { background: var(--gf-rust); color: #fff; }
+  .btn.disabled { opacity: .5; pointer-events: none; }
+
+  .arrow {
+    border: solid currentColor; border-width: 0 1.5px 1.5px 0;
+    display: inline-block; padding: 3px; transform: rotate(-45deg); margin-left: 2px;
+  }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Buttons</div><div class="e">Copper-led system</div></div>
+  <div class="row">
+    <span class="legend">Primary</span>
+    <button class="btn primary">Start building <i class="arrow"></i></button>
+    <button class="btn primary hover">Hover</button>
+    <button class="btn primary disabled">Disabled</button>
+    <button class="btn primary lg">Forge guide</button>
+  </div>
+  <div class="row">
+    <span class="legend">Secondary</span>
+    <button class="btn secondary">Save draft</button>
+    <button class="btn outline">Outline</button>
+    <button class="btn ghost">Cancel</button>
+    <a class="btn link">Learn more</a>
+  </div>
+  <div class="row">
+    <span class="legend">Size</span>
+    <button class="btn primary sm">sm</button>
+    <button class="btn primary">md</button>
+    <button class="btn primary lg">lg</button>
+    <button class="btn danger sm">Delete</button>
+  </div>
+</body></html>

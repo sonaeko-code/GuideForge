@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Components · Guide Card</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 24px; background: var(--gf-parchment); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .card-foundry {
+    border-radius: 12px;
+    padding: 14px;
+    background: var(--gf-soft-ivory);
+    background-image: linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%, var(--card) 100%);
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    box-shadow:
+      inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+      0 1px 2px rgba(0,0,0,.04),
+      0 8px 20px -10px color-mix(in oklch, var(--brass-700) 22%, transparent);
+  }
+  .thumb {
+    aspect-ratio: 16 / 10;
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 20% 30%, color-mix(in oklch, var(--brass-300) 25%, transparent), transparent 50%),
+      radial-gradient(circle at 80% 80%, color-mix(in oklch, var(--brass-500) 25%, transparent), transparent 50%),
+      linear-gradient(135deg, var(--gf-charcoal-brown), oklch(0.27 0.02 50));
+    position: relative;
+    overflow: hidden;
+  }
+  .thumb svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .35; }
+  .meta { display:flex; gap:8px; align-items:center; margin-top:10px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; }
+  .meta .b { color: var(--brass-700); }
+  .meta .d { color: var(--fg-3); }
+  h3 { font-family: var(--font-serif); font-weight: 700; font-size: 18px; line-height: 1.25; color: var(--fg-1); margin: 8px 0 6px; }
+  p { font-size: 13px; line-height: 1.5; color: var(--fg-3); margin: 0 0 10px; }
+  .pillrow { display:flex; gap:6px; flex-wrap: wrap; }
+  .pill { display:inline-flex; align-items:center; gap:4px; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 500; border: 1px solid; }
+  .pill .pips { display:inline-flex; gap: 2px; }
+  .pill .pips i { width: 3px; height: 8px; border-radius: 1px; background: var(--gf-copper); display:inline-block; }
+  .pill .pips i.off { background: var(--border); }
+  .p-diff { background: color-mix(in oklch, var(--brass-100) 60%, var(--card)); color: var(--fg-2); border-color: var(--border); }
+  .p-forged { background: var(--gf-charcoal-brown); color: #E8C781; border-color: var(--gf-brass-deep); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 9.5px; padding: 3px 9px; }
+</style></head>
+<body class="card-parchment">
+  <div class="grid">
+    <article class="card-foundry">
+      <div class="thumb">
+        <svg viewBox="0 0 200 120">
+          <circle cx="60" cy="40" r="3" fill="#C7A15A"/>
+          <circle cx="110" cy="35" r="3" fill="#C7A15A"/>
+          <circle cx="150" cy="60" r="3" fill="#C7A15A"/>
+          <line x1="60" y1="40" x2="110" y2="35" stroke="#C7A15A" stroke-width="1"/>
+          <line x1="110" y1="35" x2="150" y2="60" stroke="#C7A15A" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="meta"><span class="b">Character Build</span><span class="d">·</span><span class="d">12 min</span></div>
+      <h3>Best Fire Warden Beginner Build</h3>
+      <p>An opinionated leveling path through Emberfall — gear, talents, and rotation.</p>
+      <div class="pillrow">
+        <span class="pill p-diff"><span class="pips"><i></i><i></i><i class="off"></i><i class="off"></i></span>Intermediate</span>
+        <span class="pill p-forged">✦ Forged</span>
+      </div>
+    </article>
+
+    <article class="card-foundry">
+      <div class="thumb" style="background:
+        radial-gradient(circle at 30% 20%, color-mix(in oklch, var(--gf-teal) 35%, transparent), transparent 55%),
+        linear-gradient(135deg, #1d3a4a, #244657);">
+        <svg viewBox="0 0 200 120">
+          <circle cx="40" cy="60" r="3" fill="#9bc8c5"/>
+          <circle cx="100" cy="40" r="3" fill="#9bc8c5"/>
+          <circle cx="160" cy="70" r="3" fill="#9bc8c5"/>
+          <line x1="40" y1="60" x2="100" y2="40" stroke="#9bc8c5" stroke-width="1"/>
+          <line x1="100" y1="40" x2="160" y2="70" stroke="#9bc8c5" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="meta"><span class="b">Boss Guide</span><span class="d">·</span><span class="d">8 min</span></div>
+      <h3>Frostmarch Boss Mechanics</h3>
+      <p>Phase breakdown, tells, and squad placement — patch 4.2 verified.</p>
+      <div class="pillrow">
+        <span class="pill p-diff"><span class="pips"><i></i><i></i><i></i><i></i></span>Expert</span>
+      </div>
+    </article>
+  </div>
+</body></html>

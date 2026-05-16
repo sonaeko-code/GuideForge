@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Spacing · Radii</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 24px 28px; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; margin: 0 0 16px; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+  .grid { display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .item { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .box { width: 100%; height: 76px; background: var(--gf-soft-ivory); border: 1px solid color-mix(in oklch, var(--brass-500) 22%, var(--border)); box-shadow: inset 0 2px 0 var(--gf-brass); }
+  .name { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--fg-1); }
+  .val { font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-3); }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Corner Radii</div><div class="e">Soft · structured</div></div>
+  <div class="grid">
+    <div class="item"><div class="box" style="border-radius:6px"></div><div class="name">sm</div><div class="val">6px · inputs</div></div>
+    <div class="item"><div class="box" style="border-radius:8px"></div><div class="name">md</div><div class="val">8px · buttons</div></div>
+    <div class="item"><div class="box" style="border-radius:10px"></div><div class="name">lg</div><div class="val">10px · cards</div></div>
+    <div class="item"><div class="box" style="border-radius:16px"></div><div class="name">xl</div><div class="val">16px · hero</div></div>
+    <div class="item"><div class="box" style="border-radius:999px"></div><div class="name">pill</div><div class="val">badges</div></div>
+  </div>
+</body></html>

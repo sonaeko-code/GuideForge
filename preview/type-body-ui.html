@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Type · Body & UI</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 24px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .col h4 { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); margin: 0 0 8px; }
+  .lede { font-size: 16px; line-height: 1.55; color: var(--fg-2); margin: 0 0 10px; }
+  .body { font-size: 14px; line-height: 1.55; color: var(--fg-2); margin: 0 0 10px; }
+  .small { font-size: 12.5px; line-height: 1.5; color: var(--fg-3); margin: 0 0 8px; }
+  .mono { font-family: var(--font-mono); font-size: 12px; color: var(--fg-2); }
+  .eye { font-family: var(--font-sans); font-weight: 600; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+  .over { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-3); }
+</style></head>
+<body class="card">
+  <div class="col">
+    <h4>Body Sans</h4>
+    <p class="lede">Lede — readable, refined, never breezy.</p>
+    <p class="body">Body — the working tone of GuideForge. Calm, precise, and useful in a long-form guide.</p>
+    <p class="small">Small — captions, meta, footnote-level detail.</p>
+    <div class="mono">--font-sans: Inter, Geist, system-ui</div>
+  </div>
+  <div class="col">
+    <h4>Labels &amp; Mono</h4>
+    <div class="eye" style="margin-bottom:8px;">Trust &amp; status</div>
+    <div class="over" style="margin-bottom:10px;">Issue No. 04 — May 15, 2026</div>
+    <div class="mono" style="margin-bottom:8px;">Patch 4.2 · v1.3.0</div>
+    <div class="mono" style="background: color-mix(in oklch, var(--brass-100) 60%, var(--card)); padding: 6px 8px; border-radius: 6px; display: inline-block;">const network = "QuestLine"</div>
+  </div>
+</body></html>

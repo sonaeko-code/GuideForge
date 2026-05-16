@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Colors · Neutrals</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .sw { border-radius: 10px; overflow: hidden; border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border)); }
+  .chip { height: 90px; }
+  .meta { padding: 8px 10px 10px; background: var(--gf-soft-ivory); border-top: 1px solid color-mix(in oklch, var(--brass-500) 14%, var(--border)); }
+  .n { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-1); }
+  .h { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); margin-top: 2px; }
+  .head { margin: 0 0 14px; display:flex; align-items:baseline; justify-content:space-between; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; color: var(--fg-1); }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Neutrals</div><div class="e">Paper · Ink</div></div>
+  <div class="grid">
+    <div class="sw">
+      <div class="chip" style="background:#F6F1E8"></div>
+      <div class="meta"><div class="n">Parchment</div><div class="h">#F6F1E8 · page bg</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#FBF8F3"></div>
+      <div class="meta"><div class="n">Soft Ivory</div><div class="h">#FBF8F3 · cards</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#6B6255"></div>
+      <div class="meta"><div class="n">Muted Slate</div><div class="h">#6B6255 · 2° text</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#2B2521"></div>
+      <div class="meta"><div class="n">Charcoal</div><div class="h">#2B2521 · dark nav</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#1F1A17"></div>
+      <div class="meta"><div class="n">Graphite</div><div class="h">#1F1A17 · text</div></div>
+    </div>
+  </div>
+</body></html>

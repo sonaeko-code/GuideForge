@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Brand · Marks</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 24px 28px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+  .mark {
+    border-radius: 12px;
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    background: var(--gf-soft-ivory);
+    padding: 16px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .mark.dark {
+    background: var(--gf-charcoal-brown);
+    border-color: oklch(0.32 0.04 50);
+    color: var(--fg-on-dark);
+  }
+  .mark .well {
+    height: 96px; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .mark img { max-height: 92px; max-width: 100%; object-fit: contain; }
+  .mark .label {
+    font-family: var(--font-mono); font-size: 9.5px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  .mark.dark .label { color: oklch(0.7 0.018 75); }
+</style></head>
+<body class="card">
+  <div class="grid">
+    <div class="mark">
+      <div class="well"><img src="../assets/guideforge-icon-mark.png" alt="Icon mark"></div>
+      <div class="label">Icon Mark</div>
+    </div>
+    <div class="mark">
+      <div class="well"><img src="../assets/guideforge-app-icon.png" alt="App icon"></div>
+      <div class="label">App Icon</div>
+    </div>
+    <div class="mark">
+      <div class="well"><img src="../assets/guideforge-favicon.png" alt="Favicon"></div>
+      <div class="label">Favicon · 32px</div>
+    </div>
+    <div class="mark dark">
+      <div class="well"><img src="../assets/forged-badge-icon.png" alt="Forged verified mark"></div>
+      <div class="label">Forged · Verified</div>
+    </div>
+  </div>
+</body></html>

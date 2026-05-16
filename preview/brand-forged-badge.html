@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Brand · Forged Badge</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 0; }
+  .frame {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 28px;
+    align-items: center;
+    padding: 24px 28px;
+    background: var(--gf-parchment);
+    min-height: 320px;
+  }
+  .frame img { width: 180px; display: block; margin: 0 auto; }
+  h3 { font-family: var(--font-serif); font-weight: 600; font-size: 26px; letter-spacing: -0.01em; margin: 0; color: var(--fg-1); }
+  p  { font-size: 13px; line-height: 1.6; color: var(--fg-3); margin: 6px 0 0; max-width: 36ch; }
+  .pillrow { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .forged-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--gf-charcoal-brown);
+    color: #E8C781;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--gf-brass-deep);
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--brass-300) 65%, transparent);
+  }
+  .forge-verified {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px;
+    background: color-mix(in oklch, var(--brass-100) 70%, var(--card));
+    color: var(--brass-700);
+    font-size: 11px; font-weight: 600;
+    border: 1px solid var(--brass-500);
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .75; }
+</style></head>
+<body class="card">
+  <div class="frame">
+    <img src="../assets/forged-badge-main.png" alt="Forged Verified Status badge">
+    <div>
+      <div class="eyebrow">Trust mark</div>
+      <h3 style="margin-top:6px;">Forged Verified Status</h3>
+      <p>Reserved for guides that pass every editorial check — peer-reviewed, governance-compliant, and current.</p>
+      <div class="pillrow">
+        <span class="forged-pill"><span class="dot"></span>Forged</span>
+        <span class="forge-verified"><span class="dot"></span>Forge-verified</span>
+      </div>
+    </div>
+  </div>
+</body></html>

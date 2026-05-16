@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Components · Section Card</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 24px 28px; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .sc {
+    border-radius: 12px;
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    background: var(--gf-soft-ivory);
+    background-image: linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%, var(--card) 100%);
+  }
+  .sc header {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 16px;
+    border-bottom: 1px solid color-mix(in oklch, var(--brass-500) 14%, var(--border));
+  }
+  .icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: color-mix(in oklch, var(--gf-copper) 12%, var(--card));
+    color: var(--gf-copper);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icon svg { width: 18px; height: 18px; }
+  h3 { font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--fg-1); margin: 0 0 2px; }
+  p { font-size: 13px; line-height: 1.5; color: var(--fg-3); margin: 0; }
+  .body { padding: 14px 16px; font-size: 13px; color: var(--fg-2); line-height: 1.5; }
+  ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  ul li { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--fg-2); }
+  ul li .v { font-family: var(--font-mono); color: var(--fg-3); }
+</style></head>
+<body class="card">
+  <div class="grid">
+    <section class="sc">
+      <header>
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+        </div>
+        <div>
+          <h3>Hubs</h3>
+          <p>Games, products, departments — the layer below a network.</p>
+        </div>
+      </header>
+      <div class="body">
+        <ul>
+          <li>Emberfall <span class="v">12 guides</span></li>
+          <li>Hollowspire <span class="v">8 guides</span></li>
+          <li>Starfall Outriders <span class="v">5 guides</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="sc">
+      <header>
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3l7 7-11 11H3v-7z"/><path d="M14 3l7 7"/>
+          </svg>
+        </div>
+        <div>
+          <h3>Forge Rules</h3>
+          <p>The required sections and checks every guide passes.</p>
+        </div>
+      </header>
+      <div class="body">
+        <ul>
+          <li>Summary required <span class="v">✓</span></li>
+          <li>Prerequisites listed <span class="v">✓</span></li>
+          <li>Patch version tagged <span class="v">✓</span></li>
+          <li>Reviewer assigned <span class="v">—</span></li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</body></html>

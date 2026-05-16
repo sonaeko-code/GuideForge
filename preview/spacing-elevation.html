@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Spacing · Elevation</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 28px 30px 36px; background: var(--gf-parchment); }
+  .head { display:flex; justify-content:space-between; align-items:baseline; margin: 0 0 22px; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+  .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .e { background: var(--gf-soft-ivory); border: 1px solid color-mix(in oklch, var(--brass-500) 14%, var(--border)); border-radius: 10px; height: 90px; display:flex; align-items:center; justify-content:center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-3); }
+  .e1 { box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .e2 { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .e3 { box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .e4 { box-shadow:
+        inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+        0 1px 2px rgba(0,0,0,.04),
+        0 8px 20px -10px color-mix(in oklch, var(--brass-700) 22%, transparent); }
+  .lbl { display:block; margin-top:8px; text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--fg-3); text-transform: uppercase; }
+</style></head>
+<body class="card-parchment">
+  <div class="head"><div class="t">Elevation</div><div class="e">Card &amp; forge shadows</div></div>
+  <div class="grid">
+    <div><div class="e e1">sm</div><span class="lbl">1px subtle</span></div>
+    <div><div class="e e2">card</div><span class="lbl">default lift</span></div>
+    <div><div class="e e3">lg</div><span class="lbl">menus · dialog</span></div>
+    <div><div class="e e4">forge</div><span class="lbl">premium · brass edge</span></div>
+  </div>
+</body></html>

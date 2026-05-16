@@ -1,0 +1,473 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Brand · Primary Logo Lockup</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 26px 26px; }
+
+  .head { display:flex; justify-content:space-between; align-items:baseline; margin:0 0 16px; }
+  .head .t { font-family:var(--font-serif); font-weight:600; font-size:18px; }
+  .head .e { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--gf-copper); }
+
+  .sl {
+    font-family:var(--font-mono); font-size:9.5px; font-weight:600;
+    letter-spacing:.15em; text-transform:uppercase; color:var(--fg-3);
+    margin:18px 0 10px; display:flex; align-items:center; gap:8px;
+  }
+  .sl::after { content:""; flex:1; height:1px; background:color-mix(in oklch, var(--brass-500) 22%, transparent); }
+
+  /* ── Asset grid ── */
+  .ag { display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; }
+  .at {
+    background:var(--gf-soft-ivory);
+    border:1px solid color-mix(in oklch, var(--brass-500) 15%, var(--border));
+    border-radius:8px; overflow:hidden;
+  }
+  .at-p {
+    background:var(--gf-parchment); padding:10px;
+    display:flex; align-items:center; justify-content:center; min-height:74px;
+  }
+  .at-p.dk { background:#1c1511; }
+  .at-p img { max-width:100%; max-height:65px; object-fit:contain; }
+  .at-i { padding:6px 9px; border-top:1px solid color-mix(in oklch, var(--brass-500) 12%, var(--border)); }
+  .at-n { font-family:var(--font-mono); font-size:9px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--fg-2); }
+  .at-d { font-family:var(--font-mono); font-size:8.5px; color:var(--fg-3); margin-top:1px; }
+  .tag { display:inline-flex; align-items:center; margin-top:4px; padding:1px 6px; border-radius:999px; font-size:8.5px; border:1px solid; }
+  .tok { background:#DDF0EE; color:#1F5854; border-color:#9CCFCB; }
+  .trf { background:color-mix(in oklch, var(--brass-100) 80%, var(--background)); color:#6B4A1B; border-color:color-mix(in oklch, var(--brass-500) 28%, transparent); }
+  .tnd { background:#F4DCD8; color:#8A2A1C; border-color:#D9A097; }
+
+  /* ── SVG showcase ── */
+  .svgrow { display:flex; gap:14px; align-items:flex-start; }
+  .szs { display:flex; gap:8px; align-items:flex-end; flex-shrink:0; }
+  .szi { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .szl { font-family:var(--font-mono); font-size:8.5px; color:var(--fg-3); letter-spacing:.06em; }
+  .bgp { background:var(--gf-parchment); border-radius:8px; padding:7px; display:flex; align-items:center; justify-content:center; border:1px solid color-mix(in oklch, var(--brass-500) 12%, var(--border)); }
+  .bgd { background:var(--gf-charcoal-brown); border-radius:8px; padding:6px; display:flex; align-items:center; justify-content:center; }
+  .bgb {
+    background-image:
+      radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--brass-300) 70%, transparent), transparent 55%),
+      linear-gradient(135deg, var(--brass-700) 0%, var(--brass-500) 50%, var(--brass-700) 100%);
+    border:1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+    box-shadow:inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent);
+    border-radius:8px; padding:7px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* ── Code block ── */
+  .cblk {
+    flex:1; background:oklch(.19 .014 55);
+    border:1px solid oklch(.32 .04 50); border-radius:8px;
+    padding:10px 12px; font-family:var(--font-mono); font-size:8.8px;
+    color:#E8C781; line-height:1.75; overflow:hidden;
+  }
+  .cm { color:oklch(.62 .018 70); }
+  .tg { color:#9BC8C5; }
+  .at { color:#E8A769; }
+  .vl { color:#C8B898; }
+
+  /* ── Usage demos ── */
+  .urow { display:flex; gap:10px; }
+  .ut { flex:1; border-radius:10px; overflow:hidden; border:1px solid color-mix(in oklch, var(--brass-500) 16%, var(--border)); }
+  .utl {
+    font-family:var(--font-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--fg-3); padding:7px 10px 5px;
+    background:color-mix(in oklch, var(--brass-50) 55%, var(--card));
+    border-bottom:1px solid color-mix(in oklch, var(--brass-500) 10%, var(--border));
+  }
+  .utb { background:var(--gf-soft-ivory); padding:10px; }
+
+  /* forge seal CSS treatment */
+  .seal {
+    background-image:
+      radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--brass-300) 70%, transparent), transparent 55%),
+      linear-gradient(135deg, var(--brass-700) 0%, var(--brass-500) 50%, var(--brass-700) 100%);
+    border:1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent),
+      inset 0 -1px 0 0 color-mix(in oklch, var(--brass-900) 50%, transparent),
+      0 1px 2px rgba(0,0,0,.18);
+    color:oklch(.18 .02 50);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .mini-header {
+    display:flex; align-items:center; justify-content:space-between;
+    background:color-mix(in oklch, var(--gf-soft-ivory) 85%, transparent);
+    border-bottom:1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    padding:0 12px; height:40px; gap:12px;
+  }
+  .mini-brand { display:flex; align-items:center; gap:8px; }
+  .mini-word { font-size:14px; font-weight:700; letter-spacing:-.01em; color:var(--gf-graphite); }
+  .mini-word em { font-style:normal; color:var(--gf-copper); }
+  .mini-nav { display:flex; gap:14px; }
+  .mini-nav a { font-size:11px; color:var(--fg-3); }
+  .mini-nav a.act { color:var(--fg-1); font-weight:600; }
+  .mini-cta { background:var(--gf-copper); color:#fff; border:0; border-radius:6px; font-size:11px; padding:4px 10px; font-family:var(--font-sans); }
+  .mini-rail { height:1px; background:linear-gradient(90deg, transparent, color-mix(in oklch, var(--brass-500) 70%, transparent), transparent); }
+
+  /* ── Delivery checklist ── */
+  .checks { display:flex; flex-direction:column; gap:5px; }
+  .ci { display:flex; gap:8px; align-items:flex-start; font-size:12px; color:var(--fg-2); line-height:1.5; }
+  .ico { flex-shrink:0; font-size:10px; margin-top:2px; }
+  .ico.ok { color:var(--gf-teal); }
+  .ico.wn { color:var(--gf-amber); }
+  .ico.nd { color:var(--gf-rust); }
+
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:0; }
+</style>
+</head>
+<body class="card">
+
+<div class="head">
+  <div class="t">Primary Logo Lockup</div>
+  <div class="e">Asset extraction guide</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     1. RASTER ASSET INVENTORY
+     ═══════════════════════════════════════════════ -->
+<div class="sl">Raster assets — extracted from brand sheet PNG</div>
+<div class="ag">
+
+  <div class="at">
+    <div class="at-p"><img src="../assets/guideforge-logo-lockup-clean.png" alt="Logo lockup"></div>
+    <div class="at-i">
+      <div class="at-n">Logo lockup</div>
+      <div class="at-d">726 × 248 px · PNG · guideforge-logo-lockup-clean.png</div>
+      <span class="tag trf">Raster ref · label stripped</span>
+    </div>
+  </div>
+
+  <div class="at">
+    <div class="at-p"><img src="../assets/guideforge-icon-mark.png" alt="Icon mark"></div>
+    <div class="at-i">
+      <div class="at-n">Icon mark</div>
+      <div class="at-d">235 × 200 px · PNG</div>
+      <span class="tag tok">Clean crop</span>
+    </div>
+  </div>
+
+  <div class="at">
+    <div class="at-p dk"><img src="../assets/guideforge-app-icon.png" alt="App icon"></div>
+    <div class="at-i">
+      <div class="at-n">App icon</div>
+      <div class="at-d">215 × 215 px · PNG</div>
+      <span class="tag tok">Clean crop</span>
+    </div>
+  </div>
+
+  <div class="at">
+    <div class="at-p"><img src="../assets/guideforge-wordmark-clean.png" alt="Wordmark"></div>
+    <div class="at-i">
+      <div class="at-n">Wordmark + tagline</div>
+      <div class="at-d">390 × 248 px · PNG · guideforge-wordmark-clean.png</div>
+      <span class="tag trf">Raster ref · label stripped</span>
+    </div>
+  </div>
+
+  <div class="at">
+    <div class="at-p"><img src="../assets/guideforge-favicon-clean.png" alt="Favicon mark"></div>
+    <div class="at-i">
+      <div class="at-n">Favicon mark</div>
+      <div class="at-d">175 × 166 px · PNG · guideforge-favicon-clean.png</div>
+      <span class="tag trf">Raster ref · label stripped</span>
+    </div>
+  </div>
+
+  <div class="at">
+    <div class="at-p dk"><img src="../assets/forged-badge-main.png" alt="Forged badge"></div>
+    <div class="at-i">
+      <div class="at-n">Forged badge</div>
+      <div class="at-d">forged-badge-main.png · reference only</div>
+      <span class="tag tnd">Needs SVG delivery</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     2. SVG ICON MARK — VECTOR RECREATION
+     ═══════════════════════════════════════════════ -->
+<div class="sl">SVG icon mark — faithful vector recreation</div>
+<div class="svgrow">
+
+  <!-- Size demos -->
+  <div class="szs">
+
+    <div class="szi">
+      <div class="bgd" style="width:30px;height:30px;">
+        <svg width="16" height="16" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <defs><linearGradient id="g1a" x1="0.2" y1="0.1" x2="0.8" y2="0.9"><stop offset="0%" stop-color="#D9882F"/><stop offset="100%" stop-color="#8C4F2A"/></linearGradient></defs>
+          <circle cx="98" cy="98" r="63" stroke="#C7A15A" stroke-width="1.2" opacity="0.6"/>
+          <g stroke="url(#g1a)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/>
+            <line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/>
+            <line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/>
+          </g>
+          <circle cx="58"  cy="70"  r="7"   fill="#E8C781" stroke="url(#g1a)" stroke-width="1.5"/>
+          <circle cx="88"  cy="54"  r="7"   fill="#E8C781" stroke="url(#g1a)" stroke-width="1.5"/>
+          <circle cx="108" cy="76"  r="8.5" fill="#E8C781" stroke="#8C4F2A"   stroke-width="2"/>
+          <circle cx="76"  cy="93"  r="7"   fill="#E8C781" stroke="url(#g1a)" stroke-width="1.5"/>
+          <circle cx="127" cy="119" r="7"   fill="#E8C781" stroke="url(#g1a)" stroke-width="1.5"/>
+          <circle cx="145" cy="143" r="6"   fill="#E8C781" stroke="url(#g1a)" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <div class="szl">16 px · dark</div>
+    </div>
+
+    <div class="szi">
+      <div class="bgd" style="width:46px;height:46px;">
+        <svg width="32" height="32" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <defs><linearGradient id="g2a" x1="0.2" y1="0.1" x2="0.8" y2="0.9"><stop offset="0%" stop-color="#D9882F"/><stop offset="100%" stop-color="#8C4F2A"/></linearGradient></defs>
+          <circle cx="98" cy="98" r="63" stroke="#C7A15A" stroke-width="1.2" opacity="0.6"/>
+          <g stroke="url(#g2a)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/>
+            <line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/>
+            <line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/>
+          </g>
+          <circle cx="58"  cy="70"  r="6.5" fill="#E8C781" stroke="url(#g2a)" stroke-width="1.5"/>
+          <circle cx="88"  cy="54"  r="6.5" fill="#E8C781" stroke="url(#g2a)" stroke-width="1.5"/>
+          <circle cx="108" cy="76"  r="8"   fill="#E8C781" stroke="#8C4F2A"   stroke-width="2"/>
+          <circle cx="76"  cy="93"  r="6.5" fill="#E8C781" stroke="url(#g2a)" stroke-width="1.5"/>
+          <circle cx="127" cy="119" r="6"   fill="#E8C781" stroke="url(#g2a)" stroke-width="1.5"/>
+          <circle cx="145" cy="143" r="5.5" fill="#E8C781" stroke="url(#g2a)" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <div class="szl">32 px · dark</div>
+    </div>
+
+    <div class="szi">
+      <div class="bgb" style="width:58px;height:58px; border-radius:10px;">
+        <svg width="42" height="42" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <defs><linearGradient id="g3a" x1="0.2" y1="0.1" x2="0.8" y2="0.9"><stop offset="0%" stop-color="#D9882F"/><stop offset="100%" stop-color="#8C4F2A"/></linearGradient></defs>
+          <circle cx="98" cy="98" r="63" stroke="oklch(0.18 0.02 50)" stroke-width="1.2" opacity="0.7"/>
+          <g stroke="url(#g3a)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/>
+            <line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/>
+            <line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/>
+          </g>
+          <circle cx="58"  cy="70"  r="6.5" fill="oklch(0.18 0.02 50)" stroke="url(#g3a)" stroke-width="1.5"/>
+          <circle cx="88"  cy="54"  r="6.5" fill="oklch(0.18 0.02 50)" stroke="url(#g3a)" stroke-width="1.5"/>
+          <circle cx="108" cy="76"  r="8"   fill="oklch(0.18 0.02 50)" stroke="#8C4F2A"   stroke-width="2"/>
+          <circle cx="76"  cy="93"  r="6.5" fill="oklch(0.18 0.02 50)" stroke="url(#g3a)" stroke-width="1.5"/>
+          <circle cx="127" cy="119" r="6"   fill="oklch(0.18 0.02 50)" stroke="url(#g3a)" stroke-width="1.5"/>
+          <circle cx="145" cy="143" r="5.5" fill="oklch(0.18 0.02 50)" stroke="url(#g3a)" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <div class="szl">42 px · seal</div>
+    </div>
+
+    <div class="szi">
+      <div class="bgp" style="width:82px;height:82px;">
+        <svg width="66" height="66" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <defs>
+            <linearGradient id="g4a" x1="0.2" y1="0.1" x2="0.8" y2="0.9">
+              <stop offset="0%" stop-color="#D9882F"/><stop offset="100%" stop-color="#8C4F2A"/>
+            </linearGradient>
+          </defs>
+          <circle cx="98" cy="98" r="63" stroke="#C7A15A" stroke-width="1.1" opacity="0.55"/>
+          <g stroke="url(#g4a)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/>
+            <line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/>
+            <line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/>
+          </g>
+          <circle cx="58"  cy="70"  r="6.5" fill="#F6F1E8" stroke="url(#g4a)" stroke-width="1.6"/><circle cx="58"  cy="70"  r="2.5" fill="#B86A3B"/>
+          <circle cx="88"  cy="54"  r="6.5" fill="#F6F1E8" stroke="url(#g4a)" stroke-width="1.6"/><circle cx="88"  cy="54"  r="2.5" fill="#B86A3B"/>
+          <circle cx="108" cy="76"  r="8"   fill="#F6F1E8" stroke="#8C4F2A"   stroke-width="2" /><circle cx="108" cy="76"  r="3.2" fill="#8C4F2A"/>
+          <circle cx="76"  cy="93"  r="6.5" fill="#F6F1E8" stroke="url(#g4a)" stroke-width="1.6"/><circle cx="76"  cy="93"  r="2.5" fill="#B86A3B"/>
+          <circle cx="127" cy="119" r="6"   fill="#F6F1E8" stroke="url(#g4a)" stroke-width="1.5"/><circle cx="127" cy="119" r="2.2" fill="#B86A3B"/>
+          <circle cx="145" cy="143" r="5.5" fill="#F6F1E8" stroke="url(#g4a)" stroke-width="1.4"/><circle cx="145" cy="143" r="2"   fill="#B86A3B"/>
+          <!-- Sparkles -->
+          <path d="M157,44 L158.4,49.6 L164,51 L158.4,52.4 L157,58 L155.6,52.4 L150,51 L155.6,49.6Z" fill="#C7853C" opacity=".9"/>
+          <path d="M30,31 L31,34.5 L34.5,35.5 L31,36.5 L30,40 L29,36.5 L25.5,35.5 L29,34.5Z" fill="#C7853C" opacity=".6"/>
+          <circle cx="170" cy="97" r="2.5" fill="#C7A15A" opacity=".55"/>
+          <path d="M32,150 L33,153 L36,154 L33,155 L32,158 L31,155 L28,154 L31,153Z" fill="#C7A15A" opacity=".5"/>
+          <circle cx="50" cy="143" r="1.5" fill="#C7A15A" opacity=".4"/>
+        </svg>
+      </div>
+      <div class="szl">64 px · light</div>
+    </div>
+
+    <div class="szi">
+      <div class="bgp" style="width:130px;height:130px;">
+        <svg width="114" height="114" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <defs>
+            <linearGradient id="g5a" x1="0.2" y1="0.1" x2="0.8" y2="0.9">
+              <stop offset="0%" stop-color="#D9882F"/><stop offset="100%" stop-color="#8C4F2A"/>
+            </linearGradient>
+          </defs>
+          <circle cx="98" cy="98" r="63" stroke="#C7A15A" stroke-width="1" opacity="0.5"/>
+          <g stroke="url(#g5a)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/>
+            <line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/>
+            <line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/>
+          </g>
+          <circle cx="58"  cy="70"  r="6.5" fill="#F6F1E8" stroke="url(#g5a)" stroke-width="1.5"/><circle cx="58"  cy="70"  r="2.5" fill="#B86A3B"/>
+          <circle cx="88"  cy="54"  r="6.5" fill="#F6F1E8" stroke="url(#g5a)" stroke-width="1.5"/><circle cx="88"  cy="54"  r="2.5" fill="#B86A3B"/>
+          <circle cx="108" cy="76"  r="7.8" fill="#F6F1E8" stroke="#8C4F2A"   stroke-width="1.9"/><circle cx="108" cy="76"  r="3"   fill="#8C4F2A"/>
+          <circle cx="76"  cy="93"  r="6.5" fill="#F6F1E8" stroke="url(#g5a)" stroke-width="1.5"/><circle cx="76"  cy="93"  r="2.5" fill="#B86A3B"/>
+          <circle cx="127" cy="119" r="6"   fill="#F6F1E8" stroke="url(#g5a)" stroke-width="1.4"/><circle cx="127" cy="119" r="2.2" fill="#B86A3B"/>
+          <circle cx="145" cy="143" r="5.5" fill="#F6F1E8" stroke="url(#g5a)" stroke-width="1.3"/><circle cx="145" cy="143" r="2"   fill="#B86A3B"/>
+          <path d="M157,44 L158.4,49.6 L164,51 L158.4,52.4 L157,58 L155.6,52.4 L150,51 L155.6,49.6Z" fill="#C7853C" opacity=".9"/>
+          <path d="M30,31 L31,34.5 L34.5,35.5 L31,36.5 L30,40 L29,36.5 L25.5,35.5 L29,34.5Z" fill="#C7853C" opacity=".6"/>
+          <circle cx="170" cy="97" r="2.5" fill="#C7A15A" opacity=".55"/>
+          <path d="M32,150 L33,153 L36,154 L33,155 L32,158 L31,155 L28,154 L31,153Z" fill="#C7A15A" opacity=".5"/>
+          <circle cx="50" cy="143" r="1.5" fill="#C7A15A" opacity=".4"/>
+        </svg>
+      </div>
+      <div class="szl">112 px · light</div>
+    </div>
+
+  </div><!-- /szs -->
+
+  <!-- Code snippet -->
+  <div class="cblk"><span class="cm">/* Constellation hammer — SVG viewBox="0 0 200 200"
+   Nodes: A(58,70) B(88,54) C(108,76) D(76,93) E(127,119) F(145,143)
+   Head: A-B-C-D-A  Handle: C-E-F  Orbit: cx=98 cy=98 r=63 */</span>
+
+<span class="tg">&lt;svg</span> <span class="at">viewBox</span>=<span class="vl">"0 0 200 200"</span> <span class="at">fill</span>=<span class="vl">"none"</span>
+     <span class="at">xmlns</span>=<span class="vl">"http://www.w3.org/2000/svg"</span><span class="tg">&gt;</span>
+  <span class="cm">&lt;!-- orbit --&gt;</span>
+  <span class="tg">&lt;circle</span> <span class="at">cx</span>=<span class="vl">"98"</span> <span class="at">cy</span>=<span class="vl">"98"</span> <span class="at">r</span>=<span class="vl">"63"</span>
+    <span class="at">stroke</span>=<span class="vl">"#C7A15A"</span> <span class="at">stroke-width</span>=<span class="vl">"1.1"</span> <span class="at">opacity</span>=<span class="vl">"0.55"</span><span class="tg">/&gt;</span>
+  <span class="cm">&lt;!-- lines --&gt;</span>
+  <span class="tg">&lt;g</span> <span class="at">stroke</span>=<span class="vl">"#B86A3B"</span> <span class="at">stroke-width</span>=<span class="vl">"1.9"</span>
+     <span class="at">stroke-linecap</span>=<span class="vl">"round"</span><span class="tg">&gt;</span>
+    <span class="tg">&lt;line</span> <span class="at">x1</span>=<span class="vl">"58"</span> <span class="at">y1</span>=<span class="vl">"70"</span>  <span class="at">x2</span>=<span class="vl">"88"</span>  <span class="at">y2</span>=<span class="vl">"54"</span> <span class="tg">/&gt;</span>
+    <span class="tg">&lt;line</span> <span class="at">x1</span>=<span class="vl">"88"</span> <span class="at">y1</span>=<span class="vl">"54"</span>  <span class="at">x2</span>=<span class="vl">"108"</span> <span class="at">y2</span>=<span class="vl">"76"</span> <span class="tg">/&gt;</span>
+    <span class="tg">&lt;line</span> <span class="at">x1</span>=<span class="vl">"108"</span><span class="at"> y1</span>=<span class="vl">"76"</span>  <span class="at">x2</span>=<span class="vl">"76"</span>  <span class="at">y2</span>=<span class="vl">"93"</span> <span class="tg">/&gt;</span>
+    <span class="tg">&lt;line</span> <span class="at">x1</span>=<span class="vl">"76"</span> <span class="at">y1</span>=<span class="vl">"93"</span>  <span class="at">x2</span>=<span class="vl">"58"</span>  <span class="at">y2</span>=<span class="vl">"70"</span> <span class="tg">/&gt;</span>
+    <span class="tg">&lt;line</span> <span class="at">x1</span>=<span class="vl">"108"</span><span class="at"> y1</span>=<span class="vl">"76"</span>  <span class="at">x2</span>=<span class="vl">"127"</span> <span class="at">y2</span>=<span class="vl">"119"</span><span class="tg">/&gt;</span>
+    <span class="tg">&lt;line</span> <span class="at">x1</span>=<span class="vl">"127"</span><span class="at"> y1</span>=<span class="vl">"119"</span> <span class="at">x2</span>=<span class="vl">"145"</span> <span class="at">y2</span>=<span class="vl">"143"</span><span class="tg">/&gt;</span>
+  <span class="tg">&lt;/g&gt;</span>
+  <span class="cm">&lt;!-- nodes: outer + inner dot --&gt;</span>
+  <span class="cm">&lt;!-- repeat for A(58,70) B(88,54) D(76,93) E(127,119) F(145,143)
+       r=6.5 outer fill=#F6F1E8, r=2.5 inner fill=#B86A3B
+       C(108,76) is the junction node: r=8 outer, r=3 inner, darker stroke --&gt;</span>
+<span class="tg">&lt;/svg&gt;</span></div>
+
+</div><!-- /svgrow -->
+
+<!-- ═══════════════════════════════════════════════
+     3. IN-APP USAGE
+     ═══════════════════════════════════════════════ -->
+<div class="sl">In-app usage — what works today</div>
+<div class="urow">
+
+  <!-- Forge seal (CSS-only, no PNG needed) -->
+  <div class="ut">
+    <div class="utl">Forge seal · CSS-rendered · no PNG required</div>
+    <div class="utb">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <!-- 24px seal -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div class="seal" style="width:24px;height:24px;border-radius:6px;">
+            <svg width="13" height="13" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#3D1F08" stroke-width="2.5" stroke-linecap="round"><line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/><line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/><line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/></g>
+              <circle cx="58" cy="70" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="88" cy="54" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="108" cy="76" r="10" fill="#6B4018" stroke="#3D1F08" stroke-width="2"/>
+              <circle cx="76" cy="93" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="127" cy="119" r="7" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="145" cy="143" r="6" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.4"/>
+            </svg>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--fg-3);">24 px</div>
+        </div>
+        <!-- 32px seal -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div class="seal" style="width:32px;height:32px;border-radius:8px;">
+            <svg width="18" height="18" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#3D1F08" stroke-width="2.2" stroke-linecap="round"><line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/><line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/><line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/></g>
+              <circle cx="58" cy="70" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="88" cy="54" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="108" cy="76" r="10" fill="#6B4018" stroke="#3D1F08" stroke-width="2"/>
+              <circle cx="76" cy="93" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="127" cy="119" r="7" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="145" cy="143" r="6" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.4"/>
+            </svg>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--fg-3);">32 px</div>
+        </div>
+        <!-- 44px seal -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+          <div class="seal" style="width:44px;height:44px;border-radius:10px;">
+            <svg width="26" height="26" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#3D1F08" stroke-width="2" stroke-linecap="round"><line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/><line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/><line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/></g>
+              <circle cx="58" cy="70" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="88" cy="54" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="108" cy="76" r="10" fill="#6B4018" stroke="#3D1F08" stroke-width="2"/>
+              <circle cx="76" cy="93" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="127" cy="119" r="7" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="145" cy="143" r="6" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.4"/>
+            </svg>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--fg-3);">44 px</div>
+        </div>
+        <div style="font-size:11px; color:var(--fg-3); line-height:1.5; max-width:160px;">
+          Pure CSS gradient — no PNG dependency. Node fill darkens to match brass surface.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini site header -->
+  <div class="ut" style="flex:1.4;">
+    <div class="utl">Site header — seal + wordmark in context</div>
+    <div class="utb" style="padding:0; background:var(--gf-parchment);">
+      <div class="mini-rail"></div>
+      <div class="mini-header">
+        <div class="mini-brand">
+          <div class="seal" style="width:28px;height:28px;border-radius:7px;">
+            <svg width="16" height="16" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="#3D1F08" stroke-width="2.5" stroke-linecap="round"><line x1="58" y1="70" x2="88" y2="54"/><line x1="88" y1="54" x2="108" y2="76"/><line x1="108" y1="76" x2="76" y2="93"/><line x1="76" y1="93" x2="58" y2="70"/><line x1="108" y1="76" x2="127" y2="119"/><line x1="127" y1="119" x2="145" y2="143"/></g>
+              <circle cx="58" cy="70" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="88" cy="54" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="108" cy="76" r="10" fill="#6B4018" stroke="#3D1F08" stroke-width="2"/>
+              <circle cx="76" cy="93" r="8" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="127" cy="119" r="7" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.5"/>
+              <circle cx="145" cy="143" r="6" fill="#8C5A28" stroke="#3D1F08" stroke-width="1.4"/>
+            </svg>
+          </div>
+          <span class="mini-word">Guide<em>Forge</em></span>
+        </div>
+        <div class="mini-nav">
+          <a class="act">Networks</a>
+          <a>Guides</a>
+          <a>Trust</a>
+        </div>
+        <button class="mini-cta">Start building</button>
+      </div>
+      <div style="padding:10px 12px; font-size:11.5px; color:var(--fg-3); line-height:1.5;">
+        Seal = CSS · Wordmark = HTML text · No logo PNG required for header.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     4. DELIVERY CHECKLIST
+     ═══════════════════════════════════════════════ -->
+<div class="sl">Asset delivery status · the better way forward</div>
+<div class="two-col">
+  <div class="checks">
+    <div class="ci"><span class="ico ok">✓</span><span><strong>SVG constellation mark</strong> — recreated above. Use in forge seal, favicon, inline UI. Copy the code from the block above.</span></div>
+    <div class="ci"><span class="ico ok">✓</span><span><strong>App icon PNG</strong> (215×215) — clean, use as-is for App Store / macOS tile.</span></div>
+    <div class="ci"><span class="ico ok">✓</span><span><strong>CSS forge seal</strong> — coined brass gradient works independently at any size. No PNG needed for the header.</span></div>
+    <div class="ci"><span class="ico ok">✓</span><span><strong>Cleaned raster crops</strong> — brand-sheet labels stripped. Safe as reference; use at 1× or 0.5× only.</span></div>
+    <div class="ci"><span class="ico wn">◆</span><span><strong>Wordmark raster</strong> — usable at ≥300px display width. Below that, antialiasing degrades. Scale carefully.</span></div>
+    <div class="ci"><span class="ico wn">◆</span><span><strong>Favicon mark raster</strong> — 175×166 crops to ~32×32 ok if downsampled cleanly. Use SVG mark instead when possible.</span></div>
+  </div>
+  <div class="checks">
+    <div class="ci"><span class="ico nd">✕</span><span><strong>Wordmark SVG / font paths needed.</strong> The serif typeface (appears to be a high-contrast display serif — confirm exact face) must be exported as paths or the font licensed. This blocks crisp rendering at all sizes.</span></div>
+    <div class="ci"><span class="ico nd">✕</span><span><strong>Full lockup SVG needed.</strong> The constellation mark + wordmark as a single SVG for OG images, PDF letterhead, print-ready exports.</span></div>
+    <div class="ci"><span class="ico nd">✕</span><span><strong>Forged badge SVG needed.</strong> The hex shield with constellation interior cannot be faithfully recreated from raster. Source file export required.</span></div>
+    <div class="ci"><span class="ico nd">✕</span><span><strong>True transparent crops.</strong> Current PNGs have parchment baked into the background. Proper alpha-channel versions need source-file export (Figma / Illustrator / AI tool).</span></div>
+  </div>
+</div>
+
+</body>
+</html>

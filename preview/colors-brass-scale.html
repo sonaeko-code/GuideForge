@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Colors · Brass Scale</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 24px; }
+  .head { margin: 0 0 14px; display:flex; align-items:baseline; justify-content:space-between; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; color: var(--fg-1); }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+  .row { display:grid; grid-template-columns: repeat(6,1fr); gap:0; border-radius: 12px; overflow:hidden; border: 1px solid color-mix(in oklch, var(--brass-500) 20%, var(--border)); }
+  .stop { height: 110px; display:flex; flex-direction: column; justify-content:flex-end; padding: 10px; }
+  .stop .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .stop .v { font-family: var(--font-mono); font-size: 9.5px; margin-top:2px; opacity:.75; }
+  .desc { margin-top: 12px; font-size: 12.5px; color: var(--fg-3); line-height: 1.55; }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Brass Scale</div><div class="e">Forged surfaces · borders</div></div>
+  <div class="row">
+    <div class="stop" style="background:oklch(0.97 0.008 90); color:var(--fg-2)"><span class="lbl">50</span><span class="v">oklch .97</span></div>
+    <div class="stop" style="background:oklch(0.945 0.015 85); color:var(--fg-2)"><span class="lbl">100</span><span class="v">oklch .945</span></div>
+    <div class="stop" style="background:oklch(0.78 0.08 55); color:var(--fg-1)"><span class="lbl">300</span><span class="v">oklch .78</span></div>
+    <div class="stop" style="background:oklch(0.615 0.125 48); color:#fff"><span class="lbl">500</span><span class="v">oklch .615</span></div>
+    <div class="stop" style="background:oklch(0.45 0.08 45); color:#fff"><span class="lbl">700</span><span class="v">oklch .45</span></div>
+    <div class="stop" style="background:oklch(0.25 0.05 40); color:#E8C781"><span class="lbl">900</span><span class="v">oklch .25</span></div>
+  </div>
+  <p class="desc">A single warm copper-brass family from soft parchment-tint to forged graphite. Use 100/300 for warm fills, 500 for primary copper accents, 700 for hover/engraving, 900 as the dark-mode brass plate.</p>
+</body></html>

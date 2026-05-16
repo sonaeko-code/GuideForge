@@ -1,0 +1,71 @@
+/* Card-frame styles shared across all preview cards.
+   Each card is ~700px wide, height varies.
+   Strip chrome — the asset name renders OUTSIDE the card. */
+@import url("../colors_and_type.css");
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  color: var(--fg-1);
+  background: var(--gf-parchment);
+}
+body.card {
+  padding: 24px;
+  background: var(--gf-soft-ivory);
+}
+body.card-parchment { background: var(--gf-parchment); }
+body.card-graphite {
+  background: var(--gf-charcoal-brown);
+  color: var(--fg-on-dark);
+}
+
+* { box-sizing: border-box; }
+
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.muted { color: var(--fg-3); }
+.mono  { font-family: var(--font-mono); }
+.serif { font-family: var(--font-serif); }
+
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gf-copper);
+}
+.overline {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.swatch {
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+  overflow: hidden;
+}
+.swatch .chip { height: 64px; }
+.swatch .meta {
+  padding: 8px 10px;
+  background: var(--gf-soft-ivory);
+  border-top: 1px solid color-mix(in oklch, var(--brass-500) 14%, var(--border));
+}
+.swatch .name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+.swatch .hex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-3);
+  margin-top: 2px;
+}

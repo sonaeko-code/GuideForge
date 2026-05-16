@@ -635,6 +635,14 @@
       transparent);
   }
 
+  /* Explicit gf-copper utility fallbacks — belt-and-suspenders for Tailwind v4
+     opacity-modified variants; @layer utilities guarantees these are in the bundle */
+  .text-gf-copper           { color: var(--gf-copper); }
+  .text-gf-copper\/80       { color: color-mix(in oklch, var(--gf-copper) 80%, transparent); }
+  .bg-gf-copper\/10         { background-color: color-mix(in oklch, var(--gf-copper) 10%, transparent); }
+  .border-gf-copper\/40     { border-color: color-mix(in oklch, var(--gf-copper) 40%, transparent); }
+  .ring-gf-copper\/30       { --tw-ring-color: color-mix(in oklch, var(--gf-copper) 30%, transparent); }
+
   /* Forged seal logo wrapper — replaces flat gradient with a coined feel */
   .forge-seal {
     background-image:

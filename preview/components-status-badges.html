@@ -1,0 +1,70 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Components · Status Badges</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 26px; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; margin: 0 0 14px; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+
+  .group { margin-bottom: 12px; }
+  .grouplbl { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 8px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-family: var(--font-sans); font-size: 11.5px; font-weight: 500;
+    border: 1px solid;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+
+  .b-draft { background: color-mix(in oklch, var(--brass-100) 85%, var(--background)); color: #6B4A1B; border-color: color-mix(in oklch, var(--brass-500) 32%, transparent); }
+  .b-review { background:#E6ECF2; color:#274059; border-color:#B6C5D4; }
+  .b-ready { background:#DDF0EE; color:#1F5854; border-color:#9CCFCB; }
+  .b-pub { background:#DBEEDD; color:#1F6A37; border-color:#A4D2AC; }
+  .b-need { background:#F4DCD8; color:#8A2A1C; border-color:#D9A097; }
+  .b-deprecated { background:var(--gf-soft-ivory); color:var(--fg-3); border-color: var(--border); text-decoration: line-through; }
+
+  .b-unv { background:var(--gf-soft-ivory); color:var(--fg-3); border-color: var(--border); }
+  .b-rev { background:color-mix(in oklch, var(--brass-100) 50%, var(--card)); color: var(--fg-2); border-color: var(--border); }
+  .b-expert { background:color-mix(in oklch, var(--brass-100) 85%, var(--card)); color: var(--brass-700); border-color: color-mix(in oklch, var(--brass-500) 38%, transparent); font-weight: 600; }
+  .b-fv { background:color-mix(in oklch, var(--brass-100) 70%, var(--card)); color: var(--brass-700); border-color: var(--brass-500); font-weight: 600; }
+  .b-forged {
+    background: var(--gf-charcoal-brown);
+    color: #E8C781;
+    border-color: var(--gf-brass-deep);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 10.5px;
+    padding: 4px 10px;
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--brass-300) 65%, transparent);
+  }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Status &amp; Verification</div><div class="e">Two parallel scales</div></div>
+
+  <div class="group">
+    <div class="grouplbl">Lifecycle status</div>
+    <div class="row">
+      <span class="badge b-draft"><span class="dot"></span>Draft</span>
+      <span class="badge b-review"><span class="dot"></span>In Review</span>
+      <span class="badge b-ready"><span class="dot"></span>Ready</span>
+      <span class="badge b-pub"><span class="dot"></span>Published</span>
+      <span class="badge b-need"><span class="dot"></span>Needs update</span>
+      <span class="badge b-deprecated"><span class="dot"></span>Deprecated</span>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="grouplbl">Verification tier</div>
+    <div class="row">
+      <span class="badge b-unv"><span class="dot"></span>Unverified</span>
+      <span class="badge b-rev"><span class="dot"></span>Reviewed</span>
+      <span class="badge b-expert"><span class="dot"></span>Expert-reviewed</span>
+      <span class="badge b-fv"><span class="dot"></span>Forge-verified</span>
+      <span class="badge b-forged">✦ Forged</span>
+    </div>
+  </div>
+</body></html>

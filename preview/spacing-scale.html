@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Spacing · 4pt Scale</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 24px 28px; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; margin: 0 0 16px; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+  .row { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .label { width: 70px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--fg-2); }
+  .bar { background: var(--gf-copper); height: 14px; border-radius: 4px; }
+  .val { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Spacing Scale</div><div class="e">4pt rhythm</div></div>
+  <div class="row"><div class="label">space-1</div><div class="bar" style="width:4px"></div><div class="val">4px</div></div>
+  <div class="row"><div class="label">space-2</div><div class="bar" style="width:8px"></div><div class="val">8px</div></div>
+  <div class="row"><div class="label">space-3</div><div class="bar" style="width:12px"></div><div class="val">12px</div></div>
+  <div class="row"><div class="label">space-4</div><div class="bar" style="width:16px"></div><div class="val">16px</div></div>
+  <div class="row"><div class="label">space-6</div><div class="bar" style="width:24px"></div><div class="val">24px · default gutter</div></div>
+  <div class="row"><div class="label">space-8</div><div class="bar" style="width:32px"></div><div class="val">32px</div></div>
+  <div class="row"><div class="label">space-12</div><div class="bar" style="width:48px"></div><div class="val">48px</div></div>
+  <div class="row"><div class="label">space-16</div><div class="bar" style="width:64px"></div><div class="val">64px · section</div></div>
+  <div class="row"><div class="label">space-20</div><div class="bar" style="width:80px"></div><div class="val">80px · hero</div></div>
+</body></html>

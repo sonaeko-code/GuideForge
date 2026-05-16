@@ -1,0 +1,290 @@
+/* ============================================================
+   GuideForge — Colors & Typography
+   Refined, expert, parchment + copper + brass aesthetic.
+   Lift the OKLCH values directly from the production codebase
+   (app/globals.css) and surface them as semantic tokens here.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..800;1,9..144,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  /* ---- BRAND HEX (from brand sheet, easy reference) ---- */
+  --gf-parchment:        #F6F1E8; /* page background */
+  --gf-soft-ivory:       #FBF8F3; /* cards / soft surfaces */
+  --gf-graphite:         #1F1A17; /* primary text */
+  --gf-charcoal-brown:   #2B2521; /* dark nav, premium surface */
+  --gf-muted-slate:      #6B6255; /* secondary text (warm slate) */
+
+  --gf-copper:           #B86A3B; /* primary accent */
+  --gf-copper-deep:      #8C4F2A; /* hover / pressed copper */
+  --gf-ember:            #D9782F; /* highlight, hover glow */
+  --gf-brass:            #C7A15A; /* warm-gold badges, dividers */
+  --gf-brass-deep:       #8A6F3A; /* engraved brass on graphite */
+
+  --gf-teal:             #2F8A87; /* verified / success */
+  --gf-steel-blue:       #35546B; /* info / review */
+  --gf-amber:            #B47A2A; /* draft / parchment warm */
+  --gf-rust:             #B0432A; /* destructive */
+
+  /* ---- OKLCH FOUNDATIONS (production tokens) ---- */
+  --background:        oklch(0.972 0.014 85);
+  --foreground:        oklch(0.235 0.012 55);
+  --card:              oklch(0.99  0.008 88);
+  --card-foreground:   oklch(0.235 0.012 55);
+  --popover:           oklch(0.99  0.008 88);
+  --primary:           oklch(0.555 0.115 42);   /* copper */
+  --primary-foreground:oklch(0.985 0.008 88);
+  --secondary:         oklch(0.945 0.012 80);   /* warm wash */
+  --muted:             oklch(0.945 0.012 80);
+  --muted-foreground:  oklch(0.5   0.018 55);
+  --accent:            oklch(0.92  0.04  75);   /* muted amber */
+  --destructive:       oklch(0.55  0.20  25);
+  --border:            oklch(0.88  0.012 78);
+  --input:             oklch(0.9   0.012 78);
+  --ring:              oklch(0.555 0.115 42);
+
+  /* ---- BRASS SCALE (copper/brass family) ---- */
+  --brass-50:  oklch(0.97  0.008 90);
+  --brass-100: oklch(0.945 0.015 85);
+  --brass-300: oklch(0.78  0.08  55);
+  --brass-500: oklch(0.615 0.125 48);
+  --brass-700: oklch(0.45  0.08  45);
+  --brass-900: oklch(0.25  0.05  40);
+
+  /* ---- SEMANTIC TYPE FAMILIES ---- */
+  --font-serif:    "Fraunces", "Source Serif Pro", "Iowan Old Style", Georgia, serif;
+  --font-sans:     "Inter", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:     "JetBrains Mono", "Geist Mono", "SFMono-Regular", ui-monospace, monospace;
+
+  --fg-1: var(--foreground);
+  --fg-2: oklch(0.42 0.015 55);
+  --fg-3: var(--muted-foreground);
+  --fg-on-dark: oklch(0.96 0.012 85);
+
+  /* ---- RADIUS / ELEVATION / MOTION ---- */
+  --radius:    0.625rem;    /* 10px — default */
+  --radius-sm: 0.375rem;    /* 6px */
+  --radius-md: 0.5rem;      /* 8px */
+  --radius-lg: 0.75rem;     /* 12px */
+  --radius-xl: 1rem;        /* 16px — masthead / hero cards */
+  --radius-pill: 9999px;
+
+  --shadow-xs:    0 1px 2px rgba(0,0,0,.04);
+  --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
+  --shadow-card:  0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg:    0 8px 24px rgba(0,0,0,.12);
+  --shadow-forge: inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+                  0 1px 2px rgba(0,0,0,.04),
+                  0 8px 20px -10px color-mix(in oklch, var(--brass-700) 22%, transparent);
+
+  --ease-out:  cubic-bezier(.2,.7,.2,1);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+  --dur-fast:  120ms;
+  --dur-base:  180ms;
+  --dur-slow:  280ms;
+
+  /* ---- SPACING SCALE (4-pt) ---- */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* ---- TYPE SCALE TOKENS ---- */
+  --tracking-tight:  -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-mono:   0.15em;   /* uppercase mono labels */
+  --tracking-luxe:   0.2em;    /* masthead eyebrows */
+}
+
+/* ============================================================
+   SEMANTIC TYPOGRAPHY
+   Use these classes (or vars) on real surfaces.
+   ============================================================ */
+
+.gf-h1 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(40px, 5.2vw, 72px);
+  line-height: 1.02;
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-1);
+  text-wrap: balance;
+}
+.gf-h2 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(28px, 3.4vw, 44px);
+  line-height: 1.08;
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-1);
+  text-wrap: balance;
+}
+.gf-h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--fg-1);
+}
+.gf-h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--fg-1);
+}
+.gf-lede {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--fg-3);
+  text-wrap: pretty;
+}
+.gf-body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fg-2);
+}
+.gf-small {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-3);
+}
+.gf-eyebrow {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: var(--tracking-luxe);
+  text-transform: uppercase;
+  color: var(--gf-copper);
+}
+.gf-overline {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: var(--tracking-mono);
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.gf-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.gf-serif-display {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: -0.025em;
+}
+.gf-serif-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* ============================================================
+   SURFACE UTILITIES (lifted from production)
+   ============================================================ */
+
+.gf-surface-parchment {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse at top left,
+      color-mix(in oklch, var(--brass-500) 7%, transparent), transparent 55%),
+    radial-gradient(ellipse at bottom right,
+      color-mix(in oklch, var(--brass-700) 5%, transparent), transparent 60%),
+    linear-gradient(180deg,
+      color-mix(in oklch, var(--brass-100) 35%, var(--background)) 0%,
+      var(--background) 60%);
+}
+.gf-surface-ivory {
+  background-color: var(--card);
+  background-image: linear-gradient(180deg,
+    color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%,
+    var(--card) 100%);
+  border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+}
+.gf-surface-graphite {
+  background-color: oklch(0.22 0.014 55);
+  background-image:
+    radial-gradient(circle at 12% 18%,
+      color-mix(in oklch, var(--brass-500) 22%, transparent), transparent 35%),
+    radial-gradient(circle at 88% 82%,
+      color-mix(in oklch, var(--brass-700) 15%, transparent), transparent 40%),
+    linear-gradient(180deg, oklch(0.24 0.016 55) 0%, oklch(0.18 0.012 55) 100%);
+  color: var(--fg-on-dark);
+  border: 1px solid oklch(0.32 0.04 50);
+}
+
+.gf-parchment-grid {
+  background-image:
+    linear-gradient(to right,
+      color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom,
+      color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.gf-constellation {
+  background-image:
+    radial-gradient(circle,
+      color-mix(in oklch, var(--brass-500) 22%, transparent) 1.1px, transparent 1.4px),
+    linear-gradient(90deg, transparent 49%,
+      color-mix(in oklch, var(--brass-500) 8%, transparent) 50%, transparent 51%);
+  background-size: 36px 36px, 220px 220px;
+}
+
+.gf-divider-brass {
+  height: 1px;
+  background-image: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--brass-500) 65%, transparent) 20%,
+    color-mix(in oklch, var(--brass-500) 65%, transparent) 80%,
+    transparent 100%);
+}
+
+.gf-card {
+  background-color: var(--card);
+  background-image: linear-gradient(180deg,
+    color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%, var(--card) 100%);
+  border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-forge);
+  transition: transform var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.gf-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+}
+
+/* Forge seal — coined gradient used behind the logo glyph */
+.gf-forge-seal {
+  background-image:
+    radial-gradient(circle at 30% 25%,
+      color-mix(in oklch, var(--brass-300) 70%, transparent), transparent 55%),
+    linear-gradient(135deg,
+      var(--brass-700) 0%, var(--brass-500) 50%, var(--brass-700) 100%);
+  border: 1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent),
+    inset 0 -1px 0 0 color-mix(in oklch, var(--brass-900) 50%, transparent),
+    0 1px 2px rgba(0,0,0,.15);
+  color: oklch(0.18 0.02 50);
+}

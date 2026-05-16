@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Colors · Semantic Tokens</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 24px; }
+  .head { margin: 0 0 14px; display:flex; align-items:baseline; justify-content:space-between; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; color: var(--fg-1); }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+  table { width:100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align:left; padding: 7px 10px; border-bottom: 1px solid color-mix(in oklch, var(--brass-500) 12%, var(--border)); }
+  th { font-family: var(--font-mono); font-size: 9.5px; letter-spacing:0.15em; text-transform: uppercase; color: var(--fg-3); font-weight: 500; }
+  td.name { font-family: var(--font-mono); color: var(--fg-1); font-weight: 500; }
+  td.use { color: var(--fg-3); }
+  td.sw { width: 28px; }
+  td.sw span {
+    display: inline-block; width: 22px; height: 22px; border-radius: 5px;
+    border: 1px solid color-mix(in oklch, var(--brass-500) 22%, var(--border));
+    vertical-align: middle;
+  }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Semantic Tokens</div><div class="e">--var → use</div></div>
+  <table>
+    <thead><tr><th></th><th>Token</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td class="sw"><span style="background:var(--gf-parchment)"></span></td><td class="name">--background</td><td class="use">Page surface (parchment)</td></tr>
+      <tr><td class="sw"><span style="background:var(--gf-soft-ivory)"></span></td><td class="name">--card</td><td class="use">Cards, panels, ivory wells</td></tr>
+      <tr><td class="sw"><span style="background:#1F1A17"></span></td><td class="name">--foreground</td><td class="use">Primary text · graphite</td></tr>
+      <tr><td class="sw"><span style="background:#6B6255"></span></td><td class="name">--muted-foreground</td><td class="use">Secondary text · warm slate</td></tr>
+      <tr><td class="sw"><span style="background:#B86A3B"></span></td><td class="name">--primary</td><td class="use">CTAs, links, eyebrows · copper</td></tr>
+      <tr><td class="sw"><span style="background:#C7A15A"></span></td><td class="name">--brass-500</td><td class="use">Dividers, seals, premium edge</td></tr>
+      <tr><td class="sw"><span style="background:#2B2521"></span></td><td class="name">--graphite</td><td class="use">Dark nav, Forged badge plate</td></tr>
+      <tr><td class="sw"><span style="background:#B0432A"></span></td><td class="name">--destructive</td><td class="use">Errors, needs-update</td></tr>
+    </tbody>
+  </table>
+</body></html>

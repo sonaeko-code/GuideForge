@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Colors · Status</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 24px; }
+  .head { margin: 0 0 14px; display:flex; align-items:baseline; justify-content:space-between; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; color: var(--fg-1); }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+
+  .row2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
+  .sw { border-radius: 10px; overflow: hidden; border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border)); }
+  .chip { height: 60px; }
+  .meta { padding: 6px 9px 8px; background: var(--gf-soft-ivory); border-top: 1px solid color-mix(in oklch, var(--brass-500) 14%, var(--border)); }
+  .n { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-1); }
+  .h { font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-3); margin-top: 2px; }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:500; border:1px solid; }
+  .dot { width:6px; height:6px; border-radius:50%; background: currentColor; opacity:.7; }
+
+  .b-draft { background:color-mix(in oklch, var(--brass-100) 85%, var(--background)); color:#6B4A1B; border-color:color-mix(in oklch, var(--brass-500) 30%, transparent); }
+  .b-review { background:#E6ECF2; color:#274059; border-color:#B6C5D4; }
+  .b-ready { background:#DDF0EE; color:#1F5854; border-color:#9CCFCB; }
+  .b-pub { background:#DBEEDD; color:#1F6A37; border-color:#A4D2AC; }
+  .b-need { background:#F4DCD8; color:#8A2A1C; border-color:#D9A097; }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Status Colors</div><div class="e">Lifecycle &amp; Trust</div></div>
+  <div class="row2">
+    <div class="sw"><div class="chip" style="background:#B47A2A"></div><div class="meta"><div class="n">Draft</div><div class="h">#B47A2A</div></div></div>
+    <div class="sw"><div class="chip" style="background:#35546B"></div><div class="meta"><div class="n">In Review</div><div class="h">#35546B</div></div></div>
+    <div class="sw"><div class="chip" style="background:#2F8A87"></div><div class="meta"><div class="n">Ready</div><div class="h">#2F8A87</div></div></div>
+    <div class="sw"><div class="chip" style="background:#3E7E4B"></div><div class="meta"><div class="n">Published</div><div class="h">#3E7E4B</div></div></div>
+    <div class="sw"><div class="chip" style="background:#B0432A"></div><div class="meta"><div class="n">Needs upd.</div><div class="h">#B0432A</div></div></div>
+  </div>
+  <div class="examples">
+    <span class="badge b-draft"><span class="dot"></span>Draft</span>
+    <span class="badge b-review"><span class="dot"></span>In Review</span>
+    <span class="badge b-ready"><span class="dot"></span>Ready</span>
+    <span class="badge b-pub"><span class="dot"></span>Published</span>
+    <span class="badge b-need"><span class="dot"></span>Needs update</span>
+  </div>
+</body></html>

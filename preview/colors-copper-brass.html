@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Colors · Copper & Brass</title>
+<link rel="stylesheet" href="card.css">
+<style>
+  body.card { padding: 22px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .sw { border-radius: 10px; overflow: hidden; border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border)); }
+  .chip { height: 90px; position: relative; }
+  .chip .star { position:absolute; bottom:8px; right:10px; font-size:14px; color: rgba(255,255,255,.55); font-family: var(--font-serif); }
+  .meta { padding: 8px 10px 10px; background: var(--gf-soft-ivory); border-top: 1px solid color-mix(in oklch, var(--brass-500) 14%, var(--border)); }
+  .n { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-1); }
+  .h { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); margin-top: 2px; }
+  .head { margin: 0 0 14px; display:flex; align-items:baseline; justify-content:space-between; }
+  .head .t { font-family: var(--font-serif); font-weight: 600; font-size: 18px; color: var(--fg-1); }
+  .head .e { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gf-copper); }
+</style></head>
+<body class="card">
+  <div class="head"><div class="t">Copper &amp; Brass</div><div class="e">Primary · Highlight · Badge</div></div>
+  <div class="grid">
+    <div class="sw">
+      <div class="chip" style="background:#8C4F2A"><span class="star">✦</span></div>
+      <div class="meta"><div class="n">Copper Deep</div><div class="h">#8C4F2A · hover</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#B86A3B"><span class="star">✦</span></div>
+      <div class="meta"><div class="n">Copper</div><div class="h">#B86A3B · primary</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#D9782F"><span class="star">✦</span></div>
+      <div class="meta"><div class="n">Ember</div><div class="h">#D9782F · highlight</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#C7A15A"><span class="star">✦</span></div>
+      <div class="meta"><div class="n">Brass</div><div class="h">#C7A15A · badge</div></div>
+    </div>
+    <div class="sw">
+      <div class="chip" style="background:#8A6F3A"><span class="star">✦</span></div>
+      <div class="meta"><div class="n">Brass Deep</div><div class="h">#8A6F3A · engraved</div></div>
+    </div>
+  </div>
+</body></html>
