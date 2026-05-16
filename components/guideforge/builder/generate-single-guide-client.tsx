@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2, Sparkles } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { SingleGuideIntakeRequest, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
+import type { GenerationProvider } from "@/lib/guideforge/ai-generation-types"
 import { generateGuideForgeDraft } from "@/lib/guideforge/ai-builder-core"
 import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
@@ -41,6 +42,7 @@ export function GenerateSingleGuideClient() {
   const [importedIdea, setImportedIdea] = useState<string>("")
   const [prompt, setPrompt] = useState("")
   const [quickFillFeedback, setQuickFillFeedback] = useState<string | null>(null)
+  const [provider, setProvider] = useState<GenerationProvider>("ai")
 
   // On mount, check for intake session from welcome intake panel
   useEffect(() => {
@@ -146,7 +148,7 @@ export function GenerateSingleGuideClient() {
     try {
       const result = await generateGuideForgeDraft({
         kind: "single_guide_asset",
-        mode: "ai",
+        mode: provider === "mock" ? "mock" : "ai",
         prompt: prompt || formState.useCase || formState.goal || "",
         formData: formState,
       })
@@ -239,6 +241,58 @@ export function GenerateSingleGuideClient() {
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </Card>
         )}
+
+        {/* Generation Mode Selection */}
+        <div className="space-y-3 rounded-lg border-2 border-primary/20 bg-primary/5 p-4">
+          <h2 className="font-semibold text-foreground">Generation Mode</h2>
+          <p className="text-xs text-muted-foreground">Choose how you'd like your guide generated:</p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setProvider("mock")}
+              className={`rounded-lg border-2 p-3 text-left transition-all ${
+                provider === "mock"
+                  ? "border-primary bg-primary/10 shadow-md"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Sparkles className={`mt-0.5 size-4 shrink-0 ${provider === "mock" ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-sm">Mock Preview</p>
+                  <p className="text-xs text-muted-foreground">Fast generation for testing (~1 second)</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setProvider("ai")}
+              className={`rounded-lg border-2 p-3 text-left transition-all ${
+                provider === "ai"
+                  ? "border-primary bg-primary/10 shadow-md"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Zap className={`mt-0.5 size-4 shrink-0 ${provider === "ai" ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-sm">AI Generate</p>
+                  <p className="text-xs text-muted-foreground">Real AI powered (~10-25 seconds)</p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {provider === "ai" && (
+            <Card className="border-amber-500/30 bg-amber-500/5 p-2">
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                AI generation may take 10&ndash;25 seconds. If generation fails, switch to Mock Preview or simplify your guide details.
+              </p>
+            </Card>
+          )}
+        </div>
 
         {/* Basic Info */}
         <div className="space-y-4">
@@ -403,12 +457,12 @@ export function GenerateSingleGuideClient() {
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
-              Generating...
+              {provider === "mock" ? "Generating Mock Guide..." : "Generating with AI..."}
             </>
           ) : (
             <>
               <Sparkles className="mr-2 size-4" aria-hidden="true" />
-              Generate Guide
+              {provider === "mock" ? "Generate Mock Guide" : "Generate AI Guide"}
             </>
           )}
         </Button>

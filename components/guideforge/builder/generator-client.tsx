@@ -247,7 +247,17 @@ export function GeneratorClient({
         return
       }
 
-      // Success - update session with response
+      // Success - log if guide shape is unexpected
+      const g = data?.guide
+      if (!g?.sections?.length || !g?.title) {
+        console.error("[generator-client] AI guide response has unexpected shape:", {
+          hasTitle: !!g?.title,
+          sectionsCount: g?.sections?.length ?? "missing",
+          hasDifficulty: !!g?.difficulty,
+          raw: JSON.stringify(g)?.substring(0, 300),
+        })
+      }
+      // Update session with response
       setSession((prev) => (prev ? { ...prev, response: data, status: "done" } : null))
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
@@ -724,8 +734,8 @@ export function GeneratorClient({
                             {session.response.guide.title}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {session.response.guide.sections.length} sections ·{" "}
-                            {session.response.guide.estimatedMinutes} min read ·{" "}
+                            {session.response.guide.sections?.length ?? 0} sections ·{" "}
+                            {session.response.guide.estimatedMinutes ?? "?"} min read ·{" "}
                             {session.response.guide.difficulty}
                           </p>
                         </div>

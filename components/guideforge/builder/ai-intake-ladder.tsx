@@ -523,7 +523,6 @@ export function AIIntakeLadder({ assetType, onApplyFields, initialIdea }: AIInta
       })
 
       onApplyFields(fieldsToApply)
-      setRoughIdea("")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Quick Fill failed.")
     } finally {
@@ -574,7 +573,6 @@ export function AIIntakeLadder({ assetType, onApplyFields, initialIdea }: AIInta
       })
 
       onApplyFields(fields)
-      setRoughIdea("")
     } catch (err) {
       // Network error — fall back to Quick Fill
       console.warn("[AIIntakeLadder] Smart Fill network error, falling back to Quick Fill:", err)

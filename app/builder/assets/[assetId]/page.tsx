@@ -130,7 +130,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             setIsSaving(false)
             return
           }
-          for (const item of section.items) {
+          for (const item of (section.items ?? [])) {
             if (!item.label?.trim()) {
               setSaveMessage({
                 type: 'error',

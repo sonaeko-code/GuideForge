@@ -24,6 +24,11 @@ interface SingleGuideEditorProps {
   mode?: SingleGuideEditorMode
   onModeChange?: (mode: SingleGuideEditorMode) => void
   /**
+   * Initial tab mode for uncontrolled usage. Defaults to "edit".
+   * Use "preview" to show the generated content first before editing.
+   */
+  initialMode?: SingleGuideEditorMode
+  /**
    * Label shown on the edit tab. Defaults to "Edit Draft".
    */
   editTabLabel?: string
@@ -40,11 +45,12 @@ export function SingleGuideEditor({
   onChange,
   mode: externalMode,
   onModeChange,
+  initialMode,
   editTabLabel = "Edit Draft",
   showModeTabs = true,
 }: SingleGuideEditorProps) {
   // Internal mode used only when the parent does not control it
-  const [internalMode, setInternalMode] = useState<SingleGuideEditorMode>("edit")
+  const [internalMode, setInternalMode] = useState<SingleGuideEditorMode>(initialMode ?? "edit")
 
   const mode = externalMode ?? internalMode
   const setMode = (m: SingleGuideEditorMode) => {
@@ -79,23 +85,25 @@ export function SingleGuideEditor({
 
   // ---- Step helpers ----
 
+  const safeSteps = value.steps ?? []
+
   type StepField = keyof GeneratedSingleGuide["steps"][number]
 
   const updateStep = (idx: number, field: StepField, val: string | null) => {
-    const next = value.steps.map((s, i) => (i === idx ? { ...s, [field]: val } : s))
+    const next = safeSteps.map((s, i) => (i === idx ? { ...s, [field]: val } : s))
     set("steps", next)
   }
 
   const addStep = () => {
     set("steps", [
-      ...value.steps,
+      ...safeSteps,
       { title: "", body: "", tip: null, warning: null, successCondition: null },
     ])
   }
 
   const removeStep = (idx: number) => {
-    if (value.steps.length <= 1) return
-    set("steps", value.steps.filter((_, i) => i !== idx))
+    if (safeSteps.length <= 1) return
+    set("steps", safeSteps.filter((_, i) => i !== idx))
   }
 
   // ---- Edit view ----
@@ -213,8 +221,8 @@ export function SingleGuideEditor({
 
       {/* Steps */}
       <div className="space-y-4">
-        <Label>Steps ({value.steps.length})</Label>
-        {value.steps.map((step, idx) => (
+        <Label>Steps ({safeSteps.length})</Label>
+        {safeSteps.map((step, idx) => (
           <Card key={idx} className="p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold text-muted-foreground">
@@ -225,7 +233,7 @@ export function SingleGuideEditor({
                 size="icon"
                 onClick={() => removeStep(idx)}
                 aria-label={`Remove step ${idx + 1}`}
-                disabled={value.steps.length <= 1}
+                disabled={safeSteps.length <= 1}
               >
                 <Trash2 className="size-4 text-muted-foreground" />
               </Button>
@@ -366,7 +374,7 @@ export function SingleGuideEditor({
 
       {/* Steps */}
       <ol className="space-y-4">
-        {value.steps.map((step, idx) => (
+        {safeSteps.map((step, idx) => (
           <li key={idx}>
             <Card className="p-5 space-y-3">
               <div className="flex items-baseline gap-3">

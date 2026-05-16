@@ -25,6 +25,11 @@ interface ChecklistEditorProps {
   mode?: ChecklistEditorMode
   onModeChange?: (mode: ChecklistEditorMode) => void
   /**
+   * Initial tab mode for uncontrolled usage. Defaults to "edit".
+   * Use "preview" to show the generated content first before editing.
+   */
+  initialMode?: ChecklistEditorMode
+  /**
    * Label shown on the edit tab. Defaults to "Edit Draft".
    */
   editTabLabel?: string
@@ -41,10 +46,11 @@ export function ChecklistEditor({
   onChange,
   mode: externalMode,
   onModeChange,
+  initialMode,
   editTabLabel = "Edit Draft",
   showModeTabs = true,
 }: ChecklistEditorProps) {
-  const [internalMode, setInternalMode] = useState<ChecklistEditorMode>("edit")
+  const [internalMode, setInternalMode] = useState<ChecklistEditorMode>(initialMode ?? "edit")
 
   const mode = externalMode ?? internalMode
   const setMode = (m: ChecklistEditorMode) => {
@@ -79,30 +85,32 @@ export function ChecklistEditor({
 
   // ---- Section helpers ----
 
+  const safeSections = value.sections ?? []
+
   const updateSection = (sectionIdx: number, field: "title", val: string) => {
-    const next = value.sections.map((s, i) =>
+    const next = safeSections.map((s, i) =>
       i === sectionIdx ? { ...s, [field]: val } : s
     )
     set("sections", next)
   }
 
   const addSection = () => {
-    set("sections", [...value.sections, { title: "", items: [] }])
+    set("sections", [...safeSections, { title: "", items: [] }])
   }
 
   const removeSection = (sectionIdx: number) => {
-    if (value.sections.length <= 1) return
-    set("sections", value.sections.filter((_, i) => i !== sectionIdx))
+    if (safeSections.length <= 1) return
+    set("sections", safeSections.filter((_, i) => i !== sectionIdx))
   }
 
   // ---- Item helpers ----
 
   const updateItem = (sectionIdx: number, itemIdx: number, field: "label" | "description" | "required", val: any) => {
-    const next = value.sections.map((s, si) =>
+    const next = safeSections.map((s, si) =>
       si === sectionIdx
         ? {
             ...s,
-            items: s.items.map((item, ii) =>
+            items: (s.items ?? []).map((item, ii) =>
               ii === itemIdx ? { ...item, [field]: val } : item
             ),
           }
@@ -112,18 +120,18 @@ export function ChecklistEditor({
   }
 
   const addItem = (sectionIdx: number) => {
-    const next = value.sections.map((s, i) =>
+    const next = safeSections.map((s, i) =>
       i === sectionIdx
-        ? { ...s, items: [...s.items, { label: "", description: null, required: false }] }
+        ? { ...s, items: [...(s.items ?? []), { label: "", description: null, required: false }] }
         : s
     )
     set("sections", next)
   }
 
   const removeItem = (sectionIdx: number, itemIdx: number) => {
-    const next = value.sections.map((s, i) =>
+    const next = safeSections.map((s, i) =>
       i === sectionIdx
-        ? { ...s, items: s.items.filter((_, ii) => ii !== itemIdx) }
+        ? { ...s, items: (s.items ?? []).filter((_, ii) => ii !== itemIdx) }
         : s
     )
     set("sections", next)
@@ -213,8 +221,10 @@ export function ChecklistEditor({
 
       {/* Sections */}
       <div className="space-y-4">
-        <Label>Sections ({value.sections.length})</Label>
-        {value.sections.map((section, sectionIdx) => (
+        <Label>Sections ({safeSections.length})</Label>
+        {safeSections.map((section, sectionIdx) => {
+          const sectionItems = section.items ?? []
+          return (
           <Card key={sectionIdx} className="p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold text-muted-foreground">
@@ -225,7 +235,7 @@ export function ChecklistEditor({
                 size="icon"
                 onClick={() => removeSection(sectionIdx)}
                 aria-label={`Remove section ${sectionIdx + 1}`}
-                disabled={value.sections.length <= 1}
+                disabled={safeSections.length <= 1}
               >
                 <Trash2 className="size-4 text-muted-foreground" />
               </Button>
@@ -246,8 +256,8 @@ export function ChecklistEditor({
 
             {/* Items in Section */}
             <div className="space-y-2 pl-4 border-l-2 border-border">
-              <p className="text-xs font-semibold text-muted-foreground">Items ({section.items.length})</p>
-              {section.items.map((item, itemIdx) => (
+              <p className="text-xs font-semibold text-muted-foreground">Items ({sectionItems.length})</p>
+              {sectionItems.map((item, itemIdx) => (
                 <div key={itemIdx} className="flex gap-2 items-start">
                   <div className="flex-1 space-y-1">
                     <Input
@@ -293,7 +303,8 @@ export function ChecklistEditor({
               </Button>
             </div>
           </Card>
-        ))}
+          )
+        })}
         <Button variant="outline" size="sm" onClick={addSection} className="gap-1.5">
           <Plus className="size-3.5" aria-hidden="true" />
           Add Section
@@ -305,9 +316,9 @@ export function ChecklistEditor({
   // ---- Preview view ----
 
   const stats = {
-    sections: value.sections.length,
-    totalItems: value.sections.reduce((sum, s) => sum + s.items.length, 0),
-    requiredItems: value.sections.reduce((sum, s) => sum + s.items.filter(i => i.required).length, 0),
+    sections: safeSections.length,
+    totalItems: safeSections.reduce((sum, s) => sum + (s.items?.length ?? 0), 0),
+    requiredItems: safeSections.reduce((sum, s) => sum + (s.items?.filter((i) => i.required)?.length ?? 0), 0),
   }
 
   const previewView = (
@@ -382,13 +393,15 @@ export function ChecklistEditor({
 
       {/* Sections */}
       <div className="space-y-4">
-        {value.sections.map((section, sectionIdx) => (
+        {safeSections.map((section, sectionIdx) => {
+          const sectionItems = section.items ?? []
+          return (
           <Card key={sectionIdx} className="p-5 space-y-3">
             <h3 className="text-lg font-semibold text-foreground">
               {section.title || <span className="text-muted-foreground italic">Untitled section</span>}
             </h3>
             <div className="space-y-2">
-              {section.items.map((item, itemIdx) => (
+              {sectionItems.map((item, itemIdx) => (
                 <div key={itemIdx} className="flex items-start gap-3 p-2 rounded hover:bg-muted/50 transition-colors">
                   <input
                     type="checkbox"
@@ -409,7 +422,8 @@ export function ChecklistEditor({
               ))}
             </div>
           </Card>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

@@ -53,10 +53,11 @@ export function SingleGuideProposal({
         <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
       </div>
 
-      {/* Shared editor (owns its own tab toggle) */}
+      {/* Shared editor — starts in preview so user reviews before editing */}
       <SingleGuideEditor
         value={draft}
         onChange={setDraft}
+        initialMode="preview"
         editTabLabel="Edit Draft"
       />
 

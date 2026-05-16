@@ -221,35 +221,56 @@ async function generateSingleGuideAsset(
       asset = mockResult.asset
       generatedBy = "mock"
     } else if (request.mode === "ai") {
-      // Try AI first; fall back to mock on failure (preserves existing behaviour)
+      const response = await fetch("/api/guideforge/generate-single-guide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, prompt: request.prompt }),
+      })
+
+      let responseText: string
       try {
-        const response = await fetch("/api/guideforge/generate-single-guide", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData, prompt: request.prompt }),
-        })
-        const data = await response.json()
-        if (data.success && data.asset) {
-          asset = data.asset
-          generatedBy = "openai"
-        } else {
-          throw new Error(data.error || "AI generation failed")
+        responseText = await response.text()
+      } catch {
+        return {
+          kind: "single_guide_asset",
+          mode: "ai",
+          success: false,
+          error: "AI generation failed — could not read server response. Please try again.",
         }
-      } catch (aiErr) {
-        console.warn("[GuideForge] Single guide AI failed, falling back to mock:", aiErr)
-        const { generateSingleGuideMock } = await import("./mock-asset-generator")
-        const mockResult = await generateSingleGuideMock(formData)
-        if (!mockResult.success) {
-          return {
-            kind: "single_guide_asset",
-            mode: "ai",
-            success: false,
-            error: mockResult.error || "Generation failed",
-          }
-        }
-        asset = mockResult.asset
-        generatedBy = "mock"
       }
+
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch {
+        return {
+          kind: "single_guide_asset",
+          mode: "ai",
+          success: false,
+          error: "AI generation failed — server returned an invalid response. Please try again.",
+        }
+      }
+
+      if (!response.ok || !data.success) {
+        return {
+          kind: "single_guide_asset",
+          mode: "ai",
+          success: false,
+          error: data.error || "AI generation failed. Please try again.",
+        }
+      }
+
+      if (!data.asset || !Array.isArray(data.asset.steps) || data.asset.steps.length === 0) {
+        return {
+          kind: "single_guide_asset",
+          mode: "ai",
+          success: false,
+          error: "AI returned an incomplete guide. Please try again.",
+        }
+      }
+
+      asset = data.asset
+      generatedBy = "openai"
     } else {
       return {
         kind: "single_guide_asset",

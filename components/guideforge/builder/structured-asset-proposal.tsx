@@ -162,10 +162,11 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
           </Card>
         )}
 
-        {/* ChecklistEditor */}
+        {/* ChecklistEditor — starts in preview so user reviews before editing */}
         <ChecklistEditor
           value={checklistDraft}
           onChange={setChecklistDraft}
+          initialMode="preview"
           editTabLabel="Edit Draft"
         />
 
