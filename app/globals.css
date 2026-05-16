@@ -40,6 +40,10 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
+  --radius-sm: 0.375rem;   /* 6px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
   --sidebar: oklch(0.965 0.012 82);
   --sidebar-foreground: oklch(0.235 0.012 55);
   --sidebar-primary: oklch(0.555 0.115 42);
@@ -104,9 +108,9 @@
   --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
   --shadow-card:  0 4px 12px rgba(0,0,0,.08);
   --shadow-lg:    0 8px 24px rgba(0,0,0,.12);
-  --shadow-forge: inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+  --shadow-forge: inset 0 2px 0 0 color-mix(in srgb, var(--brass-500) 60%, transparent),
                   0 1px 2px rgba(0,0,0,.04),
-                  0 8px 20px -10px color-mix(in oklch, var(--brass-700) 22%, transparent);
+                  0 8px 20px -10px color-mix(in srgb, var(--brass-700) 22%, transparent);
 
   /* ── Motion tokens ─────────────────────────────────────────────────────── */
   --ease-out:  cubic-bezier(.2,.7,.2,1);
@@ -121,6 +125,20 @@
   --tracking-wide:   0.04em;
   --tracking-mono:   0.15em;
   --tracking-luxe:   0.20em;
+
+  /* ── Spacing scale (4-pt) ────────────────────────────────────────────── */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
 }
 
 .dark {
@@ -193,10 +211,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -265,14 +283,14 @@
 @layer utilities {
   .bg-parchment-grid {
     background-image:
-      linear-gradient(to right, color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px);
+      linear-gradient(to right, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px);
     background-size: 32px 32px;
     background-position: -1px -1px;
   }
   .bg-parchment-dots {
     background-image: radial-gradient(
-      color-mix(in oklch, var(--foreground) 12%, transparent) 1px,
+      color-mix(in srgb, var(--foreground) 12%, transparent) 1px,
       transparent 1px
     );
     background-size: 18px 18px;
@@ -289,17 +307,17 @@
     background-image:
       radial-gradient(
         ellipse at top left,
-        color-mix(in oklch, var(--brass-500) 7%, transparent),
+        color-mix(in srgb, var(--brass-500) 7%, transparent),
         transparent 55%
       ),
       radial-gradient(
         ellipse at bottom right,
-        color-mix(in oklch, var(--brass-700) 5%, transparent),
+        color-mix(in srgb, var(--brass-700) 5%, transparent),
         transparent 60%
       ),
       linear-gradient(
         180deg,
-        color-mix(in oklch, var(--brass-100) 35%, var(--background)) 0%,
+        color-mix(in srgb, var(--brass-100) 35%, var(--background)) 0%,
         var(--background) 60%
       );
   }
@@ -310,15 +328,15 @@
     background-image:
       linear-gradient(
         135deg,
-        color-mix(in oklch, var(--brass-300) 12%, transparent) 0%,
+        color-mix(in srgb, var(--brass-300) 12%, transparent) 0%,
         transparent 45%
       ),
       radial-gradient(
         circle at 85% 20%,
-        color-mix(in oklch, var(--brass-500) 10%, transparent),
+        color-mix(in srgb, var(--brass-500) 10%, transparent),
         transparent 50%
       );
-    border: 1px solid color-mix(in oklch, var(--brass-500) 25%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--brass-500) 25%, var(--border));
   }
 
   /* Ivory card — premium light surface (slightly lifted from page bg) */
@@ -326,10 +344,10 @@
     background-color: var(--card);
     background-image: linear-gradient(
       180deg,
-      color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%,
+      color-mix(in srgb, var(--brass-50) 70%, var(--card)) 0%,
       var(--card) 100%
     );
-    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--brass-500) 18%, var(--border));
   }
 
   /* Graphite premium panel — dark even in light mode (used selectively) */
@@ -338,12 +356,12 @@
     background-image:
       radial-gradient(
         circle at 12% 18%,
-        color-mix(in oklch, var(--brass-500) 22%, transparent),
+        color-mix(in srgb, var(--brass-500) 22%, transparent),
         transparent 35%
       ),
       radial-gradient(
         circle at 88% 82%,
-        color-mix(in oklch, var(--brass-700) 15%, transparent),
+        color-mix(in srgb, var(--brass-700) 15%, transparent),
         transparent 40%
       ),
       linear-gradient(
@@ -394,8 +412,8 @@
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      color-mix(in oklch, var(--brass-500) 65%, transparent) 20%,
-      color-mix(in oklch, var(--brass-500) 65%, transparent) 80%,
+      color-mix(in srgb, var(--brass-500) 65%, transparent) 20%,
+      color-mix(in srgb, var(--brass-500) 65%, transparent) 80%,
       transparent 100%
     );
   }
@@ -405,31 +423,28 @@
     background-image:
       radial-gradient(
         circle,
-        color-mix(in oklch, var(--brass-500) 22%, transparent) 1.1px,
+        color-mix(in srgb, var(--brass-500) 22%, transparent) 1.1px,
         transparent 1.4px
       ),
       linear-gradient(
         90deg,
         transparent 49%,
-        color-mix(in oklch, var(--brass-500) 8%, transparent) 50%,
+        color-mix(in srgb, var(--brass-500) 8%, transparent) 50%,
         transparent 51%
       );
     background-size: 36px 36px, 220px 220px;
     background-position: 0 0, 0 0;
   }
 
-  /* Premium layered forge shadow */
+  /* Premium layered forge shadow — references token directly */
   .shadow-forge {
-    box-shadow:
-      0 1px 0 0 color-mix(in oklch, var(--brass-500) 25%, transparent),
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 8px 24px -8px color-mix(in oklch, var(--brass-700) 22%, transparent);
+    box-shadow: var(--shadow-forge);
   }
   .shadow-forge-lg {
     box-shadow:
-      0 1px 0 0 color-mix(in oklch, var(--brass-500) 30%, transparent),
+      0 1px 0 0 color-mix(in srgb, var(--brass-500) 30%, transparent),
       0 2px 4px rgba(0, 0, 0, 0.06),
-      0 14px 32px -10px color-mix(in oklch, var(--brass-700) 28%, transparent);
+      0 14px 32px -10px color-mix(in srgb, var(--brass-700) 28%, transparent);
   }
 
   /* Premium card shadows — structured depth */
@@ -448,33 +463,33 @@
     background-color: var(--card);
     background-image: linear-gradient(
       180deg,
-      color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%,
+      color-mix(in srgb, var(--brass-50) 60%, var(--card)) 0%,
       var(--card) 100%
     );
-    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--brass-500) 18%, var(--border));
     box-shadow:
-      inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+      inset 0 2px 0 0 color-mix(in srgb, var(--brass-500) 60%, transparent),
       0 1px 2px rgba(0, 0, 0, 0.04),
-      0 8px 20px -10px color-mix(in oklch, var(--brass-700) 18%, transparent);
+      0 8px 20px -10px color-mix(in srgb, var(--brass-700) 18%, transparent);
     transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   }
   .card-foundry:hover {
     transform: translateY(-1px);
-    border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+    border-color: color-mix(in srgb, var(--brass-500) 38%, var(--border));
     box-shadow:
       inset 0 2px 0 0 var(--brass-500),
       0 2px 4px rgba(0, 0, 0, 0.06),
-      0 14px 28px -10px color-mix(in oklch, var(--brass-700) 28%, transparent);
+      0 14px 28px -10px color-mix(in srgb, var(--brass-700) 28%, transparent);
   }
 
   /* Warm pill (e.g. "Owned by you") */
   .pill-warm {
     background-image: linear-gradient(
       180deg,
-      color-mix(in oklch, var(--brass-100) 80%, var(--card)) 0%,
-      color-mix(in oklch, var(--brass-50) 90%, var(--card)) 100%
+      color-mix(in srgb, var(--brass-100) 80%, var(--card)) 0%,
+      color-mix(in srgb, var(--brass-50) 90%, var(--card)) 100%
     );
-    border: 1px solid color-mix(in oklch, var(--brass-500) 35%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brass-500) 35%, transparent);
     color: var(--brass-700);
   }
 
@@ -495,11 +510,11 @@
     background-color: var(--background);
     background-image:
       radial-gradient(ellipse at top left,
-        color-mix(in oklch, var(--brass-500) 7%, transparent), transparent 55%),
+        color-mix(in srgb, var(--brass-500) 7%, transparent), transparent 55%),
       radial-gradient(ellipse at bottom right,
-        color-mix(in oklch, var(--brass-700) 5%, transparent), transparent 60%),
+        color-mix(in srgb, var(--brass-700) 5%, transparent), transparent 60%),
       linear-gradient(180deg,
-        color-mix(in oklch, var(--brass-100) 35%, var(--background)) 0%,
+        color-mix(in srgb, var(--brass-100) 35%, var(--background)) 0%,
         var(--background) 60%);
     color: var(--foreground);
     font-family: var(--font-sans);
@@ -510,9 +525,9 @@
   .gf-card {
     background-color: var(--card);
     background-image: linear-gradient(180deg,
-      color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%,
+      color-mix(in srgb, var(--brass-50) 60%, var(--card)) 0%,
       var(--card) 100%);
-    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--brass-500) 18%, var(--border));
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-forge);
     transition:
@@ -522,7 +537,7 @@
   }
   .gf-card:hover {
     transform: translateY(-1px);
-    border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+    border-color: color-mix(in srgb, var(--brass-500) 38%, var(--border));
   }
 
   /* Forged card — dark graphite for premium / admin contexts */
@@ -530,9 +545,9 @@
     background-color: oklch(0.22 0.014 55);
     background-image:
       radial-gradient(circle at 12% 18%,
-        color-mix(in oklch, var(--brass-500) 22%, transparent), transparent 35%),
+        color-mix(in srgb, var(--brass-500) 22%, transparent), transparent 35%),
       radial-gradient(circle at 88% 82%,
-        color-mix(in oklch, var(--brass-700) 15%, transparent), transparent 40%),
+        color-mix(in srgb, var(--brass-700) 15%, transparent), transparent 40%),
       linear-gradient(180deg, oklch(0.24 0.016 55) 0%, oklch(0.18 0.012 55) 100%);
     color: var(--fg-on-dark);
     border: 1px solid oklch(0.32 0.04 50);
@@ -543,14 +558,14 @@
   .gf-section-card {
     background: var(--gf-soft-ivory);
     background-image: linear-gradient(180deg,
-      color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%,
+      color-mix(in srgb, var(--brass-50) 60%, var(--card)) 0%,
       var(--card) 100%);
-    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--brass-500) 18%, var(--border));
     border-radius: var(--radius-lg);
     transition: border-color var(--dur-base), box-shadow var(--dur-base), transform var(--dur-base);
   }
   .gf-section-card:hover {
-    border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+    border-color: color-mix(in srgb, var(--brass-500) 38%, var(--border));
     box-shadow: var(--shadow-card);
     transform: translateY(-1px);
   }
@@ -560,8 +575,8 @@
     height: 1px;
     background-image: linear-gradient(90deg,
       transparent 0%,
-      color-mix(in oklch, var(--brass-500) 65%, transparent) 20%,
-      color-mix(in oklch, var(--brass-500) 65%, transparent) 80%,
+      color-mix(in srgb, var(--brass-500) 65%, transparent) 20%,
+      color-mix(in srgb, var(--brass-500) 65%, transparent) 80%,
       transparent 100%);
     border: none;
   }
@@ -598,9 +613,9 @@
     background-color: oklch(0.22 0.014 55);
     background-image:
       radial-gradient(circle at 12% 18%,
-        color-mix(in oklch, var(--brass-500) 22%, transparent), transparent 35%),
+        color-mix(in srgb, var(--brass-500) 22%, transparent), transparent 35%),
       radial-gradient(circle at 88% 82%,
-        color-mix(in oklch, var(--brass-700) 15%, transparent), transparent 40%),
+        color-mix(in srgb, var(--brass-700) 15%, transparent), transparent 40%),
       linear-gradient(180deg, oklch(0.24 0.016 55) 0%, oklch(0.18 0.012 55) 100%);
     color: var(--fg-on-dark);
     border-right: 1px solid oklch(0.32 0.04 50);
@@ -610,13 +625,13 @@
   .gf-forge-seal {
     background-image:
       radial-gradient(circle at 30% 25%,
-        color-mix(in oklch, var(--brass-300) 70%, transparent), transparent 55%),
+        color-mix(in srgb, var(--brass-300) 70%, transparent), transparent 55%),
       linear-gradient(135deg,
         var(--brass-700) 0%, var(--brass-500) 50%, var(--brass-700) 100%);
-    border: 1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brass-900) 60%, transparent);
     box-shadow:
-      inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent),
-      inset 0 -1px 0 0 color-mix(in oklch, var(--brass-900) 50%, transparent),
+      inset 0 1px 0 0 color-mix(in srgb, var(--brass-300) 80%, transparent),
+      inset 0 -1px 0 0 color-mix(in srgb, var(--brass-900) 50%, transparent),
       0 1px 2px rgba(0,0,0,.15);
     color: oklch(0.18 0.02 50);
     display: flex;
@@ -631,24 +646,206 @@
     height: 1px;
     background: linear-gradient(90deg,
       transparent,
-      color-mix(in oklch, var(--brass-500) 70%, transparent),
+      color-mix(in srgb, var(--brass-500) 70%, transparent),
       transparent);
   }
 
   /* Explicit gf-copper utility fallbacks — belt-and-suspenders for Tailwind v4
      opacity-modified variants; @layer utilities guarantees these are in the bundle */
   .text-gf-copper           { color: var(--gf-copper); }
-  .text-gf-copper\/80       { color: color-mix(in oklch, var(--gf-copper) 80%, transparent); }
-  .bg-gf-copper\/10         { background-color: color-mix(in oklch, var(--gf-copper) 10%, transparent); }
-  .border-gf-copper\/40     { border-color: color-mix(in oklch, var(--gf-copper) 40%, transparent); }
-  .ring-gf-copper\/30       { --tw-ring-color: color-mix(in oklch, var(--gf-copper) 30%, transparent); }
+  .text-gf-copper\/80       { color: color-mix(in srgb, var(--gf-copper) 80%, transparent); }
+  .bg-gf-copper\/10         { background-color: color-mix(in srgb, var(--gf-copper) 10%, transparent); }
+  .border-gf-copper\/40     { border-color: color-mix(in srgb, var(--gf-copper) 40%, transparent); }
+  .ring-gf-copper\/30       { --tw-ring-color: color-mix(in srgb, var(--gf-copper) 30%, transparent); }
+
+  /* ============================================================
+     DESIGN SYSTEM NAMING ALIASES
+     Canonical gf-* names from colors_and_type.css; CSS-identical
+     to existing app utility classes. Use either name; both resolve
+     the same styles. New components should prefer the gf-* names.
+     ============================================================ */
+
+  .gf-divider-brass {
+    height: 1px;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--brass-500) 65%, transparent) 20%,
+      color-mix(in srgb, var(--brass-500) 65%, transparent) 80%,
+      transparent 100%
+    );
+    border: none;
+  }
+
+  .gf-surface-parchment {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        ellipse at top left,
+        color-mix(in srgb, var(--brass-500) 7%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse at bottom right,
+        color-mix(in srgb, var(--brass-700) 5%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--brass-100) 35%, var(--background)) 0%,
+        var(--background) 60%
+      );
+  }
+
+  .gf-surface-ivory {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--brass-50) 70%, var(--card)) 0%,
+      var(--card) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--brass-500) 18%, var(--border));
+  }
+
+  .gf-surface-graphite {
+    background-color: oklch(0.22 0.014 55);
+    background-image:
+      radial-gradient(
+        circle at 12% 18%,
+        color-mix(in srgb, var(--brass-500) 22%, transparent),
+        transparent 35%
+      ),
+      radial-gradient(
+        circle at 88% 82%,
+        color-mix(in srgb, var(--brass-700) 15%, transparent),
+        transparent 40%
+      ),
+      linear-gradient(180deg, oklch(0.24 0.016 55) 0%, oklch(0.18 0.012 55) 100%);
+    color: var(--fg-on-dark);
+    border: 1px solid oklch(0.32 0.04 50);
+  }
+
+  .gf-parchment-grid {
+    background-image:
+      linear-gradient(to right,
+        color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom,
+        color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+
+  .gf-constellation {
+    background-image:
+      radial-gradient(
+        circle,
+        color-mix(in srgb, var(--brass-500) 22%, transparent) 1.1px,
+        transparent 1.4px
+      ),
+      linear-gradient(
+        90deg,
+        transparent 49%,
+        color-mix(in srgb, var(--brass-500) 8%, transparent) 50%,
+        transparent 51%
+      );
+    background-size: 36px 36px, 220px 220px;
+    background-position: 0 0, 0 0;
+  }
+
+  /* ============================================================
+     DESIGN SYSTEM TYPOGRAPHY UTILITIES
+     From colors_and_type.css. Opt-in — no components are forced
+     to use these. Prefer these over inline Tailwind stacks when
+     you need the full type scale fidelity.
+     ============================================================ */
+
+  .gf-h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: clamp(40px, 5.2vw, 72px);
+    line-height: 1.02;
+    letter-spacing: var(--tracking-tight);
+    color: var(--fg-1);
+    text-wrap: balance;
+  }
+
+  .gf-h2 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: clamp(28px, 3.4vw, 44px);
+    line-height: 1.08;
+    letter-spacing: var(--tracking-tight);
+    color: var(--fg-1);
+    text-wrap: balance;
+  }
+
+  .gf-h3 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--fg-1);
+  }
+
+  .gf-h4 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.35;
+    color: var(--fg-1);
+  }
+
+  .gf-lede {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--fg-3);
+    text-wrap: pretty;
+  }
+
+  .gf-body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  .gf-small {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--fg-3);
+  }
+
+  .gf-mono {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--fg-2);
+  }
+
+  .gf-serif-display {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-style: normal;
+    letter-spacing: -0.025em;
+  }
+
+  .gf-serif-italic {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 500;
+  }
 
   /* Forged seal logo wrapper — replaces flat gradient with a coined feel */
   .forge-seal {
     background-image:
       radial-gradient(
         circle at 30% 25%,
-        color-mix(in oklch, var(--brass-300) 70%, transparent),
+        color-mix(in srgb, var(--brass-300) 70%, transparent),
         transparent 55%
       ),
       linear-gradient(
@@ -657,10 +854,10 @@
         var(--brass-500) 50%,
         var(--brass-700) 100%
       );
-    border: 1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brass-900) 60%, transparent);
     box-shadow:
-      inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent),
-      inset 0 -1px 0 0 color-mix(in oklch, var(--brass-900) 50%, transparent),
+      inset 0 1px 0 0 color-mix(in srgb, var(--brass-300) 80%, transparent),
+      inset 0 -1px 0 0 color-mix(in srgb, var(--brass-900) 50%, transparent),
       0 1px 2px rgba(0, 0, 0, 0.15);
   }
 }

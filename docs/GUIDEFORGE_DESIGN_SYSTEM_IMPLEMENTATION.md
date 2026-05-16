@@ -1,5 +1,79 @@
 # GuideForge Design System — Implementation Log
 
+---
+
+## ⚠️ Background color rule — read before touching any surface
+
+**Default page/card backgrounds must be parchment/cream, not pink/blush.**
+
+- Page background: `#F6F1E8` → `oklch(0.972 0.014 85)` — warm cream
+- Card background: `#FBF8F3` → `oklch(0.99 0.008 88)` — soft ivory
+- Pink, rose, blush, and red-tinted surfaces are WRONG. They should never appear on any page background, hero surface, card, or section background.
+
+**Why pink appeared (and the fix):**
+`color-mix(in oklch, var(--brass-500) 7%, transparent)` causes pink because `transparent` in oklch is `oklch(0 0 0)` with hue H=0 (red). When mixing a warm brass color (H~42-55) with this transparent at low percentages, the hue interpolates toward H=0 (red/pink). At 7%, the result is a faint reddish glow instead of the intended warm brass glow.
+
+**Fix applied (Pass 2):** All `color-mix(in oklch, …, transparent)` calls in `app/globals.css` have been changed to `color-mix(in srgb, …, transparent)`. In sRGB, alpha blends without hue-shifting toward red. The brass/golden glow now renders correctly as warm amber, not pink.
+
+**Rule going forward:** Never use `color-mix(in oklch, …, transparent)` for visible background glow effects. Use `in srgb` when fading to transparent. Use `in oklch` only when mixing two fully-opaque, non-transparent colors.
+
+---
+
+## Pass 2 — Token alignment + sRGB pink fix
+
+**Date:** 2026-05-16  
+**Status:** Complete.
+
+### Changes in Pass 2
+
+#### `app/globals.css` — `:root` additions
+
+| Addition | Value | Reason |
+|---|---|---|
+| `--radius-sm` | `0.375rem` (6px) | Explicit value matching design system |
+| `--radius-md` | `0.5rem` (8px) | Explicit value matching design system |
+| `--radius-lg` | `0.75rem` (12px) | **Was 10px via calc** — now matches design system 12px |
+| `--radius-xl` | `1rem` (16px) | **Was 14px via calc** — now matches design system 16px |
+| `--space-0` … `--space-20` | 4-pt scale | Design system spacing tokens; not used by Tailwind utilities |
+
+#### `app/globals.css` — `@theme inline` changes
+
+`--radius-sm/md/lg/xl` changed from `calc(var(--radius) ± Npx)` to explicit `0.375rem / 0.5rem / 0.75rem / 1rem`. Tailwind's `rounded-lg` and `rounded-xl` utilities now match design system values.
+
+#### `app/globals.css` — `.shadow-forge` utility class
+
+Changed from a custom, weaker shadow (no inset, 25% brass-500) to `box-shadow: var(--shadow-forge)`. The Tailwind class `shadow-forge` now matches the `--shadow-forge` CSS token exactly (inset brass top rail at 60%, forge drop shadow).
+
+#### `app/globals.css` — `color-mix` pink fix
+
+**All** `color-mix(in oklch, …)` calls changed to `color-mix(in srgb, …)` globally via replace. This eliminates the pink/blush hue shift caused by oklch hue interpolation toward H=0 (red) when fading to transparent. Affects:
+- `.gf-page` and `.surface-parchment` radial glows
+- `.surface-masthead`, `.surface-graphite`, `.surface-ivory`
+- `.bg-parchment-grid`, `.bg-parchment-dots`, `.bg-constellation`
+- `.divider-brass`, `.gf-brass-divider`, `.gf-brass-rail::before`
+- All `gf-copper` opacity fallback utilities
+- `--shadow-forge` token in `:root`
+- All seal/card/border color mixes
+
+#### `app/globals.css` — new naming aliases (additive)
+
+CSS-identical aliases using design system canonical names:
+
+| New class | Aliases |
+|---|---|
+| `.gf-divider-brass` | Same CSS as `.gf-brass-divider` |
+| `.gf-surface-parchment` | Same CSS as `.surface-parchment` |
+| `.gf-surface-ivory` | Same CSS as `.surface-ivory` |
+| `.gf-surface-graphite` | Same CSS as `.surface-graphite` |
+| `.gf-parchment-grid` | Same CSS as `.bg-parchment-grid` |
+| `.gf-constellation` | Same CSS as `.bg-constellation` |
+
+#### `app/globals.css` — new typography utility classes (additive)
+
+`.gf-h1`, `.gf-h2`, `.gf-h3`, `.gf-h4`, `.gf-lede`, `.gf-body`, `.gf-small`, `.gf-mono`, `.gf-serif-display`, `.gf-serif-italic` — from `colors_and_type.css`. All opt-in; no components changed.
+
+---
+
 ## Pass 1 — Foundation tokens + scoped component updates
 
 **Date:** 2026-05-15  
@@ -87,7 +161,7 @@ Usage:
 - All verification tier styles already aligned — left unchanged.
 
 **3. `components/guideforge/builder/network-dashboard-tabs.tsx`**
-- Updated "Guides", "Hubs", "Collections" tab count pills from generic `bg-slate-200 dark:bg-slate-700 text-slate-900` to brass-tinted: `color-mix(in oklch, var(--brass-100) 60%, var(--card))` background, `var(--fg-3)` text, `var(--font-mono)` at 10px.
+- Updated "Guides", "Hubs", "Collections" tab count pills from generic `bg-slate-200 dark:bg-slate-700 text-slate-900` to brass-tinted: `color-mix(in srgb, var(--brass-100) 60%, var(--card))` background, `var(--fg-3)` text, `var(--font-mono)` at 10px. (Pass 2 updated this from `in oklch` to `in srgb` to prevent pink shift.)
 - Draft / Pending Review / Published count pills already had correct brass/steel/teal treatment — left unchanged.
 
 **4. `components/guideforge/public/guide-card.tsx`**
