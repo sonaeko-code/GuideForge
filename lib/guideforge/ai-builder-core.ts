@@ -201,13 +201,89 @@ async function generateNetworkGuide(
 async function generateSingleGuideAsset(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
-  // To be implemented: call existing single guide asset generation logic
-  // This will gradually migrate generate-single-guide-client.tsx
-  return {
-    kind: "single_guide_asset",
-    mode: request.mode,
-    success: false,
-    error: "Not yet migrated to core",
+  try {
+    const formData = (request.formData ?? {}) as any
+
+    let asset: any = null
+    let generatedBy: "mock" | "openai" = "mock"
+
+    if (request.mode === "mock") {
+      const { generateSingleGuideMock } = await import("./mock-asset-generator")
+      const mockResult = await generateSingleGuideMock(formData)
+      if (!mockResult.success) {
+        return {
+          kind: "single_guide_asset",
+          mode: "mock",
+          success: false,
+          error: mockResult.error || "Mock generation failed",
+        }
+      }
+      asset = mockResult.asset
+      generatedBy = "mock"
+    } else if (request.mode === "ai") {
+      // Try AI first; fall back to mock on failure (preserves existing behaviour)
+      try {
+        const response = await fetch("/api/guideforge/generate-single-guide", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...formData, prompt: request.prompt }),
+        })
+        const data = await response.json()
+        if (data.success && data.asset) {
+          asset = data.asset
+          generatedBy = "openai"
+        } else {
+          throw new Error(data.error || "AI generation failed")
+        }
+      } catch (aiErr) {
+        console.warn("[GuideForge] Single guide AI failed, falling back to mock:", aiErr)
+        const { generateSingleGuideMock } = await import("./mock-asset-generator")
+        const mockResult = await generateSingleGuideMock(formData)
+        if (!mockResult.success) {
+          return {
+            kind: "single_guide_asset",
+            mode: "ai",
+            success: false,
+            error: mockResult.error || "Generation failed",
+          }
+        }
+        asset = mockResult.asset
+        generatedBy = "mock"
+      }
+    } else {
+      return {
+        kind: "single_guide_asset",
+        mode: request.mode,
+        success: false,
+        error: `Unknown generation mode: ${request.mode}`,
+      }
+    }
+
+    return {
+      kind: "single_guide_asset",
+      mode: request.mode,
+      success: true,
+      title: asset.title,
+      summary: asset.summary,
+      structuredPayload: asset,
+      assumptions: asset.assumptions || [],
+      missingInfo: asset.missingInfo || [],
+      warnings: asset.warnings || [],
+      generatedBy,
+      saveTargetHint: {
+        type: "workspace_asset",
+        context: { assetType: "single_guide" },
+      },
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return {
+      kind: "single_guide_asset",
+      mode: request.mode,
+      success: false,
+      error: message,
+      stage: "generation",
+    }
   }
 }
 

@@ -362,19 +362,19 @@ export function NetworkDashboardTabs({
         </TabsTrigger>
         <TabsTrigger value="guides">
           Guides
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full px-1.5 py-px font-mono text-[10px]" style={{ background: "color-mix(in oklch, var(--brass-100) 60%, var(--card))", color: "var(--fg-3)", border: "1px solid color-mix(in oklch, var(--brass-500) 20%, var(--border))" }}>
             {filteredGuides.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="hubs">
           Hubs
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full px-1.5 py-px font-mono text-[10px]" style={{ background: "color-mix(in oklch, var(--brass-100) 60%, var(--card))", color: "var(--fg-3)", border: "1px solid color-mix(in oklch, var(--brass-500) 20%, var(--border))" }}>
             {safeHubs.length}
           </span>
         </TabsTrigger>
         <TabsTrigger value="collections">
           Collections
-          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+          <span className="ml-2 inline-flex items-center justify-center rounded-full px-1.5 py-px font-mono text-[10px]" style={{ background: "color-mix(in oklch, var(--brass-100) 60%, var(--card))", color: "var(--fg-3)", border: "1px solid color-mix(in oklch, var(--brass-500) 20%, var(--border))" }}>
             {safeCollections.length}
           </span>
         </TabsTrigger>

@@ -32,6 +32,10 @@ export function SiteHeader({ className, hideCta }: SiteHeaderProps) {
         className,
       )}
     >
+      <div
+        className="gf-brass-divider"
+        aria-hidden="true"
+      />
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 md:px-6">
         {/* Logo */}
         <Link

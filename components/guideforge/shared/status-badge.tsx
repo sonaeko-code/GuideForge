@@ -34,7 +34,7 @@ const GUIDE_STATUS_STYLE: Record<GuideStatus, string> = {
   published:
     "bg-[oklch(0.93_0.03_185)]/70 text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)] border-[oklch(0.55_0.09_185)]/40",
   "needs-update":
-    "bg-destructive/10 text-destructive border-destructive/30",
+    "border-[#D9A097] bg-[#F4DCD8] text-[#8A2A1C]",
   deprecated:
     "bg-muted text-muted-foreground border-border line-through opacity-80",
   archived: "bg-muted text-muted-foreground border-border opacity-70",

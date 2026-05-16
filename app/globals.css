@@ -71,6 +71,56 @@
   --brand-teal: oklch(0.550 0.090 185);        /* #2F8A87 — verified/success */
   --brand-steel-blue: oklch(0.370 0.050 225);  /* #35546B — review/info */
   --brand-muted-slate: oklch(0.280 0.120 330); /* #6B255A — governance/admin */
+
+  /* ── GuideForge canonical named tokens (gf-* prefix) — Pass 1 ──────────────
+     These are the design-system source-of-truth aliases. They coexist with
+     --brand-* tokens above. Use gf-* for new components going forward.     */
+  --gf-parchment:      #F6F1E8; /* page background — NOT pink */
+  --gf-soft-ivory:     #FBF8F3; /* cards, panels, popovers */
+  --gf-graphite:       #1F1A17; /* primary text */
+  --gf-charcoal-brown: #2B2521; /* dark nav, Forged surface */
+  --gf-muted-slate:    #6B6255; /* secondary/muted text (warm brown — distinct from --brand-muted-slate governance purple) */
+  --gf-copper:         #B86A3B; /* primary CTA accent */
+  --gf-copper-deep:    #8C4F2A; /* copper hover / pressed */
+  --gf-ember:          #D9782F; /* highlight glow, link hover */
+  --gf-brass:          #C7A15A; /* warm-gold badges, dividers */
+  --gf-brass-deep:     #8A6F3A; /* engraved brass on dark surfaces */
+  --gf-teal:           #2F8A87; /* verified / success / Ready */
+  --gf-steel-blue:     #35546B; /* info / In Review */
+  --gf-amber:          #B47A2A; /* Draft state (warm amber-gold) */
+  --gf-rust:           #B0432A; /* destructive / error / Needs Update */
+
+  /* ── Foreground tiers ──────────────────────────────────────────────────── */
+  --fg-1: var(--foreground);
+  --fg-2: oklch(0.42 0.015 55);
+  --fg-3: var(--muted-foreground);
+  --fg-on-dark: oklch(0.96 0.012 85);
+
+  /* ── Pill radius ────────────────────────────────────────────────────────── */
+  --radius-pill: 9999px;
+
+  /* ── Shadow tokens ─────────────────────────────────────────────────────── */
+  --shadow-xs:    0 1px 2px rgba(0,0,0,.04);
+  --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
+  --shadow-card:  0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg:    0 8px 24px rgba(0,0,0,.12);
+  --shadow-forge: inset 0 2px 0 0 color-mix(in oklch, var(--brass-500) 60%, transparent),
+                  0 1px 2px rgba(0,0,0,.04),
+                  0 8px 20px -10px color-mix(in oklch, var(--brass-700) 22%, transparent);
+
+  /* ── Motion tokens ─────────────────────────────────────────────────────── */
+  --ease-out:  cubic-bezier(.2,.7,.2,1);
+  --ease-soft: cubic-bezier(.4,0,.2,1);
+  --dur-fast:  120ms;
+  --dur-base:  180ms;
+  --dur-slow:  280ms;
+
+  /* ── Tracking tokens ───────────────────────────────────────────────────── */
+  --tracking-tight:  -0.02em;
+  --tracking-normal: 0em;
+  --tracking-wide:   0.04em;
+  --tracking-mono:   0.15em;
+  --tracking-luxe:   0.20em;
 }
 
 .dark {
@@ -168,6 +218,29 @@
   --color-brand-teal: var(--brand-teal);
   --color-brand-steel-blue: var(--brand-steel-blue);
   --color-brand-muted-slate: var(--brand-muted-slate);
+
+  /* GuideForge gf-* semantic color utilities — bg-gf-copper, text-gf-teal, etc. */
+  --color-gf-parchment:   var(--gf-parchment);
+  --color-gf-soft-ivory:  var(--gf-soft-ivory);
+  --color-gf-graphite:    var(--gf-graphite);
+  --color-gf-charcoal:    var(--gf-charcoal-brown);
+  --color-gf-copper:      var(--gf-copper);
+  --color-gf-copper-deep: var(--gf-copper-deep);
+  --color-gf-ember:       var(--gf-ember);
+  --color-gf-brass:       var(--gf-brass);
+  --color-gf-brass-deep:  var(--gf-brass-deep);
+  --color-gf-muted-slate: var(--gf-muted-slate);
+  --color-gf-teal:        var(--gf-teal);
+  --color-gf-steel-blue:  var(--gf-steel-blue);
+  --color-gf-amber:       var(--gf-amber);
+  --color-gf-rust:        var(--gf-rust);
+
+  /* Serif font family — available as font-serif Tailwind class.
+     No font files loaded here; resolve Fraunces/Geist conflict before broad use. */
+  --font-serif: 'Fraunces', 'Source Serif Pro', 'Georgia', serif;
+
+  /* Pill border-radius — rounded-pill Tailwind class */
+  --radius-pill: 9999px;
 
   /* Brass scale exposed as Tailwind utilities.
      Use: bg-brass-100, text-brass-700, border-brass-300, etc. */
@@ -408,6 +481,158 @@
   /* Subtle hover elevation for interactive cards */
   .card-interactive {
     @apply transition-all duration-200 hover:shadow-md active:shadow-sm;
+  }
+
+  /* ============================================================
+     GuideForge gf-* surface utilities — Pass 1
+     Canonical names per design system handoff.
+     Existing .surface-* and .card-foundry classes remain unchanged.
+     These are additive — opt in per component; do not force all pages.
+     ============================================================ */
+
+  /* Default page surface — parchment with brass radial glows */
+  .gf-page {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(ellipse at top left,
+        color-mix(in oklch, var(--brass-500) 7%, transparent), transparent 55%),
+      radial-gradient(ellipse at bottom right,
+        color-mix(in oklch, var(--brass-700) 5%, transparent), transparent 60%),
+      linear-gradient(180deg,
+        color-mix(in oklch, var(--brass-100) 35%, var(--background)) 0%,
+        var(--background) 60%);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+
+  /* Standard foundry card — ivory surface, brass border, forge shadow */
+  .gf-card {
+    background-color: var(--card);
+    background-image: linear-gradient(180deg,
+      color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%,
+      var(--card) 100%);
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-forge);
+    transition:
+      transform var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) var(--ease-out);
+  }
+  .gf-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+  }
+
+  /* Forged card — dark graphite for premium / admin contexts */
+  .gf-card-forge {
+    background-color: oklch(0.22 0.014 55);
+    background-image:
+      radial-gradient(circle at 12% 18%,
+        color-mix(in oklch, var(--brass-500) 22%, transparent), transparent 35%),
+      radial-gradient(circle at 88% 82%,
+        color-mix(in oklch, var(--brass-700) 15%, transparent), transparent 40%),
+      linear-gradient(180deg, oklch(0.24 0.016 55) 0%, oklch(0.18 0.012 55) 100%);
+    color: var(--fg-on-dark);
+    border: 1px solid oklch(0.32 0.04 50);
+    border-radius: var(--radius-lg);
+  }
+
+  /* Section / panel card — builder panels and public-reader dispatch boxes */
+  .gf-section-card {
+    background: var(--gf-soft-ivory);
+    background-image: linear-gradient(180deg,
+      color-mix(in oklch, var(--brass-50) 60%, var(--card)) 0%,
+      var(--card) 100%);
+    border: 1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border));
+    border-radius: var(--radius-lg);
+    transition: border-color var(--dur-base), box-shadow var(--dur-base), transform var(--dur-base);
+  }
+  .gf-section-card:hover {
+    border-color: color-mix(in oklch, var(--brass-500) 38%, var(--border));
+    box-shadow: var(--shadow-card);
+    transform: translateY(-1px);
+  }
+
+  /* Brass divider — horizontal hairline that fades at both ends */
+  .gf-brass-divider {
+    height: 1px;
+    background-image: linear-gradient(90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--brass-500) 65%, transparent) 20%,
+      color-mix(in oklch, var(--brass-500) 65%, transparent) 80%,
+      transparent 100%);
+    border: none;
+  }
+
+  /* Mono overline — taxonomy breadcrumbs, section labels */
+  .gf-overline {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: var(--tracking-mono);
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  /* Copper eyebrow — section leads, feature callouts */
+  .gf-eyebrow {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: var(--tracking-luxe);
+    text-transform: uppercase;
+    color: var(--gf-copper);
+  }
+
+  /* Muted text — secondary body copy */
+  .gf-muted {
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Forged surface — dark graphite for nav / sidebar / admin panels */
+  .gf-forged-surface {
+    background-color: oklch(0.22 0.014 55);
+    background-image:
+      radial-gradient(circle at 12% 18%,
+        color-mix(in oklch, var(--brass-500) 22%, transparent), transparent 35%),
+      radial-gradient(circle at 88% 82%,
+        color-mix(in oklch, var(--brass-700) 15%, transparent), transparent 40%),
+      linear-gradient(180deg, oklch(0.24 0.016 55) 0%, oklch(0.18 0.012 55) 100%);
+    color: var(--fg-on-dark);
+    border-right: 1px solid oklch(0.32 0.04 50);
+  }
+
+  /* Forge seal — coined-gradient brass icon well (32–44px square element) */
+  .gf-forge-seal {
+    background-image:
+      radial-gradient(circle at 30% 25%,
+        color-mix(in oklch, var(--brass-300) 70%, transparent), transparent 55%),
+      linear-gradient(135deg,
+        var(--brass-700) 0%, var(--brass-500) 50%, var(--brass-700) 100%);
+    border: 1px solid color-mix(in oklch, var(--brass-900) 60%, transparent);
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklch, var(--brass-300) 80%, transparent),
+      inset 0 -1px 0 0 color-mix(in oklch, var(--brass-900) 50%, transparent),
+      0 1px 2px rgba(0,0,0,.15);
+    color: oklch(0.18 0.02 50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Brass accent rail — 1px gradient top line; add as ::before on sticky headers */
+  .gf-brass-rail::before {
+    content: "";
+    display: block;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent,
+      color-mix(in oklch, var(--brass-500) 70%, transparent),
+      transparent);
   }
 
   /* Forged seal logo wrapper — replaces flat gradient with a coined feel */

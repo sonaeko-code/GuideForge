@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { SingleGuideIntakeRequest, GeneratedSingleGuide } from "@/lib/guideforge/generation-schemas"
-import { generateSingleGuideMock } from "@/lib/guideforge/mock-asset-generator"
+import { generateGuideForgeDraft } from "@/lib/guideforge/ai-builder-core"
 import { readIntakeSession, clearIntakeSession } from "@/lib/guideforge/intake-session"
 import { parseRoughIdea } from "@/lib/guideforge/intake-field-parser"
 import { StructuredAssetProposal } from "./structured-asset-proposal"
@@ -144,31 +144,18 @@ export function GenerateSingleGuideClient() {
 
     setIsGenerating(true)
     try {
-      // Attempt AI generation first with prompt
-      const aiResponse = await fetch("/api/guideforge/generate-single-guide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formState,
-          prompt: prompt || formState.useCase || formState.goal,
-        }),
+      const result = await generateGuideForgeDraft({
+        kind: "single_guide_asset",
+        mode: "ai",
+        prompt: prompt || formState.useCase || formState.goal || "",
+        formData: formState,
       })
 
-      const aiData = await aiResponse.json()
-
-      if (aiData.success && aiData.asset) {
-        setProposal(aiData.asset as GeneratedSingleGuide)
-        return
+      if (!result.success || !result.structuredPayload) {
+        throw new Error(result.error || "Generation failed")
       }
 
-      // AI route returned an error — fall back to mock generator
-      console.warn("[GuideForge] AI generation failed, falling back to mock:", aiData.error)
-
-      const mockResponse = await generateSingleGuideMock(formState)
-      if (!mockResponse.success) {
-        throw new Error(mockResponse.error || "Generation failed")
-      }
-      setProposal(mockResponse.asset as GeneratedSingleGuide)
+      setProposal(result.structuredPayload as GeneratedSingleGuide)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"
       setError(`Generation failed: ${msg}`)
