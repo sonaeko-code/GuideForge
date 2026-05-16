@@ -36,9 +36,7 @@ export function WhatItBuilds() {
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-20">
         <div className="mb-10 flex flex-col gap-3 md:max-w-2xl">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-            What GuideForge creates
-          </span>
+          <span className="gf-eyebrow">What GuideForge creates</span>
           <h2 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             A structured guide world — already wired up for you.
           </h2>
@@ -56,6 +54,7 @@ export function WhatItBuilds() {
               icon={item.icon}
               title={item.title}
               description={item.description}
+              className="card-foundry"
             />
           ))}
         </div>

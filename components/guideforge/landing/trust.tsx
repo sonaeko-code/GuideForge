@@ -7,9 +7,7 @@ export function TrustSection() {
       <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-20">
         <div className="grid gap-10 md:grid-cols-2 md:items-center">
           <div className="flex flex-col gap-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              Trust & status
-            </span>
+            <span className="gf-eyebrow">Trust &amp; status</span>
             <h2 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
               Readers should know how trustworthy a guide is — at a glance.
             </h2>
@@ -26,16 +24,16 @@ export function TrustSection() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="gf-card p-6">
             <div className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
               <Stamp
-                className="size-4 text-primary"
+                className="size-4 text-gf-copper"
                 aria-hidden="true"
               />
               Sample status surface
             </div>
             <ul className="flex flex-col gap-3">
-              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
+              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-card-sm">
                 <span className="text-sm text-foreground">
                   Best Fire Warden Beginner Build
                 </span>
@@ -44,7 +42,7 @@ export function TrustSection() {
                   <StatusBadge status="forged" kind="verification" />
                 </span>
               </li>
-              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
+              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-card-sm">
                 <span className="text-sm text-foreground">
                   Frostmarch Boss Mechanics
                 </span>
@@ -53,7 +51,7 @@ export function TrustSection() {
                   <StatusBadge status="expert-reviewed" kind="verification" />
                 </span>
               </li>
-              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
+              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-card-sm">
                 <span className="text-sm text-foreground">
                   Patch 4.2 Impact Notes
                 </span>
@@ -62,7 +60,7 @@ export function TrustSection() {
                   <StatusBadge status="community-proven" kind="verification" />
                 </span>
               </li>
-              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
+              <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-card-sm">
                 <span className="text-sm text-foreground">
                   Patch 3.8 Class Tier List
                 </span>

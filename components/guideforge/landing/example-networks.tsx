@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Gamepad2, GraduationCap, LifeBuoy, Users, Wrench, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 const EXAMPLES = [
   {
@@ -48,9 +49,7 @@ export function ExampleNetworks() {
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-20">
         <div className="mb-10 flex flex-col gap-3 md:max-w-2xl">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Example Networks
-          </span>
+          <span className="gf-eyebrow">Example Networks</span>
           <h2 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             One engine. Many network types.
           </h2>
@@ -64,18 +63,17 @@ export function ExampleNetworks() {
           {EXAMPLES.map(({ icon: Icon, name, type, blurb, featured, link }) => (
             <article
               key={name}
-              className={`flex flex-col gap-3 rounded-xl border bg-card p-5 ${
-                featured
-                  ? "border-primary/40 ring-1 ring-primary/20"
-                  : "border-border"
-              }`}
+              className={cn(
+                "flex flex-col gap-3 gf-card p-5",
+                featured && "ring-1 ring-gf-copper/30"
+              )}
             >
               <div className="flex items-center justify-between">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-gf-copper/10 text-gf-copper">
                   <Icon className="size-4.5" aria-hidden="true" />
                 </div>
                 {featured ? (
-                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  <span className="rounded-full border border-gf-copper/40 bg-gf-copper/10 px-2 py-0.5 text-xs font-medium text-gf-copper">
                     Live demo
                   </span>
                 ) : (

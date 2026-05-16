@@ -8,7 +8,7 @@ import { CtaFooter } from "@/components/guideforge/landing/cta-footer"
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="gf-page">
       <SiteHeader />
       <LandingHero />
       <WhatItBuilds />

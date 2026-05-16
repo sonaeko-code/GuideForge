@@ -8,7 +8,7 @@ export function CtaFooter() {
     <>
       <section className="border-b border-border">
         <div className="mx-auto w-full max-w-6xl px-4 py-20 md:px-6 md:py-24">
-          <div className="flex flex-col items-start gap-6 rounded-2xl border border-border bg-card px-6 py-12 md:items-center md:px-10 md:text-center">
+          <div className="flex flex-col items-start gap-6 rounded-2xl surface-masthead px-6 py-12 md:items-center md:px-10 md:text-center">
             <h2 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl md:max-w-2xl">
               Ready to forge your first guide world?
             </h2>
@@ -27,7 +27,8 @@ export function CtaFooter() {
         </div>
       </section>
 
-      <footer className="border-t border-border">
+      <footer className="">
+        <div className="gf-brass-divider" aria-hidden="true" />
         <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-4 px-4 py-8 text-sm text-muted-foreground md:flex-row md:items-center md:px-6">
           <div className="flex items-center gap-2">
             <GuideMark className="size-6 [&_svg]:size-3.5" />
