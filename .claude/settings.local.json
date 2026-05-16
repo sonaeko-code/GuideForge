@@ -4,7 +4,9 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\" -Depth 1)",
       "Bash(Select-Object Name, FullName)",
       "Bash(Test-Path \"c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\docs\")",
-      "Bash(mkdir -p c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\docs)"
+      "Bash(mkdir -p c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\docs)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm dev *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\sonaeko\\Documents\\GitHub\\GuideForge"
