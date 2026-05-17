@@ -271,6 +271,10 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     general: "Community Hub",
   }
 
+  // Detect a known game/product title and content categories from the idea
+  const knownTitle = extractKnownTitle(idea)
+  const contentCategories = detectContentCategories(idea)
+
   let name: string
 
   const sfx = typeSuffix[typeId] ?? "Guide Hub"
@@ -278,38 +282,40 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   const descriptor = typeDescriptor[typeId] ?? "Guide"
 
   if (quotedMatch) {
-    // Use quoted text as the core name
+    // Quoted text is always highest priority
     name = `${quotedMatch[1]} ${sfx}`
-  } else if (detectedAnchors.length > 0) {
-    // Combine detected domain anchors with type descriptor + suffix.
-    // "Survival RPG Strategy Guides" / "Laptop Repair Hub" / "Onboarding Team Runbook".
-    const anchorPhrase = detectedAnchors.join(" ")
-    name = `${anchorPhrase} ${descriptor}`
-  } else if (properNounMatch && properNounMatch[1].length > 2) {
-    // Use detected proper noun
-    name = `${properNounMatch[1]} ${sfx}`
   } else {
-    // Fall back to a cleaned-up, concise version: take first meaningful noun phrase
-    // Remove type-describing words and pick up to 3 specific words
-    const stopWords = new Set([
-      "gaming", "guide", "network", "hub", "platform", "site", "wiki",
-      "a", "an", "the", "for", "with", "and", "or", "to", "in", "on",
-      "guides", "knowledge", "base", "community", "repair", "training",
-      "build", "system", "organize", "create", "library", "app",
-    ])
-    const candidateWords = stripped
-      .split(/\s+/)
-      .filter((w) => !stopWords.has(w.toLowerCase()) && w.length > 2)
-      .slice(0, 2)
-
-    if (candidateWords.length >= 1) {
-      // Capitalize first letters
-      const core = candidateWords
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")
-      name = `${core} ${sfx}`
+    // Try intent-aware name first (uses knownTitle + categories + type)
+    const intentName = buildNetworkName(knownTitle, typeId, contentCategories, idea)
+    if (intentName) {
+      name = intentName
+    } else if (detectedAnchors.length > 0) {
+      // Combine detected domain anchors with type descriptor + suffix
+      const anchorPhrase = detectedAnchors.join(" ")
+      name = `${anchorPhrase} ${descriptor}`
+    } else if (properNounMatch && properNounMatch[1].length > 2) {
+      // Use detected proper noun
+      name = `${properNounMatch[1]} ${sfx}`
     } else {
-      name = defaultName
+      const stopWords = new Set([
+        "gaming", "guide", "network", "hub", "platform", "site", "wiki",
+        "a", "an", "the", "for", "with", "and", "or", "to", "in", "on",
+        "guides", "knowledge", "base", "community", "repair", "training",
+        "build", "system", "organize", "create", "library", "app",
+      ])
+      const candidateWords = stripped
+        .split(/\s+/)
+        .filter((w) => !stopWords.has(w.toLowerCase()) && w.length > 2)
+        .slice(0, 2)
+
+      if (candidateWords.length >= 1) {
+        const core = candidateWords
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ")
+        name = `${core} ${sfx}`
+      } else {
+        name = defaultName
+      }
     }
   }
 
@@ -334,7 +340,7 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
   const suggestedHubs = generateHubSuggestions(typeId, idea, words)
 
   // ============ Scaffold Suggestion (hubs + collections) ============
-  const suggestedScaffold = generateScaffoldSuggestion(typeId, suggestedHubs)
+  const suggestedScaffold = generateScaffoldSuggestion(typeId, suggestedHubs, knownTitle ?? undefined)
 
   const confidence = Math.min(100, (typeScore * 20 + (detectedKeywords.length > 0 ? 40 : 0)))
 
@@ -351,6 +357,291 @@ export function smartFillNetwork(roughIdea: string): SmartFillResult {
     detectedKeywords: Array.from(new Set(detectedKeywords)).slice(0, 5),
     confidence,
   }
+}
+
+// ============ Content-intent detection ============
+
+/**
+ * Detect lightweight content categories from the lowercased idea.
+ * Used by buildNetworkName to pick a stronger, more specific name.
+ */
+function detectContentCategories(lowerIdea: string): string[] {
+  const cats: string[] = []
+  if (/\b(build|builds|loadout|loadouts)\b/.test(lowerIdea)) cats.push("builds")
+  if (/\b(raid|raids|raiding)\b/.test(lowerIdea)) cats.push("raids")
+  if (/\bpvp\b/.test(lowerIdea)) cats.push("pvp")
+  if (/\b(boss|bosses)\b/.test(lowerIdea)) cats.push("bosses")
+  if (/\bsurvival\b/.test(lowerIdea)) cats.push("survival")
+  if (/\b(crafting|redstone|farm|farms)\b/.test(lowerIdea)) cats.push("crafting")
+  if (/\bredstone\b/.test(lowerIdea)) cats.push("redstone")
+  if (/\bbeginner\b/.test(lowerIdea)) cats.push("beginner")
+  if (/\b(patch|patches)\b/.test(lowerIdea)) cats.push("patch")
+  if (/\b(lore|story)\b/.test(lowerIdea)) cats.push("lore")
+  if (/\beconomy\b/.test(lowerIdea)) cats.push("economy")
+  // Creator
+  if (/\b(thumbnail|thumbnails)\b/.test(lowerIdea)) cats.push("thumbnails")
+  if (/\b(upload|uploads)\b/.test(lowerIdea)) cats.push("upload")
+  if (/\bdiscord\b/.test(lowerIdea)) cats.push("discord")
+  if (/\banalytics\b/.test(lowerIdea)) cats.push("analytics")
+  if (/\b(gameplay|gaming creator)\b/.test(lowerIdea)) cats.push("gaming-creator")
+  if (/\bsolo\b/.test(lowerIdea)) cats.push("solo")
+  // Business / service type
+  if (/\blaunch\b/.test(lowerIdea)) cats.push("launch")
+  if (/\bpricing\b/.test(lowerIdea)) cats.push("pricing")
+  if (/\bwebsite\b/.test(lowerIdea)) cats.push("website")
+  if (/\bfollow.?up\b/.test(lowerIdea)) cats.push("followup")
+  if (/\blawn\b/.test(lowerIdea)) cats.push("service:lawn")
+  if (/\bcleaning\b/.test(lowerIdea)) cats.push("service:cleaning")
+  if (/\bpainting\b/.test(lowerIdea)) cats.push("service:painting")
+  if (/\bplumbing\b/.test(lowerIdea)) cats.push("service:plumbing")
+  // Home/family
+  if (/\b(chore|chores)\b/.test(lowerIdea)) cats.push("chores")
+  if (/\b(medication|allerg)\b/.test(lowerIdea)) cats.push("medication")
+  if (/\b(childcare|child care)\b/.test(lowerIdea)) cats.push("childcare")
+  if (/\b(maintenance|seasonal)\b/.test(lowerIdea)) cats.push("maintenance")
+  return cats
+}
+
+/**
+ * Compose a stronger, intent-aware network name.
+ * Returns "" to signal the caller should fall through to the existing generic path.
+ */
+function buildNetworkName(
+  knownTitle: string | null,
+  typeId: string,
+  cats: string[],
+  lowerIdea: string,
+): string {
+  const has = (c: string) => cats.includes(c)
+
+  if (typeId === "gaming") {
+    if (!knownTitle) return ""
+    if (has("builds") && has("raids")) return `${knownTitle} Builds & Raids`
+    if (has("pvp") && has("raids")) return `${knownTitle} PvP & Raiding Hub`
+    if (has("pvp") && has("bosses")) return `${knownTitle} PvP & Boss Guides`
+    if (has("pvp")) return `${knownTitle} PvP Guide Network`
+    if (has("raids") || has("bosses")) return `${knownTitle} Raid & Boss Guides`
+    if (has("survival") && has("redstone")) return `${knownTitle} Survival & Redstone Hub`
+    if (has("survival") && has("crafting")) return `${knownTitle} Survival & Crafting Hub`
+    if (has("survival")) return `${knownTitle} Survival Guide Network`
+    if (has("crafting") || has("redstone")) return `${knownTitle} Crafting Guide Network`
+    if (has("builds")) return `${knownTitle} Builds & Strategy Hub`
+    if (has("lore")) return `${knownTitle} Lore & Guide Network`
+    if (has("beginner")) return `${knownTitle} Beginner Guide Network`
+    return `${knownTitle} Guide Network`
+  }
+
+  if (typeId === "creator_workflow") {
+    const platform = knownTitle  // YouTube, TikTok, Twitch — detected via KNOWN_TITLES
+    const isGaming = has("gaming-creator") || lowerIdea.includes("gameplay") || lowerIdea.includes("gaming")
+    const isSolo = has("solo")
+    if (platform && isGaming && isSolo) return `${platform} Gaming Creator Playbook`
+    if (platform && isGaming) return `${platform} Gaming Creator Hub`
+    if (platform && isSolo) return `${platform} Creator Playbook`
+    if (platform) return `${platform} Creator Hub`
+    if (isGaming && isSolo) return "Solo Gaming Creator Playbook"
+    if (isGaming) return "Gaming Creator Hub"
+    return "Creator Workflow Playbook"
+  }
+
+  if (typeId === "small_business") {
+    const serviceType = cats.find((c) => c.startsWith("service:"))?.replace("service:", "")
+    const capitalized = serviceType ? serviceType.charAt(0).toUpperCase() + serviceType.slice(1) : null
+    if (capitalized && has("launch")) return `${capitalized} Care Launch Network`
+    if (capitalized) return `${capitalized} Care Service Playbook`
+    if (has("launch") && has("pricing")) return "Service Business Launch Network"
+    if (has("launch")) return "Business Launch Playbook"
+    return "Business Operations Playbook"
+  }
+
+  if (typeId === "home_systems") {
+    const hasMaint = has("maintenance") || lowerIdea.includes("hvac") || lowerIdea.includes("seasonal")
+    const hasRoutines = has("chores") || lowerIdea.includes("routine")
+    const hasFamily = lowerIdea.includes("family") || has("childcare")
+    if (hasMaint && hasRoutines) return "Home Maintenance & Family Routines"
+    if (hasMaint && hasFamily) return "Household Systems Guide Network"
+    if (hasMaint) return "Home Maintenance Guide Network"
+    if (hasFamily && has("medication")) return "Family Health & Routines Network"
+    if (hasFamily) return "Family Operations Playbook"
+    return "Home Systems Guide Network"
+  }
+
+  if (typeId === "restaurant_training") return "Restaurant Operations Hub"
+  if (typeId === "wellness_training") {
+    if (lowerIdea.includes("fitness")) return "Fitness & Wellness Program Network"
+    if (lowerIdea.includes("nutrition")) return "Nutrition & Wellness Guide Network"
+    return "Wellness Program Network"
+  }
+
+  return ""
+}
+
+// ============ Known title detection ============
+
+/**
+ * Maps lowercase search strings to their proper-cased game/product name.
+ * Multi-word phrases are listed first so greedy matching finds them before single-word aliases.
+ */
+const KNOWN_TITLES: Array<{ search: string; title: string }> = [
+  // Multi-word phrases (checked before single-word aliases)
+  { search: "world of warcraft", title: "World of Warcraft" },
+  { search: "league of legends", title: "League of Legends" },
+  { search: "path of exile", title: "Path of Exile" },
+  { search: "baldur's gate 3", title: "Baldur's Gate 3" },
+  { search: "baldurs gate 3", title: "Baldur's Gate 3" },
+  { search: "baldur's gate", title: "Baldur's Gate" },
+  { search: "baldurs gate", title: "Baldur's Gate" },
+  { search: "final fantasy xiv", title: "Final Fantasy XIV" },
+  { search: "final fantasy xi", title: "Final Fantasy XI" },
+  { search: "final fantasy", title: "Final Fantasy" },
+  { search: "the elder scrolls", title: "The Elder Scrolls" },
+  { search: "elder scrolls", title: "The Elder Scrolls" },
+  { search: "apex legends", title: "Apex Legends" },
+  { search: "animal crossing", title: "Animal Crossing" },
+  { search: "monster hunter", title: "Monster Hunter" },
+  { search: "genshin impact", title: "Genshin Impact" },
+  { search: "stardew valley", title: "Stardew Valley" },
+  { search: "hollow knight", title: "Hollow Knight" },
+  { search: "dead cells", title: "Dead Cells" },
+  { search: "mario kart", title: "Mario Kart" },
+  { search: "super smash", title: "Super Smash Bros" },
+  { search: "smash bros", title: "Super Smash Bros" },
+  { search: "dark souls", title: "Dark Souls" },
+  { search: "elden ring", title: "Elden Ring" },
+  { search: "new world", title: "New World" },
+  { search: "lost ark", title: "Lost Ark" },
+  { search: "destiny 2", title: "Destiny 2" },
+  { search: "diablo iv", title: "Diablo IV" },
+  { search: "diablo 4", title: "Diablo IV" },
+  { search: "wow classic", title: "WoW Classic" },
+  { search: "cyberpunk 2077", title: "Cyberpunk 2077" },
+  { search: "overwatch 2", title: "Overwatch 2" },
+  { search: "honkai star rail", title: "Honkai: Star Rail" },
+  { search: "risk of rain", title: "Risk of Rain 2" },
+  { search: "breath of the wild", title: "Breath of the Wild" },
+  { search: "tears of the kingdom", title: "Tears of the Kingdom" },
+  { search: "legend of zelda", title: "The Legend of Zelda" },
+  { search: "counter-strike 2", title: "Counter-Strike 2" },
+  { search: "dota 2", title: "Dota 2" },
+  // Single words (word-boundary checked to avoid false positives)
+  { search: "warcraft", title: "World of Warcraft" },
+  { search: "minecraft", title: "Minecraft" },
+  { search: "terraria", title: "Terraria" },
+  { search: "valheim", title: "Valheim" },
+  { search: "starfield", title: "Starfield" },
+  { search: "cyberpunk", title: "Cyberpunk 2077" },
+  { search: "overwatch", title: "Overwatch" },
+  { search: "fortnite", title: "Fortnite" },
+  { search: "valorant", title: "Valorant" },
+  { search: "hearthstone", title: "Hearthstone" },
+  { search: "genshin", title: "Genshin Impact" },
+  { search: "stardew", title: "Stardew Valley" },
+  { search: "pokemon", title: "Pokémon" },
+  { search: "pokémon", title: "Pokémon" },
+  { search: "zelda", title: "The Legend of Zelda" },
+  { search: "hades", title: "Hades" },
+  { search: "skyrim", title: "Skyrim" },
+  { search: "oblivion", title: "Oblivion" },
+  { search: "diablo", title: "Diablo" },
+  { search: "warframe", title: "Warframe" },
+  { search: "ffxiv", title: "Final Fantasy XIV" },
+  { search: "ff14", title: "Final Fantasy XIV" },
+  { search: "csgo", title: "Counter-Strike" },
+  { search: "dota", title: "Dota 2" },
+  { search: "wow", title: "World of Warcraft" },
+  { search: "bg3", title: "Baldur's Gate 3" },
+  { search: "poe", title: "Path of Exile" },
+  // Creator platforms
+  { search: "youtube", title: "YouTube" },
+  { search: "tiktok", title: "TikTok" },
+  { search: "twitch", title: "Twitch" },
+]
+
+/**
+ * Scan the lowercased idea for a known game/product title.
+ * Multi-word phrases use substring matching; single words require word boundaries.
+ * Returns the proper-cased title, or null if nothing matches.
+ */
+function extractKnownTitle(lowerIdea: string): string | null {
+  const multiWord = KNOWN_TITLES.filter((e) => e.search.includes(" "))
+  const singleWord = KNOWN_TITLES.filter((e) => !e.search.includes(" "))
+
+  for (const { search, title } of multiWord) {
+    if (lowerIdea.includes(search)) return title
+  }
+  for (const { search, title } of singleWord) {
+    const re = new RegExp(`\\b${search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)
+    if (re.test(lowerIdea)) return title
+  }
+  return null
+}
+
+// ============ Hub descriptions ============
+
+const HUB_DESCRIPTIONS: Record<string, string> = {
+  // Gaming
+  "Survival Mechanics": "Survival fundamentals — food, water, shelter, and staying alive.",
+  "Crafting & Materials": "Material farming, crafting recipes, and station progression.",
+  "PvP & Combat": "Combat mechanics, PvP loadouts, and engagement strategy.",
+  "Builds & Loadouts": "Character builds, gear setups, and playstyle optimization.",
+  "Boss Guides": "Phase-by-phase strategies, attack patterns, and counter builds.",
+  "Patch Notes": "Update summaries, balance changes, and new content breakdowns.",
+  "Beginner Guides": "Core mechanics and first-hour walkthroughs for new players.",
+  "Progression Guides": "Leveling routes, gear tiers, and endgame roadmaps.",
+  "Economy & Trading": "Currency management, market strategy, and trading tips.",
+  "Farming & Resources": "Efficient resource routes and rare drop hunting guides.",
+  "Multiplayer & Co-op": "Group composition, co-op strategy, and team play tips.",
+  "Lore & World Building": "Story context, faction guides, and world timeline.",
+  "Quests & Missions": "Main story and optional quest walkthroughs.",
+  "Strategy & Tactics": "Macro planning and moment-to-moment decision making.",
+  "Community Highlights": "Top community guides and featured discussion threads.",
+  "Tier Lists": "Meta rankings for PvE and PvP across all content phases.",
+  "Maps & Locations": "Region overviews, hidden areas, and points of interest.",
+  // Repair / tech
+  "Diagnostics & Testing": "Structured triage from first look to confirmed root cause.",
+  "Safety Procedures": "Mandatory safety steps before starting any repair job.",
+  "Tools & Equipment": "Required and specialty tools for each repair type.",
+  "Troubleshooting": "Most-reported problems and step-by-step fixes.",
+  "Preventive Maintenance": "Scheduled tasks to prevent failures before they happen.",
+  "Installation Guides": "First-time setup and drop-in replacement procedures.",
+  // Training / operations
+  "Onboarding": "First-day through first-month guides for new team members.",
+  "Compliance & Policies": "Internal and regulatory compliance references.",
+  "Workflows & Processes": "Day-to-day and exception handling procedures.",
+  "Assessments & Quizzes": "Knowledge checks and formal certification paths.",
+  "Core Curriculum": "Foundation concepts and applied practice materials.",
+  "Advanced Topics": "Expert-level deep dives for experienced practitioners.",
+  "Daily Operations": "Opening, closing, and routine operational procedures.",
+  "Food Safety": "Temperature logs, sanitation checklists, and compliance records.",
+  "Launch Checklist": "Launch readiness steps from branding to legal.",
+  "Client Onboarding": "Intake workflows, contracts, and first-engagement guides.",
+  // Wellness / creator / personal knowledge
+  "Programs": "Structured wellness and training program guides.",
+  "Nutrition": "Meal planning, macros, and supplement guidance.",
+  "Habits & Mindset": "Daily habit systems and mindset fundamentals.",
+  "Content Planning": "Editorial calendar, topic research, and batch planning.",
+  "Production Workflow": "Filming, recording, and editing workflow guides.",
+  "Publishing": "Upload checklists and multi-platform publishing procedures.",
+  "Analytics & Growth": "Performance tracking and channel growth strategies.",
+  "Daily Planning": "Morning routines, task management, and weekly reviews.",
+  "Projects": "Active and archived project documentation.",
+  "Learning & Goals": "Learning notes, skill tracking, and long-term goals.",
+  "Reviews & Reflections": "Weekly and monthly review templates.",
+  // Home systems
+  "Family Routines": "Daily, weekly, and seasonal family schedules and chore assignments.",
+  "Medications & Health": "Medication schedules, allergies, and healthcare contacts.",
+  "Emergency & Safety": "Emergency contacts, evacuation plans, and first aid procedures.",
+  "Seasonal Maintenance": "Seasonal home tasks and maintenance checklists.",
+  "Baby & Infant Care": "Supplies, feeding schedules, sleep routines, and infant care.",
+  "Home Systems": "HVAC, plumbing, electrical, and appliance documentation.",
+  // Generic
+  "Getting Started": "Quick-start guides and essential first steps.",
+  "Resources": "Reference links, tools, templates, and external reading.",
+  "Best Practices": "Recommended patterns and anti-patterns to skip.",
+  "News & Updates": "Announcements, roadmap updates, and changelog entries.",
+  "FAQ": "Frequently asked questions and detailed answers.",
+  "Reference": "Data tables, glossary, and searchable reference material.",
+  "Team Resources": "Internal directories, shared templates, and team tools.",
 }
 
 /**
@@ -723,42 +1014,152 @@ const HUB_TO_COLLECTIONS: Record<string, SmartFillCollectionSuggestion[]> = {
 }
 
 /**
+ * Collection-name → specific guide idea. Checked before pattern matching to avoid repeating
+ * generic titles (e.g. "Best Starter Build" appearing in every build-related collection).
+ * Keys are the canonical collection display names from HUB_TO_COLLECTIONS.
+ */
+const COLLECTION_GUIDE_IDEAS: Record<string, StarterGuideIdea> = {
+  // Builds & Loadouts
+  "Beginner Builds": { title: "Beginner-Friendly Build Starter Guide", summary: "An easy-to-pilot build with flexible stats — great for your first hours.", guideType: "character-build", difficulty: "beginner" },
+  "Endgame Builds": { title: "Endgame Raid Build Checklist", summary: "Optimized gear priorities, stats, and rotation for late-game content.", guideType: "character-build", difficulty: "advanced" },
+  "Niche & Off-Meta": { title: "Off-Meta Build Evaluation Guide", summary: "When to run off-meta and how to make it work at each difficulty tier.", guideType: "guide", difficulty: "intermediate" },
+  // Boss Guides
+  "Early-Game Bosses": { title: "First Boss Mechanics Checklist", summary: "Phase patterns, safe spots, and damage windows for early encounters.", guideType: "boss-guide", difficulty: "beginner" },
+  "Late-Game Bosses": { title: "Endgame Boss Prep Guide", summary: "Required gear, mechanics overview, and callout cheatsheet for late-game fights.", guideType: "boss-guide", difficulty: "advanced" },
+  "Optional Bosses": { title: "Optional Boss Rewards & Route Guide", summary: "Which optional fights are worth doing and in what order.", guideType: "guide", difficulty: "intermediate" },
+  // Beginner Guides
+  "Getting Started": { title: "First-Hour Beginner Roadmap", summary: "Your first steps from character creation to the first meaningful milestone.", guideType: "guide", difficulty: "beginner" },
+  "Core Concepts": { title: "Core Systems Explained", summary: "The mechanics every player must understand to progress confidently.", guideType: "guide", difficulty: "beginner" },
+  "Common Mistakes": { title: "Beginner Mistakes to Avoid", summary: "The most common new-player pitfalls and exactly how to skip them.", guideType: "guide", difficulty: "beginner" },
+  // Patch Notes
+  "Major Updates": { title: "Patch Summary & Player Impact Guide", summary: "What's new, what changed, and how it affects your current build.", guideType: "reference", difficulty: "beginner" },
+  "Balance Changes": { title: "Class Balance Impact Breakdown", summary: "Buffs, nerfs, and meta shifts explained for every class.", guideType: "reference", difficulty: "intermediate" },
+  // Progression
+  "Leveling Routes": { title: "Fastest Leveling Route Guide", summary: "The most time-efficient path from level 1 to cap.", guideType: "guide", difficulty: "intermediate" },
+  "Gear Progression": { title: "Fresh Max-Level Gear Priority Guide", summary: "What to chase first after hitting max level and why.", guideType: "guide", difficulty: "intermediate" },
+  // Tier Lists
+  "PvE Tier Lists": { title: "PvE Class Tier List", summary: "Rankings by damage output, survivability, and ease of play for PvE.", guideType: "tier-list", difficulty: "intermediate" },
+  "PvP Tier Lists": { title: "PvP Class & Loadout Tier List", summary: "Top picks for ranked and unranked PvP modes this patch.", guideType: "tier-list", difficulty: "intermediate" },
+  // Quests
+  "Main Story Quests": { title: "Main Story Quest Walkthrough", summary: "Critical-path quest guide with important choices explained.", guideType: "walkthrough", difficulty: "beginner" },
+  "Side Quests": { title: "Best Side Quests Worth Completing", summary: "Hidden storylines and side content with the best rewards.", guideType: "guide", difficulty: "beginner" },
+  // PvP / Combat
+  "Combat Fundamentals": { title: "Combat Mechanics Primer", summary: "Dodge, parry, cooldown management, and core engagement rules.", guideType: "guide", difficulty: "beginner" },
+  "PvP Strategy": { title: "PvP Build & Positioning Guide", summary: "Loadouts, positioning, and baiting strategies for competitive play.", guideType: "guide", difficulty: "intermediate" },
+  // Farming
+  "Daily Farms": { title: "Efficient Daily Farm Route", summary: "The highest-yield daily routes completable in under 30 minutes.", guideType: "guide", difficulty: "intermediate" },
+  "Rare Drops": { title: "Rare Drop Hunting Guide", summary: "Target locations, farm methods, and expected drop rates for top loot.", guideType: "guide", difficulty: "intermediate" },
+  // Survival / Crafting
+  "Day-One Survival": { title: "Day One Survival Checklist", summary: "How to survive your first night and get a stable foothold.", guideType: "guide", difficulty: "beginner" },
+  "Long-Term Survival": { title: "Base Building & Sustainability Guide", summary: "Sustainable bases, food cycles, and long-term resource planning.", guideType: "guide", difficulty: "intermediate" },
+  "Environmental Hazards": { title: "Environmental Hazard Field Guide", summary: "Weather, biomes, and status effects — what to watch for and how to prep.", guideType: "reference", difficulty: "beginner" },
+  "Resource Gathering": { title: "Resource Gathering Route Guide", summary: "Where and how to efficiently farm each resource type.", guideType: "guide", difficulty: "beginner" },
+  "Crafting Recipes": { title: "Crafting Recipe Quick Reference", summary: "Full recipe list with material counts and unlock requirements.", guideType: "reference", difficulty: "beginner" },
+  "Workbenches & Stations": { title: "Crafting Station Progression Guide", summary: "Which stations to build first and what they unlock.", guideType: "guide", difficulty: "beginner" },
+  // Economy
+  "Currency Sinks": { title: "Where to Spend Your Currency Wisely", summary: "The best currency investments at each stage of progression.", guideType: "guide", difficulty: "intermediate" },
+  "Trading Strategies": { title: "Player Market & Trading Guide", summary: "How to flip items, find deals, and build wealth efficiently.", guideType: "guide", difficulty: "intermediate" },
+  // Training / SOP
+  "First Day": { title: "First Day Orientation Checklist", summary: "Logins, introductions, paperwork, and your first-day task list.", guideType: "sop", difficulty: "beginner" },
+  "First Week": { title: "First Week Training Checklist", summary: "Core training, shadowing sessions, and first independent tasks.", guideType: "sop", difficulty: "beginner" },
+  "First Month": { title: "First Month Milestone Checklist", summary: "Independent task ramp, review meetings, and onboarding sign-off.", guideType: "sop", difficulty: "beginner" },
+  "Company Policies": { title: "Company Policy Quick Reference", summary: "The policies every new hire must know and where to find them.", guideType: "reference", difficulty: "beginner" },
+  "Regulatory Compliance": { title: "Regulatory Compliance Checklist", summary: "External requirements and how to document compliance correctly.", guideType: "sop", difficulty: "beginner" },
+  "Knowledge Checks": { title: "Module Knowledge Check Guide", summary: "Short quizzes for each core topic linked to the curriculum.", guideType: "reference", difficulty: "beginner" },
+  // Restaurant
+  "Opening Procedures": { title: "Opening Procedures SOP", summary: "Step-by-step morning setup checklist for the shift lead.", guideType: "sop", difficulty: "beginner" },
+  "Closing Procedures": { title: "Closing Procedures SOP", summary: "End-of-shift cleanup and close-out checklist.", guideType: "sop", difficulty: "beginner" },
+  // Home systems
+  "Daily Routines": { title: "Daily Household Routine Checklist", summary: "Morning, afternoon, and evening routines for the whole family.", guideType: "sop", difficulty: "beginner" },
+  "Household Chores": { title: "Weekly Chore Assignment Guide", summary: "Who does what and when — a repeatable chore rotation.", guideType: "guide", difficulty: "beginner" },
+  "School & Activities": { title: "School Schedule & Pickup Procedure Guide", summary: "Daily school timing, extracurriculars, and pickup contacts.", guideType: "reference", difficulty: "beginner" },
+  "Medication Schedules": { title: "Medication Schedule Quick Reference", summary: "Daily doses, times, and caregiver notes at a glance.", guideType: "reference", difficulty: "beginner" },
+  "Allergies & Restrictions": { title: "Allergy & Dietary Restriction Reference Card", summary: "Known allergies, safe substitutions, and what to avoid.", guideType: "reference", difficulty: "beginner" },
+  "Doctor & Provider Info": { title: "Healthcare Provider Contact Sheet", summary: "Primary care, specialists, pharmacy, and insurance contacts.", guideType: "reference", difficulty: "beginner" },
+  "Emergency Contacts": { title: "Emergency Contact Reference Sheet", summary: "Family, neighbors, doctors, and emergency services — all in one place.", guideType: "reference", difficulty: "beginner" },
+  "Emergency Plans": { title: "Home Emergency Plan Guide", summary: "Evacuation routes, severe weather procedures, and disaster prep checklist.", guideType: "guide", difficulty: "beginner" },
+  "First Aid & CPR": { title: "First Aid & CPR Quick Reference", summary: "Key procedures, supply locations, and when to call 911.", guideType: "reference", difficulty: "beginner" },
+  "Spring Tasks": { title: "Spring Home Maintenance Checklist", summary: "Spring cleaning, yard prep, and HVAC startup checks.", guideType: "sop", difficulty: "beginner" },
+  "Fall Tasks": { title: "Fall Winterization Checklist", summary: "Heating prep, gutter cleaning, and cold-weather readiness.", guideType: "sop", difficulty: "beginner" },
+  "Summer & Winter": { title: "Summer & Winter Home Care Guide", summary: "AC maintenance, outdoor care, and snow/heating procedures.", guideType: "guide", difficulty: "beginner" },
+  "Supplies & Inventory": { title: "Baby Supplies Inventory & Restock List", summary: "Current diaper sizes, formula brand, clothing sizes, and restock thresholds.", guideType: "reference", difficulty: "beginner" },
+  "Feeding & Nutrition": { title: "Feeding Schedule & Allergy Reference", summary: "Feeding times, bottle prep, introduced foods, and known allergies.", guideType: "reference", difficulty: "beginner" },
+  "Sleep & Routines": { title: "Sleep Schedule & Bedtime Routine Guide", summary: "Nap times, bedtime routine steps, and sleep regression notes.", guideType: "guide", difficulty: "beginner" },
+  "HVAC & Climate": { title: "HVAC & Thermostat Settings Guide", summary: "Seasonal settings, filter schedule, and service contact.", guideType: "reference", difficulty: "beginner" },
+  "Plumbing & Electrical": { title: "Shut-Off & Breaker Reference Guide", summary: "Water shut-off locations, circuit breaker map, and emergency contacts.", guideType: "reference", difficulty: "beginner" },
+  "Appliances": { title: "Appliance Maintenance & Warranty Reference", summary: "Model numbers, warranty expiry, filter schedules, and service contacts.", guideType: "reference", difficulty: "beginner" },
+  // Creator workflow
+  "Content Planning": { title: "Weekly Content Planning Checklist", summary: "How to plan, batch, and schedule content for the week.", guideType: "guide", difficulty: "beginner" },
+  "Upload Checklist": { title: "Upload QA Checklist Before Publishing", summary: "Title, thumbnail, tags, description, and scheduling review.", guideType: "sop", difficulty: "beginner" },
+  "Promotion Workflow": { title: "Post-Upload Promotion Checklist", summary: "Where and how to share each new video after publishing.", guideType: "sop", difficulty: "beginner" },
+  // Launch Checklist (small business)
+  "Branding Basics": { title: "Brand Setup Quick Guide", summary: "Logo, name, colors, and consistent branding from day one.", guideType: "guide", difficulty: "beginner" },
+  "Legal & Admin": { title: "Business Registration Checklist", summary: "LLC/sole-proprietor, EIN, bank account, and insurance setup.", guideType: "sop", difficulty: "beginner" },
+  "Intro Workflow": { title: "First Client Intake Workflow", summary: "Discovery call, contract, deposit, and kickoff SOP.", guideType: "sop", difficulty: "beginner" },
+  "Contracts & Billing": { title: "Service Contract & Invoice Guide", summary: "What to include in service contracts and how to send invoices.", guideType: "guide", difficulty: "beginner" },
+  "Daily Workflows": { title: "Daily Operations Workflow", summary: "The repeatable day-to-day process for delivering your service.", guideType: "sop", difficulty: "beginner" },
+}
+
+/**
  * Generate 1-2 starter guide ideas for a given collection based on its name and parent hub.
  * These are purely informational — shown in the scaffold preview, not auto-saved.
+ * @param subject - Optional known game/product name (e.g. "World of Warcraft") for personalized summaries.
  */
-function generateStarterGuideIdeas(hubName: string, collectionName: string): StarterGuideIdea[] {
+function generateStarterGuideIdeas(hubName: string, collectionName: string, subject?: string): StarterGuideIdea[] {
+  // Check exact collection name first — guarantees variety across similar collections
+  const exact = COLLECTION_GUIDE_IDEAS[collectionName]
+  if (exact) {
+    // Inject subject into summary for gaming collections when it adds meaning
+    if (subject && exact.guideType !== "sop" && exact.guideType !== "reference") {
+      const summary = exact.summary.replace(/\bnew players\b/, `new ${subject} players`)
+        .replace(/\byour (build|playstyle|gear|stats)\b/, `your ${subject} $1`)
+      return [{ ...exact, summary }]
+    }
+    return [{ ...exact }]
+  }
+
   const lower = `${hubName} ${collectionName}`.toLowerCase()
+  const s = subject ? `${subject} ` : ""
 
   // Gaming-specific ideas
   if (lower.includes("getting started") || lower.includes("quickstart") || lower.includes("first")) {
-    return [{ title: `${collectionName}: Complete Beginner's Walkthrough`, summary: "Everything a new player needs to know in the first hour.", guideType: "guide", difficulty: "beginner" }]
+    return [{ title: `${collectionName}: Complete Beginner's Walkthrough`, summary: `Everything a new ${s}player needs to know in the first hour.`, guideType: "guide", difficulty: "beginner" }]
   }
   if (lower.includes("build") || lower.includes("loadout")) {
     return [
-      { title: "Best Starter Build for New Players", summary: "A forgiving, easy-to-pilot build for your first hours.", guideType: "character-build", difficulty: "beginner" },
-      { title: "Endgame Meta Build Guide", summary: "Optimized stat distribution for late-game content.", guideType: "character-build", difficulty: "advanced" },
+      { title: "Best Starter Build for New Players", summary: `A forgiving, easy-to-pilot ${s}build for your first hours.`, guideType: "character-build", difficulty: "beginner" },
+      { title: "Endgame Meta Build Guide", summary: `Optimized ${s}stat distribution for late-game content.`, guideType: "character-build", difficulty: "advanced" },
     ]
   }
   if (lower.includes("boss")) {
-    return [{ title: "Boss Fight Strategy Guide", summary: "Phase breakdowns, attack patterns, and counter strategies.", guideType: "boss-guide", difficulty: "intermediate" }]
+    return [{ title: "Boss Fight Strategy Guide", summary: subject ? `${subject} boss phase breakdowns, attack patterns, and counter builds.` : "Boss phase breakdowns, attack patterns, and counter builds.", guideType: "boss-guide", difficulty: "intermediate" }]
   }
   if (lower.includes("patch") || lower.includes("balance") || lower.includes("update")) {
-    return [{ title: "Patch Notes Summary & Impact Analysis", summary: "What changed and how it affects your playstyle.", guideType: "reference", difficulty: "beginner" }]
+    return [{ title: "Patch Notes Summary & Impact Analysis", summary: `What changed and how it affects your ${s}playstyle.`, guideType: "reference", difficulty: "beginner" }]
   }
   if (lower.includes("tier") || lower.includes("tier list")) {
-    return [{ title: "Current Meta Tier List", summary: "Rankings based on win rate, ease of play, and flexibility.", guideType: "tier-list", difficulty: "intermediate" }]
+    return [{ title: "Current Meta Tier List", summary: subject ? `${subject} meta rankings — win rate, ease of play, and flexibility.` : "Meta rankings based on win rate, ease of play, and flexibility.", guideType: "tier-list", difficulty: "intermediate" }]
   }
   if (lower.includes("farming") || lower.includes("resource") || lower.includes("daily")) {
-    return [{ title: "Efficient Daily Farm Route", summary: "Maximize resources per hour with this optimized route.", guideType: "guide", difficulty: "intermediate" }]
+    return [{ title: "Efficient Daily Farm Route", summary: `Maximize ${s}resources per hour with this optimized route.`, guideType: "guide", difficulty: "intermediate" }]
   }
   if (lower.includes("pvp") || lower.includes("combat") || lower.includes("strategy") || lower.includes("tactic")) {
-    return [{ title: "PvP Fundamentals Guide", summary: "Core mechanics, positioning, and engagement rules.", guideType: "guide", difficulty: "intermediate" }]
+    return [{ title: "PvP Fundamentals Guide", summary: `Core ${s}combat mechanics, positioning, and engagement rules.`, guideType: "guide", difficulty: "intermediate" }]
   }
   if (lower.includes("lore") || lower.includes("story") || lower.includes("world")) {
-    return [{ title: "World Lore Overview", summary: "Key factions, timeline, and story context for new readers.", guideType: "reference", difficulty: "beginner" }]
+    return [{ title: `${subject ? `${subject} ` : ""}Lore Overview`, summary: subject ? `Key factions, timeline, and story context for ${subject}.` : "Key factions, timeline, and story context for new readers.", guideType: "reference", difficulty: "beginner" }]
   }
   if (lower.includes("crafting") || lower.includes("recipe")) {
-    return [{ title: "Crafting System Explained", summary: "How the crafting system works, from basic to advanced.", guideType: "guide", difficulty: "beginner" }]
+    return [{ title: "Crafting System Explained", summary: `How the ${s}crafting system works, from basic to advanced.`, guideType: "guide", difficulty: "beginner" }]
+  }
+  if (lower.includes("progression") || lower.includes("leveling") || lower.includes("gear")) {
+    return [{ title: "Progression Roadmap", summary: `The fastest path from start to ${s}endgame — gear tiers and key milestones.`, guideType: "guide", difficulty: "intermediate" }]
+  }
+  if (lower.includes("economy") || lower.includes("trading") || lower.includes("currency")) {
+    return [{ title: "Economy & Trading Basics", summary: `How to earn and spend ${s}currency efficiently.`, guideType: "guide", difficulty: "intermediate" }]
+  }
+  if (lower.includes("survival") || lower.includes("beginner")) {
+    return [{ title: "Beginner's Survival Guide", summary: `Core ${s}mechanics every new player must know to survive the first night.`, guideType: "beginner-guide", difficulty: "beginner" }]
   }
 
   // Training / business ideas
@@ -809,7 +1210,8 @@ function generateStarterGuideIdeas(hubName: string, collectionName: string): Sta
   }
 
   // Generic fallback
-  return [{ title: `${collectionName} Overview Guide`, summary: `Introduction to ${collectionName.toLowerCase()} — what it covers and how to use it.`, guideType: "guide", difficulty: "beginner" }]
+  const subjectPrefix = subject ? `${subject}: ` : ""
+  return [{ title: `${subjectPrefix}${collectionName} Overview`, summary: `Introduction to ${collectionName.toLowerCase()} — what it covers and how to use it.`, guideType: "guide", difficulty: "beginner" }]
 }
 
 /**
@@ -821,7 +1223,11 @@ function generateStarterGuideIdeas(hubName: string, collectionName: string): Sta
 function generateScaffoldSuggestion(
   typeId: string,
   hubNames: string[],
+  subject?: string,
 ): SmartFillScaffoldSuggestion {
+  // Track seen idea titles across the whole scaffold to prevent duplicates
+  const seenTitles = new Set<string>()
+
   const hubs: SmartFillHubSuggestion[] = hubNames.map((hubName) => {
     const collections =
       HUB_TO_COLLECTIONS[hubName] ??
@@ -833,11 +1239,21 @@ function generateScaffoldSuggestion(
     return {
       name: hubName,
       slug: slugify(hubName),
-      description: `${hubName} for your network.`,
-      collections: collections.map((c) => ({
-        ...c,
-        starterGuideIdeas: generateStarterGuideIdeas(hubName, c.name),
-      })),
+      description: HUB_DESCRIPTIONS[hubName] ?? `${hubName} guides and resources.`,
+      collections: collections.map((c) => {
+        const ideas = generateStarterGuideIdeas(hubName, c.name, subject)
+        // Dedupe: filter out any title already seen in this scaffold
+        const deduped = ideas.filter((idea) => {
+          const key = idea.title.toLowerCase().replace(/[^a-z0-9]/g, "")
+          if (seenTitles.has(key)) return false
+          seenTitles.add(key)
+          return true
+        })
+        return {
+          ...c,
+          starterGuideIdeas: deduped.length > 0 ? deduped : undefined,
+        }
+      }),
     }
   })
 

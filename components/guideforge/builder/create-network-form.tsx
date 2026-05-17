@@ -235,6 +235,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   // Holds the rich smart-fill result with starterGuideIdeas for display in the preview.
   // Not persisted — proposal-only metadata cleared on type change.
   const [lastSmartFillScaffold, setLastSmartFillScaffold] = useState<SmartFillScaffoldSuggestion | null>(null)
+  // One-line summary shown after a successful Quick Fill run.
+  const [smartFillSummary, setSmartFillSummary] = useState<string | null>(null)
 
   // Restore draft if returning from Step 3/4
   const didHydrateRef = useRef(false)
@@ -428,9 +430,25 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
           setScaffoldSourceType(nextTypeId)
         }
 
+        // Build Quick Fill success summary
+        const hubCount = result.suggestedScaffold?.hubs.length ?? 0
+        const collectionCount = result.suggestedScaffold?.hubs.reduce(
+          (sum, h) => sum + h.collections.length, 0
+        ) ?? 0
+        const ideaCount = result.suggestedScaffold?.hubs.reduce(
+          (sum, h) => sum + h.collections.reduce(
+            (s, c) => s + (c.starterGuideIdeas?.length ?? 0), 0
+          ), 0
+        ) ?? 0
+        setSmartFillSummary(
+          `${result.name}` +
+          (hubCount > 0 ? ` · ${hubCount} hub${hubCount !== 1 ? "s" : ""}` : "") +
+          (collectionCount > 0 ? ` · ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "") +
+          (ideaCount > 0 ? ` · ${ideaCount} guide idea${ideaCount !== 1 ? "s" : ""}` : "")
+        )
         setError(null)
       } catch (err) {
-        setError("Smart Fill failed. Please try again or fill in the fields manually.")
+        setError("Quick Fill failed. Please try again or fill in the fields manually.")
       } finally {
         setIsSmartFilling(false)
       }
@@ -460,6 +478,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setDomainPrefixManuallyEdited(false)
     setScaffoldDraft(buildDefaultScaffoldDraft(newTypeId))
     setLastSmartFillScaffold(null)
+    setSmartFillSummary(null)
     setScaffoldIsDefaultForType(true)
     setScaffoldSourceType(newTypeId)
     setStep("configure")
@@ -594,6 +613,11 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   {isSmartFilling ? "Filling..." : "Quick Fill"}
                 </Button>
               </div>
+              {smartFillSummary && (
+                <p className="text-xs text-green-700 dark:text-green-400 leading-snug">
+                  Filled: {smartFillSummary}
+                </p>
+              )}
             </div>
           </Card>
 
@@ -887,31 +911,34 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
 
               {/* Starter guide ideas — proposal-only, not auto-saved */}
               {(() => {
-                const ideas: Array<StarterGuideIdea & { collectionName: string }> = []
+                const ideas: Array<StarterGuideIdea & { collectionName: string; hubName: string }> = []
                 lastSmartFillScaffold?.hubs.forEach((hub) =>
                   hub.collections.forEach((col) =>
                     col.starterGuideIdeas?.slice(0, 1).forEach((idea) =>
-                      ideas.push({ ...idea, collectionName: col.name })
+                      ideas.push({ ...idea, collectionName: col.name, hubName: hub.name })
                     )
                   )
                 )
-                const topIdeas = ideas.slice(0, 4)
+                const topIdeas = ideas.slice(0, 6)
                 if (topIdeas.length === 0) return null
                 return (
                   <div className="mt-4 pt-4 border-t border-border/40">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                       Suggested starter guides
                     </p>
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-2">
                       {topIdeas.map((idea, i) => (
                         <li key={i} className="flex flex-col gap-0.5">
                           <span className="text-xs font-medium text-foreground">{idea.title}</span>
-                          <span className="text-xs text-muted-foreground">{idea.collectionName} · {idea.guideType} · {idea.difficulty}</span>
+                          <span className="text-xs text-muted-foreground">{idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}</span>
+                          {idea.summary && (
+                            <span className="text-xs text-muted-foreground/70 leading-snug">{idea.summary}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
                     <p className="mt-2 text-xs text-muted-foreground italic">
-                      These are suggestions only — you&apos;ll create guides after saving the network.
+                      Suggestions only — guides are not created until you choose to create them after saving the network.
                     </p>
                   </div>
                 )
