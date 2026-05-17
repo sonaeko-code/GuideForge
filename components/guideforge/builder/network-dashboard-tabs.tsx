@@ -341,7 +341,7 @@ export function NetworkDashboardTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-6 mb-6 h-auto p-1 shadow-forge" style={{backgroundImage: 'linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%, var(--card) 100%)', border: '1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border))'}}>
+      <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-6 h-auto p-1 gap-1 shadow-forge" style={{backgroundImage: 'linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%, var(--card) 100%)', border: '1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border))'}}>
         <TabsTrigger value="drafts">
           Drafts
           <span className="ml-2 inline-flex items-center justify-center rounded-full bg-brass-100 dark:bg-[oklch(0.30_0.05_55)] px-2 py-0.5 text-xs font-semibold text-brass-700 dark:text-brass-300">
@@ -382,16 +382,16 @@ export function NetworkDashboardTabs({
 
       {/* Drafts tab */}
       <TabsContent value="drafts" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-foreground">
               Draft Guides
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Work in progress guides awaiting review.
+              Work in progress guides awaiting review. Drafts are private — only published guides appear on the public network page.
             </p>
           </div>
-          <Button size="sm" asChild>
+          <Button size="sm" asChild className="shrink-0">
             <Link href={`/builder/network/${networkId}/generate`}>
               <Plus className="size-4 mr-1" aria-hidden="true" />
               New Draft
@@ -419,10 +419,10 @@ export function NetworkDashboardTabs({
         {draftAssets.length > 0 && (
           <div className="mt-6 space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Attached Draft Assets
+              Attached Assets &middot; Private Drafts
             </h3>
             <p className="text-xs text-muted-foreground">
-              Submit assets for review to move them to the Pending Review tab. Once published, they will appear in the Published tab but remain workspace-only until public guide conversion is implemented.
+              Attached assets are private drafts until they&apos;re submitted, reviewed, and published. Use Submit to move them to Pending Review; once published, single guides and checklists appear on the public network page.
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               {draftAssets.map((asset: AssetDraft) => (

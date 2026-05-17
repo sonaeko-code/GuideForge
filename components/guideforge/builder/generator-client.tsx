@@ -399,28 +399,30 @@ export function GeneratorClient({
   // Pre-check banner: only one prerequisite message at a time, never both.
   const preCheck =
     prereqDecision === "needs-hub" ? (
-      <Card className="mb-6 border-amber-500/30 bg-amber-500/5 p-5">
-        <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-          <strong>Create a hub first.</strong> Guides belong to collections,
-          which belong to hubs.
-        </p>
-        <Button asChild size="sm" variant="outline">
-          <Link href={`/builder/network/${networkId}/hub/new`}>
-            Create First Hub
-          </Link>
-        </Button>
+      <Card className="mb-5 border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            <strong>Create a hub first.</strong> Guides belong to collections, which belong to hubs.
+          </p>
+          <Button asChild size="sm" variant="outline" className="shrink-0 self-start sm:self-auto">
+            <Link href={`/builder/network/${networkId}/hub/new`}>
+              Create First Hub
+            </Link>
+          </Button>
+        </div>
       </Card>
     ) : prereqDecision === "needs-collection" ? (
-      <Card className="mb-6 border-amber-500/30 bg-amber-500/5 p-5">
-        <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-          <strong>Create a collection first.</strong> Collections organize
-          guides within your hubs.
-        </p>
-        <Button asChild size="sm" variant="outline">
-          <Link href={`/builder/network/${networkId}/collection/new`}>
-            Create First Collection
-          </Link>
-        </Button>
+      <Card className="mb-5 border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            <strong>Create a collection first.</strong> Collections organize guides within your hubs.
+          </p>
+          <Button asChild size="sm" variant="outline" className="shrink-0 self-start sm:self-auto">
+            <Link href={`/builder/network/${networkId}/collection/new`}>
+              Create First Collection
+            </Link>
+          </Button>
+        </div>
       </Card>
     ) : null
 
@@ -453,17 +455,17 @@ export function GeneratorClient({
       {preCheck}
 
       {prereqDecision === "ready" && (
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-2">
           {/* Left: form */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
-              <h1 className="text-3xl font-bold">Generate a Guide</h1>
-              <p className="mt-2 text-muted-foreground">
-                Describe the guide you want to create, and we'll generate structured content. Use Mock Preview for testing or AI Generate for real context.
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Generate a Guide</h1>
+              <p className="mt-2 text-sm md:text-base text-muted-foreground">
+                Describe the guide you want to create, and we&apos;ll generate structured content. Use Mock Preview for testing or AI Generate for real context.
               </p>
             </div>
 
-            <Card className="border-border/50 p-6 space-y-4">
+            <Card className="border-border/50 p-4 md:p-6 space-y-4">
               {/* PROMPT FIRST */}
               <div>
                 <label className="text-sm font-semibold mb-2 block">
@@ -677,16 +679,20 @@ export function GeneratorClient({
 
               {(!selectedHubId || !selectedCollectionId) && (
                 <p className="text-xs text-muted-foreground">
-                  Select a hub and collection above to enable generation.
+                  {!selectedHubId && !selectedCollectionId
+                    ? "Select a hub and collection above to enable generation."
+                    : !selectedHubId
+                      ? "Select a hub above to enable generation."
+                      : "Select a collection above to enable generation."}
                 </p>
               )}
             </Card>
           </div>
 
           {/* Right: preview */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-bold">Generated Draft Preview</h2>
+              <h2 className="text-lg md:text-xl font-bold">Generated Draft Preview</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Review the generated guide structure before sending to editor.
               </p>
@@ -695,14 +701,14 @@ export function GeneratorClient({
             {session ? (
               <>
                 {session.status === "generating" && (
-                  <Card className="border-border/50 p-8 text-center">
+                  <Card className="border-border/50 p-6 text-center">
                     <Flame className="mx-auto mb-3 size-8 text-primary animate-spin" />
                     <p className="text-muted-foreground">Generating guide...</p>
                   </Card>
                 )}
 
                 {session.status === "done" && session.response ? (
-                  <Card className="border-border/50 p-6 space-y-4">
+                  <Card className="border-border/50 p-4 md:p-5 space-y-4">
                     {session.response.success ? (
                       <>
                         <div>
@@ -794,8 +800,8 @@ export function GeneratorClient({
                 ) : null}
               </>
             ) : (
-              <Card className="border-border/50 p-8 text-center">
-                <p className="text-muted-foreground">
+              <Card className="border-border/50 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
                   Fill out the form and click{" "}
                   &quot;{generationMode === "mock" ? "Generate Mock Guide" : "Generate AI Guide"}&quot;{" "}
                   to preview the output.

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, AlertCircle, Trash2, CheckSquare2, ListTodo, BarChart3, LinkIcon, X, Eye } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Trash2, LinkIcon, X, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -302,55 +302,111 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-5xl px-6 py-12 md:px-8 md:py-16">
-        <div className="space-y-8">
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 md:px-8 md:py-10">
+        <div className="space-y-6">
       {/* Header Navigation */}
-      <div className="flex justify-between items-center gap-4 flex-wrap">
+      <div className="flex justify-between items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/builder/assets">
             <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
             Back to My Assets
           </Link>
         </Button>
-        <div className="text-xs text-muted-foreground">
+        <div className="hidden sm:block text-xs text-muted-foreground">
           Builder / My Assets / Asset Detail
         </div>
       </div>
 
       {/* Title and Metadata */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2.5 flex-wrap">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {asset && <AssetTypeBadge assetType={asset.assetType} variant="small" />}
           {asset?.payload?.generatedBy && (
             <Badge variant="secondary" className="text-xs">
               {asset.payload.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
             </Badge>
           )}
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Draft</span>
-          {asset?.createdAt && (
-            <span className="text-xs text-muted-foreground ml-auto">
-              Created {new Date(asset.createdAt).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-        
-        {isEditMode ? (
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground">Edit Asset</h1>
-            <p className="text-muted-foreground">Update the title, summary, and content below. Changes will be saved to your workspace.</p>
+          <Badge variant="outline" className="text-xs">Draft</Badge>
+          <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+            {asset?.createdAt && (
+              <span>Created {new Date(asset.createdAt).toLocaleDateString()}</span>
+            )}
+            {asset?.updatedAt && asset.updatedAt !== asset.createdAt && (
+              <span>Updated {new Date(asset.updatedAt).toLocaleDateString()}</span>
+            )}
           </div>
+        </div>
+
+        {isEditMode ? (
+          <h1 className="text-lg md:text-xl font-semibold text-foreground break-words">
+            <span className="text-muted-foreground">Editing:</span> {asset?.title}
+          </h1>
         ) : (
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground">{asset?.title}</h1>
+          <div className="space-y-1.5">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground break-words">{asset?.title}</h1>
             {asset?.summary && (
-              <p className="text-lg text-muted-foreground">{asset.summary}</p>
+              <p className="text-sm md:text-base text-muted-foreground">{asset.summary}</p>
             )}
           </div>
         )}
       </div>
 
+      {/* Checklist at-a-glance stats — compact pills, preview mode only */}
+      {!isEditMode && asset.assetType === "checklist" && (() => {
+        const sections = Array.isArray(asset.payload?.sections) ? asset.payload.sections : []
+        const totalItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.length : 0), 0)
+        const requiredItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.filter((i: any) => i?.required === true).length : 0), 0)
+        return (
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium">
+              <span className="font-bold text-foreground">{sections.length}</span>
+              <span className="text-muted-foreground">section{sections.length !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium">
+              <span className="font-bold text-foreground">{totalItems}</span>
+              <span className="text-muted-foreground">item{totalItems !== 1 ? "s" : ""}</span>
+            </div>
+            {requiredItems > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-xs font-medium">
+                <span className="font-bold text-amber-700 dark:text-amber-400">{requiredItems}</span>
+                <span className="text-amber-700 dark:text-amber-400">required</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Single Guide at-a-glance metadata — compact pills, preview mode only.
+          The embedded editor hides its difficulty/audience block via showModeTabs=false,
+          so surface that information here instead. */}
+      {!isEditMode && asset.assetType === "single_guide" && (() => {
+        const steps = Array.isArray(asset.payload?.steps) ? asset.payload.steps : []
+        const difficulty = asset.payload?.difficulty as string | undefined
+        const audience = asset.payload?.audience as string | undefined
+        return (
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium">
+              <span className="font-bold text-foreground">{steps.length}</span>
+              <span className="text-muted-foreground">step{steps.length !== 1 ? "s" : ""}</span>
+            </div>
+            {difficulty && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium capitalize">
+                <span className="text-muted-foreground">Level:</span>
+                <span className="font-semibold text-foreground">{difficulty}</span>
+              </div>
+            )}
+            {audience && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium min-w-0">
+                <span className="text-muted-foreground shrink-0">For:</span>
+                <span className="font-medium text-foreground truncate max-w-[16rem]" title={audience}>{audience}</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {isEditMode && (
-        <Card className="p-6 space-y-6 border-border rounded-lg bg-muted/40">
+        <Card className="p-5 space-y-5 border-border rounded-lg bg-muted/40">
           <div className="space-y-6">
             {/* Title/summary inputs are shown for non-single_guide assets.
                 For single_guide, SingleGuideEditor renders its own title/summary fields. */}
@@ -401,9 +457,10 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           </div>
 
           {/* Save/Cancel Actions - Sticky at bottom */}
-          <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-muted/40 to-transparent pt-6 mt-6 flex gap-2 justify-between border-t border-border/50">
+          <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-muted/40 via-muted/40 to-transparent pt-4 mt-4 flex flex-wrap gap-2 items-center justify-between border-t border-border/50">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 setEditTitle(asset?.title || "")
                 setEditSummary(asset?.summary || "")
@@ -414,13 +471,17 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             >
               Cancel
             </Button>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               {saveMessage && (
-                <div className={`text-xs font-medium ${saveMessage.type === 'error' ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                <div
+                  className={`text-xs font-medium break-words max-w-full ${saveMessage.type === 'error' ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}
+                  role={saveMessage.type === 'error' ? 'alert' : 'status'}
+                >
                   {saveMessage.text}
                 </div>
               )}
               <Button
+                size="sm"
                 onClick={handleSaveChanges}
                 disabled={isSaving}
               >
@@ -433,11 +494,11 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
-        <Card className="p-6 border-red-500/30 bg-red-500/5">
-          <div className="space-y-4">
+        <Card className="p-4 sm:p-5 border-red-500/30 bg-red-500/5">
+          <div className="space-y-3">
             <div className="flex items-start gap-3">
               <AlertCircle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-semibold text-red-900 dark:text-red-100">Delete this asset draft?</h3>
                 {asset?.attachedCollectionId ? (
                   <p className="text-sm text-red-800 dark:text-red-200 mt-1">
@@ -450,9 +511,10 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
                 )}
               </div>
             </div>
-            <div className="flex gap-3 justify-end pt-4 border-t border-red-500/20">
+            <div className="flex flex-wrap gap-2 justify-end pt-3 border-t border-red-500/20">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={isDeleting}
               >
@@ -460,6 +522,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
               </Button>
               <Button
                 variant="destructive"
+                size="sm"
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
               >
@@ -470,115 +533,62 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
         </Card>
       )}
 
-      {/* Metadata Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            Created
-          </p>
-          <p className="text-sm font-medium">{new Date(asset.createdAt).toLocaleString()}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            Last Updated
-          </p>
-          <p className="text-sm font-medium">{new Date(asset.updatedAt).toLocaleString()}</p>
-        </Card>
-      </div>
 
-      {/* Checklist Summary Card */}
-      {asset.assetType === "checklist" && (() => {
-        const sections = Array.isArray(asset.payload?.sections) ? asset.payload.sections : []
-        const totalItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.length : 0), 0)
-        const requiredItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.filter((i: any) => i?.required === true).length : 0), 0)
-        return (
-          <Card className="p-6 border-blue-500/20 bg-blue-500/5">
-            <div className="space-y-4">
-              <h2 className="text-base font-semibold text-foreground">Checklist Overview</h2>
-              <div className="grid gap-4 md:grid-cols-4">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Sections</p>
-                  <p className="text-2xl font-bold text-foreground">{sections.length}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Total Items</p>
-                  <p className="text-2xl font-bold text-foreground">{totalItems}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Required Items</p>
-                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{requiredItems}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Source</p>
-                  <p className="text-sm font-medium capitalize">
-                    {asset?.payload?.generatedBy === "openai" ? "AI Generated" : asset?.payload?.generatedBy === "mock" ? "Mock Preview" : asset?.source || "Unknown"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        )
-      })()}
-
-      {/* Asset Content Preview */}
+      {/* Asset Content Preview — flat structure (no outer Card) so the inner
+          section/step Cards aren't visually nested. */}
       {!isEditMode && (
-        <Card className="p-6 space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Eye className="size-5 text-muted-foreground" aria-hidden="true" />
-              Preview
-            </h2>
+        <section className="space-y-3" aria-label="Asset preview">
+          <h2 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 text-muted-foreground">
+            <Eye className="size-3.5" aria-hidden="true" />
+            Preview
+          </h2>
 
-            {asset.assetType === "single_guide" && (
-              <SingleGuideEditor
-                value={asset.payload as GeneratedSingleGuide}
-                onChange={() => {}}
-                mode="preview"
-                showModeTabs={false}
-              />
-            )}
+          {asset.assetType === "single_guide" && (
+            <SingleGuideEditor
+              value={asset.payload as GeneratedSingleGuide}
+              onChange={() => {}}
+              mode="preview"
+              showModeTabs={false}
+            />
+          )}
 
-            {asset.assetType === "recipe" && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">
-                    Ingredients ({asset.payload.ingredients.length})
-                  </h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {asset.payload.ingredients.slice(0, 10).map((ing, idx) => (
-                      <li key={idx}>
-                        • {ing.name}
-                        {ing.amount && ` (${ing.amount})`}
-                        {ing.notes && ` - ${ing.notes}`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
+          {asset.assetType === "recipe" && (
+            <Card className="p-4 space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">
+                Ingredients ({asset.payload.ingredients.length})
+              </h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {asset.payload.ingredients.slice(0, 10).map((ing, idx) => (
+                  <li key={idx}>
+                    • {ing.name}
+                    {ing.amount && ` (${ing.amount})`}
+                    {ing.notes && ` - ${ing.notes}`}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
-            {asset.assetType === "checklist" && (
-              <ChecklistEditor
-                value={asset.payload as GeneratedChecklist}
-                onChange={() => {}}
-                mode="preview"
-                showModeTabs={false}
-              />
-            )}
-          </div>
-        </Card>
+          {asset.assetType === "checklist" && (
+            <ChecklistEditor
+              value={asset.payload as GeneratedChecklist}
+              onChange={() => {}}
+              mode="preview"
+              showModeTabs={false}
+            />
+          )}
+        </section>
       )}
 
-      {/* Future Actions */}
-      {/* Attachment Panel or Coming Soon */}
+      {/* Attachment Panel or Attach prompt */}
       {showAttachPanel ? (
-        <Card className="p-6 border-blue-500/20 bg-blue-500/5">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-5 border-blue-500/20 bg-blue-500/5">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="text-base font-semibold text-foreground">Attach to Network</h2>
               <button
                 onClick={() => setShowAttachPanel(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 aria-label="Close attachment panel"
               >
                 <X className="size-5" aria-hidden="true" />
@@ -608,44 +618,64 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             />
           </div>
         </Card>
-      ) : asset?.attachedCollectionId ? (
-        <Card className="p-6 border-green-500/20 bg-green-500/5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <LinkIcon className="size-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-              <div>
-                <h3 className="font-semibold text-green-900 dark:text-green-100">Attached as Private Draft</h3>
-                <p className="text-sm text-green-800 dark:text-green-200 mt-1">
-                  This asset is attached to a collection in your network's private workspace. It will not appear publicly until explicitly published.
-                </p>
-                {asset.attachedNetworkId && asset.attachedCollectionId && (
-                  <p className="text-xs text-green-700 dark:text-green-300 mt-2 font-mono bg-green-900/20 px-2 py-1 rounded inline-block">
-                    Collection ID: {asset.attachedCollectionId.slice(0, 8)}...
-                  </p>
+      ) : asset?.attachedCollectionId ? (() => {
+        // Status-aware attached card. Published assets show "Published to Network"
+        // and offer a Public View link; other statuses keep the private-draft framing.
+        const isPublished = asset.status === "published"
+        const isPendingReview = asset.status === "pending_review"
+        const heading = isPublished
+          ? "Published to Network"
+          : isPendingReview
+            ? "Submitted for Review"
+            : "Attached as Private Draft"
+        const body = isPublished
+          ? "This asset is attached to a network collection and published. Single guides and checklists appear on the public network page."
+          : isPendingReview
+            ? "Submitted to the network's reviewers. Not visible publicly until approved and published."
+            : "This asset is attached to a collection in your network's private workspace. It will not appear publicly until published."
+        return (
+          <Card className="p-4 sm:p-5 border-green-500/20 bg-green-500/5">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between">
+              <div className="flex items-start gap-3 min-w-0">
+                <LinkIcon className="size-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="min-w-0 space-y-1">
+                  <h3 className="font-semibold text-green-900 dark:text-green-100">{heading}</h3>
+                  <p className="text-sm text-green-800 dark:text-green-200">{body}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 self-start sm:self-auto shrink-0">
+                {asset.attachedNetworkId && (
+                  <Button asChild size="sm" variant="default">
+                    <Link href={`/builder/network/${asset.attachedNetworkId}/dashboard`}>
+                      Open Network
+                    </Link>
+                  </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowAttachPanel(true)}
+                >
+                  Change
+                </Button>
               </div>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowAttachPanel(true)}
-            >
-              Change
-            </Button>
-          </div>
-        </Card>
+          </Card>
+        )
+      })()
       ) : (
-        <Card className="p-6 border-blue-500/20 bg-blue-500/5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+        <Card className="p-4 sm:p-5 border-blue-500/20 bg-blue-500/5">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between">
+            <div className="min-w-0 space-y-1">
               <p className="font-semibold text-foreground">Attach to Network</p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground">
                 Add this asset to one of your networks to make it part of a collection.
               </p>
             </div>
             <Button
               size="sm"
               onClick={() => setShowAttachPanel(true)}
+              className="self-start sm:self-auto shrink-0"
             >
               <LinkIcon className="mr-2 size-4" aria-hidden="true" />
               Attach
@@ -655,18 +685,19 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <Button asChild variant="outline">
+      <div className="flex flex-wrap gap-2 items-center">
+        <Button asChild variant="outline" size="sm">
           <Link href="/builder/assets">Back to Assets</Link>
         </Button>
         {!isEditMode && (
-          <Button onClick={() => setIsEditMode(true)} variant="default">
+          <Button onClick={() => setIsEditMode(true)} size="sm">
             Edit Asset
           </Button>
         )}
         {!showDeleteConfirm && (
           <Button
             variant="destructive"
+            size="sm"
             className="ml-auto"
             onClick={() => setShowDeleteConfirm(true)}
           >

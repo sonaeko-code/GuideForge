@@ -300,32 +300,35 @@ export function SingleGuideEditor({
   // ---- Preview view ----
 
   const previewView = (
-    <div className="space-y-6">
-      {/* Title & meta */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline">Guide</Badge>
-          <Badge variant="secondary" className="text-xs capitalize">
-            {value.difficulty}
-          </Badge>
-          {(value as any).generatedBy && (
-            <Badge variant="secondary" className="text-xs">
-              {(value as any).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+    <div className="space-y-5">
+      {/* Title & meta — only shown in standalone/proposal context (showModeTabs=true).
+          In embedded asset-detail context the page already renders the title. */}
+      {showModeTabs && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline">Guide</Badge>
+            <Badge variant="secondary" className="text-xs capitalize">
+              {value.difficulty}
             </Badge>
+            {(value as any).generatedBy && (
+              <Badge variant="secondary" className="text-xs">
+                {(value as any).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+              </Badge>
+            )}
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {value.title || <span className="text-muted-foreground italic">Untitled guide</span>}
+          </h2>
+          {value.summary && (
+            <p className="text-base text-muted-foreground leading-relaxed">{value.summary}</p>
+          )}
+          {value.audience && (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium">Audience:</span> {value.audience}
+            </p>
           )}
         </div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          {value.title || <span className="text-muted-foreground italic">Untitled guide</span>}
-        </h2>
-        {value.summary && (
-          <p className="text-base text-muted-foreground leading-relaxed">{value.summary}</p>
-        )}
-        {value.audience && (
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium">Audience:</span> {value.audience}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Warnings */}
       {(value.warnings ?? []).filter(Boolean).length > 0 && (
@@ -376,7 +379,7 @@ export function SingleGuideEditor({
       <ol className="space-y-4">
         {safeSteps.map((step, idx) => (
           <li key={idx}>
-            <Card className="p-5 space-y-3">
+            <Card className="p-4 space-y-3">
               <div className="flex items-baseline gap-3">
                 <span className="text-2xl font-bold text-muted-foreground/40 shrink-0 leading-none tabular-nums">
                   {String(idx + 1).padStart(2, "0")}

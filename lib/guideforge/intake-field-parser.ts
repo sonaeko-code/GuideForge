@@ -468,20 +468,33 @@ export function inferItemsPerSection(lowerText: string): number | null {
 }
 
 /**
- * Title-case a string while preserving common acronyms.
+ * Title-case a string while preserving common acronyms and lowercasing short
+ * connector words (e.g. "a", "the", "for") unless they appear first.
  */
+const SMALL_TITLE_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "for", "from",
+  "if", "in", "into", "nor", "of", "on", "or", "per", "the",
+  "to", "vs", "via", "with",
+])
+
 function titleCase(text: string): string {
   const preserveCasing: Record<string, string> = {
     youtube: "YouTube",
     api: "API",
     ai: "AI",
     seo: "SEO",
+    hvac: "HVAC",
     "ci/cd": "CI/CD",
     next: "Next.js",
     nextjs: "Next.js",
     vercel: "Vercel",
     discord: "Discord",
     steam: "Steam",
+    pvp: "PvP",
+    pve: "PvE",
+    mmo: "MMO",
+    rpg: "RPG",
+    fps: "FPS",
   }
 
   let result = text
@@ -491,9 +504,11 @@ function titleCase(text: string): string {
   }
 
   return result
-    .split(" ")
-    .map((word) => {
+    .split(/\s+/)
+    .map((word, idx) => {
       if (/[A-Z]/.test(word)) return word
+      const lower = word.toLowerCase()
+      if (idx > 0 && SMALL_TITLE_WORDS.has(lower)) return lower
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     })
     .join(" ")

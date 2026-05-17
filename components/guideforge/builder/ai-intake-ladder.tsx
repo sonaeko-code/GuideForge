@@ -16,8 +16,16 @@ interface AIIntakeLadderProps {
 }
 
 /**
- * Title-case a string while preserving common acronyms and brand names
+ * Title-case a string while preserving common acronyms, brand names, and
+ * leaving short connector words ("a", "an", "the", "and", "or", "for", "of",
+ * "in", "on", "at", "to", "by", "with") lowercase unless they're the first word.
  */
+const SMALL_TITLE_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "for", "from",
+  "if", "in", "into", "nor", "of", "on", "or", "per", "the",
+  "to", "vs", "via", "with",
+])
+
 function titleCaseGuideTitle(text: string): string {
   // Common acronyms and brand names that should preserve their casing
   const preserveCasing: Record<string, string> = {
@@ -26,12 +34,19 @@ function titleCaseGuideTitle(text: string): string {
     api: "API",
     ai: "AI",
     seo: "SEO",
+    hvac: "HVAC",
     "ci/cd": "CI/CD",
     next: "Next.js",
     nextjs: "Next.js",
     vercel: "Vercel",
     steam: "Steam",
     discord: "Discord",
+    npc: "NPC",
+    pvp: "PvP",
+    pve: "PvE",
+    mmo: "MMO",
+    rpg: "RPG",
+    fps: "FPS",
   }
 
   // Check for whole word matches first
@@ -40,12 +55,14 @@ function titleCaseGuideTitle(text: string): string {
     text = text.replace(regex, proper)
   }
 
-  // Title-case remaining words
+  // Title-case remaining words; lowercase small connector words except as the first word
   return text
-    .split(" ")
-    .map((word) => {
-      // Skip if already title-cased (contains uppercase letters)
+    .split(/\s+/)
+    .map((word, idx) => {
+      // Skip if already title-cased / contains uppercase (acronyms, brand names)
       if (/[A-Z]/.test(word)) return word
+      const lower = word.toLowerCase()
+      if (idx > 0 && SMALL_TITLE_WORDS.has(lower)) return lower
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     })
     .join(" ")
@@ -512,7 +529,7 @@ export function AIIntakeLadder({ assetType, onApplyFields, initialIdea }: AIInta
         return
       }
 
-      const fieldsToApply = buildFieldsFromParsed(parsed, assetType)
+      const fieldsToApply = buildFieldsFromParsed(parsed, assetType, roughIdea)
 
       setResult({
         fields: fieldsToApply as Record<string, string | number | boolean>,
@@ -783,33 +800,162 @@ export function AIIntakeLadder({ assetType, onApplyFields, initialIdea }: AIInta
   )
 }
 
+// ---- Quick Fill synthesis helpers ----
+
 /**
- * Convert parsed heuristic data into structured intake fields
+ * Synthesize a readable title when the parser cannot extract one directly.
+ * Strips common guide/checklist prefixes, caps at ~60 chars, appends type suffix.
+ */
+function synthesizeTitleFromIdea(text: string, assetType: "single_guide" | "checklist"): string | null {
+  let cleaned = text
+    // "Create / write / make / generate / build [me] a/an [adj] guide/tutorial/checklist for/on/about/to/that ..."
+    .replace(/^(?:create|write|make|generate|build|put together|draft)\s+(?:me\s+)?(?:a|an)\s+(?:\w+\s+){0,3}(?:guide|tutorial|checklist|list|walkthrough|reference)\s+(?:for|on|about|to|that)\s+/i, "")
+    // "I want / I need / I'd like / Let me / Show me / Help me a [adj] guide/checklist for/on/about/to ..."
+    .replace(/^(?:i\s+want|i\s+need|i'?d\s+like|let\s+me|show\s+me|help\s+me|give\s+me)\s+(?:a|an)\s+(?:\w+\s+){0,2}(?:guide|tutorial|checklist|walkthrough|reference)\s+(?:for|on|about|to)\s+/i, "")
+    // Bare "How to / A guide for/on/to / Guide for/on/to / Tutorial for/on/about / Checklist for/on/about"
+    .replace(/^(?:how\s+to|a\s+(?:guide|tutorial|checklist|walkthrough)\s+(?:for|on|to)|guide\s+(?:for|on|to)|tutorial\s+(?:for|on|about)|checklist\s+(?:for|on|about))\s+/i, "")
+    // Standalone leading personal-pronoun phrases that shouldn't appear in a title
+    .replace(/^(?:i\s+want\s+to|i\s+need\s+to|i'?d\s+like\s+to|let\s+me|show\s+me\s+how\s+to|help\s+me)\s+/i, "")
+    // Leftover leading filler "the / a / an / to" after prefix stripping
+    .replace(/^(?:to|a|an|the)\s+/i, "")
+    .replace(/\.$/, "")
+    .trim()
+
+  // Stop at first sentence boundary if concise enough
+  const sentenceEnd = cleaned.search(/[.!?]/)
+  if (sentenceEnd > 5 && sentenceEnd < 80) {
+    cleaned = cleaned.slice(0, sentenceEnd).trim()
+  } else if (cleaned.length > 60) {
+    const commaIdx = cleaned.indexOf(",")
+    if (commaIdx > 10 && commaIdx < 60) {
+      cleaned = cleaned.slice(0, commaIdx).trim()
+    } else {
+      // Trim to word boundary
+      let truncated = cleaned.slice(0, 60)
+      const lastSpace = truncated.lastIndexOf(" ")
+      cleaned = lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated
+    }
+  }
+
+  if (cleaned.length < 4) return null
+
+  // Only append type suffix if not already a content-type word ending
+  const hasSuffix = /\b(guide|tutorial|checklist|reference|walkthrough|list)\b/i.test(cleaned)
+  const suffix = hasSuffix ? "" : assetType === "checklist" ? " Checklist" : " Guide"
+
+  return titleCaseGuideTitle(cleaned.trim()) + suffix
+}
+
+/**
+ * Synthesize a goal when the parser cannot extract one directly.
+ * Looks for "help them do X", "so they can X", "learn/understand X" patterns.
+ */
+function synthesizeGoalFromIdea(text: string): string | null {
+  const helpMatch = text.match(/\bhelp\s+(?:them|users?|readers?|players?|people|teams?)\s+([^.!?,]{5,80})/i)
+  if (helpMatch) {
+    const goal = helpMatch[1].trim()
+    if (goal.length > 5 && goal.length <= 100) {
+      return goal.charAt(0).toUpperCase() + goal.slice(1)
+    }
+  }
+
+  const soTheyMatch = text.match(/\bso\s+(?:they|users?|readers?|players?|teams?)\s+can\s+([^.!?,]{5,80})/i)
+  if (soTheyMatch) {
+    const goal = soTheyMatch[1].trim()
+    if (goal.length > 5 && goal.length <= 100) {
+      return goal.charAt(0).toUpperCase() + goal.slice(1)
+    }
+  }
+
+  const learnMatch = text.match(/\b(learn|understand|master|complete|accomplish|achieve)\s+(?:how\s+to\s+)?([^.!?,]{5,60})/i)
+  if (learnMatch) {
+    const verb = learnMatch[1]
+    const obj = learnMatch[2].trim()
+    if (obj.length > 5 && obj.length <= 80) {
+      return verb.charAt(0).toUpperCase() + verb.slice(1) + " " + obj.toLowerCase()
+    }
+  }
+
+  return null
+}
+
+/**
+ * Synthesize a use case when the parser cannot extract one directly.
+ * Looks for "for [verb+ing] X", "when X", "during X" patterns.
+ */
+function synthesizeUseCaseFromIdea(text: string): string | null {
+  const actionMatch = text.match(
+    /\bfor\s+(setting\s+up|deploying|publishing|creating|building|learning|managing|tracking|planning|running|launching|preparing|onboarding)\s+([a-z0-9\s\-]{3,50})/i
+  )
+  if (actionMatch) {
+    const phrase = (actionMatch[1] + " " + actionMatch[2]).trim()
+    if (phrase.length > 5 && phrase.length <= 80) return phrase
+  }
+
+  const whenMatch = text.match(/\bwhen\s+([^.!?,]{5,60})/i)
+  if (whenMatch) {
+    const useCase = whenMatch[1].trim()
+    if (useCase.length > 5 && useCase.length <= 80) return useCase
+  }
+
+  const duringMatch = text.match(/\bduring\s+([^.!?,]{5,60})/i)
+  if (duringMatch) {
+    const useCase = duringMatch[1].trim()
+    if (useCase.length > 5 && useCase.length <= 80) return useCase
+  }
+
+  return null
+}
+
+/**
+ * Convert parsed heuristic data into structured intake fields.
+ * Accepts the original roughIdea text so synthesis helpers can fill gaps
+ * when direct pattern extraction fails.
  */
 function buildFieldsFromParsed(
   parsed: Record<string, string | number | boolean>,
-  assetType: "single_guide" | "checklist"
+  assetType: "single_guide" | "checklist",
+  roughIdea?: string
 ): Partial<SingleGuideIntakeRequest> | Partial<ChecklistIntakeRequest> {
   const fields: Record<string, any> = {}
 
-  // Common fields - always apply if detected
-  if (parsed.title) fields.title = parsed.title
+  // Title: use parsed value or synthesize from the rough idea
+  if (parsed.title) {
+    fields.title = parsed.title
+  } else if (roughIdea?.trim()) {
+    const synthesized = synthesizeTitleFromIdea(roughIdea.trim(), assetType)
+    if (synthesized) fields.title = synthesized
+  }
+
   if (parsed.purpose) fields.purpose = parsed.purpose
   if (parsed.audience) fields.audience = parsed.audience
-  if (parsed.goal) fields.goal = parsed.goal
-  if (parsed.useCase) fields.useCase = parsed.useCase
+
+  // Goal: use parsed value or synthesize
+  if (parsed.goal) {
+    fields.goal = parsed.goal
+  } else if (roughIdea?.trim()) {
+    const synthesized = synthesizeGoalFromIdea(roughIdea.trim())
+    if (synthesized) fields.goal = synthesized
+  }
+
+  // Use case: use parsed value or synthesize
+  if (parsed.useCase) {
+    fields.useCase = parsed.useCase
+  } else if (roughIdea?.trim()) {
+    const synthesized = synthesizeUseCaseFromIdea(roughIdea.trim())
+    if (synthesized) fields.useCase = synthesized
+  }
+
   if (parsed.optionalContext) fields.optionalContext = parsed.optionalContext
   if (parsed.tone) fields.tone = parsed.tone
   if (parsed.difficulty) fields.difficulty = parsed.difficulty
 
   if (assetType === "single_guide") {
-    // Single guide specific
     if (parsed.guideType) fields.guideType = parsed.guideType
     if (parsed.hasWarnings !== undefined) fields.hasWarnings = parsed.hasWarnings
     if (parsed.hasPrerequisites !== undefined) fields.hasPrerequisites = parsed.hasPrerequisites
     if (parsed.numberOfSteps) fields.numberOfSteps = parsed.numberOfSteps
 
-    // Set defaults only if not already set by parser
     if (!fields.purpose) fields.purpose = "Provide structured, step-by-step guidance"
     if (!fields.numberOfSteps) {
       fields.numberOfSteps = fields.difficulty === "beginner" ? 4 : fields.difficulty === "advanced" ? 8 : 5
@@ -820,11 +966,9 @@ function buildFieldsFromParsed(
   }
 
   if (assetType === "checklist") {
-    // Checklist specific
     if (parsed.numberOfSections) fields.numberOfSections = parsed.numberOfSections
     if (parsed.itemsPerSection) fields.itemsPerSection = parsed.itemsPerSection
 
-    // Set defaults only if not already set
     if (!fields.purpose) fields.purpose = "Provide a structured, actionable checklist"
     if (!fields.numberOfSections) fields.numberOfSections = 4
     if (!fields.itemsPerSection) fields.itemsPerSection = 5

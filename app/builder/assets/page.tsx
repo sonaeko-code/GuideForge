@@ -138,38 +138,35 @@ export default function AssetsPage() {
 
   return (
     <main className="min-h-screen surface-parchment">
-      <div className="mx-auto w-full max-w-7xl px-6 py-12 md:px-8 md:py-16">
-        <div className="space-y-8">
-          {/* Header Navigation */}
-          <div className="flex justify-between items-center gap-4 flex-wrap">
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 md:px-8 md:py-14">
+        <div className="space-y-6">
+          {/* Header Navigation — compact */}
+          <div className="flex justify-between items-center gap-3 flex-wrap">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/builder">
                 <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
                 Back to Workspace
               </Link>
             </Button>
-            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              Builder &middot; My Assets
-            </div>
             <Button asChild variant="outline" size="sm">
               <Link href="/builder/networks?scope=mine">
-                View My Networks
+                My Networks
               </Link>
             </Button>
           </div>
 
-          {/* Masthead */}
-          <div className="surface-masthead relative overflow-hidden rounded-xl p-7 md:p-9 shadow-forge">
+          {/* Masthead — compact */}
+          <div className="surface-masthead relative overflow-hidden rounded-xl p-5 md:p-7 shadow-forge">
             <div className="absolute inset-0 bg-constellation opacity-30 pointer-events-none" aria-hidden="true" />
-            <div className="relative space-y-2 max-w-3xl">
+            <div className="relative space-y-1 max-w-3xl">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--brass-700)]">
-                Workspace &middot; Forge Drafts
+                Workspace &middot; Private Drafts
               </p>
-              <h1 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
+              <h1 className="text-balance text-2xl md:text-3xl font-bold tracking-tight">
                 My Assets
               </h1>
-              <p className="text-pretty text-base leading-relaxed text-muted-foreground">
-                Your personal asset drafts saved to your workspace. These are private and only visible to you — refine them here, then attach to a network when they&apos;re ready.
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Private guide and checklist drafts. Refine here, then attach to a network when ready.
               </p>
             </div>
           </div>
@@ -288,56 +285,61 @@ export default function AssetsPage() {
                   </div>
                 </Card>
               ) : (
-                <article className="card-foundry group flex h-full flex-col rounded-xl p-5">
+                <article className="card-foundry group flex h-full flex-col rounded-xl p-4">
                   <div className="flex-1 space-y-3">
-                    {/* Top: type badge + meta */}
-                    <div className="flex items-start justify-between gap-2">
-                      <AssetTypeBadge assetType={asset.assetType} variant="small" />
+                    {/* Top: type badge + meta pills (source, dates) */}
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <AssetTypeBadge assetType={asset.assetType} variant="small" />
+                        {(asset.source === 'generated' || (asset.payload as any)?.generatedBy === 'openai') && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.55_0.05_280)]/35 bg-[oklch(0.94_0.012_280)] dark:bg-[oklch(0.28_0.03_280)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.42_0.05_280)] dark:text-[oklch(0.82_0.04_280)]">
+                            AI
+                          </span>
+                        )}
+                      </div>
                       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                        {new Date(asset.createdAt).toLocaleDateString()}
+                        {new Date(asset.updatedAt || asset.createdAt).toLocaleDateString()}
                       </span>
                     </div>
 
-                    {/* Status row — Asset type + AI Generated badge */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {asset.generationSource === 'ai' && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.55_0.05_280)]/35 bg-[oklch(0.94_0.012_280)] dark:bg-[oklch(0.28_0.03_280)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.42_0.05_280)] dark:text-[oklch(0.82_0.04_280)]">
-                          AI Generated
-                        </span>
-                      )}
-                    </div>
-
                     {/* Title + summary */}
-                    <div>
-                      <h3 className="text-base font-bold leading-snug text-foreground line-clamp-2 text-balance">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold leading-snug text-foreground line-clamp-2 text-balance break-words">
                         {asset.title}
                       </h3>
                       {asset.summary && (
-                        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground line-clamp-2">
+                        <p className="mt-1 text-sm leading-snug text-muted-foreground line-clamp-2">
                           {asset.summary}
                         </p>
                       )}
                     </div>
 
-                    {asset.attachedCollectionId && (
-                      <p className="flex items-center gap-1 text-xs font-medium text-[oklch(0.4_0.07_240)] dark:text-[oklch(0.78_0.06_240)]">
+                    {/* Attached status — clickable link to network dashboard */}
+                    {asset.attachedNetworkId ? (
+                      <Link
+                        href={`/builder/network/${asset.attachedNetworkId}/dashboard`}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[oklch(0.4_0.07_240)] dark:text-[oklch(0.78_0.06_240)] hover:underline"
+                      >
                         <LinkIcon className="size-3" aria-hidden="true" />
-                        Attached to network
-                      </p>
+                        Attached &middot; Open Network
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        Private Draft &middot; Not attached
+                      </span>
                     )}
                   </div>
 
-                  {/* Grouped actions */}
-                  <div className="mt-5 pt-4">
-                    <div className="divider-brass mb-4" aria-hidden="true" />
+                  {/* Grouped actions — tighter row */}
+                  <div className="mt-4 pt-3 border-t border-border/40">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Button asChild size="sm" variant="outline" className="gap-1.5">
+                      <Button asChild size="sm" variant="outline" className="gap-1 h-8 px-2.5">
                         <Link href={`/builder/assets/${asset.id}`}>
                           <Eye className="size-3.5" aria-hidden="true" />
                           View
                         </Link>
                       </Button>
-                      <Button asChild size="sm" variant="outline" className="gap-1.5">
+                      <Button asChild size="sm" variant="outline" className="gap-1 h-8 px-2.5">
                         <Link href={`/builder/assets/${asset.id}?edit=true`}>
                           <Edit className="size-3.5" aria-hidden="true" />
                           Edit
@@ -346,7 +348,7 @@ export default function AssetsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5"
+                        className="gap-1 h-8 px-2.5"
                         onClick={() => setAttachingAssetId(asset.id)}
                       >
                         <LinkIcon className="size-3.5" aria-hidden="true" />

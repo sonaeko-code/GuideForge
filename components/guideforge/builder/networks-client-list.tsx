@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Lock, Settings, Layers, FolderTree, BookMarked } from 'lucide-react'
+import { ArrowRight, Settings, Layers, FolderTree, BookMarked, Sparkles, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/guideforge/auth-context'
 import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
@@ -279,42 +279,61 @@ export function NetworksClientList({ networks }: NetworksClientListProps) {
               </div>
             </div>
 
-            {/* Grouped actions */}
+            {/* Grouped actions — context-aware secondary action based on network state.
+                Management-only buttons are hidden entirely when the user can't manage,
+                rather than shown as disabled-with-lock. */}
             <div className="flex flex-col gap-2 pt-1">
-              <div className="flex gap-2">
-                <Button asChild size="sm" className="flex-1">
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" className="flex-1 min-w-[120px]">
                   <Link href={`/builder/network/${network.id}/dashboard`}>
-                    Dashboard
+                    Open Dashboard
                   </Link>
                 </Button>
-                {network.canManageNetwork ? (
-                  <Button asChild size="sm" variant="outline" className="flex-1">
-                    <Link href={`/builder/network/${network.id}/hub/new`}>
-                      New Hub
+
+                {/* Contextual secondary action — only for users who can manage */}
+                {network.canManageNetwork && (() => {
+                  if (network.hubCount === 0) {
+                    return (
+                      <Button asChild size="sm" variant="outline" className="flex-1 min-w-[120px]">
+                        <Link href={`/builder/network/${network.id}/hub/new`}>
+                          <Plus className="size-3.5 mr-1" aria-hidden="true" />
+                          First Hub
+                        </Link>
+                      </Button>
+                    )
+                  }
+                  if (network.collectionCount === 0) {
+                    return (
+                      <Button asChild size="sm" variant="outline" className="flex-1 min-w-[120px]">
+                        <Link href={`/builder/network/${network.id}/collection/new`}>
+                          <Plus className="size-3.5 mr-1" aria-hidden="true" />
+                          First Collection
+                        </Link>
+                      </Button>
+                    )
+                  }
+                  return (
+                    <Button asChild size="sm" variant="outline" className="flex-1 min-w-[120px]">
+                      <Link href={`/builder/network/${network.id}/generate`}>
+                        <Sparkles className="size-3.5 mr-1" aria-hidden="true" />
+                        Generate Guide
+                      </Link>
+                    </Button>
+                  )
+                })()}
+
+                {network.canManageNetwork && (
+                  <Button asChild size="sm" variant="outline" aria-label="Network settings" title="Settings">
+                    <Link href={`/builder/network/${network.id}/settings`}>
+                      <Settings className="size-3.5" aria-hidden="true" />
                     </Link>
                   </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled
-                    className="flex-1 opacity-50 cursor-not-allowed"
-                    title="Only owners/admins can add hubs"
-                  >
-                    <Lock className="size-3 mr-1" aria-hidden="true" />
-                    New Hub
-                  </Button>
                 )}
-                <Button asChild size="sm" variant="outline" aria-label="Settings">
-                  <Link href={`/builder/network/${network.id}/settings`}>
-                    <Settings className="size-3.5" aria-hidden="true" />
-                  </Link>
-                </Button>
               </div>
               {network.slug && (
                 <Button asChild size="sm" variant="ghost" className="w-full justify-center gap-2 text-xs">
                   <Link href={`/n/${network.slug}`}>
-                    View Public Site
+                    Public View
                     <ArrowRight className="size-3.5" aria-hidden="true" />
                   </Link>
                 </Button>

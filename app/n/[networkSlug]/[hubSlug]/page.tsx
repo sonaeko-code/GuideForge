@@ -241,18 +241,15 @@ export default async function PublicHubPage({
                 const collectionGuideCount = allPublishedGuides.filter(
                   (g) => g.collectionId === collection.id,
                 ).length
-                const firstGuide = allPublishedGuides.find(
-                  (g) => g.collectionId === collection.id,
-                )
-                const href = firstGuide
-                  ? `/n/${networkSlug}/${hub.slug}/${firstGuide.slug}`
-                  : `/n/${networkSlug}/${hub.slug}`
-                return (
-                  <Link
-                    key={collection.id}
-                    href={href}
-                    className="group flex flex-col rounded-lg border border-foreground/15 bg-background p-5 transition-colors hover:border-primary/40 hover:bg-muted/50"
-                  >
+                // Link to the collection's anchored section on this same page when there are
+                // guides to read. If the collection is empty, leave a non-link card so users
+                // aren't surprised by a no-op navigation.
+                const href =
+                  collectionGuideCount > 0
+                    ? `#collection-${collection.slug || collection.id}`
+                    : null
+                const inner = (
+                  <>
                     <CollectionIcon slug={collection.slug} size="lg" />
                     <h3 className="mt-4 text-lg font-bold tracking-tight transition-colors group-hover:text-primary">
                       {collection.name}
@@ -261,10 +258,27 @@ export default async function PublicHubPage({
                       {collection.description || "Explore guides in this collection."}
                     </p>
                     <p className="mt-3 text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                      {collectionGuideCount} published guide
-                      {collectionGuideCount !== 1 ? "s" : ""}
+                      {collectionGuideCount === 0
+                        ? "No published guides yet"
+                        : `${collectionGuideCount} published guide${collectionGuideCount !== 1 ? "s" : ""}`}
                     </p>
+                  </>
+                )
+                return href ? (
+                  <Link
+                    key={collection.id}
+                    href={href}
+                    className="group flex flex-col rounded-lg border border-foreground/15 bg-background p-5 transition-colors hover:border-primary/40 hover:bg-muted/50"
+                  >
+                    {inner}
                   </Link>
+                ) : (
+                  <div
+                    key={collection.id}
+                    className="group flex flex-col rounded-lg border border-dashed border-foreground/15 bg-background/50 p-5"
+                  >
+                    {inner}
+                  </div>
                 )
               })}
             </div>
@@ -281,7 +295,11 @@ export default async function PublicHubPage({
             {collectionsWithGuides
               .filter(({ guides }) => guides.length > 0)
               .map(({ collection, guides }) => (
-                <div key={collection.id} className="space-y-5">
+                <div
+                  key={collection.id}
+                  id={`collection-${collection.slug || collection.id}`}
+                  className="space-y-5 scroll-mt-20"
+                >
                   <div className="flex items-end justify-between gap-3 border-b border-foreground/10 pb-2">
                     <div className="flex items-center gap-3">
                       <CollectionIcon slug={collection.slug} size="md" />

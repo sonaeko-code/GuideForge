@@ -167,8 +167,8 @@ const GUIDE_TYPE_SIGNALS: Array<{ type: GuideType; keywords: string[] }> = [
 // Maps guide types to keywords commonly found in collection names.
 // Used to boost collection score when the collection's name aligns with the detected type.
 const TYPE_COLLECTION_KEYWORDS: Partial<Record<GuideType, string[]>> = {
-  "character-build": ["build", "builds", "character", "class", "spec"],
-  "boss-guide": ["boss", "bosses", "raid", "raids", "encounter"],
+  "character-build": ["build", "builds", "character", "class", "spec", "loadout", "talent"],
+  "boss-guide": ["boss", "bosses", "raid", "raids", "encounter", "encounters"],
   "beginner-guide": ["beginner", "starter", "intro", "getting started"],
   "walkthrough": ["walkthrough", "story", "main quest", "campaign"],
   "patch-notes": ["patch", "patches", "update", "updates", "news", "changelog"],
@@ -178,6 +178,49 @@ const TYPE_COLLECTION_KEYWORDS: Partial<Record<GuideType, string[]>> = {
   "sop": ["sop", "procedure", "process", "operations"],
   "news": ["news", "updates", "announcements", "releases"],
 }
+
+// Prompt-keyword-driven collection boost. When the user's prompt mentions any of
+// `promptKeywords`, boost collections whose name contains any of `collectionKeywords`.
+// This catches categories (PvP, quests, maps, farming, crafting) that aren't first-class
+// guide types but commonly map directly to a collection.
+const PROMPT_TO_COLLECTION_BOOST: Array<{ promptKeywords: string[]; collectionKeywords: string[] }> = [
+  {
+    promptKeywords: ["pvp", "arena", "battleground", "duel", "ranked"],
+    collectionKeywords: ["pvp", "arena", "battleground", "combat", "duel"],
+  },
+  {
+    promptKeywords: ["quest", "mission", "campaign", "side quest", "main quest"],
+    collectionKeywords: ["quest", "quests", "mission", "missions", "campaign", "story"],
+  },
+  {
+    promptKeywords: ["map", "location", "route", "zone", "region", "fast travel"],
+    collectionKeywords: ["map", "maps", "location", "locations", "route", "zones", "regions"],
+  },
+  {
+    promptKeywords: ["farm", "farming", "grind", "grinding", "resource", "material", "drop"],
+    collectionKeywords: ["farm", "farming", "resource", "resources", "material", "materials", "drops"],
+  },
+  {
+    promptKeywords: ["craft", "crafting", "recipe", "recipes", "blueprint"],
+    collectionKeywords: ["craft", "crafting", "recipe", "recipes", "blueprint", "blueprints"],
+  },
+  {
+    promptKeywords: ["boss", "raid", "encounter", "phase"],
+    collectionKeywords: ["boss", "bosses", "raid", "raids", "encounter", "encounters"],
+  },
+  {
+    promptKeywords: ["beginner", "getting started", "new player", "first steps", "intro"],
+    collectionKeywords: ["beginner", "beginners", "starter", "intro", "getting started"],
+  },
+  {
+    promptKeywords: ["build", "character", "class", "loadout", "spec", "talents"],
+    collectionKeywords: ["build", "builds", "loadout", "loadouts", "character", "class", "spec"],
+  },
+  {
+    promptKeywords: ["patch", "update", "notes", "version"],
+    collectionKeywords: ["patch", "patches", "update", "updates", "changelog", "notes"],
+  },
+]
 
 // ─── Scoring helpers ──────────────────────────────────────────────────────────
 
@@ -227,9 +270,9 @@ function scoreCollectionAgainstPrompt(
   guideType: GuideType | null
 ): number {
   let score = 0
+  const colLower = col.name.toLowerCase()
 
-  const colWords = col.name
-    .toLowerCase()
+  const colWords = colLower
     .split(/[\s\-_/]+/)
     .filter((w) => w.length >= 3)
 
@@ -243,12 +286,22 @@ function scoreCollectionAgainstPrompt(
   // Guide type alignment: boost collection if its name aligns with detected type
   if (guideType) {
     const alignWords = TYPE_COLLECTION_KEYWORDS[guideType] ?? []
-    const colLower = col.name.toLowerCase()
     for (const aw of alignWords) {
       if (colLower.includes(aw)) {
         score += 3
         break // only count alignment once per collection
       }
+    }
+  }
+
+  // Prompt-keyword to collection-keyword boost (catches PvP, quests, maps, farming, crafting, etc.)
+  for (const { promptKeywords, collectionKeywords } of PROMPT_TO_COLLECTION_BOOST) {
+    const promptHit = promptKeywords.some((kw) => lowerPrompt.includes(kw))
+    if (!promptHit) continue
+    const colHit = collectionKeywords.some((kw) => colLower.includes(kw))
+    if (colHit) {
+      score += 4
+      break // one boost per collection is enough
     }
   }
 
@@ -316,6 +369,12 @@ export function classifyNetworkGuidePrompt(
     bestHubId = hubs[0].id
   }
 
+  // Fallback: if no keyword match found, pick the first hub that has at least one collection
+  if (!bestHubId && hubs.length > 0) {
+    const hubWithCollections = hubs.find((h) => (collectionsByHub[h.id] ?? []).length > 0)
+    bestHubId = hubWithCollections ? hubWithCollections.id : hubs[0].id
+  }
+
   // --- Collection matching — search within best hub first, then all
   let bestCollectionId: string | null = null
   let bestCollectionScore = 0
@@ -337,6 +396,14 @@ export function classifyNetworkGuidePrompt(
     bestCollectionId = collectionsToSearch[0].id
   }
 
+  // Fallback: if no collection keyword match, use the first collection in the selected hub
+  if (!bestCollectionId && bestHubId) {
+    const hubCollections = collectionsByHub[bestHubId] ?? []
+    if (hubCollections.length > 0) {
+      bestCollectionId = hubCollections[0].id
+    }
+  }
+
   // --- Confidence
   const totalCollections = Object.values(collectionsByHub).flat().length
   const confidence = computeConfidence(
@@ -349,10 +416,10 @@ export function classifyNetworkGuidePrompt(
 
   const confidenceNote =
     confidence === "high"
-      ? null
+      ? "Suggestions applied — review guide type, difficulty, hub, and collection before generating."
       : confidence === "medium"
-        ? "Suggestions applied — review before generating."
-        : "We suggested the closest match — review before generating."
+        ? "Suggestions applied — review guide type, difficulty, hub, and collection before generating."
+        : "We picked the closest match — review guide type, difficulty, hub, and collection before generating."
 
   return {
     title,

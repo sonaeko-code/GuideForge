@@ -68,11 +68,11 @@ export function SingleGuideProposal({
             <p className="text-sm text-red-700 dark:text-red-300">{saveError}</p>
           </Card>
         )}
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={onBack} disabled={isSaving}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onBack} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={() => onSave(draft)} disabled={isSaving} className="flex-1">
+          <Button onClick={() => onSave(draft)} disabled={isSaving} className="flex-1 min-w-[160px]">
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />

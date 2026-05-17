@@ -322,44 +322,48 @@ export function ChecklistEditor({
   }
 
   const previewView = (
-    <div className="space-y-6">
-      {/* Title & meta */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline">Checklist</Badge>
-          {(value as any).generatedBy && (
-            <Badge variant="secondary" className="text-xs">
-              {(value as any).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
-            </Badge>
-          )}
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          {value.title || <span className="text-muted-foreground italic">Untitled checklist</span>}
-        </h2>
-        {value.summary && (
-          <p className="text-base text-muted-foreground leading-relaxed">{value.summary}</p>
-        )}
-      </div>
+    <div className="space-y-5">
+      {/* Title, meta, and stats — only shown in standalone/proposal context (showModeTabs=true).
+          In embedded asset-detail context the page already renders the title and stat pills. */}
+      {showModeTabs && (
+        <>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline">Checklist</Badge>
+              {(value as any).generatedBy && (
+                <Badge variant="secondary" className="text-xs">
+                  {(value as any).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+                </Badge>
+              )}
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              {value.title || <span className="text-muted-foreground italic">Untitled checklist</span>}
+            </h2>
+            {value.summary && (
+              <p className="text-base text-muted-foreground leading-relaxed">{value.summary}</p>
+            )}
+          </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-foreground">{stats.sections}</div>
-          <div className="text-xs text-muted-foreground">Section{stats.sections !== 1 ? 's' : ''}</div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-foreground">{stats.totalItems}</div>
-          <div className="text-xs text-muted-foreground">Total Item{stats.totalItems !== 1 ? 's' : ''}</div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-foreground">{stats.requiredItems}</div>
-          <div className="text-xs text-muted-foreground">Required</div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-foreground">{(value.completionCriteria ?? []).length}</div>
-          <div className="text-xs text-muted-foreground">Criteria</div>
-        </Card>
-      </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-foreground">{stats.sections}</div>
+              <div className="text-xs text-muted-foreground">Section{stats.sections !== 1 ? "s" : ""}</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-foreground">{stats.totalItems}</div>
+              <div className="text-xs text-muted-foreground">Total Item{stats.totalItems !== 1 ? "s" : ""}</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-foreground">{stats.requiredItems}</div>
+              <div className="text-xs text-muted-foreground">Required</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <div className="text-2xl font-bold text-foreground">{(value.completionCriteria ?? []).length}</div>
+              <div className="text-xs text-muted-foreground">Criteria</div>
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* Completion Criteria */}
       {(value.completionCriteria ?? []).filter(Boolean).length > 0 && (
@@ -396,8 +400,8 @@ export function ChecklistEditor({
         {safeSections.map((section, sectionIdx) => {
           const sectionItems = section.items ?? []
           return (
-          <Card key={sectionIdx} className="p-5 space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">
+          <Card key={sectionIdx} className="p-4 space-y-3">
+            <h3 className="text-base font-semibold text-foreground">
               {section.title || <span className="text-muted-foreground italic">Untitled section</span>}
             </h3>
             <div className="space-y-2">

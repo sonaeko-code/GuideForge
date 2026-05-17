@@ -201,12 +201,12 @@ export default async function PublicNetworkPage({
           </div>
         </section>
       ) : hubs.length > 0 ? (
-        <section className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
+        <section id="guides" className={`border-b ${theme.borderClasses} ${theme.bgClasses}`}>
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 text-center">
             <div className="space-y-3">
               <p className="text-lg font-medium text-foreground">No published guides yet</p>
-              <p className="text-sm text-muted-foreground">
-                This network is being built. Check back soon for published guides.
+              <p className="mx-auto max-w-md text-sm text-muted-foreground">
+                Drafts may exist in the creator workspace, but are not public until published.
               </p>
             </div>
           </div>
@@ -217,7 +217,12 @@ export default async function PublicNetworkPage({
       {hubs.length === 0 ? (
         <section id="hubs" className="border-b border-foreground/15">
           <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 text-center">
-            <p className="text-lg text-muted-foreground">No hubs published yet for this network.</p>
+            <div className="mx-auto max-w-md space-y-2">
+              <p className="text-lg font-medium text-foreground">No hubs yet</p>
+              <p className="text-sm text-muted-foreground">
+                The network owner hasn&apos;t added any hubs. Hubs organize collections and published guides.
+              </p>
+            </div>
           </div>
         </section>
       ) : (
@@ -240,6 +245,75 @@ export default async function PublicNetworkPage({
                   />
                 )
               })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* COLLECTIONS — overview grouped by hub, links to each hub page where guides live */}
+      {allCollections.length > 0 && (
+        <section id="collections" className="border-b border-foreground/15">
+          <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
+            <SectionHeading
+              eyebrow="Browse"
+              title="Collections"
+              description="Collections group related guides inside each hub. Open a hub to read the guides in its collections."
+            />
+            <div className="mt-8 space-y-8">
+              {hubs
+                .map((hub) => ({
+                  hub,
+                  hubCollections: allCollections.filter((c) => c.hubId === hub.id),
+                }))
+                .filter(({ hubCollections }) => hubCollections.length > 0)
+                .map(({ hub, hubCollections }) => (
+                  <div key={hub.id} className="space-y-4">
+                    <div className="flex items-center justify-between gap-3 border-b border-foreground/10 pb-2">
+                      <Link
+                        href={`/n/${networkSlug}/${hub.slug}`}
+                        className="group inline-flex items-center gap-2"
+                      >
+                        <span className="text-xs font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                          Hub
+                        </span>
+                        <span className="text-base font-bold tracking-tight group-hover:text-primary transition-colors">
+                          {hub.name}
+                        </span>
+                      </Link>
+                      <Link
+                        href={`/n/${networkSlug}/${hub.slug}`}
+                        className="text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                      >
+                        Open hub
+                        <ArrowRight className="size-3" aria-hidden="true" />
+                      </Link>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {hubCollections.map((collection) => {
+                        const guideCount = allPublishedGuides.filter((g) => g.collectionId === collection.id).length
+                        return (
+                          <Link
+                            key={collection.id}
+                            href={`/n/${networkSlug}/${hub.slug}#collection-${collection.slug || collection.id}`}
+                            className="group flex flex-col rounded-lg border border-foreground/15 bg-background p-4 transition-colors hover:border-primary/40 hover:bg-muted/50"
+                          >
+                            <h4 className="text-sm font-bold tracking-tight transition-colors group-hover:text-primary">
+                              {collection.name}
+                            </h4>
+                            {collection.description && (
+                              <p className="mt-1 line-clamp-2 flex-1 text-xs leading-relaxed text-muted-foreground">
+                                {collection.description}
+                              </p>
+                            )}
+                            <p className="mt-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                              {guideCount} published guide{guideCount !== 1 ? "s" : ""}
+                            </p>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         </section>

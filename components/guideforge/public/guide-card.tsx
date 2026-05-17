@@ -15,11 +15,20 @@ interface GuideCardProps {
     difficulty: "beginner" | "intermediate" | "advanced" | "expert"
     verification?: "forge-verified" | "verified" | null
     estimatedMinutes?: number | null
+    publishedAt?: string | null
+    updatedAt?: string | null
   }
   href: string
   variant?: "grid" | "featured" | "minimal"
   imageVariant?: "image" | "spark" | "patch"
   imageAspect?: string
+}
+
+function formatGuideDate(iso?: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
 }
 
 export function GuideCard({
@@ -87,6 +96,7 @@ export function GuideCard({
   }
 
   // variant === "grid" (default)
+  const dateLabel = formatGuideDate(guide.publishedAt ?? guide.updatedAt)
   return (
     <Link href={href} className="group block">
       <article className="card-foundry flex h-full flex-col gap-3 overflow-hidden rounded-xl p-4">
@@ -105,7 +115,7 @@ export function GuideCard({
             </>
           )}
         </div>
-        <h3 className="px-1 text-balance text-lg font-bold leading-snug transition-colors group-hover:text-primary line-clamp-2">
+        <h3 className="px-1 text-balance text-lg font-bold leading-snug transition-colors group-hover:text-primary line-clamp-2 break-words">
           {guide.title}
         </h3>
         <p className="flex-1 px-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
@@ -114,6 +124,16 @@ export function GuideCard({
         <div className="flex items-center gap-2 px-1 pt-1 text-xs">
           <DifficultyBadge difficulty={guide.difficulty} />
           <PublishedBadge verification={guide.verification} showLabel={false} />
+          {dateLabel && (
+            <span className="ml-auto text-[10px] font-mono uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+              {dateLabel}
+            </span>
+          )}
+        </div>
+        {/* Always-visible Read Guide affordance — accessible CTA inside the card link. */}
+        <div className="flex items-center justify-end px-1 pt-1 text-xs font-mono uppercase tracking-wider text-muted-foreground group-hover:text-primary transition-colors">
+          <span>Read Guide</span>
+          <ArrowRight className="ml-1 size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
         </div>
       </article>
     </Link>

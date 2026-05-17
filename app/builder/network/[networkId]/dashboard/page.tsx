@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, AlertCircle, Settings, Globe } from "lucide-react"
+import { ArrowLeft, AlertCircle, Settings, Globe, Sparkles, Plus, Layers, FolderTree, BookMarked, Package } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { Button } from "@/components/ui/button"
@@ -59,48 +59,174 @@ export default async function NetworkDashboardPage({
     const safeCollections = Array.isArray(collections) ? collections : []
     const safeGuides = Array.isArray(guides) ? guides : []
 
+    // Snapshot stats for the dashboard quick-glance panel
+    const attachedAssetCount = Object.values(attachedAssetsMap).reduce((sum, list) => sum + (list?.length ?? 0), 0)
+    const publishedCount = safeGuides.filter((g) => g.status === "published").length
+    const draftCount = safeGuides.filter((g) => g.status === "draft").length
+    const publishedAssetCount = Object.values(attachedAssetsMap)
+      .flat()
+      .filter((a: AssetDraft) => a?.status === "published" && (a?.assetType === "single_guide" || a?.assetType === "checklist"))
+      .length
+    const totalPublic = publishedCount + publishedAssetCount
+
+    // Determine the primary "what's next" CTA based on network state
+    const generateState: "ready" | "needs-hub" | "needs-collection" =
+      safeHubs.length === 0 ? "needs-hub" : safeCollections.length === 0 ? "needs-collection" : "ready"
+
     return (
       <main className="min-h-screen surface-parchment">
         <SiteHeader hideCta />
-        <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold tracking-tight">{network.name} Dashboard</h1>
-              <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12 space-y-6">
+          {/* Back link */}
+          <Button asChild variant="ghost" size="sm" className="-ml-2">
+            <Link href="/builder/networks?scope=mine">
+              <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+              Back to My Networks
+            </Link>
+          </Button>
+
+          {/* Network header — compact, single row */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight break-words">{network.name}</h1>
+                <NetworkOwnershipBadge ownerUserId={network.ownerUserId} />
+              </div>
+              {network.description && (
+                <p className="text-sm text-muted-foreground line-clamp-2 max-w-2xl">{network.description}</p>
+              )}
+              <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                /n/{network.slug}
+              </p>
             </div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-              /n/{network.slug}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href={`/n/${network.slug}`} target="_blank">
-                <Globe className="size-4 mr-1" aria-hidden="true" />
-                View Public Site
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/builder/network/${networkId}/settings`}>
-                <Settings className="size-4 mr-1" aria-hidden="true" />
-                Settings
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-          {/* GuideForge Data Spine Contract - Dashboard Guide Loading
-             The dashboard loads guides directly from Supabase filtered by collection IDs.
-             Guides flow: networkId → hubs → collections → collection IDs → Supabase WHERE collection_id IN (ids)
-             Attached assets flow: collections → collection IDs → Supabase asset_drafts WHERE attached_collection_id IN (ids)
-             Do not change this data loading path. */}
-
-          {/* Lane 2A: Governance Summary Card */}
-          <div className="mb-6">
-            <GovernanceSummary network={network} />
+            <div className="flex flex-col items-start gap-1 shrink-0 sm:items-end">
+              <div className="flex flex-wrap gap-2">
+                {network.slug ? (
+                  <Button asChild variant="outline" size="sm" title={totalPublic === 0 ? "No published content yet" : `${totalPublic} published`}>
+                    <Link href={`/n/${network.slug}`} target="_blank" rel="noopener">
+                      <Globe className="size-4 mr-1.5" aria-hidden="true" />
+                      Public View
+                    </Link>
+                  </Button>
+                ) : null}
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/builder/network/${networkId}/settings`}>
+                    <Settings className="size-4 mr-1.5" aria-hidden="true" />
+                    Settings
+                  </Link>
+                </Button>
+              </div>
+              {network.slug && totalPublic === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Public View has nothing published yet.
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* Tabs Section - Wrapped in Error Boundary */}
+          {/* Network Snapshot — quick stats + primary "what's next" CTA.
+              The CTA changes based on whether the network has hubs/collections,
+              so the user always sees the most useful next step. */}
+          <section
+            aria-label="Network snapshot"
+            className="rounded-xl border border-border/50 bg-card p-4 md:p-5 shadow-sm"
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              {/* Stat row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Layers className="size-4 text-primary shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold leading-none tabular-nums">{safeHubs.length}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
+                      {safeHubs.length === 1 ? "Hub" : "Hubs"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FolderTree className="size-4 text-primary shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold leading-none tabular-nums">{safeCollections.length}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
+                      {safeCollections.length === 1 ? "Collection" : "Collections"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BookMarked className="size-4 text-primary shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold leading-none tabular-nums">{publishedCount}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
+                      Published &middot; {draftCount} draft
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Package className="size-4 text-primary shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold leading-none tabular-nums">{attachedAssetCount}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
+                      Attached Asset{attachedAssetCount === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Primary "what's next" action — adapts to network state */}
+              <div className="flex flex-wrap gap-2 lg:shrink-0">
+                {generateState === "needs-hub" ? (
+                  <Button asChild size="sm">
+                    <Link href={`/builder/network/${networkId}/hub/new`}>
+                      <Plus className="size-4 mr-1.5" aria-hidden="true" />
+                      Create first hub
+                    </Link>
+                  </Button>
+                ) : generateState === "needs-collection" ? (
+                  <Button asChild size="sm">
+                    <Link href={`/builder/network/${networkId}/collection/new`}>
+                      <Plus className="size-4 mr-1.5" aria-hidden="true" />
+                      Create first collection
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild size="sm">
+                    <Link href={`/builder/network/${networkId}/generate`}>
+                      <Sparkles className="size-4 mr-1.5" aria-hidden="true" />
+                      Generate Guide
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+            {generateState !== "ready" && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {generateState === "needs-hub"
+                  ? "Hubs organize collections. You need at least one hub before generating guides."
+                  : "Collections hold guides. Add a collection to enable guide generation."}
+              </p>
+            )}
+          </section>
+
+          {/* GuideForge Data Spine Contract — see /docs/guideforge-data-spine-contract.md */}
+
+          {/* Governance Summary — collapsible to reduce visual weight on initial load */}
+          <details className="group rounded-xl border border-border/50 bg-card">
+            <summary className="cursor-pointer list-none flex items-center justify-between p-4 hover:bg-muted/40 transition-colors rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Forge Governance
+                </span>
+                <span className="text-sm font-semibold text-foreground">Trust &amp; Standards</span>
+              </div>
+              <span className="text-xs text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs text-muted-foreground hidden group-open:inline">Hide</span>
+            </summary>
+            <div className="px-4 pb-4">
+              <GovernanceSummary network={network} />
+            </div>
+          </details>
+
+          {/* Tabs Section — wrapped in Error Boundary */}
           <DashboardErrorBoundary networkId={network.id}>
             <NetworkDashboardTabs
               networkId={network.id}

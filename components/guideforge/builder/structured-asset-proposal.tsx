@@ -133,7 +133,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Back button */}
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
@@ -141,16 +141,14 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         </Button>
 
         {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <AssetTypeBadge assetType="checklist" variant="small" />
-            {asset.generatedBy && (
-              <Badge variant="secondary" className="text-xs">
-                {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
-              </Badge>
-            )}
-            <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <AssetTypeBadge assetType="checklist" variant="small" />
+          {asset.generatedBy && (
+            <Badge variant="secondary" className="text-xs">
+              {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+            </Badge>
+          )}
+          <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
         </div>
 
         {/* Mock Preview Clarification Notice */}
@@ -197,11 +195,11 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         )}
 
         {/* Actions */}
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={onBack} disabled={isSaving}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onBack} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleChecklistSave} disabled={isSaving} className="flex-1">
+          <Button onClick={handleChecklistSave} disabled={isSaving} className="flex-1 min-w-[160px]">
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
@@ -254,7 +252,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Back button */}
       <Button variant="ghost" size="sm" onClick={onBack}>
         <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
@@ -262,7 +260,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       </Button>
 
       {/* Header */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <AssetTypeBadge assetType={asset.assetType} variant="small" />
           {asset.generatedBy && (
@@ -270,9 +268,9 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
               {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
             </Badge>
           )}
-          <span className="text-sm text-muted-foreground">Generated Asset — Not Saved Yet</span>
+          <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
         </div>
-        
+
         {/* Editable Title */}
         <div>
           {isEditingTitle ? (
@@ -281,7 +279,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground text-3xl font-bold"
+                className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground text-xl font-bold"
                 placeholder="Asset title..."
               />
               <Button size="sm" variant="ghost" onClick={() => setIsEditingTitle(false)}>
@@ -293,7 +291,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
               onClick={() => setIsEditingTitle(true)}
               className="cursor-pointer hover:opacity-70 transition-opacity"
             >
-              <h1 className="text-3xl font-bold tracking-tight">{editTitle}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{editTitle}</h1>
             </div>
           )}
         </div>
@@ -361,7 +359,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       )}
 
       {/* Asset-Specific Content Preview (BEFORE refinement) */}
-      <Card className="p-6 space-y-4">
+      <Card className="p-4 space-y-3">
         {asset.assetType === "single_guide" && (
           <div className="space-y-4">
             <div>
@@ -407,21 +405,6 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
             <p className="text-sm text-muted-foreground">{asset.symptom}</p>
           </div>
         )}
-      </Card>
-
-      {/* Save Summary */}
-      <Card className="p-4 border-blue-500/20 bg-blue-500/5">
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-foreground">Ready to save to your workspace:</p>
-          <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-            <li>• 1 {asset.assetType === "single_guide" ? "Guide" : asset.assetType === "recipe" ? "Recipe" : asset.assetType === "sop" ? "SOP / Procedure" : asset.assetType === "troubleshooting_flow" ? "Troubleshooting Flow" : "Checklist"}: {asset.title}</li>
-            <li>• Saved as a draft to your personal workspace</li>
-            <li>• You can edit, attach to a network, or delete it later</li>
-          </ul>
-          <p className="text-xs text-muted-foreground italic pt-2">
-            This asset will not be published or visible to anyone else automatically.
-          </p>
-        </div>
       </Card>
 
       {/* Auth Error State */}
@@ -488,11 +471,11 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       </Card>
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={isSaving}>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={onBack} disabled={isSaving}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+        <Button onClick={handleSave} disabled={isSaving} className="flex-1 min-w-[160px]">
           {isSaving ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />

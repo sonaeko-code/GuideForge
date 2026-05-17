@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Plus, Folder, Wand2, FileText, ArrowRight } from "lucide-react"
+import { Plus, Folder, Wand2, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/guideforge/site-header"
 import { NetworksClientList } from "@/components/guideforge/builder/networks-client-list"
@@ -128,16 +128,13 @@ export default async function NetworksDirectoryPage({
     <main className="min-h-screen surface-parchment">
       <SiteHeader hideCta />
       
-      <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-        <div className="mb-8 flex justify-between items-center gap-4 flex-wrap">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12">
+        <div className="mb-5 flex justify-between items-center gap-3 flex-wrap">
           <Button asChild variant="ghost" size="sm">
             <Link href="/builder">
               ← Back to Workspace
             </Link>
           </Button>
-            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              Builder &middot; {scope === 'mine' ? 'My Networks' : 'All Networks'}
-            </div>
           <Button asChild variant="outline" size="sm">
             <Link href="/builder/assets">
               <FileText className="mr-2 size-4" aria-hidden="true" />
@@ -146,62 +143,55 @@ export default async function NetworksDirectoryPage({
           </Button>
         </div>
 
-        {/* Networks masthead */}
-        <div className="surface-masthead relative mb-8 overflow-hidden rounded-xl p-7 md:p-9 shadow-forge">
+        {/* Networks masthead — compact */}
+        <div className="surface-masthead relative mb-6 overflow-hidden rounded-xl p-5 md:p-7 shadow-forge">
           <div className="absolute inset-0 bg-constellation opacity-25 pointer-events-none" aria-hidden="true" />
           <div className="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--brass-700)]">
+            <div className="min-w-0">
+              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--brass-700)]">
                 Workspace &middot; Knowledge Networks
               </p>
-              <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+              <h1 className="text-balance text-2xl md:text-3xl font-bold tracking-tight text-foreground">
                 {scope === 'mine' ? 'My Networks' : 'All Networks'}
               </h1>
-              <p className="mt-2 text-pretty text-base text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {networks.length} {networks.length === 1 ? 'network' : 'networks'} {scope === 'mine' ? 'you own or manage' : 'visible'}
               </p>
             </div>
             <div className="flex flex-col gap-3 w-full md:w-auto">
-              {/* Scope toggle */}
-              <div className="flex gap-2 flex-wrap">
-                <Button 
+              {/* Scope toggle — My Networks first, All Networks secondary */}
+              <div className="flex gap-2 flex-wrap" role="tablist" aria-label="Network scope">
+                <Button
                   asChild
                   variant={scope === 'mine' ? 'default' : 'outline'}
                   size="sm"
                 >
-                  <Link href="/builder/networks?scope=mine">
+                  <Link href="/builder/networks?scope=mine" role="tab" aria-selected={scope === 'mine'}>
                     My Networks
                   </Link>
                 </Button>
-                <Button 
+                <Button
                   asChild
-                  variant={scope === 'all' || !scope ? 'default' : 'outline'}
+                  variant={scope === 'all' ? 'default' : 'outline'}
                   size="sm"
                 >
-                  <Link href="/builder/networks?scope=all">
+                  <Link href="/builder/networks?scope=all" role="tab" aria-selected={scope === 'all'}>
                     All Networks
                   </Link>
                 </Button>
               </div>
-              
-              {/* Action buttons */}
+
+              {/* Primary action — single Create Network entry */}
               <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/builder/network/scaffold">
-                    <Plus className="mr-2 size-4" aria-hidden="true" />
-                    Template
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/builder/generate-asset">
-                    <Wand2 className="mr-2 size-4" aria-hidden="true" />
-                    Generate
-                  </Link>
-                </Button>
                 <Button asChild size="sm">
                   <Link href="/builder/network/new">
                     <Plus className="mr-2 size-4" aria-hidden="true" />
-                    New Network
+                    Create Network
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/builder/network/scaffold">
+                    From Template
                   </Link>
                 </Button>
               </div>

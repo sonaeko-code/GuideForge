@@ -34,7 +34,7 @@ export function NetworkPublicFooter({ network }: NetworkPublicFooterProps) {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link href={`/n/${network.slug}`} className="hover:text-foreground">
-                  Home
+                  Overview
                 </Link>
               </li>
               <li>
@@ -43,8 +43,13 @@ export function NetworkPublicFooter({ network }: NetworkPublicFooterProps) {
                 </Link>
               </li>
               <li>
+                <Link href={`/n/${network.slug}#collections`} className="hover:text-foreground">
+                  Collections
+                </Link>
+              </li>
+              <li>
                 <Link href={`/n/${network.slug}#guides`} className="hover:text-foreground">
-                  Latest Guides
+                  Published Guides
                 </Link>
               </li>
             </ul>

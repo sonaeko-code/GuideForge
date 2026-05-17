@@ -6,7 +6,9 @@
       "Bash(Test-Path \"c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\docs\")",
       "Bash(mkdir -p c:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\docs)",
       "Bash(pnpm install *)",
-      "Bash(pnpm dev *)"
+      "Bash(pnpm dev *)",
+      "Bash(npx tsc *)",
+      "Bash(git diff *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\sonaeko\\Documents\\GitHub\\GuideForge"
