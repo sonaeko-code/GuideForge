@@ -11,10 +11,25 @@ import { slugify } from "./utils"
 import type { ThemeDirection, NetworkDraft } from "./types"
 import { NETWORK_TYPE_REGISTRY, getDefaultRegistryId } from "./network-types"
 
+/**
+ * A starter guide idea inferred from the hub/collection name.
+ * Proposal-only: these are not saved to Supabase in the scaffold creation flow
+ * unless explicitly passed to save-network-skeleton.ts's guideIdeas array.
+ * Use them to give the user a sense of what guides to create first.
+ */
+export interface StarterGuideIdea {
+  title: string
+  summary: string
+  guideType: string
+  difficulty: string
+}
+
 export interface SmartFillCollectionSuggestion {
   name: string
   slug: string
   description: string
+  /** Starter guide ideas for this collection. Proposal-only — not persisted in this bundle. */
+  starterGuideIdeas?: StarterGuideIdea[]
 }
 
 export interface SmartFillHubSuggestion {
@@ -708,9 +723,100 @@ const HUB_TO_COLLECTIONS: Record<string, SmartFillCollectionSuggestion[]> = {
 }
 
 /**
+ * Generate 1-2 starter guide ideas for a given collection based on its name and parent hub.
+ * These are purely informational — shown in the scaffold preview, not auto-saved.
+ */
+function generateStarterGuideIdeas(hubName: string, collectionName: string): StarterGuideIdea[] {
+  const lower = `${hubName} ${collectionName}`.toLowerCase()
+
+  // Gaming-specific ideas
+  if (lower.includes("getting started") || lower.includes("quickstart") || lower.includes("first")) {
+    return [{ title: `${collectionName}: Complete Beginner's Walkthrough`, summary: "Everything a new player needs to know in the first hour.", guideType: "guide", difficulty: "beginner" }]
+  }
+  if (lower.includes("build") || lower.includes("loadout")) {
+    return [
+      { title: "Best Starter Build for New Players", summary: "A forgiving, easy-to-pilot build for your first hours.", guideType: "character-build", difficulty: "beginner" },
+      { title: "Endgame Meta Build Guide", summary: "Optimized stat distribution for late-game content.", guideType: "character-build", difficulty: "advanced" },
+    ]
+  }
+  if (lower.includes("boss")) {
+    return [{ title: "Boss Fight Strategy Guide", summary: "Phase breakdowns, attack patterns, and counter strategies.", guideType: "boss-guide", difficulty: "intermediate" }]
+  }
+  if (lower.includes("patch") || lower.includes("balance") || lower.includes("update")) {
+    return [{ title: "Patch Notes Summary & Impact Analysis", summary: "What changed and how it affects your playstyle.", guideType: "reference", difficulty: "beginner" }]
+  }
+  if (lower.includes("tier") || lower.includes("tier list")) {
+    return [{ title: "Current Meta Tier List", summary: "Rankings based on win rate, ease of play, and flexibility.", guideType: "tier-list", difficulty: "intermediate" }]
+  }
+  if (lower.includes("farming") || lower.includes("resource") || lower.includes("daily")) {
+    return [{ title: "Efficient Daily Farm Route", summary: "Maximize resources per hour with this optimized route.", guideType: "guide", difficulty: "intermediate" }]
+  }
+  if (lower.includes("pvp") || lower.includes("combat") || lower.includes("strategy") || lower.includes("tactic")) {
+    return [{ title: "PvP Fundamentals Guide", summary: "Core mechanics, positioning, and engagement rules.", guideType: "guide", difficulty: "intermediate" }]
+  }
+  if (lower.includes("lore") || lower.includes("story") || lower.includes("world")) {
+    return [{ title: "World Lore Overview", summary: "Key factions, timeline, and story context for new readers.", guideType: "reference", difficulty: "beginner" }]
+  }
+  if (lower.includes("crafting") || lower.includes("recipe")) {
+    return [{ title: "Crafting System Explained", summary: "How the crafting system works, from basic to advanced.", guideType: "guide", difficulty: "beginner" }]
+  }
+
+  // Training / business ideas
+  if (lower.includes("onboarding") || lower.includes("first day") || lower.includes("first week")) {
+    return [{ title: "New Team Member Onboarding Checklist", summary: "Everything to complete in the first week.", guideType: "sop", difficulty: "beginner" }]
+  }
+  if (lower.includes("compliance") || lower.includes("policy") || lower.includes("regulatory")) {
+    return [{ title: "Compliance Policy Overview", summary: "Key policies every team member must know.", guideType: "reference", difficulty: "beginner" }]
+  }
+  if (lower.includes("food safety") || lower.includes("sanitation") || lower.includes("temperature")) {
+    return [{ title: "Food Safety Daily Checklist", summary: "Temperature logs, sanitation steps, and sign-off procedure.", guideType: "sop", difficulty: "beginner" }]
+  }
+  if (lower.includes("opening") || lower.includes("closing") || lower.includes("operations")) {
+    return [{ title: "Opening Procedures SOP", summary: "Step-by-step opening checklist for the shift lead.", guideType: "sop", difficulty: "beginner" }]
+  }
+
+  // Repair / tech ideas
+  if (lower.includes("diagnostic") || lower.includes("triage")) {
+    return [{ title: "Initial Triage Checklist", summary: "First questions to ask and quick tests to run.", guideType: "troubleshooting", difficulty: "intermediate" }]
+  }
+  if (lower.includes("safety") || lower.includes("ppe")) {
+    return [{ title: "Safety Procedures Before Any Repair", summary: "Mandatory steps to protect yourself and equipment.", guideType: "sop", difficulty: "beginner" }]
+  }
+  if (lower.includes("troubleshoot") || lower.includes("common issue")) {
+    return [{ title: "Common Issues Quick Reference", summary: "The 10 most-reported problems and their fixes.", guideType: "troubleshooting", difficulty: "intermediate" }]
+  }
+
+  // Home systems
+  if (lower.includes("routine") || lower.includes("daily")) {
+    return [{ title: "Daily Household Routine Guide", summary: "A structured routine for the whole family.", guideType: "guide", difficulty: "beginner" }]
+  }
+  if (lower.includes("medication") || lower.includes("allergy")) {
+    return [{ title: "Medication Schedule Template", summary: "Daily medication times, doses, and caregiver notes.", guideType: "reference", difficulty: "beginner" }]
+  }
+  if (lower.includes("emergency") || lower.includes("contact")) {
+    return [{ title: "Emergency Contacts Reference Card", summary: "Family, neighbors, doctors, and emergency services.", guideType: "reference", difficulty: "beginner" }]
+  }
+  if (lower.includes("seasonal") || lower.includes("maintenance")) {
+    return [{ title: "Seasonal Home Maintenance Checklist", summary: "Tasks to complete each season to keep systems running.", guideType: "sop", difficulty: "beginner" }]
+  }
+
+  // Creator workflow
+  if (lower.includes("content") || lower.includes("calendar") || lower.includes("planning")) {
+    return [{ title: "Weekly Content Planning Template", summary: "How to plan, batch, and schedule content for the week.", guideType: "guide", difficulty: "beginner" }]
+  }
+  if (lower.includes("upload") || lower.includes("publish") || lower.includes("production")) {
+    return [{ title: "Video Upload Checklist", summary: "Title, tags, thumbnail, description, and publishing steps.", guideType: "sop", difficulty: "beginner" }]
+  }
+
+  // Generic fallback
+  return [{ title: `${collectionName} Overview Guide`, summary: `Introduction to ${collectionName.toLowerCase()} — what it covers and how to use it.`, guideType: "guide", difficulty: "beginner" }]
+}
+
+/**
  * Build a hierarchical scaffold from the flat hub-name suggestion list.
  * Each hub receives 2-3 starter collections from `HUB_TO_COLLECTIONS`,
  * falling back to a generic two-collection seed when the hub is unknown.
+ * Each collection receives 1-2 starter guide ideas (proposal-only metadata).
  */
 function generateScaffoldSuggestion(
   typeId: string,
@@ -728,7 +834,10 @@ function generateScaffoldSuggestion(
       name: hubName,
       slug: slugify(hubName),
       description: `${hubName} for your network.`,
-      collections: collections.map((c) => ({ ...c })),
+      collections: collections.map((c) => ({
+        ...c,
+        starterGuideIdeas: generateStarterGuideIdeas(hubName, c.name),
+      })),
     }
   })
 

@@ -33,7 +33,7 @@ import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
 import { getScaffoldTemplate, type ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
-import { smartFillNetwork, type SmartFillScaffoldSuggestion } from "@/lib/guideforge/smart-fill-network"
+import { smartFillNetwork, type SmartFillScaffoldSuggestion, type StarterGuideIdea } from "@/lib/guideforge/smart-fill-network"
 import {
   getDefaultForgeRulesDraft,
   makeCollectionClientId,
@@ -232,6 +232,9 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   )
   const [scaffoldIsDefaultForType, setScaffoldIsDefaultForType] = useState(true)
   const [scaffoldSourceType, setScaffoldSourceType] = useState<string>(safeInitialType)
+  // Holds the rich smart-fill result with starterGuideIdeas for display in the preview.
+  // Not persisted — proposal-only metadata cleared on type change.
+  const [lastSmartFillScaffold, setLastSmartFillScaffold] = useState<SmartFillScaffoldSuggestion | null>(null)
 
   // Restore draft if returning from Step 3/4
   const didHydrateRef = useRef(false)
@@ -304,11 +307,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     // Check if we have roughIdea from intake hydration
     if (roughIdea.trim() && roughIdea.length > 10) {
       didAutoSmartFillRef.current = true
-      console.log('[v0] CreateNetworkForm: Auto-running Smart Fill on welcome intake hydration')
-      
       const result = smartFillNetwork(roughIdea)
       if (!result.success) {
-        console.log('[v0] Auto-Smart-Fill could not parse the idea, leaving defaults')
         return
       }
 
@@ -341,10 +341,12 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
       // Apply scaffold
       if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
         setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+        setLastSmartFillScaffold(result.suggestedScaffold)
         setScaffoldIsDefaultForType(true)
         setScaffoldSourceType(nextTypeId)
       } else if (nextTypeId !== scaffoldSourceType) {
         setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
+        setLastSmartFillScaffold(null)
         setScaffoldIsDefaultForType(true)
         setScaffoldSourceType(nextTypeId)
       }
@@ -413,18 +415,19 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
           setDomainPrefixManuallyEdited(false)
         }
 
-        // Replace scaffold from Smart Fill suggestion, or regenerate for new type
+        // Replace scaffold from Quick Fill suggestion, or regenerate for new type
         if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
           setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
+          setLastSmartFillScaffold(result.suggestedScaffold)
           setScaffoldIsDefaultForType(true)
           setScaffoldSourceType(nextTypeId)
         } else if (nextTypeId !== scaffoldSourceType) {
           setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
+          setLastSmartFillScaffold(null)
           setScaffoldIsDefaultForType(true)
           setScaffoldSourceType(nextTypeId)
         }
 
-        setRoughIdea("")
         setError(null)
       } catch (err) {
         setError("Smart Fill failed. Please try again or fill in the fields manually.")
@@ -456,6 +459,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setDomainPrefix(newEntry.defaultSlug)
     setDomainPrefixManuallyEdited(false)
     setScaffoldDraft(buildDefaultScaffoldDraft(newTypeId))
+    setLastSmartFillScaffold(null)
     setScaffoldIsDefaultForType(true)
     setScaffoldSourceType(newTypeId)
     setStep("configure")
@@ -551,8 +555,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   Start with a rough idea
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Describe the network you want to build and GuideForge will fill in the name,
-                  type, theme, hubs, and slug.
+                  Describe the network you want to build. Quick Fill infers the name, type, theme, hubs, and slug from your idea — your idea stays here so you can refine it.
                 </p>
               </div>
               <Textarea
@@ -588,7 +591,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   ) : (
                     <Zap className="size-3.5" aria-hidden="true" />
                   )}
-                  {isSmartFilling ? "Filling..." : "Smart Fill Network"}
+                  {isSmartFilling ? "Filling..." : "Quick Fill"}
                 </Button>
               </div>
             </div>
@@ -881,6 +884,38 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 You&apos;ll be able to edit, add, or remove hubs and collections on the next
                 step before anything is saved.
               </p>
+
+              {/* Starter guide ideas — proposal-only, not auto-saved */}
+              {(() => {
+                const ideas: Array<StarterGuideIdea & { collectionName: string }> = []
+                lastSmartFillScaffold?.hubs.forEach((hub) =>
+                  hub.collections.forEach((col) =>
+                    col.starterGuideIdeas?.slice(0, 1).forEach((idea) =>
+                      ideas.push({ ...idea, collectionName: col.name })
+                    )
+                  )
+                )
+                const topIdeas = ideas.slice(0, 4)
+                if (topIdeas.length === 0) return null
+                return (
+                  <div className="mt-4 pt-4 border-t border-border/40">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      Suggested starter guides
+                    </p>
+                    <ul className="space-y-1.5">
+                      {topIdeas.map((idea, i) => (
+                        <li key={i} className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">{idea.title}</span>
+                          <span className="text-xs text-muted-foreground">{idea.collectionName} · {idea.guideType} · {idea.difficulty}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-muted-foreground italic">
+                      These are suggestions only — you&apos;ll create guides after saving the network.
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
           )
         })()}

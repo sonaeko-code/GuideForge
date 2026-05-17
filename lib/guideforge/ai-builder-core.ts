@@ -2,14 +2,21 @@
  * GuideForge AI Builder Core
  *
  * Unified contract for all AI generation flows across GuideForge.
+ * The prompt is always the source of truth — never mutate or clear it.
  * Pages provide builder kind, context, Forge Rules, and save target.
  * The core handles:
  * - Request validation
- * - Mode routing (mock vs AI)
+ * - Mode routing (mock | ai | smart_fill)
  * - Schema normalization
  * - Error handling
  *
- * This is GuideForge's equivalent to Techsperts' diagnosis/intake intelligence layer.
+ * Builder kind map (current migration status):
+ *   single_guide_asset  → fully migrated, uses generateSingleGuideAsset()
+ *   checklist_asset     → fully migrated, uses generateChecklistAsset() via ai-generation-client
+ *   network_guide       → stub; active flow is in generator-client.tsx (migrate next)
+ *   network_scaffold    → stub; active flow is in smart-fill-network + forge-rules-editor (migrate later)
+ *
+ * Do NOT create separate one-off builders. Extend this file instead.
  */
 
 import type {
@@ -36,23 +43,36 @@ export type GuideForgeBuilderKind =
 // GENERATION MODE
 // ============================================================================
 
-export type GenerationMode = "mock" | "ai"
+/**
+ * mock       — local, fast, never calls AI; used for testing and proposal preview
+ * ai         — calls OpenAI; requires API key; validates structured output
+ * smart_fill — heuristic-only field extraction; no content generation; no network call
+ */
+export type GenerationMode = "mock" | "ai" | "smart_fill"
 
 // ============================================================================
 // CONTEXT TYPES
 // ============================================================================
 
+/** Network context — passed when the builder is scoped to an existing network. */
 export interface NetworkContext {
   networkId: string
   networkName?: string
+  networkType?: string
   hubId?: string
+  hubName?: string
   collectionId?: string
+  collectionName?: string
   forgeRules?: Record<string, any>
 }
 
+/** Asset context — passed for standalone workspace asset builders. */
 export interface AssetContext {
   workspaceId?: string
-  forgeRules?: Record<string, any>
+  assetType?: string
+  guideType?: string
+  audience?: string
+  difficulty?: string
 }
 
 export interface UserContext {
@@ -67,22 +87,51 @@ export interface OutputPreferences {
   itemsPerSection?: number
 }
 
+/**
+ * Builder rules — Forge Rules and output/verification constraints.
+ * Pass forge rule strings as freeform rule entries; the AI prompt builder
+ * will include them as system-level constraints.
+ */
+export interface BuilderRules {
+  forgeRules?: string[]
+  verificationRequired?: boolean
+  contentStandard?: string
+  aiPolicy?: string
+  outputConstraints?: string[]
+}
+
+/**
+ * Save target — where the generated content should be persisted.
+ * Used as a hint to the consuming component; the builder core does not
+ * perform saves directly.
+ */
+export interface BuilderTarget {
+  type: "workspace_asset" | "network_collection" | "network_scaffold"
+  networkId?: string
+  hubId?: string
+  collectionId?: string
+  assetType?: string
+}
+
 // ============================================================================
 // BUILDER REQUEST (UNIFIED ENTRY POINT)
 // ============================================================================
 
 export interface GuideForgeBuilderRequest {
   kind: GuideForgeBuilderKind
+  /** The original user prompt. Must never be mutated or cleared by the system. */
   prompt: string
   mode: GenerationMode
 
-  // Optional context
+  // Structured context
   networkContext?: NetworkContext
   assetContext?: AssetContext
   userContext?: UserContext
   outputPreferences?: OutputPreferences
+  rules?: BuilderRules
+  target?: BuilderTarget
 
-  // Raw form data passed through (varies by builder kind)
+  // Raw form data passed through (varies by builder kind; prefer typed context fields)
   formData?: Record<string, any>
 }
 
@@ -188,13 +237,17 @@ export async function generateGuideForgeDraft(
 async function generateNetworkGuide(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
-  // To be implemented: call existing network guide generation logic
-  // This will gradually migrate generator-client.tsx to use this core
+  // Migration path: generator-client.tsx currently calls generateMockResponse() and
+  // /api/guideforge/generate-guide directly. When migrating:
+  //   mock  → import { generateMockResponse } from "./mock-generator"; pass GenerationRequest shape
+  //   ai    → fetch("/api/guideforge/generate-guide", { networkId, networkName, collectionId, ...formData })
+  //   Both  → normalize with normalizeGeneratedGuide() before returning structuredPayload
+  // Context: request.networkContext carries networkId, hubId, collectionId, networkName
   return {
     kind: "network_guide",
     mode: request.mode,
     success: false,
-    error: "Not yet migrated to core",
+    error: "Not yet migrated to core — use generator-client.tsx directly",
   }
 }
 
@@ -396,12 +449,60 @@ async function generateChecklistAsset(
 async function generateNetworkScaffold(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
-  // To be implemented: smart fill network scaffold generation
-  // This will eventually replace the heuristic in create-network-form.tsx
+  // Migration path: create-network-form.tsx currently calls smartFillNetwork() (heuristic)
+  // and forge-rules-editor.tsx calls createNetworkScaffold() to save.
+  // When migrating:
+  //   smart_fill → import { smartFillNetwork } from "./smart-fill-network"; return SmartFillResult
+  //   ai         → call a future /api/guideforge/generate-scaffold endpoint
+  //   Both       → structuredPayload should conform to NetworkSkeletonGenerationResponse shape
   return {
     kind: "network_scaffold",
     mode: request.mode,
     success: false,
-    error: "Not yet migrated to core",
+    error: "Not yet migrated to core — use smartFillNetwork() in create-network-form.tsx",
+  }
+}
+
+// ============================================================================
+// ADAPTER HELPERS
+// ============================================================================
+
+/**
+ * Build a GuideForgeBuilderRequest from network guide generator form data.
+ * Use this when migrating generator-client.tsx to the builder core.
+ * Currently informational — generator-client.tsx calls its own flow directly.
+ */
+export function toNetworkGuideBuilderRequest(opts: {
+  prompt: string
+  mode: "mock" | "ai"
+  networkId: string
+  networkName: string
+  hubId: string
+  collectionId: string
+  guideType?: string
+  difficulty?: string
+  forgeRules?: string[]
+}): GuideForgeBuilderRequest {
+  return {
+    kind: "network_guide",
+    prompt: opts.prompt,
+    mode: opts.mode,
+    networkContext: {
+      networkId: opts.networkId,
+      networkName: opts.networkName,
+      hubId: opts.hubId,
+      collectionId: opts.collectionId,
+    },
+    assetContext: {
+      guideType: opts.guideType,
+      difficulty: opts.difficulty,
+    },
+    rules: opts.forgeRules ? { forgeRules: opts.forgeRules } : undefined,
+    target: {
+      type: "network_collection",
+      networkId: opts.networkId,
+      hubId: opts.hubId,
+      collectionId: opts.collectionId,
+    },
   }
 }

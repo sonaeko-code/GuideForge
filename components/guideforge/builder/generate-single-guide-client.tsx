@@ -19,6 +19,13 @@ import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 import type { DifficultyLevel, GuideType } from "@/lib/guideforge/types"
 
+/**
+ * Single Guide Asset Builder — fully on AI Builder Core:
+ *   prompt (purpose field) → AIIntakeLadder Quick/Smart Fill → form fields
+ *   → generateGuideForgeDraft({ kind: "single_guide_asset", mode, formData })
+ *   → StructuredAssetProposal → saveStructuredAssetToWorkspace()
+ * The purpose field is the prompt. Quick Fill fills title/audience/goal from it; purpose stays editable.
+ */
 export function GenerateSingleGuideClient() {
   const [formState, setFormState] = useState<SingleGuideIntakeRequest>({
     title: "",

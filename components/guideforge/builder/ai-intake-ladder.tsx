@@ -636,8 +636,7 @@ export function AIIntakeLadder({ assetType, onApplyFields, initialIdea }: AIInta
           <div>
             <h2 className="font-semibold text-foreground">Start with a rough idea</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Describe what you want to build in plain language and we&apos;ll fill in the structured fields.
-              Use <strong>Smart Fill</strong> for AI-powered extraction, or <strong>Quick Fill</strong> for instant local parsing.
+              Describe what you want to build in plain language. <strong>Quick Fill</strong> uses local pattern matching to fill fields instantly — your idea stays unchanged. <strong>Smart Fill</strong> uses AI for more thorough extraction.
             </p>
           </div>
         </div>

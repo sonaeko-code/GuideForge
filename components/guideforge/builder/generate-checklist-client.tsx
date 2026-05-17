@@ -20,8 +20,12 @@ import { StructuredAssetProposal } from "./structured-asset-proposal"
 import { AIIntakeLadder } from "./ai-intake-ladder"
 
 /**
- * Checklist client component with pending proposal restore support.
- * On mount, checks sessionStorage for guideforge.pendingAssetProposal and restores if valid.
+ * Checklist Asset Builder — fully on AI Builder Core:
+ *   prompt (purpose field) → AIIntakeLadder Quick/Smart Fill → form fields
+ *   → generateGuideForgeDraft({ kind: "checklist_asset", mode, formData })
+ *   → generateChecklist() via ai-generation-client → StructuredAssetProposal → save
+ * Supports auth-redirect restore: pending proposal is stored in sessionStorage and
+ * restored on mount if the user was redirected to login mid-flow.
  */
 export function GenerateChecklistClient() {
   const [formState, setFormState] = useState<ChecklistIntakeRequest>({

@@ -45,6 +45,17 @@ function sanitizeParam(value: string | null | undefined): string {
   return trimmed
 }
 
+/**
+ * Network Guide Generator — current flow (pre-builder-core migration):
+ *   prompt → Suggest Structure (classifyNetworkGuidePrompt) → hub/collection selection
+ *   → Mock Preview (generateMockResponse) or AI Generate (/api/guideforge/generate-guide)
+ *   → human-readable preview → Send to Editor (createAndSaveGuideDraft → redirect)
+ *
+ * Builder core migration (next bundle):
+ *   Replace generateMockResponse + fetch with generateGuideForgeDraft({ kind: "network_guide", ... })
+ *   Use toNetworkGuideBuilderRequest() from ai-builder-core.ts to build the request.
+ *   The prompt must never be mutated — handleSuggestStructure already respects this.
+ */
 export function GeneratorClient({
   networkId,
   networkName,
@@ -462,7 +473,7 @@ export function GeneratorClient({
                   className="min-h-32"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  This is your source of truth. AI can help infer guide type, difficulty, and placement.
+                  Your prompt is the source of truth — it is never changed. Suggest Structure fills in guide type, difficulty, hub, and collection from your prompt.
                 </p>
                 <div className="mt-2">
                   <Button
@@ -473,7 +484,7 @@ export function GeneratorClient({
                     disabled={formState.prompt.trim().length < 20}
                   >
                     <Sparkles className="mr-1.5 size-3.5" aria-hidden="true" />
-                    Suggest structure
+                    Suggest Structure
                   </Button>
                 </div>
                 {suggestionBanner && (
