@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ArrowLeft,
   Globe,
+  ChevronRight,
   Lightbulb,
   Layers,
   X,
@@ -404,6 +405,7 @@ export function NetworkDashboardTabs({
     <>
     {buildPlan && (
       <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 md:p-5 shadow-sm">
+        {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <Layers className="size-4 text-primary shrink-0" aria-hidden="true" />
@@ -419,52 +421,25 @@ export function NetworkDashboardTabs({
           </button>
         </div>
 
+        {/* Goal */}
         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{buildPlan.goal}</p>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          {/* First steps */}
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">First steps</p>
-            <ol className="space-y-1.5 text-sm text-muted-foreground list-decimal list-inside">
-              {buildPlan.firstSteps.slice(0, 5).map((step, i) => (
-                <li key={i} className="leading-snug">{step}</li>
-              ))}
-            </ol>
-          </div>
-
-          {/* Pre-launch checklist */}
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pre-launch checklist</p>
-            <ul className="space-y-1.5 text-sm">
-              {buildPlan.readinessChecklist.map((item, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className={`mt-px shrink-0 text-sm font-medium ${item.done ? "text-emerald-500" : "text-muted-foreground/40"}`}>
-                    {item.done ? "✓" : "○"}
-                  </span>
-                  <span className={item.done ? "text-foreground/80" : "text-muted-foreground"}>{item.label}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
+        {/* Top 3 priority guides — always visible */}
         {buildPlan.priorityGuides.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-border/40">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Priority guides to create</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {buildPlan.priorityGuides.map((idea, i) => (
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Start with these</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {buildPlan.priorityGuides.slice(0, 3).map((idea, i) => (
                 <div
                   key={i}
                   className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground leading-snug">
                       <span className="text-muted-foreground/60 mr-1">{i + 1}.</span>
                       {idea.title}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{idea.hubName} › {idea.collectionName}</p>
                     <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
                   </div>
                   <Button
@@ -482,23 +457,101 @@ export function NetworkDashboardTabs({
           </div>
         )}
 
-        {buildPlan.nextSteps.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border/40">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Next steps</p>
-            <ol className="space-y-1 text-xs text-muted-foreground list-decimal list-inside">
-              {buildPlan.nextSteps.map((step, i) => (
-                <li key={i} className="leading-snug">{step}</li>
-              ))}
-            </ol>
-          </div>
-        )}
+        {/* Top 3 first steps — always visible */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">First steps</p>
+          <ol className="space-y-1.5 text-sm text-muted-foreground list-decimal list-inside">
+            {buildPlan.firstSteps.slice(0, 3).map((step, i) => (
+              <li key={i} className="leading-snug">{step}</li>
+            ))}
+          </ol>
+        </div>
 
-        <p className="mt-4 text-xs text-muted-foreground italic">
-          This plan is session-only and may disappear after browser close. No guides are created automatically.
+        {/* Expandable: remaining guides + steps + checklist + next steps */}
+        <details className="group">
+          <summary className="cursor-pointer select-none flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors list-none">
+            <ChevronRight className="size-3 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
+            <span className="group-open:hidden">View full launch plan</span>
+            <span className="hidden group-open:inline">Hide full plan</span>
+          </summary>
+
+          <div className="mt-4 space-y-5">
+            {buildPlan.firstSteps.length > 3 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">More steps</p>
+                <ol className="space-y-1.5 text-sm text-muted-foreground list-decimal list-inside" start={4}>
+                  {buildPlan.firstSteps.slice(3).map((step, i) => (
+                    <li key={i} className="leading-snug">{step}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {buildPlan.priorityGuides.length > 3 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">More guides</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {buildPlan.priorityGuides.slice(3).map((idea, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground leading-snug">
+                          <span className="text-muted-foreground/60 mr-1">{i + 4}.</span>
+                          {idea.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{idea.hubName} › {idea.collectionName}</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="self-start text-xs"
+                        onClick={() => handleCreateFromIdea(idea)}
+                      >
+                        <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                        Create this guide
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pre-launch checklist</p>
+              <ul className="space-y-1.5 text-sm">
+                {buildPlan.readinessChecklist.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={`mt-px shrink-0 text-sm font-medium ${item.done ? "text-emerald-500" : "text-muted-foreground/40"}`}>
+                      {item.done ? "✓" : "○"}
+                    </span>
+                    <span className={item.done ? "text-foreground/80" : "text-muted-foreground"}>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {buildPlan.nextSteps.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Next steps</p>
+                <ol className="space-y-1 text-xs text-muted-foreground list-decimal list-inside">
+                  {buildPlan.nextSteps.map((step, i) => (
+                    <li key={i} className="leading-snug">{step}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+        </details>
+
+        <p className="mt-4 text-xs text-muted-foreground/60">
+          From your scaffold · session-only. No guides created automatically.
         </p>
       </div>
     )}
-    {starterIdeas && starterIdeas.ideas.length > 0 && (
+    {starterIdeas && starterIdeas.ideas.length > 0 && !buildPlan && (
       <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 md:p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-center gap-2">

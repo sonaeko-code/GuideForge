@@ -198,10 +198,13 @@ The network build plan is a richer, type-aware planning layer generated alongsid
 
 1. `forge-rules-editor.tsx` calls `generateNetworkBuildPlan(sfResult)` after writing starter ideas.
 2. The plan is written to sessionStorage via `writeNetworkBuildPlan(networkId, plan)`.
-3. The network dashboard reads the plan on mount and shows a **Network launch plan** panel above the starter ideas panel.
-4. Priority guide cards have **Create this guide** buttons that reuse the same `handleCreateFromIdea` flow as starter ideas.
-5. The panel is dismissible; dismiss clears the sessionStorage key.
-6. In the wizard preview step (`create-network-form.tsx`), a collapsed `<details open>` preview of the plan is shown before the network is saved — no networkId required since it's derived from the in-progress `SmartFillResult`.
+3. The network dashboard reads the plan on mount and shows a compact **Network launch plan** panel.
+   - Always visible: goal, top 3 priority guides with **Create this guide** buttons, top 3 first steps.
+   - Collapsed `<details>` ("View full launch plan"): remaining guides, remaining steps, checklist, next steps.
+4. When `buildPlan` is present, the **Suggested starter guides** panel is suppressed — the build plan's priority guides already cover those ideas via the same `handleCreateFromIdea` handoff.
+5. When `buildPlan` is absent but `starterIdeas` is present, **Suggested starter guides** shows as before.
+6. The panel is dismissible; dismiss clears the sessionStorage key.
+7. In the wizard preview step (`create-network-form.tsx`), a compact `<details open>` shows goal + top 3 first steps + top 3 priority guides; a nested closed `<details>` holds the rest.
 
 ### Storage Key
 
@@ -214,5 +217,6 @@ The network build plan is a richer, type-aware planning layer generated alongsid
 - Uses sessionStorage. Disappears on tab/browser close.
 - No Supabase writes.
 - No auto-generation or auto-publishing.
-- Panel is dismissible and clears the key.
+- Panel is dismissible and clears only the sessionStorage key.
 - `NetworkBuildPlanIdea` is a structural superset of `NetworkStarterIdeas["ideas"][number]` — can be passed directly to `handleCreateFromIdea`.
+- **Starter guides and build plan ideas are the same data** (both come from `starterGuideIdeas[0]` of each collection). The build plan is the preferred entry point when present.
