@@ -9,10 +9,10 @@ import { Loader2 } from 'lucide-react'
  * Protected route wrapper - redirects to login if not authenticated
  * Phase 2: Will implement actual auth checks
  */
-export function ProtectedRoute({ 
+export function ProtectedRoute({
   children,
-  requiredPath?: string,
-}: { 
+  requiredPath,
+}: {
   children: React.ReactNode
   requiredPath?: string
 }) {

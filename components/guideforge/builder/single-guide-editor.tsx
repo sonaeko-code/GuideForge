@@ -310,9 +310,9 @@ export function SingleGuideEditor({
             <Badge variant="secondary" className="text-xs capitalize">
               {value.difficulty}
             </Badge>
-            {(value as any).generatedBy && (
+            {(value as any).generatedBy === "openai" && (
               <Badge variant="secondary" className="text-xs">
-                {(value as any).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+                AI Generated
               </Badge>
             )}
           </div>

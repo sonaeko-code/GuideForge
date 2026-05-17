@@ -625,13 +625,6 @@ export function GeneratorClient({
                 </div>
               )}
 
-              <div className="rounded-lg bg-muted/30 border border-border/50 p-3">
-                <p className="text-xs text-muted-foreground">
-                  <strong>Forge Rules:</strong>{" "}
-                  The network&apos;s forge rules will be applied as context to the generator.
-                </p>
-              </div>
-
               {/* Generation mode selector */}
               <div>
                 <label className="text-sm font-semibold mb-2 block">
@@ -708,56 +701,56 @@ export function GeneratorClient({
                 )}
 
                 {session.status === "done" && session.response ? (
-                  <Card className="border-border/50 p-4 md:p-5 space-y-4">
+                  <div className="space-y-4">
                     {session.response.success ? (
                       <>
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold uppercase text-muted-foreground">
-                              Generated Guide JSON
+                        {/* Guide summary card */}
+                        <Card className="border-border/50 p-4 md:p-5 space-y-3">
+                          <div>
+                            <p className="font-semibold text-foreground leading-snug">
+                              {session.response.guide.title}
                             </p>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleCopyJson}
-                            >
-                              {copiedId === "json" ? (
-                                <Check className="size-4" />
-                              ) : (
-                                <Copy className="size-4" />
-                              )}
-                            </Button>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {session.response.guide.sections?.length ?? 0} sections ·{" "}
+                              {session.response.guide.estimatedMinutes ?? "—"} min ·{" "}
+                              <span className="capitalize">{session.response.guide.difficulty}</span>
+                            </p>
                           </div>
-                          <div className="bg-muted/30 rounded border border-border/50 p-3 overflow-x-auto max-h-96 overflow-y-auto font-mono text-xs text-foreground">
-                            <pre>
-                              {JSON.stringify(session.response.guide, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
-
-                        <div className="bg-primary/5 border border-primary/20 rounded p-3">
-                          <p className="text-sm font-semibold mb-1">
-                            {session.response.guide.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {session.response.guide.sections?.length ?? 0} sections ·{" "}
-                            {session.response.guide.estimatedMinutes ?? "?"} min read ·{" "}
-                            {session.response.guide.difficulty}
-                          </p>
-                        </div>
+                          {session.response.guide.summary && (
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {session.response.guide.summary}
+                            </p>
+                          )}
+                          {/* Section list */}
+                          {(session.response.guide.sections ?? []).length > 0 && (
+                            <ol className="space-y-2">
+                              {session.response.guide.sections.map((sec: any, i: number) => (
+                                <li key={i} className="flex gap-3 items-start">
+                                  <span className="text-xs font-bold text-muted-foreground/50 tabular-nums shrink-0 mt-0.5 w-5 text-right">
+                                    {i + 1}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-foreground leading-snug">{sec.title}</p>
+                                    {sec.body && (
+                                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{sec.body}</p>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </Card>
 
                         <Button
                           onClick={handleSendToEditor}
                           disabled={!session?.response?.guide || isSending}
+                          className="w-full"
                           size="lg"
                         >
                           {isSending ? (
                             <>
-                              <Loader2
-                                className="mr-2 size-4 animate-spin"
-                                aria-hidden="true"
-                              />
-                              Saving...
+                              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                              Saving to Editor...
                             </>
                           ) : (
                             "Send to Editor"
@@ -766,23 +759,37 @@ export function GeneratorClient({
 
                         {sendError && (
                           <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-4">
-                            <p className="text-sm text-red-700 dark:text-red-400">
-                              {sendError}
-                            </p>
+                            <p className="text-sm text-red-700 dark:text-red-400">{sendError}</p>
                           </div>
                         )}
+
+                        {/* Raw JSON for devs — collapsed by default */}
+                        <details className="group">
+                          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 select-none">
+                            <Copy className="size-3" aria-hidden="true" />
+                            View raw JSON
+                          </summary>
+                          <div className="mt-2 flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">Guide JSON</span>
+                            <Button size="sm" variant="ghost" onClick={handleCopyJson} className="h-6 px-2 text-xs gap-1">
+                              {copiedId === "json" ? <Check className="size-3" /> : <Copy className="size-3" />}
+                              {copiedId === "json" ? "Copied" : "Copy"}
+                            </Button>
+                          </div>
+                          <div className="bg-muted/30 rounded border border-border/50 p-3 overflow-x-auto max-h-64 overflow-y-auto font-mono text-xs text-foreground">
+                            <pre>{JSON.stringify(session.response.guide, null, 2)}</pre>
+                          </div>
+                        </details>
                       </>
                     ) : (
-                      <div className="text-center py-6">
-                        <p className="text-red-600 text-sm mb-2">
-                          Generation failed
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          {session.response.error}
-                        </p>
-                      </div>
+                      <Card className="border-red-200/50 bg-red-500/5 p-6">
+                        <div className="text-center">
+                          <p className="text-red-600 dark:text-red-400 font-semibold mb-1">Generation failed</p>
+                          <p className="text-muted-foreground text-xs">{session.response.error}</p>
+                        </div>
+                      </Card>
                     )}
-                  </Card>
+                  </div>
                 ) : session.status === "error" ? (
                   <Card className="border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-6">
                     <div className="text-center">
@@ -800,11 +807,11 @@ export function GeneratorClient({
                 ) : null}
               </>
             ) : (
-              <Card className="border-border/50 p-6 text-center">
+              <Card className="border-border/50 p-8 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Fill out the form and click{" "}
-                  &quot;{generationMode === "mock" ? "Generate Mock Guide" : "Generate AI Guide"}&quot;{" "}
-                  to preview the output.
+                  Describe your guide above and click{" "}
+                  <strong>{generationMode === "mock" ? "Generate Mock Guide" : "Generate AI Guide"}</strong>{" "}
+                  to preview the structure.
                 </p>
               </Card>
             )}

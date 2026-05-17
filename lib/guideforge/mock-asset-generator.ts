@@ -22,6 +22,126 @@ import type {
 } from "./generation-schemas"
 import { slugify } from "./utils"
 
+// ── Topic-aware step generation ───────────────────────────────────────────────
+
+type GuideDomain = "youtube" | "gaming" | "business" | "tech" | "cooking" | "writing" | "general"
+
+function detectGuideDomain(text: string): GuideDomain {
+  const t = text.toLowerCase()
+  if (/youtube|video channel|content creator|vlog|twitch|streaming|subscriber|thumbnail|podcast/.test(t)) return "youtube"
+  if (/\bgame\b|build|class|character|boss|raid|dungeon|quest|leveling|farming|pvp|pve|rpg|mmorpg|fps|minecraft|warcraft|elden ring|fortnite|valorant|diablo/.test(t)) return "gaming"
+  if (/business|sop\b|procedure|process|workflow|onboarding|compliance|department|employee|operations/.test(t)) return "business"
+  if (/install|setup|configure|deploy|server|docker|api|database|integration|software|coding|developer|cloud|infrastructure/.test(t)) return "tech"
+  if (/recipe|cooking|baking|ingredient|\bmeal\b|food|kitchen|cuisine|\bdish\b/.test(t)) return "cooking"
+  if (/\bwriting\b|article|blog|essay|copywriting|fiction|\bstory\b|novelist|script/.test(t)) return "writing"
+  return "general"
+}
+
+function extractGuideSubject(title: string): string {
+  const cleaned = title
+    .replace(/^(how to|guide to|a guide to|complete guide to|beginner'?s guide to|beginner guide to|getting started with|introduction to|the )\s*/i, "")
+    .trim()
+  return cleaned || title
+}
+
+type StepTemplate = { title: string; body: string; tip: string | null; warning: string | null }
+
+function getDomainStepTemplates(subject: string, domain: GuideDomain): StepTemplate[] {
+  switch (domain) {
+    case "youtube":
+      return [
+        { title: "Define Your Content Concept", body: `Outline the core idea for your ${subject} content. Define your unique angle, target audience, and the one takeaway you want viewers to leave with.`, tip: "Write your single-sentence value proposition before scripting — it keeps every decision focused.", warning: null },
+        { title: "Plan Your Production Setup", body: `Choose a recording environment suited to ${subject}. Clear audio matters more than camera quality for most viewers — prioritize a good microphone first.`, tip: "Test audio and lighting with a 30-second sample clip before your full recording session.", warning: null },
+        { title: "Script and Record", body: `Record your ${subject} content in manageable segments. A bullet-point outline works better than a word-for-word script — it keeps delivery natural.`, tip: "Record extra takes for complex sections. Raw footage is cheap; reshoots are expensive.", warning: null },
+        { title: "Edit for Clarity and Pace", body: `Cut dead air, filler words, and off-topic sections from your ${subject} video. Add chapter markers and on-screen text to reinforce key moments.`, tip: "Check audience retention in Analytics — sharp drop-off points show exactly where to improve.", warning: null },
+        { title: "Optimize for Discovery", body: `Write a keyword-rich title, description, and tags for your ${subject} content. Your thumbnail should be legible at small sizes and clearly communicate the video's value.`, tip: "Use YouTube's search autocomplete for keyword research — those suggestions are real queries from your audience.", warning: null },
+        { title: "Publish and Promote", body: `Publish your ${subject} content on a consistent schedule. Share it in relevant communities and respond to early comments to signal engagement.`, tip: "The first 24 hours of engagement heavily influence long-term reach — prioritize early interaction.", warning: null },
+      ]
+
+    case "gaming":
+      return [
+        { title: "Overview", body: `${subject} rewards understanding the core mechanics before attempting advanced techniques. This guide covers everything from setup to advanced optimization.`, tip: "Read the full guide before making changes — individual steps make more sense in context.", warning: null },
+        { title: "Prerequisites and Gear", body: `Confirm your character meets the baseline for ${subject}: level, gear tier, and required ability unlocks. Underpowered gear is the most common reason this strategy underperforms.`, tip: "Check your gear score first. If you're significantly below the recommended level, gear up before proceeding.", warning: null },
+        { title: "Core Mechanics", body: `${subject} revolves around a specific mechanic or rotation. Understanding why each step works — not just what to do — separates average from skilled execution.`, tip: "Practice in a low-risk environment first until the mechanic becomes muscle memory.", warning: null },
+        { title: "Execution and Rotation", body: `Execute ${subject} by establishing your opener, applying buffs and debuffs in order, then cycling through primary abilities. Manage resources actively throughout.`, tip: "Track cooldowns at all times — off-cycle cooldowns are the single biggest performance loss in most builds.", warning: null },
+        { title: "Common Mistakes", body: `Frequent mistakes with ${subject}: skipping the setup phase, ignoring positioning, and mismanaging resources. Fixing these three things will improve your results immediately.`, tip: "Record a run and review it — mistakes are far easier to spot on playback than in the moment.", warning: null },
+        { title: "Advanced Optimizations", body: `Once you've mastered the basics of ${subject}, explore advanced layers: adapt to different enemy compositions, chain synergistic mechanics, and optimize secondary stats for your content type.`, tip: "Check community guides and top player VODs — optimizations are often discovered in community spaces before anywhere else.", warning: null },
+      ]
+
+    case "business":
+      return [
+        { title: "Purpose and Scope", body: `This guide covers ${subject} for the relevant team members and stakeholders. Clear scope prevents confusion and ensures consistent execution.`, tip: "If you're unsure whether this applies to your situation, clarify with your supervisor before proceeding.", warning: null },
+        { title: "Prerequisites and Access", body: `Before beginning ${subject}, verify you have the required system access, tools, and approvals. Missing access causes delays — request it at least 1–3 business days in advance.`, tip: "Keep a list of required credentials updated — access gaps are the most common blocker.", warning: "Do not attempt steps requiring access you don't have. Unauthorized actions may be logged or irreversible." },
+        { title: "Step-by-Step Procedure", body: `Complete each step of ${subject} in order. Do not skip steps even if they appear optional — each one validates conditions required for the next step.`, tip: "Check off each step as you go. Incomplete steps are the most common source of errors and rework.", warning: null },
+        { title: "Quality Checks and Verification", body: `After completing the main steps for ${subject}, verify your output against the defined acceptance criteria. Common issues: incomplete data entry, missed approvals, and formatting inconsistencies.`, tip: "A second review before submission catches the majority of preventable issues.", warning: null },
+        { title: "Exceptions and Escalation", body: `If you encounter a situation during ${subject} not covered by this guide, document it and escalate to the process owner. Logging exceptions helps improve the procedure over time.`, tip: "Track recurring exceptions in the team log — patterns reveal gaps in the procedure.", warning: null },
+        { title: "Completion and Handoff", body: `Once ${subject} is complete, update relevant systems, notify required stakeholders, and file all required documentation. Confirm the handoff has been acknowledged before closing.`, tip: "Set a follow-up reminder if you don't receive acknowledgment within one business day.", warning: null },
+      ]
+
+    case "tech":
+      return [
+        { title: "Prerequisites", body: `Before setting up ${subject}, verify your environment meets the minimum requirements: correct software versions, necessary permissions, and required credentials.`, tip: "Take a system snapshot or backup before making configuration changes — it makes rollback painless.", warning: "Verify all requirements before starting. Incompatible environments cause errors that are difficult to diagnose." },
+        { title: "Installation", body: `Install ${subject} using the recommended method for your OS and environment. Follow documentation for your specific version — older guides often reference deprecated steps.`, tip: "Test the installation in a sandbox environment before applying it to production.", warning: null },
+        { title: "Configuration", body: `Configure ${subject} by updating the required settings and environment variables. Use the provided configuration template as a baseline and customize for your environment.`, tip: "Store your working configuration in version control so the next person doesn't have to reconstruct it.", warning: "Double-check all values for production. Incorrect configuration is the most common post-install failure mode." },
+        { title: "Verification and Testing", body: `Confirm ${subject} is working correctly by running health checks or smoke tests. Verify integrations are responding and error handling works as expected.`, tip: "Test the failure case deliberately — trigger an expected error to confirm your alerting and error handling work.", warning: null },
+        { title: "Troubleshooting", body: `If ${subject} isn't working as expected, start with logs, then verify environment variables and permissions. Common causes: port conflicts, missing dependencies, incorrect credentials, and network rules.`, tip: "Search the exact error message — most common failures have documented solutions in official docs or community forums.", warning: null },
+        { title: "Next Steps and Maintenance", body: `Now that ${subject} is running, set up monitoring, alerts, and automated health checks. Document your setup for the team and consider scripting it for reproducibility.`, tip: "Add your setup steps to the team runbook so the next person doesn't start from scratch.", warning: null },
+      ]
+
+    case "cooking":
+      return [
+        { title: "Gather and Prep Ingredients", body: `Collect and measure all ingredients for ${subject} before you start. Mise en place — having everything ready ahead of time — is the most important habit for consistent results.`, tip: "Read the full recipe before starting. Surprises mid-cook cause mistakes.", warning: null },
+        { title: "Set Up Your Kitchen", body: `Prepare your workspace for ${subject}: preheat the oven or pan as needed, prep your cutting board, and have all utensils within reach.`, tip: "Clean as you go — it reduces end-of-cook chaos and keeps your workspace organized.", warning: null },
+        { title: "Cook the Main Components", body: `Follow the cooking steps for ${subject} carefully. Heat levels and timing are the most critical variables — they affect texture, flavor, and food safety.`, tip: "Taste as you cook and adjust seasoning gradually. It's easier to add than to fix over-seasoning.", warning: "Never leave hot oil unattended on the stovetop." },
+        { title: "Assemble and Plate", body: `Assemble ${subject} while it's at the right temperature. Even simple, intentional plating elevates the experience significantly.`, tip: "Add garnishes just before serving. Wilted garnish undermines an otherwise well-prepared dish.", warning: null },
+        { title: "Serve and Store", body: `Serve ${subject} immediately for best results. If storing, cool to room temperature before refrigerating. Label containers with the date and reheating instructions.`, tip: "Most cooked dishes keep 3–5 days when stored correctly. When in doubt, smell and taste before reheating.", warning: null },
+      ]
+
+    case "writing":
+      return [
+        { title: "Define Your Goal and Audience", body: `Before writing ${subject}, clarify what you want the reader to know, feel, or do after reading. A clear goal shapes every word choice and structural decision.`, tip: "Write your single-sentence goal at the top of the document — check every paragraph against it.", warning: null },
+        { title: "Research and Outline", body: `Gather sources and evidence for ${subject}. Build an outline that flows from hook → context → body → conclusion before writing prose.`, tip: "Your outline is a starting point, not a cage — deviate when the writing demands it, but start with structure.", warning: null },
+        { title: "Write the First Draft", body: `Write your first draft of ${subject} without stopping to edit. The goal is words on the page — speed matters here, not quality. You can't revise a blank document.`, tip: "Turn off autocorrect for the first draft. Corrections interrupt flow and slow you down.", warning: null },
+        { title: "Revise for Clarity", body: `Revise ${subject} with fresh eyes — after a break if possible. Cut anything that doesn't serve the reader, simplify complex sentences, and eliminate filler language.`, tip: "Read it aloud — your ear catches what your eyes skip when reading silently.", warning: null },
+        { title: "Proofread and Polish", body: `Proofread ${subject} for grammar, spelling, consistency, and formatting. Verify all links and references are accurate. Check headings create a clear logical hierarchy.`, tip: "Use a grammar tool as a second pass, not a first — it's better for catching what you've already missed.", warning: null },
+        { title: "Publish and Distribute", body: `Publish ${subject} and share it through relevant channels. Track engagement to learn what resonates for future pieces.`, tip: "Repurpose one piece across multiple formats — an article becomes a thread, a newsletter section, a short video script.", warning: null },
+      ]
+
+    default:
+      return [
+        { title: `What Is ${subject}?`, body: `${subject} is a process or skill that benefits from a structured approach. This guide covers everything you need to get started and see results.`, tip: "Read the full guide before beginning so you understand how each step connects.", warning: null },
+        { title: "Before You Begin", body: `Prepare for ${subject} by gathering required materials, confirming access or permissions, and reviewing the prerequisites. Good preparation eliminates the most common sources of frustration.`, tip: "Skipping preparation is the most common reason people need to restart from the beginning.", warning: null },
+        { title: `Getting Started with ${subject}`, body: `Begin ${subject} by completing the initial setup steps carefully and in order. This foundation phase sets up everything that follows — rushing through it causes problems that are hard to trace later.`, tip: "If anything seems unclear, review the previous step before continuing.", warning: null },
+        { title: "Core Process", body: `The core of ${subject} involves steps that build on each other. Follow them in sequence and verify completion before moving on — partial completion is a common source of errors.`, tip: "If a step isn't working, return to the previous step and verify it was completed correctly.", warning: null },
+        { title: "Common Mistakes and Fixes", body: `Most frequent problems with ${subject}: rushing through setup, skipping verification, and working from incomplete information. Slow down, check your work, and you'll avoid 90% of issues.`, tip: "When troubleshooting, start from the beginning — it's faster than debugging halfway through.", warning: null },
+        { title: "Next Steps", body: `Now that you've completed ${subject}, consider documenting what you learned, exploring advanced techniques, or applying the same approach to a related challenge.`, tip: "Document your experience while it's fresh — even brief notes save significant time the next time you revisit this.", warning: null },
+      ]
+  }
+}
+
+function buildTopicSteps(
+  request: SingleGuideIntakeRequest,
+  count: number
+): Array<{ title: string; body: string; successCondition: string | null; tip: string | null; warning: string | null }> {
+  const combinedText = `${request.title} ${request.purpose} ${request.optionalContext || ""}`
+  const domain = detectGuideDomain(combinedText)
+  const subject = extractGuideSubject(request.title)
+  const templates = getDomainStepTemplates(subject, domain)
+
+  const result = []
+  for (let i = 0; i < count; i++) {
+    const t = templates[i % templates.length]
+    result.push({
+      title: t.title,
+      body: t.body,
+      tip: t.tip,
+      warning: request.hasWarnings ? (t.warning ?? (i === 0 ? "Review all prerequisites before proceeding." : null)) : null,
+      successCondition: null,
+    })
+  }
+  return result
+}
+
 export interface GenerateAssetResult<T extends GeneratedStructuredAsset = GeneratedStructuredAsset> {
   success: boolean
   asset?: T
@@ -35,41 +155,33 @@ export async function generateSingleGuideMock(
   await new Promise((resolve) => setTimeout(resolve, 1000))
 
   try {
-    const steps = Array.from({ length: Math.max(3, request.numberOfSteps) }).map((_, idx) => ({
-      title: `Step ${idx + 1}: ${["Initialize", "Configure", "Execute", "Verify", "Optimize"][idx] || "Continue"}`,
-      body: `This is step ${idx + 1} of the guide. Follow this carefully to proceed.`,
-      successCondition: idx < request.numberOfSteps - 1 ? `Step ${idx + 1} completed` : null,
-      tip: idx % 2 === 0 ? `Pro tip for step ${idx + 1}` : null,
-      warning: request.hasWarnings && idx % 3 === 0 ? `⚠️ Warning for step ${idx + 1}` : null,
-    }))
+    const steps = buildTopicSteps(request, Math.max(3, request.numberOfSteps))
 
     const asset: GeneratedSingleGuide = {
       assetType: "single_guide",
       title: request.title,
-      summary: `A comprehensive ${request.difficulty} guide for ${request.audience}. ${request.purpose}`,
+      summary: request.purpose.trim()
+        ? request.purpose.trim()
+        : `A ${request.difficulty} guide for ${request.audience} covering ${extractGuideSubject(request.title).toLowerCase()}.`,
       audience: request.audience,
       difficulty: request.difficulty,
       requirements: request.hasPrerequisites
         ? [
-            "Basic familiarity with the topic",
-            "Required tools or access",
-            "Time to complete: ~15-30 minutes",
+            `Basic familiarity with ${extractGuideSubject(request.title).toLowerCase()}`,
+            "Required tools or access confirmed before starting",
+            "Estimated time: 15–30 minutes to complete",
           ]
         : [],
       warnings: request.hasWarnings
         ? [
-            "This process may have irreversible consequences if done incorrectly.",
-            "Proceed only if you have the necessary permissions.",
+            "Review all steps before beginning — some actions may be difficult to reverse.",
+            "Ensure you have the necessary permissions or access before proceeding.",
           ]
         : [],
       steps,
-      tags: [request.guideType, request.difficulty, request.tone],
-      assumptions: [
-        `Target audience: ${request.audience}`,
-        `Tone: ${request.tone}`,
-        `Guide type: ${request.guideType}`,
-      ],
-      missingInfo: request.optionalContext.trim() ? [] : ["Consider providing domain-specific context for more targeted generation."],
+      tags: [request.guideType, request.difficulty],
+      assumptions: [],
+      missingInfo: request.optionalContext.trim() ? [] : ["Adding domain-specific context in the optional field will improve the relevance of generated steps."],
     }
 
     return { success: true, asset }
@@ -112,11 +224,7 @@ export async function generateRecipeMock(
       dietaryNotes: request.dietaryNotes.trim() ? [request.dietaryNotes] : [],
       warnings: [],
       tags: [request.cuisine, "recipe", "homemade"],
-      assumptions: [
-        `Cuisine: ${request.cuisine}`,
-        `Audience: ${request.audience}`,
-        `Purpose: ${request.purpose}`,
-      ],
+      assumptions: [],
       missingInfo: [],
     }
 
@@ -149,12 +257,8 @@ export async function generateChecklistMock(
         "All verification passed",
         "Documentation updated",
       ],
-      tags: [request.useCase, "checklist", request.tone],
-      assumptions: [
-        `Goal: ${request.goal}`,
-        `Use case: ${request.useCase}`,
-        `Audience: ${request.audience}`,
-      ],
+      tags: [request.useCase, "checklist"],
+      assumptions: [],
       missingInfo: [],
       generatedBy: "mock",
     }
@@ -516,20 +620,20 @@ export async function generateSOPMock(
       ].filter((r) => r.trim()),
       procedureSteps: [
         {
-          title: "Step 1: Initiate",
-          body: "Begin the procedure with proper authorization and documentation.",
+          title: "Initiate and Authorize",
+          body: `Begin ${request.purpose || "the procedure"} with proper authorization. Confirm all prerequisites are met and required documentation is in place before proceeding.`,
           responsibleRole: request.owner || "Process Owner",
           warning: null,
         },
         {
-          title: "Step 2: Execute",
-          body: "Follow the procedure according to specifications.",
+          title: "Execute Procedure",
+          body: `Follow the defined steps for ${request.purpose || "this process"} according to specifications. Document any deviations or exceptions as they occur.`,
           responsibleRole: "Operator",
-          warning: "Ensure compliance with all requirements.",
+          warning: "Ensure compliance with all applicable requirements. Escalate if you encounter an undocumented situation.",
         },
         {
-          title: "Step 3: Verify",
-          body: "Verify completion and document results.",
+          title: "Verify and Document",
+          body: "Confirm all steps were completed correctly. Document results, any exceptions encountered, and confirm the outcome meets acceptance criteria.",
           responsibleRole: "Supervisor",
           warning: null,
         },
@@ -540,11 +644,7 @@ export async function generateSOPMock(
         "Document all exceptions",
       ].filter((n) => n.trim()),
       tags: [request.department, "sop", "procedure"],
-      assumptions: [
-        `Owner: ${request.owner}`,
-        `Department: ${request.department}`,
-        `Purpose: ${request.purpose}`,
-      ],
+      assumptions: [],
       missingInfo: [],
     }
 
@@ -615,11 +715,7 @@ export async function generateTroubleshootingFlowMock(
         "Document your steps for troubleshooting",
       ],
       tags: [request.environment, "troubleshooting", request.riskLevel],
-      assumptions: [
-        `Environment: ${request.environment}`,
-        `Risk level: ${request.riskLevel}`,
-        `Audience: ${request.audience}`,
-      ],
+      assumptions: [],
       missingInfo: [],
     }
 

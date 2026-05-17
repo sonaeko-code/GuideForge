@@ -441,20 +441,6 @@ export function NetworkDashboardTabs({
           </Button>
         </div>
 
-        {/* Phase 10H: Debug log for visible guides in drafts tab */}
-        {safeDrafts.length > 0 && (
-          console.log("[v0] Dashboard visible guide ids - drafts", {
-            tab: "drafts",
-            visibleGuideIds: safeDrafts.map(g => ({
-              id: g.id,
-              title: g.title,
-              status: g.status,
-              revisionOf: g.revisionOf,
-              revisionNumber: g.revisionNumber,
-            })),
-          })
-        )}
-
         <DraftList networkId={networkId} scopedDrafts={safeDrafts} scopedPublished={safePublished} />
 
         {/* Lane 2B: Attached Draft Assets with Submit for Review */}
@@ -611,9 +597,6 @@ export function NetworkDashboardTabs({
                         </p>
                       )}
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground border-dashed">
-                          Source: Network Guide
-                        </Badge>
                         <StatusBadge status={guide.status} />
                         {guide.type && <Badge variant="outline" className="text-xs font-normal capitalize">{guide.type.replace("-", " ")}</Badge>}
                         {guide.difficulty && <DifficultyBadge difficulty={guide.difficulty} />}
@@ -658,9 +641,6 @@ export function NetworkDashboardTabs({
                           </p>
                         )}
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground border-dashed">
-                            Source: Attached Asset
-                          </Badge>
                           <Badge variant="outline" className="text-xs font-normal capitalize">
                             {asset.assetType.replace(/_/g, " ")}
                           </Badge>

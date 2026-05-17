@@ -392,46 +392,112 @@ export function generateMockResponse(
 // ---------- Helper functions ----------
 
 function generateTitle(request: GenerationRequest): string {
-  const prompt = request.prompt.toLowerCase()
-  
-  // Extract keywords from prompt for a more contextual title
-  let titleContext = ""
-  
-  if (prompt.includes("frost") || prompt.includes("ice")) {
-    titleContext = "Frost Shaman"
-  } else if (prompt.includes("fire") || prompt.includes("blaze")) {
-    titleContext = "Fire Warden"
-  } else if (prompt.includes("shadow") || prompt.includes("rogue")) {
-    titleContext = "Shadow Assassin"
-  } else if (prompt.includes("holy") || prompt.includes("priest")) {
-    titleContext = "Holy Priest"
-  } else if (prompt.includes("ranger") || prompt.includes("bow")) {
-    titleContext = "Ranger"
-  } else {
-    titleContext = "Character Build"
+  const prompt = request.prompt
+  const lower = prompt.toLowerCase()
+
+  const diffLabel: Record<string, string> = {
+    beginner: "Beginner's",
+    intermediate: "Complete",
+    advanced: "Advanced",
+    expert: "Expert",
   }
-  
+  const difficulty = diffLabel[request.preferredDifficulty ?? "intermediate"] ?? "Complete"
+
+  const typeLabel: Record<string, string> = {
+    "character-build": "Build Guide",
+    "boss-guide": "Boss Guide",
+    "beginner-guide": "Getting Started Guide",
+    walkthrough: "Walkthrough",
+    "patch-notes": "Patch Notes",
+    tutorial: "Tutorial",
+    reference: "Reference Guide",
+    news: "News Update",
+    "repair-procedure": "Repair Guide",
+    sop: "Standard Operating Procedure",
+  }
+  const typeStr = typeLabel[request.guideType] ?? "Guide"
+
+  // Known games / products — checked before generic class detection
+  const knownGames: [RegExp, string][] = [
+    [/ember\s*fall/i, "Emberfall"],
+    [/star\s*fall/i, "StarFall Outriders"],
+    [/hollow\s*spire/i, "HollowSpire"],
+    [/mech\s*bound/i, "MechBound Tactics"],
+    [/minecraft/i, "Minecraft"],
+    [/world of warcraft|wow\b/i, "World of Warcraft"],
+    [/final fantasy/i, "Final Fantasy"],
+    [/elden ring/i, "Elden Ring"],
+    [/diablo/i, "Diablo"],
+    [/fortnite/i, "Fortnite"],
+    [/valorant/i, "Valorant"],
+    [/league of legends|lol\b/i, "League of Legends"],
+    [/path of exile|poe\b/i, "Path of Exile"],
+  ]
+
   let gameContext = ""
-  if (prompt.includes("emberfall")) {
-    gameContext = "Emberfall"
-  } else if (prompt.includes("starfall")) {
-    gameContext = "StarFall Outriders"
-  } else if (prompt.includes("hollowspire")) {
-    gameContext = "HollowSpire"
+  for (const [pattern, display] of knownGames) {
+    if (pattern.test(prompt)) {
+      gameContext = display
+      break
+    }
   }
-  
-  const difficulties = {
-    "beginner": "Beginner",
-    "intermediate": "Complete",
-    "advanced": "Advanced"
+
+  // Class / subject detection — broader vocabulary
+  const subjectKeywords: [RegExp, string][] = [
+    [/frost\s*shaman|ice\s*mage/i, "Frost Shaman"],
+    [/\bfrost\b|\bice\b/i, "Frost Build"],
+    [/fire\s*warden|blaze/i, "Fire Warden"],
+    [/\bfire\b|\bflame\b/i, "Fire Build"],
+    [/shadow\s*assassin/i, "Shadow Assassin"],
+    [/\bshadow\b|\brogue\b/i, "Shadow Build"],
+    [/holy\s*priest/i, "Holy Priest"],
+    [/\bholy\b|\bpriest\b/i, "Healer Build"],
+    [/\branger\b|\bbow\b|\barcher\b/i, "Ranger"],
+    [/\btank\b/i, "Tank Build"],
+    [/\bhealer\b|\bsupport\b/i, "Support Build"],
+    [/\bwarrior\b/i, "Warrior"],
+    [/\bmage\b|\bwizard\b/i, "Mage"],
+    [/\bpaladin\b/i, "Paladin"],
+    [/\bdruid\b/i, "Druid"],
+    [/\bshaman\b/i, "Shaman"],
+    [/\bhunter\b/i, "Hunter"],
+  ]
+
+  let subjectContext = ""
+  for (const [pattern, display] of subjectKeywords) {
+    if (pattern.test(prompt)) {
+      subjectContext = display
+      break
+    }
   }
-  
-  const difficulty = difficulties[request.preferredDifficulty as keyof typeof difficulties] || "Complete"
-  
-  if (gameContext) {
-    return `${difficulty} ${titleContext} Guide for ${gameContext}`
+
+  if (subjectContext && gameContext) return `${difficulty} ${subjectContext} ${typeStr} — ${gameContext}`
+  if (subjectContext) return `${difficulty} ${subjectContext} ${typeStr}`
+  if (gameContext) return `${difficulty} ${typeStr} for ${gameContext}`
+
+  // Extract the first meaningful phrase from the prompt to use as the subject
+  const subject = extractPromptSubject(prompt)
+  if (subject) return `${difficulty} ${subject} ${typeStr}`
+
+  return `${difficulty} ${typeStr}`
+}
+
+function extractPromptSubject(prompt: string): string {
+  // Strip leading verbs/articles to get the core noun phrase
+  const cleaned = prompt
+    .replace(/^(create|write|generate|make|build|give me|show me|help me|I need|I want|can you|please)\s+/i, "")
+    .replace(/^(a|an|the)\s+/i, "")
+    .replace(/\s+(guide|tutorial|walkthrough|reference|for|about|on|in|covering)\s+.*/i, "")
+    .trim()
+
+  const words = cleaned.split(/\s+/).slice(0, 4)
+  while (words.length > 0 && /^(for|to|a|an|the|about|on|in|of|that|which)$/i.test(words[words.length - 1])) {
+    words.pop()
   }
-  return `${difficulty} ${titleContext} Guide`
+
+  const subject = words.join(" ")
+  if (!subject || subject.length < 3) return ""
+  return subject.charAt(0).toUpperCase() + subject.slice(1)
 }
 
 function generateSlug(title: string): string {
@@ -443,22 +509,20 @@ function generateSlug(title: string): string {
 }
 
 function generateSummary(request: GenerationRequest): string {
-  const prompt = request.prompt.toLowerCase()
-  
-  // Extract keywords from prompt
-  let characterClass = "character build"
-  if (prompt.includes("frost")) characterClass = "Frost Shaman build"
-  else if (prompt.includes("fire")) characterClass = "Fire Warden build"
-  else if (prompt.includes("shadow")) characterClass = "Shadow Assassin build"
-  else if (prompt.includes("holy")) characterClass = "Holy Priest build"
-  else if (prompt.includes("ranger")) characterClass = "Ranger build"
-  
-  let gameContext = "Emberfall"
-  if (prompt.includes("starfall")) gameContext = "StarFall Outriders"
-  else if (prompt.includes("hollowspire")) gameContext = "HollowSpire"
-  
-  const typeLabel = request.guideType.replace("-", " ")
-  return `A comprehensive ${characterClass} for ${gameContext} designed to help you understand core mechanics, optimal rotations, gear selection, and strategies. Learn best practices, avoid common mistakes, and master this ${typeLabel}.`
+  // Use the first 1–2 sentences of the prompt as the basis, then augment
+  const prompt = request.prompt.trim()
+  if (!prompt) return "A structured guide covering core mechanics, strategies, and actionable tips to help you succeed."
+
+  // If the prompt is short, use it directly as a summary seed
+  const firstSentence = prompt.split(/[.!?]/)[0].trim()
+  if (firstSentence.length > 20 && firstSentence.length < 200) {
+    return `${firstSentence}. This guide covers the key strategies, common mistakes to avoid, and step-by-step techniques you need to succeed.`
+  }
+
+  // Fallback: construct from guide type and difficulty
+  const typeLabel = (request.guideType ?? "guide").replace(/-/g, " ")
+  const diff = request.preferredDifficulty ?? "intermediate"
+  return `A ${diff} ${typeLabel} designed to help you understand core mechanics, apply the right strategies, and avoid common mistakes. Follow each section in order for the best results.`
 }
 
 function formatSectionTitle(kind: GuideSectionKind): string {
