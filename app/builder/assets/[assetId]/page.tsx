@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/guideforge/auth-context"
 import { getAssetDraft, updateAssetDraft, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
+import { getAssetDraftStatusLabel } from "@/lib/guideforge/asset-draft-reviews"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import type { GeneratedSingleGuide, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
 import { SingleGuideEditor } from "@/components/guideforge/builder/single-guide-editor"
@@ -321,12 +322,10 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           {asset && <AssetTypeBadge assetType={asset.assetType} variant="small" />}
-          {asset?.payload?.generatedBy && (
-            <Badge variant="secondary" className="text-xs">
-              {asset.payload.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
-            </Badge>
+          {asset?.payload?.generatedBy === "openai" && (
+            <Badge variant="secondary" className="text-xs">AI Generated</Badge>
           )}
-          <Badge variant="outline" className="text-xs">Draft</Badge>
+          <Badge variant="outline" className="text-xs">{getAssetDraftStatusLabel(asset.status).displayName}</Badge>
           <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
             {asset?.createdAt && (
               <span>Created {new Date(asset.createdAt).toLocaleDateString()}</span>

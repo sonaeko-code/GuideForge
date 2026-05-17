@@ -318,16 +318,6 @@ export function GeneratorClient({
       const difficultyToUse = generatedGuide.difficulty || "intermediate"
       const summaryToUse = generatedGuide.summary || generatedGuide.title?.substring(0, 100) || "AI-generated guide"
       
-      console.log("[v0] Generated guide save target:", {
-        networkId,
-        hubId: selectedHubId,
-        collectionId: selectedCollectionId,
-        collectionIdLength: selectedCollectionId.length,
-        guideType: guideTypeToUse,
-        difficulty: difficultyToUse,
-        sectionsCount: generatedGuide.sections?.length,
-      })
-
       const result = await createAndSaveGuideDraft({
         title: generatedGuide.title || "Untitled Guide",
         summary: summaryToUse,
@@ -346,12 +336,6 @@ export function GeneratorClient({
       })
 
       const { id, verified, error } = result
-
-      console.log("[v0] handleSendToEditor: createAndSaveGuideDraft returned:", {
-        id,
-        verified,
-        error,
-      })
 
       if (!verified) {
         console.error("[v0] handleSendToEditor: Verification failed:", error)
@@ -376,8 +360,6 @@ export function GeneratorClient({
         return
       }
 
-      console.log("[v0] handleSendToEditor: redirecting to editor id:", id)
-      console.log("[v0] handleSendToEditor: target route: /builder/network/%s/guide/%s/edit", networkId, id)
       router.push(`/builder/network/${networkId}/guide/${id}/edit`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error"

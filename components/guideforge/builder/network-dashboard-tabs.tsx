@@ -303,20 +303,7 @@ export function NetworkDashboardTabs({
     return raw.replace(/^(Failed to [a-z]+: )/i, "")
   }
 
-  // Phase 10E: Debug dashboard data source
-  console.log("[v0] Dashboard guide source", {
-    source: "supabase (page-level fetch)",
-    total: safeGuides.length,
-    statuses: safeGuides.map(g => ({
-      id: g.id,
-      title: g.title,
-      status: g.status,
-      revisionOf: g.revisionOf,
-      revisionNumber: g.revisionNumber,
-    })),
-  })
-  
-  // Phase 10G: Exclude archived from active tabs, but count them separately
+  // Exclude archived from active tabs, but count them separately
   const activeGuides = filterOutArchived(safeGuides)
   const archivedGuides = filterGuidesByStatus(safeGuides, "archived")
 
@@ -332,27 +319,7 @@ export function NetworkDashboardTabs({
   const safeReady = filterGuidesByStatus(activeGuides, "ready")
   const safePublished = filterGuidesByStatus(activeGuides, "published")
   
-  // Phase 10G: Enhanced debug logs with archived count
-  console.log("[v0] Dashboard filtered counts", {
-    totalLoaded: safeGuides.length,
-    drafts: safeDrafts.length,
-    ready: safeReady.length,
-    published: safePublished.length,
-    archived: archivedGuides.length,
-    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
-  })
-
-  // Phase 10H: Debug logs showing what's visible in each tab
-  console.log("[v0] Dashboard active counts", {
-    totalLoaded: safeGuides.length,
-    activeVisible: safeDrafts.length + safeReady.length + safePublished.length,
-    drafts: safeDrafts.length,
-    ready: safeReady.length,
-    published: safePublished.length,
-    archived: archivedGuides.length,
-  })
-
-  // Phase 10G: Guides tab filtering - exclude archived
+  // Guides tab filtering - exclude archived
   const filteredCollection = initialCollectionId
     ? safeCollections.find((c: NormalizedCollection) => c.id === initialCollectionId)
     : null
@@ -360,21 +327,6 @@ export function NetworkDashboardTabs({
     ? filterOutArchived(safeGuides.filter((g: Guide) => g.collectionId === initialCollectionId))
     : filterOutArchived(safeGuides)
   
-  console.log("[v0] Guides tab rendering:", {
-    totalGuides: safeGuides.length,
-    filteredByCollection: initialCollectionId ? true : false,
-    filteredGuideCount: filteredGuides.length,
-    collectionMatch: filteredCollection ? filteredCollection.name : "none",
-    guideSample: safeGuides.slice(0, 3).map(g => ({ 
-      id: g.id, 
-      title: g.title, 
-      summary: g.summary ? g.summary.substring(0, 50) + "..." : "(no summary)",
-      collectionId: g.collectionId,
-      collectionName: g.collectionName,
-      hubName: g.hubName,
-    })),
-  })
-
   // Lane 2B: Filter attached assets by status
   const allAttachedAssets = Object.values(attachedAssetsMap || {}).flat() as AssetDraft[]
   const draftAssets = allAttachedAssets.filter((a) => a.status === "draft")

@@ -701,7 +701,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Publish this guide?</AlertDialogTitle>
             <AlertDialogDescription>
-              Published guides will appear on QuestLine public pages and can be seen by everyone.
+              Published guides will appear on your network's public pages and can be seen by everyone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-end gap-3">
@@ -738,7 +738,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           {autosaveStatus === "saved" && (
             <>
               <CheckCircle2 className="size-4" />
-              <span>Saved to Supabase</span>
+              <span>Draft saved</span>
             </>
           )}
           {autosaveStatus === "failed" && (
@@ -757,63 +757,53 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
         {/* Detailed error debug panel - appears only when save currently failed */}
         {autosaveStatus === "failed" && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-xs">
-            <div className="mb-3">
-              <h3 className="font-semibold text-red-900 dark:text-red-100 mb-2">Save Failed — Debug Information</h3>
-              <div className="space-y-1 text-red-800 dark:text-red-200/90">
+            <div className="space-y-1 text-red-800 dark:text-red-200/90">
+              <div>
+                <span className="font-medium">Error:</span> {saveError || lastSaveDebug?.error || "Unknown error"}
+              </div>
+              {lastSaveDebug?.stage && (
                 <div>
-                  <span className="font-medium">Error:</span> {saveError || lastSaveDebug?.error || "Unknown error"}
+                  <span className="font-medium">Stage:</span> {lastSaveDebug.stage}
                 </div>
-                {lastSaveDebug?.source && (
-                  <div>
-                    <span className="font-medium">Source:</span> {lastSaveDebug.source}
-                  </div>
-                )}
-                {lastSaveDebug?.stage && (
-                  <div>
-                    <span className="font-medium">Failed Stage:</span> {lastSaveDebug.stage}
-                  </div>
-                )}
-                {lastSaveDebug?.errorCode && (
-                  <div>
-                    <span className="font-medium">Error Code:</span> {lastSaveDebug.errorCode}
-                  </div>
-                )}
-                {lastSaveDebug?.errorDetails && (
-                  <div>
-                    <span className="font-medium">Error Details:</span> {lastSaveDebug.errorDetails}
-                  </div>
-                )}
-                {lastSaveDebug?.errorHint && (
-                  <div>
-                    <span className="font-medium">Error Hint:</span> {lastSaveDebug.errorHint}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-red-200 dark:border-red-800/50">
-              <div className="text-red-700 dark:text-red-300/80">
-                <span className="font-medium">Guide ID:</span>
-                <div className="font-mono break-all text-xs">{lastSaveDebug?.guideId || normalizedGuide.id}</div>
-              </div>
-              <div className="text-red-700 dark:text-red-300/80">
-                <span className="font-medium">Status:</span>
-                <div className="font-mono">{lastSaveDebug?.status || normalizedGuide.status}</div>
-              </div>
-              <div className="text-red-700 dark:text-red-300/80">
-                <span className="font-medium">Collection ID:</span>
-                <div className="font-mono break-all text-xs">{lastSaveDebug?.collectionId || normalizedGuide.collectionId || "(empty)"}</div>
-              </div>
-              <div className="text-red-700 dark:text-red-300/80">
-                <span className="font-medium">Verification Status:</span>
-                <div className="font-mono">{lastSaveDebug?.verificationStatus || normalizedGuide.verification || "unverified"}</div>
-              </div>
-              {lastSaveDebug?.authorId && (
-                <div className="text-red-700 dark:text-red-300/80">
-                  <span className="font-medium">Author ID:</span>
-                  <div className="font-mono break-all text-xs">{lastSaveDebug.authorId}</div>
+              )}
+              {lastSaveDebug?.errorCode && (
+                <div>
+                  <span className="font-medium">Code:</span> {lastSaveDebug.errorCode}
+                </div>
+              )}
+              {lastSaveDebug?.errorHint && (
+                <div>
+                  <span className="font-medium">Hint:</span> {lastSaveDebug.errorHint}
                 </div>
               )}
             </div>
+            <details className="mt-3 pt-3 border-t border-red-200 dark:border-red-800/50">
+              <summary className="cursor-pointer text-red-600 dark:text-red-400 select-none">Technical details</summary>
+              <div className="grid grid-cols-2 gap-3 mt-2 text-red-700 dark:text-red-300/80">
+                <div>
+                  <span className="font-medium">Guide ID:</span>
+                  <div className="font-mono break-all">{lastSaveDebug?.guideId || normalizedGuide.id}</div>
+                </div>
+                <div>
+                  <span className="font-medium">Status:</span>
+                  <div className="font-mono">{lastSaveDebug?.status || normalizedGuide.status}</div>
+                </div>
+                <div>
+                  <span className="font-medium">Collection ID:</span>
+                  <div className="font-mono break-all">{lastSaveDebug?.collectionId || normalizedGuide.collectionId || "(empty)"}</div>
+                </div>
+                <div>
+                  <span className="font-medium">Verification:</span>
+                  <div className="font-mono">{lastSaveDebug?.verificationStatus || normalizedGuide.verification || "unverified"}</div>
+                </div>
+                {lastSaveDebug?.authorId && (
+                  <div>
+                    <span className="font-medium">Author ID:</span>
+                    <div className="font-mono break-all">{lastSaveDebug.authorId}</div>
+                  </div>
+                )}
+              </div>
+            </details>
           </div>
         )}
 
@@ -978,7 +968,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
               {autosaveStatus === "saved" && (
                 <>
                   <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  <span>Saved to Supabase</span>
+                  <span>Draft saved</span>
                 </>
               )}
               {autosaveStatus === "failed" && (
