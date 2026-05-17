@@ -291,6 +291,38 @@ export default function AssetsPage() {
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <AssetTypeBadge assetType={asset.assetType} variant="small" />
+                        {/* Asset status badge — single source of truth for what state the draft is in.
+                            Colors mirror StatusBadge: draft=brass/amber, pending=steel-blue, published=teal. */}
+                        {(() => {
+                          const status = asset.status
+                          if (status === "published") {
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.55_0.09_185)]/40 bg-[oklch(0.93_0.03_185)]/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.40_0.09_185)] dark:text-[oklch(0.82_0.07_185)]">
+                                Published
+                              </span>
+                            )
+                          }
+                          if (status === "pending_review") {
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.37_0.05_225)]/40 bg-[oklch(0.94_0.015_225)] dark:bg-[oklch(0.24_0.04_225)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.34_0.055_225)] dark:text-[oklch(0.78_0.065_225)]">
+                                Pending Review
+                              </span>
+                            )
+                          }
+                          if (status === "archived") {
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Archived
+                              </span>
+                            )
+                          }
+                          // default: draft
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[color-mix(in_oklch,var(--brass-500)_30%,transparent)] bg-[color-mix(in_oklch,var(--brass-100)_85%,var(--background))] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.42_0.08_55)]">
+                              Private Draft
+                            </span>
+                          )
+                        })()}
                         {(asset.source === 'generated' || (asset.payload as any)?.generatedBy === 'openai') && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.55_0.05_280)]/35 bg-[oklch(0.94_0.012_280)] dark:bg-[oklch(0.28_0.03_280)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[oklch(0.42_0.05_280)] dark:text-[oklch(0.82_0.04_280)]">
                             AI
@@ -314,7 +346,7 @@ export default function AssetsPage() {
                       )}
                     </div>
 
-                    {/* Attached status — clickable link to network dashboard */}
+                    {/* Relationship status — distinct from publishing status. */}
                     {asset.attachedNetworkId ? (
                       <Link
                         href={`/builder/network/${asset.attachedNetworkId}/dashboard`}
@@ -325,7 +357,7 @@ export default function AssetsPage() {
                       </Link>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                        Private Draft &middot; Not attached
+                        Not attached to a network
                       </span>
                     )}
                   </div>

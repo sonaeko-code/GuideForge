@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, AlertCircle, Settings, Globe, Sparkles, Plus, Layers, FolderTree, BookMarked, Package } from "lucide-react"
+import { ArrowLeft, AlertCircle, Settings, Globe, Sparkles, Plus, Layers, FolderTree, BookMarked, Package, Clock } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
 import { Button } from "@/components/ui/button"
@@ -59,14 +59,23 @@ export default async function NetworkDashboardPage({
     const safeCollections = Array.isArray(collections) ? collections : []
     const safeGuides = Array.isArray(guides) ? guides : []
 
-    // Snapshot stats for the dashboard quick-glance panel
-    const attachedAssetCount = Object.values(attachedAssetsMap).reduce((sum, list) => sum + (list?.length ?? 0), 0)
+    // Snapshot stats for the dashboard quick-glance panel.
+    // We deliberately separate Pending Review (needs action) from generic Drafts
+    // and Attached Assets so the snapshot tells the creator what to do next.
+    const allAttachedAssets: AssetDraft[] = Object.values(attachedAssetsMap).flat()
+    const attachedAssetCount = allAttachedAssets.length
+    const attachedDraftAssetCount = allAttachedAssets.filter((a) => a?.status === "draft").length
+    const pendingReviewAssetCount = allAttachedAssets.filter((a) => a?.status === "pending_review").length
+    const publishedAssetCount = allAttachedAssets.filter(
+      (a) => a?.status === "published" && (a?.assetType === "single_guide" || a?.assetType === "checklist")
+    ).length
+
     const publishedCount = safeGuides.filter((g) => g.status === "published").length
     const draftCount = safeGuides.filter((g) => g.status === "draft").length
-    const publishedAssetCount = Object.values(attachedAssetsMap)
-      .flat()
-      .filter((a: AssetDraft) => a?.status === "published" && (a?.assetType === "single_guide" || a?.assetType === "checklist"))
-      .length
+    const readyGuidesCount = safeGuides.filter((g) => g.status === "ready").length
+
+    // Counts shown in the snapshot panel
+    const pendingReviewCount = readyGuidesCount + pendingReviewAssetCount
     const totalPublic = publishedCount + publishedAssetCount
 
     // Determine the primary "what's next" CTA based on network state
@@ -132,8 +141,9 @@ export default async function NetworkDashboardPage({
             className="rounded-xl border border-border/50 bg-card p-4 md:p-5 shadow-sm"
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              {/* Stat row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-w-0">
+              {/* Stat row — five cells: Hubs, Collections, Pending Review (needs action),
+                  Published (public), Attached (relationship). Counts are accurate (no fudging). */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <Layers className="size-4 text-primary shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
@@ -153,9 +163,18 @@ export default async function NetworkDashboardPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Clock className="size-4 text-primary shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold leading-none tabular-nums">{pendingReviewCount}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
+                      Pending Review
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
                   <BookMarked className="size-4 text-primary shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
-                    <div className="text-lg font-bold leading-none tabular-nums">{publishedCount}</div>
+                    <div className="text-lg font-bold leading-none tabular-nums">{totalPublic}</div>
                     <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
                       Published &middot; {draftCount} draft
                     </div>
@@ -166,7 +185,7 @@ export default async function NetworkDashboardPage({
                   <div className="min-w-0">
                     <div className="text-lg font-bold leading-none tabular-nums">{attachedAssetCount}</div>
                     <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
-                      Attached Asset{attachedAssetCount === 1 ? "" : "s"}
+                      Attached &middot; {attachedDraftAssetCount} private
                     </div>
                   </div>
                 </div>
@@ -230,6 +249,7 @@ export default async function NetworkDashboardPage({
           <DashboardErrorBoundary networkId={network.id}>
             <NetworkDashboardTabs
               networkId={network.id}
+              networkSlug={network.slug}
               initialTab={tab}
               initialCollectionId={filterCollectionId}
               hubs={safeHubs}
