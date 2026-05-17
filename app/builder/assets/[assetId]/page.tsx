@@ -662,8 +662,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             </div>
           </Card>
         )
-      })()
-      ) : (
+      })() : (
         <Card className="p-4 sm:p-5 border-blue-500/20 bg-blue-500/5">
           <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between">
             <div className="min-w-0 space-y-1">
