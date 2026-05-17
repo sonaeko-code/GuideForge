@@ -144,3 +144,75 @@ When a user enters a rough idea at the Welcome screen:
 4. `clearIntakeSession()` is called after hydration
 
 The intake idea is the prompt. It must not be cleared or mutated by the builder.
+
+---
+
+## Starter Guide Idea Handoff
+
+Starter guide ideas are scaffold suggestions shown during network creation. They are **never persisted to Supabase** and **never auto-created**.
+
+### Flow
+
+1. `forge-rules-editor.tsx` creates the network and gets the new `networkId`.
+2. It re-runs `smartFillNetwork(draft.roughIdea)` to re-derive the scaffold's `starterGuideIdeas`.
+3. Top 6 ideas are written to sessionStorage via `writeNetworkStarterIdeas(networkId, ideas)`.
+4. The network dashboard (`NetworkDashboardTabs`) reads these ideas on mount and shows a **Suggested starter guides** panel.
+5. User clicks **Create from idea** → the selected idea is written as a `StarterGuideIdeaHandoff` via `writeStarterGuideHandoff(networkId, handoff)`, then router navigates to the generator.
+6. The generator reads the handoff on mount via `readStarterGuideHandoff(networkId)`, clears it, and prefills: prompt, guide type, difficulty, hub (matched by name), collection (matched by name).
+7. No content is auto-generated. The user reviews all fields before clicking Generate.
+
+### Storage Keys
+
+| Key | Contents |
+|-----|----------|
+| `guideforge:starterGuideIdeas:{networkId}` | `NetworkStarterIdeas` — list of ideas for the panel |
+| `guideforge:starterGuideHandoff:{networkId}` | `StarterGuideIdeaHandoff` — single selected idea for the generator |
+
+### Session-Only Guarantees
+
+- Both keys use sessionStorage, not localStorage or Supabase.
+- Ideas disappear after tab/browser close (expected — shown as a disclaimer).
+- The panel is dismissible and clears the key.
+- The handoff is single-use: the generator clears it immediately on read.
+- If hub/collection cannot be matched by name, the generator shows a warning and leaves selects empty.
+- No guides are created until the user explicitly clicks Generate and Send to Editor.
+
+---
+
+## Network Build Plan
+
+The network build plan is a richer, type-aware planning layer generated alongside the scaffold. It is **never persisted to Supabase** and **never triggers any automatic actions**.
+
+### What it contains
+
+| Field | Description |
+|-------|-------------|
+| `goal` | One-sentence launch goal for the network type |
+| `firstSteps` | Ordered list of 5 action items to take after saving |
+| `priorityGuides` | Top 6 starter guides with reasons and creation order |
+| `creationOrder` | Hub-level order strings (hub name + collections) |
+| `readinessChecklist` | Pre-launch items with computed `done` state |
+| `nextSteps` | 5 narrative steps shown at the bottom of the panel |
+
+### Flow
+
+1. `forge-rules-editor.tsx` calls `generateNetworkBuildPlan(sfResult)` after writing starter ideas.
+2. The plan is written to sessionStorage via `writeNetworkBuildPlan(networkId, plan)`.
+3. The network dashboard reads the plan on mount and shows a **Network launch plan** panel above the starter ideas panel.
+4. Priority guide cards have **Create this guide** buttons that reuse the same `handleCreateFromIdea` flow as starter ideas.
+5. The panel is dismissible; dismiss clears the sessionStorage key.
+6. In the wizard preview step (`create-network-form.tsx`), a collapsed `<details open>` preview of the plan is shown before the network is saved — no networkId required since it's derived from the in-progress `SmartFillResult`.
+
+### Storage Key
+
+| Key | Contents |
+|-----|----------|
+| `guideforge:networkBuildPlan:{networkId}` | `NetworkBuildPlan` — full plan object |
+
+### Session-Only Guarantees
+
+- Uses sessionStorage. Disappears on tab/browser close.
+- No Supabase writes.
+- No auto-generation or auto-publishing.
+- Panel is dismissible and clears the key.
+- `NetworkBuildPlanIdea` is a structural superset of `NetworkStarterIdeas["ideas"][number]` — can be passed directly to `handleCreateFromIdea`.

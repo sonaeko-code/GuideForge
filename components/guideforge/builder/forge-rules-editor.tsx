@@ -33,6 +33,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
 import type { ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { resolveDbType, getRegistryTypeById } from "@/lib/guideforge/network-types"
+import { smartFillNetwork, generateNetworkBuildPlan } from "@/lib/guideforge/smart-fill-network"
+import { writeNetworkStarterIdeas, writeNetworkBuildPlan, type NetworkStarterIdeas } from "@/lib/guideforge/intake-session"
 import {
   clearWizardDraft,
   mergeWizardDraft,
@@ -210,6 +212,43 @@ export function ForgeRulesEditor() {
       // Keep the data on the draft until after navigation, then clear.
       writeWizardDraft({ ...draft, forgeRules: rules })
       clearWizardDraft()
+
+      // Derive and store starter guide ideas session-only.
+      // These are shown on the dashboard as a one-time "suggested guides" panel.
+      // Non-critical: errors here must not block navigation.
+      if (draft.roughIdea?.trim()) {
+        try {
+          const sfResult = smartFillNetwork(draft.roughIdea)
+          if (sfResult.success && sfResult.suggestedScaffold) {
+            const ideas: NetworkStarterIdeas["ideas"] = []
+            sfResult.suggestedScaffold.hubs.forEach((hub) => {
+              hub.collections.forEach((col) => {
+                col.starterGuideIdeas?.slice(0, 1).forEach((idea) => {
+                  ideas.push({
+                    title: idea.title,
+                    summary: idea.summary,
+                    guideType: idea.guideType,
+                    difficulty: idea.difficulty,
+                    hubName: hub.name,
+                    collectionName: col.name,
+                  })
+                })
+              })
+            })
+            if (ideas.length > 0) {
+              writeNetworkStarterIdeas(result.network.id, {
+                networkId: result.network.id,
+                ideas: ideas.slice(0, 6),
+                createdAt: new Date().toISOString(),
+              })
+            }
+            const plan = generateNetworkBuildPlan(sfResult)
+            writeNetworkBuildPlan(result.network.id, plan)
+          }
+        } catch {
+          // Starter ideas and build plan are optional — never block network creation
+        }
+      }
 
       router.push(`/builder/network/${result.network.id}/dashboard`)
     } catch (err) {

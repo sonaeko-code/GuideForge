@@ -18,6 +18,9 @@ import {
   CheckCircle2,
   ArrowLeft,
   Globe,
+  Lightbulb,
+  Layers,
+  X,
 } from "lucide-react"
 import type { Guide } from "@/lib/guideforge/types"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
@@ -29,6 +32,15 @@ import { StatusBadge, DifficultyBadge } from "@/components/guideforge/shared"
 import { normalizeGuideStatus, filterGuidesByStatus, filterOutArchived } from "@/lib/guideforge/utils"
 import { DraftList } from "@/components/guideforge/builder/draft-list"
 import { deleteHub, deleteCollection, updateHub, updateCollection } from "@/lib/guideforge/supabase-networks"
+import {
+  readNetworkStarterIdeas,
+  clearNetworkStarterIdeas,
+  writeStarterGuideHandoff,
+  readNetworkBuildPlan,
+  clearNetworkBuildPlan,
+  type NetworkStarterIdeas,
+} from "@/lib/guideforge/intake-session"
+import type { NetworkBuildPlan } from "@/lib/guideforge/smart-fill-network"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 import {
   submitAssetDraftForReview,
@@ -80,7 +92,62 @@ export function NetworkDashboardTabs({
   const [assetActionLoading, setAssetActionLoading] = useState<string | null>(null)
   const [assetActionError, setAssetActionError] = useState<Record<string, string>>({})
   const [assetActionSuccess, setAssetActionSuccess] = useState<Record<string, boolean>>({})
-  
+
+  // Starter guide ideas panel — session-only, read from sessionStorage on mount
+  const [starterIdeas, setStarterIdeas] = useState<NetworkStarterIdeas | null>(null)
+
+  useEffect(() => {
+    const stored = readNetworkStarterIdeas(networkId)
+    if (stored && stored.ideas.length > 0) {
+      setStarterIdeas(stored)
+    }
+  }, [networkId])
+
+  // Network build plan panel — session-only, read from sessionStorage on mount
+  const [buildPlan, setBuildPlan] = useState<NetworkBuildPlan | null>(null)
+
+  useEffect(() => {
+    const stored = readNetworkBuildPlan(networkId)
+    if (stored) {
+      setBuildPlan(stored)
+    }
+  }, [networkId])
+
+  const handleCreateFromIdea = (idea: NetworkStarterIdeas["ideas"][number]) => {
+    const prompt = [
+      `Create a guide titled "${idea.title}".`,
+      `Summary: ${idea.summary}`,
+      ``,
+      `Network context:`,
+      `Hub: ${idea.hubName}`,
+      `Collection: ${idea.collectionName}`,
+    ].join("\n")
+
+    writeStarterGuideHandoff(networkId, {
+      title: idea.title,
+      summary: idea.summary,
+      prompt,
+      guideType: idea.guideType,
+      difficulty: idea.difficulty,
+      hubName: idea.hubName,
+      collectionName: idea.collectionName,
+      source: "starter_guide_idea",
+      createdAt: new Date().toISOString(),
+    })
+
+    router.push(`/builder/network/${networkId}/generate`)
+  }
+
+  const handleDismissStarterIdeas = () => {
+    clearNetworkStarterIdeas(networkId)
+    setStarterIdeas(null)
+  }
+
+  const handleDismissBuildPlan = () => {
+    clearNetworkBuildPlan(networkId)
+    setBuildPlan(null)
+  }
+
   // Sync URL changes to tab state
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab") || "drafts"
@@ -334,6 +401,153 @@ export function NetworkDashboardTabs({
   const publishedAssets = allAttachedAssets.filter((a) => a.status === "published")
 
   return (
+    <>
+    {buildPlan && (
+      <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 md:p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Layers className="size-4 text-primary shrink-0" aria-hidden="true" />
+            <h2 className="text-sm font-semibold text-foreground">Network launch plan</h2>
+          </div>
+          <button
+            type="button"
+            onClick={handleDismissBuildPlan}
+            className="text-muted-foreground hover:text-foreground transition-colors shrink-0 p-0.5"
+            aria-label="Dismiss launch plan"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{buildPlan.goal}</p>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          {/* First steps */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">First steps</p>
+            <ol className="space-y-1.5 text-sm text-muted-foreground list-decimal list-inside">
+              {buildPlan.firstSteps.slice(0, 5).map((step, i) => (
+                <li key={i} className="leading-snug">{step}</li>
+              ))}
+            </ol>
+          </div>
+
+          {/* Pre-launch checklist */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pre-launch checklist</p>
+            <ul className="space-y-1.5 text-sm">
+              {buildPlan.readinessChecklist.map((item, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className={`mt-px shrink-0 text-sm font-medium ${item.done ? "text-emerald-500" : "text-muted-foreground/40"}`}>
+                    {item.done ? "✓" : "○"}
+                  </span>
+                  <span className={item.done ? "text-foreground/80" : "text-muted-foreground"}>{item.label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {buildPlan.priorityGuides.length > 0 && (
+          <div className="mt-5 pt-4 border-t border-border/40">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Priority guides to create</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {buildPlan.priorityGuides.map((idea, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground leading-snug">
+                      <span className="text-muted-foreground/60 mr-1">{i + 1}.</span>
+                      {idea.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}
+                    </p>
+                    <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="self-start text-xs"
+                    onClick={() => handleCreateFromIdea(idea)}
+                  >
+                    <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                    Create this guide
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {buildPlan.nextSteps.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border/40">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Next steps</p>
+            <ol className="space-y-1 text-xs text-muted-foreground list-decimal list-inside">
+              {buildPlan.nextSteps.map((step, i) => (
+                <li key={i} className="leading-snug">{step}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        <p className="mt-4 text-xs text-muted-foreground italic">
+          This plan is session-only and may disappear after browser close. No guides are created automatically.
+        </p>
+      </div>
+    )}
+    {starterIdeas && starterIdeas.ideas.length > 0 && (
+      <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 md:p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="size-4 text-primary shrink-0" aria-hidden="true" />
+            <h2 className="text-sm font-semibold text-foreground">Suggested starter guides</h2>
+          </div>
+          <button
+            type="button"
+            onClick={handleDismissStarterIdeas}
+            className="text-muted-foreground hover:text-foreground transition-colors shrink-0 p-0.5"
+            aria-label="Dismiss starter guide suggestions"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          These came from your network scaffold. They are suggestions only — no guides were created automatically. Suggestions are session-only and may disappear after refresh or browser close.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {starterIdeas.ideas.map((idea, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
+            >
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground leading-snug">{idea.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}
+                </p>
+                {idea.summary && (
+                  <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-2 leading-snug">
+                    {idea.summary}
+                  </p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="self-start text-xs"
+                onClick={() => handleCreateFromIdea(idea)}
+              >
+                <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                Create from idea
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-6 h-auto p-1 gap-1 shadow-forge" style={{backgroundImage: 'linear-gradient(180deg, color-mix(in oklch, var(--brass-50) 70%, var(--card)) 0%, var(--card) 100%)', border: '1px solid color-mix(in oklch, var(--brass-500) 18%, var(--border))'}}>
         <TabsTrigger value="drafts">
@@ -1322,5 +1536,6 @@ export function NetworkDashboardTabs({
         )}
       </TabsContent>
     </Tabs>
+    </>
   )
 }

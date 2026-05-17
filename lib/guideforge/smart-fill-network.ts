@@ -1259,3 +1259,209 @@ function generateScaffoldSuggestion(
 
   return { hubs }
 }
+
+// ─── Network Build Plan ───────────────────────────────────────────────────────
+
+export interface NetworkBuildPlanIdea {
+  title: string
+  summary: string
+  guideType: string
+  difficulty: string
+  hubName: string
+  collectionName: string
+  /** Why this guide is prioritized in the launch plan. */
+  reason: string
+  /** 1-based creation order position. */
+  order: number
+}
+
+export interface NetworkBuildPlan {
+  networkName: string
+  networkType: string
+  /** One-sentence launch goal for this network type. */
+  goal: string
+  /** Ordered action items to take after saving the network. */
+  firstSteps: string[]
+  /** Top priority guides with reasons, drawn from scaffold starter ideas. */
+  priorityGuides: NetworkBuildPlanIdea[]
+  /** Hub-level creation order strings (hub name + collection list). */
+  creationOrder: string[]
+  /** Pre-launch checklist items with completion state. */
+  readinessChecklist: { label: string; done: boolean }[]
+  /** Narrative next steps shown after the plan. */
+  nextSteps: string[]
+}
+
+const TYPE_LAUNCH_GOALS: Record<string, string> = {
+  gaming: "Build a comprehensive game knowledge base that helps players at every level.",
+  tech_repair: "Ship a structured repair knowledge base that reduces support time and empowers technicians.",
+  creator_workflow: "Build a creative workflow library that captures your process and helps your team ship consistently.",
+  small_business: "Create an operational playbook that standardizes processes and gets new team members up to speed fast.",
+  wellness_training: "Develop a training and wellness guide network that keeps clients on track and informed.",
+  home_systems: "Build a home systems reference hub that makes maintenance and repairs accessible for any owner.",
+  restaurant_training: "Assemble a staff training network that reduces onboarding time and keeps service standards high.",
+  personal_knowledge: "Create a structured personal knowledge base that captures your expertise and connects your thinking.",
+  general: "Build a structured knowledge network that delivers clear, organized information to your readers.",
+}
+
+const TYPE_FIRST_STEPS: Record<string, string[]> = {
+  gaming: [
+    "Pick your highest-traffic game or game mode and create its first hub",
+    "Write a beginner's guide — it's the entry point for most new visitors",
+    "Add a patch notes collection so returning players have a reason to come back",
+    "Create a character or build reference for the most popular competitive pick",
+    "Invite a contributor or collaborator to review your first draft guides",
+  ],
+  tech_repair: [
+    "Create a hub for your most common device category or repair type",
+    "Write a troubleshooting guide for the #1 most-reported issue first",
+    "Add a parts and tools reference collection — technicians need it on every job",
+    "Document a full repair procedure for your highest-volume repair",
+    "Add a safety and warnings collection before expanding to advanced repairs",
+  ],
+  creator_workflow: [
+    "Create a hub for your primary creative medium or output format",
+    "Document your core creative process — start with the phase you know best",
+    "Add a tools and resources collection your team references frequently",
+    "Write a brand or style guide early — it anchors everything else",
+    "Create a templates collection to speed up repeatable creative work",
+  ],
+  small_business: [
+    "Identify your highest-friction process and document it first",
+    "Create an onboarding hub — new team members need orientation before anything else",
+    "Write an SOPs collection for your most repeated tasks",
+    "Add a tools and resources hub so teams know what's available",
+    "Set your network to private until your core playbooks are reviewed and approved",
+  ],
+  wellness_training: [
+    "Create a hub for your primary program or training discipline",
+    "Write a beginner's overview guide — most clients start with zero background",
+    "Add a nutrition or protocol reference collection for quick access during sessions",
+    "Document your most popular program or workout plan step by step",
+    "Create a progress tracking or assessment guide so clients know how to measure results",
+  ],
+  home_systems: [
+    "Start with the system that fails most often or costs the most to repair",
+    "Write a seasonal maintenance checklist for your climate or home type",
+    "Add a tools and materials reference — most homeowners don't know what they need",
+    "Document a full repair procedure for the most common failure in your first hub",
+    "Create a safety guide for any work that involves electrical, gas, or structural elements",
+  ],
+  restaurant_training: [
+    "Create a hub for front-of-house and one for back-of-house — they train very differently",
+    "Write the onboarding guide first — it's used on every new hire's first day",
+    "Add a food safety and sanitation collection — compliance is non-negotiable",
+    "Document your most complex station or role with a step-by-step SOP",
+    "Create a drinks or specials reference so servers can answer guest questions confidently",
+  ],
+  personal_knowledge: [
+    "Choose the domain you know best and create its first hub",
+    "Write an overview guide that explains the core concepts",
+    "Add a reference collection for tools, terms, or frameworks you use often",
+    "Create a how-to guide for the most common task in this domain",
+    "Set your network to private while you draft your first five guides",
+  ],
+  general: [
+    "Create your first hub and write an overview guide",
+    "Add a getting started or beginner guide — it's always the most visited page",
+    "Build a reference collection for terms, tools, or frequently needed information",
+    "Write two or three guides in your strongest area before expanding",
+    "Share your draft network with a trusted reviewer before publishing",
+  ],
+}
+
+const DEFAULT_FIRST_STEPS = TYPE_FIRST_STEPS.general
+
+function getIdeaReason(guideType: string, difficulty: string, order: number): string {
+  if (order === 1) {
+    return difficulty === "beginner"
+      ? "First guide — low-barrier entry point for new visitors"
+      : "First guide — sets the tone for your entire network"
+  }
+  if (guideType === "tutorial" || guideType === "beginner-guide") {
+    return "Foundational — helps newcomers get oriented quickly"
+  }
+  if (guideType === "reference") {
+    return "Reference content is evergreen and drives repeat visits"
+  }
+  if (guideType === "patch-notes" || guideType === "news") {
+    return "Timely content gives returning visitors a reason to come back"
+  }
+  if (guideType === "boss-guide" || guideType === "character-build") {
+    return "High-search-intent topic — players actively look for this"
+  }
+  if (guideType === "walkthrough") {
+    return "Walkthroughs keep readers engaged across multiple sessions"
+  }
+  if (guideType === "repair-procedure" || guideType === "sop") {
+    return "Procedural guides reduce repeated support questions"
+  }
+  if (difficulty === "beginner") return "Beginner content fills the largest gap in most networks"
+  if (difficulty === "advanced") return "Advanced content attracts your most loyal, engaged readers"
+  return "Covers a core topic in your network"
+}
+
+export function generateNetworkBuildPlan(result: SmartFillResult): NetworkBuildPlan {
+  const type = result.type ?? "general"
+  const goal = TYPE_LAUNCH_GOALS[type] ?? TYPE_LAUNCH_GOALS.general!
+  const firstSteps = TYPE_FIRST_STEPS[type] ?? DEFAULT_FIRST_STEPS
+
+  const scaffold = result.suggestedScaffold
+  const priorityGuides: NetworkBuildPlanIdea[] = []
+
+  if (scaffold) {
+    let order = 1
+    outer: for (const hub of scaffold.hubs) {
+      for (const col of hub.collections) {
+        if (!col.starterGuideIdeas?.length) continue
+        const idea = col.starterGuideIdeas[0]
+        priorityGuides.push({
+          title: idea.title,
+          summary: idea.summary,
+          guideType: idea.guideType,
+          difficulty: idea.difficulty,
+          hubName: hub.name,
+          collectionName: col.name,
+          reason: getIdeaReason(idea.guideType, idea.difficulty, order),
+          order,
+        })
+        order++
+        if (priorityGuides.length >= 6) break outer
+      }
+    }
+  }
+
+  const creationOrder: string[] = scaffold
+    ? scaffold.hubs.map((hub) => `${hub.name} — ${hub.collections.map((c) => c.name).join(", ")}`)
+    : []
+
+  const readinessChecklist = [
+    { label: "Network name and description look right", done: !!(result.name && result.description) },
+    { label: "At least one hub created", done: !!(scaffold && scaffold.hubs.length > 0) },
+    { label: "At least one collection per hub", done: !!(scaffold && scaffold.hubs.every((h) => h.collections.length > 0)) },
+    { label: "First starter guide selected to create", done: false },
+    { label: "Forge rules reviewed", done: false },
+    { label: "Network visibility confirmed", done: !!result.visibility },
+  ]
+
+  const nextSteps = [
+    "Review the hub and collection structure — rename anything that doesn't fit your vision",
+    "Click 'Create from idea' on your first priority guide to open the generator",
+    "Generate and review your first guide before publishing the network",
+    "Add collaborators if you want help building out the content",
+    result.visibility === "public"
+      ? "Publish when your first 3 guides are ready for readers"
+      : "Switch to public when your content feels launch-ready",
+  ]
+
+  return {
+    networkName: result.name,
+    networkType: type,
+    goal,
+    firstSteps,
+    priorityGuides,
+    creationOrder,
+    readinessChecklist,
+    nextSteps,
+  }
+}

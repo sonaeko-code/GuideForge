@@ -33,7 +33,7 @@ import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
 import { getScaffoldTemplate, type ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
-import { smartFillNetwork, type SmartFillScaffoldSuggestion, type StarterGuideIdea } from "@/lib/guideforge/smart-fill-network"
+import { smartFillNetwork, generateNetworkBuildPlan, type SmartFillScaffoldSuggestion, type StarterGuideIdea, type NetworkBuildPlan } from "@/lib/guideforge/smart-fill-network"
 import {
   getDefaultForgeRulesDraft,
   makeCollectionClientId,
@@ -237,6 +237,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [lastSmartFillScaffold, setLastSmartFillScaffold] = useState<SmartFillScaffoldSuggestion | null>(null)
   // One-line summary shown after a successful Quick Fill run.
   const [smartFillSummary, setSmartFillSummary] = useState<string | null>(null)
+  const [buildPlan, setBuildPlan] = useState<NetworkBuildPlan | null>(null)
 
   // Restore draft if returning from Step 3/4
   const didHydrateRef = useRef(false)
@@ -344,11 +345,13 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
       if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
         setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
         setLastSmartFillScaffold(result.suggestedScaffold)
+        setBuildPlan(generateNetworkBuildPlan(result))
         setScaffoldIsDefaultForType(true)
         setScaffoldSourceType(nextTypeId)
       } else if (nextTypeId !== scaffoldSourceType) {
         setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
         setLastSmartFillScaffold(null)
+        setBuildPlan(null)
         setScaffoldIsDefaultForType(true)
         setScaffoldSourceType(nextTypeId)
       }
@@ -421,11 +424,13 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         if (result.suggestedScaffold && result.suggestedScaffold.hubs.length > 0) {
           setScaffoldDraft(scaffoldDraftFromSmartFill(result.suggestedScaffold))
           setLastSmartFillScaffold(result.suggestedScaffold)
+          setBuildPlan(generateNetworkBuildPlan(result))
           setScaffoldIsDefaultForType(true)
           setScaffoldSourceType(nextTypeId)
         } else if (nextTypeId !== scaffoldSourceType) {
           setScaffoldDraft(buildDefaultScaffoldDraft(nextTypeId))
           setLastSmartFillScaffold(null)
+          setBuildPlan(null)
           setScaffoldIsDefaultForType(true)
           setScaffoldSourceType(nextTypeId)
         }
@@ -478,6 +483,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setDomainPrefixManuallyEdited(false)
     setScaffoldDraft(buildDefaultScaffoldDraft(newTypeId))
     setLastSmartFillScaffold(null)
+    setBuildPlan(null)
     setSmartFillSummary(null)
     setScaffoldIsDefaultForType(true)
     setScaffoldSourceType(newTypeId)
@@ -943,6 +949,59 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   </div>
                 )
               })()}
+
+              {/* Network build plan — proposal-only, not persisted in this step */}
+              {buildPlan && (
+                <div className="mt-4 pt-4 border-t border-border/40">
+                  <details open>
+                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 select-none list-none">
+                      Network launch plan
+                    </summary>
+                    <div className="mt-3 space-y-4 text-xs">
+                      <p className="text-foreground/80 leading-relaxed">{buildPlan.goal}</p>
+
+                      <div>
+                        <p className="font-medium text-muted-foreground mb-1.5">First steps after saving</p>
+                        <ol className="space-y-1 list-decimal list-inside text-muted-foreground">
+                          {buildPlan.firstSteps.slice(0, 5).map((s, i) => (
+                            <li key={i} className="leading-snug">{s}</li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      {buildPlan.priorityGuides.length > 0 && (
+                        <div>
+                          <p className="font-medium text-muted-foreground mb-1.5">Priority guides to create</p>
+                          <ul className="space-y-2">
+                            {buildPlan.priorityGuides.map((idea, i) => (
+                              <li key={i} className="flex flex-col gap-0.5">
+                                <span className="font-medium text-foreground/90">{i + 1}. {idea.title}</span>
+                                <span className="text-muted-foreground">{idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}</span>
+                                <span className="text-muted-foreground/70 italic">{idea.reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="font-medium text-muted-foreground mb-1.5">Pre-launch checklist</p>
+                        <ul className="space-y-1">
+                          {buildPlan.readinessChecklist.map((item, i) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className={item.done ? "text-emerald-500" : "text-muted-foreground/50"}>{item.done ? "✓" : "○"}</span>
+                              <span className={item.done ? "text-foreground/80" : "text-muted-foreground"}>{item.label}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </details>
+                  <p className="mt-2 text-xs text-muted-foreground italic">
+                    This plan is a guide — full details with create buttons appear on the network dashboard after saving.
+                  </p>
+                </div>
+              )}
             </div>
           )
         })()}

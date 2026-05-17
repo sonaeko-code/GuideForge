@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Flame, ChevronRight, Copy, Check, ArrowLeft, Loader2, Sparkles } from "lucide-react"
@@ -27,6 +27,7 @@ import type {
   NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
 import { classifyNetworkGuidePrompt } from "@/lib/guideforge/network-guide-classifier"
+import { readStarterGuideHandoff, clearStarterGuideHandoff } from "@/lib/guideforge/intake-session"
 
 interface GeneratorClientProps {
   networkId: string
@@ -43,6 +44,22 @@ function sanitizeParam(value: string | null | undefined): string {
   const trimmed = value.trim()
   if (!trimmed || trimmed === "undefined" || trimmed === "null") return ""
   return trimmed
+}
+
+const VALID_GENERATOR_GUIDE_TYPES = new Set([
+  "character-build", "boss-guide", "beginner-guide", "walkthrough",
+  "patch-notes", "tutorial", "reference", "news", "repair-procedure", "sop",
+])
+
+const GUIDE_TYPE_FALLBACKS: Record<string, string> = {
+  "guide": "tutorial",
+  "tier-list": "reference",
+  "troubleshooting": "repair-procedure",
+}
+
+function sanitizeHandoffGuideType(type: string): string {
+  if (VALID_GENERATOR_GUIDE_TYPES.has(type)) return type
+  return GUIDE_TYPE_FALLBACKS[type] ?? "tutorial"
 }
 
 /**
@@ -107,6 +124,58 @@ export function GeneratorClient({
     confidence: "high" | "medium" | "low"
     note: string | null
   } | null>(null)
+  const [handoffBanner, setHandoffBanner] = useState<string | null>(null)
+
+  // Apply starter guide idea handoff once on mount (written by the dashboard panel)
+  const didApplyHandoffRef = useRef(false)
+  useEffect(() => {
+    if (didApplyHandoffRef.current) return
+    didApplyHandoffRef.current = true
+
+    const handoff = readStarterGuideHandoff(networkId)
+    if (!handoff) return
+
+    clearStarterGuideHandoff(networkId)
+
+    setFormState((prev) => ({
+      ...prev,
+      prompt: handoff.prompt,
+      guideType: sanitizeHandoffGuideType(handoff.guideType) as GuideType,
+      preferredDifficulty: (
+        ["beginner", "intermediate", "advanced", "expert"].includes(handoff.difficulty)
+          ? handoff.difficulty
+          : prev.preferredDifficulty
+      ) as DifficultyLevel,
+    }))
+
+    // Match hub and collection by name (case-insensitive)
+    const matchedHub = hubs.find(
+      (h) => h.name.toLowerCase() === handoff.hubName.toLowerCase()
+    )
+    let hubMatched = false
+    let colMatched = false
+
+    if (matchedHub) {
+      setSelectedHubId(matchedHub.id)
+      hubMatched = true
+      const hubCollections = collectionsByHub[matchedHub.id] || []
+      const matchedCol = hubCollections.find(
+        (c) => c.name.toLowerCase() === handoff.collectionName.toLowerCase()
+      )
+      if (matchedCol) {
+        setSelectedCollectionId(matchedCol.id)
+        colMatched = true
+      }
+    }
+
+    if (hubMatched && colMatched) {
+      setHandoffBanner("Loaded starter guide idea. Review placement before generating.")
+    } else {
+      setHandoffBanner(
+        "We loaded the idea, but could not match its hub or collection. Please choose placement before generating."
+      )
+    }
+  }, [networkId, hubs, collectionsByHub])
 
   const collectionsForHub = useMemo(
     () => (selectedHubId ? collectionsByHub[selectedHubId] || [] : []),
@@ -459,6 +528,11 @@ export function GeneratorClient({
             </div>
 
             <Card className="border-border/50 p-4 md:p-6 space-y-4">
+              {handoffBanner && (
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                  {handoffBanner}
+                </div>
+              )}
               {/* PROMPT FIRST */}
               <div>
                 <label className="text-sm font-semibold mb-2 block">
