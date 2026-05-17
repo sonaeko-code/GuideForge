@@ -328,6 +328,11 @@ export function StarterPagesEditor() {
         </div>
       </Card>
 
+      {/* Context note */}
+      <p className="text-xs text-muted-foreground -mt-2">
+        These starter pages become your hubs and collections after the network is created. You can rename, reorder, or remove them before continuing.
+      </p>
+
       {/* Validation panel */}
       {validation && validation.hubsWithoutCollections.length > 0 && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-900 dark:text-amber-200">

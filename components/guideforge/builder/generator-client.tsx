@@ -18,8 +18,9 @@ import type {
   GenerationRequest,
   GenerationResponse,
   GenerationSession,
+  GeneratedGuide,
 } from "@/lib/guideforge/generation-schemas"
-import { generateMockResponse } from "@/lib/guideforge/mock-generator"
+import { generateGuideForgeDraft, toNetworkGuideBuilderRequest } from "@/lib/guideforge/ai-builder-core"
 import { createAndSaveGuideDraft } from "@/lib/guideforge/create-and-save-guide-draft"
 import type { GuideType, DifficultyLevel } from "@/lib/guideforge/types"
 import type {
@@ -34,6 +35,45 @@ interface GeneratorClientProps {
   networkName: string
   hubs: NormalizedHub[]
   collectionsByHub: Record<string, NormalizedCollection[]>
+}
+
+// ─── Generation source tracking ──────────────────────────────────────────────
+
+type GenerationSource = "manual_prompt" | "starter_guide_idea"
+
+/**
+ * Build a unified GuideForgeBuilderRequest for network guide generation.
+ * Wraps toNetworkGuideBuilderRequest() and merges source metadata into formData
+ * without overwriting any fields the adapter may have set.
+ */
+function buildNetworkGuideGenerationRequest(opts: {
+  mode: "mock" | "ai"
+  prompt: string
+  guideType: string
+  difficulty: string
+  networkId: string
+  networkName: string
+  hubId: string
+  collectionId: string
+  source?: GenerationSource
+}) {
+  const base = toNetworkGuideBuilderRequest({
+    prompt: opts.prompt,
+    mode: opts.mode,
+    networkId: opts.networkId,
+    networkName: opts.networkName,
+    hubId: opts.hubId,
+    collectionId: opts.collectionId,
+    guideType: opts.guideType,
+    difficulty: opts.difficulty,
+  })
+  return {
+    ...base,
+    formData: {
+      ...(base.formData ?? {}),
+      _source: opts.source ?? "manual_prompt",
+    },
+  }
 }
 
 /**
@@ -63,15 +103,13 @@ function sanitizeHandoffGuideType(type: string): string {
 }
 
 /**
- * Network Guide Generator — current flow (pre-builder-core migration):
+ * Network Guide Generator — uses the shared AI Builder Core contract.
  *   prompt → Suggest Structure (classifyNetworkGuidePrompt) → hub/collection selection
- *   → Mock Preview (generateMockResponse) or AI Generate (/api/guideforge/generate-guide)
+ *   → generateGuideForgeDraft({ kind: "network_guide", mode }) via buildNetworkGuideGenerationRequest()
  *   → human-readable preview → Send to Editor (createAndSaveGuideDraft → redirect)
  *
- * Builder core migration (next bundle):
- *   Replace generateMockResponse + fetch with generateGuideForgeDraft({ kind: "network_guide", ... })
- *   Use toNetworkGuideBuilderRequest() from ai-builder-core.ts to build the request.
- *   The prompt must never be mutated — handleSuggestStructure already respects this.
+ * The prompt is never mutated — Suggest Structure and handoff apply structure only.
+ * Source tracking: handoffSource distinguishes manual_prompt from starter_guide_idea handoffs.
  */
 export function GeneratorClient({
   networkId,
@@ -125,6 +163,7 @@ export function GeneratorClient({
     note: string | null
   } | null>(null)
   const [handoffBanner, setHandoffBanner] = useState<string | null>(null)
+  const [handoffSource, setHandoffSource] = useState<GenerationSource>("manual_prompt")
 
   // Apply starter guide idea handoff once on mount (written by the dashboard panel)
   const didApplyHandoffRef = useRef(false)
@@ -136,6 +175,12 @@ export function GeneratorClient({
     if (!handoff) return
 
     clearStarterGuideHandoff(networkId)
+    // Use the source field already on the handoff payload.
+    // TODO: Both starter guide ideas and launch plan priority guides currently write
+    // source: "starter_guide_idea" in writeStarterGuideHandoff(). To distinguish launch
+    // plan origin, expand StarterGuideIdeaHandoff.source to include
+    // "launch_plan_priority_guide" and update the dashboard's handleCreateFromIdea.
+    setHandoffSource(handoff.source)
 
     setFormState((prev) => ({
       ...prev,
@@ -229,7 +274,7 @@ export function GeneratorClient({
     setSuggestionBanner({ confidence: result.confidence, note: result.confidenceNote })
   }
 
-  const handleGenerateMock = async () => {
+  const handleGenerate = async () => {
     if (!formState.prompt.trim()) {
       alert("Please enter a prompt")
       return
@@ -239,34 +284,7 @@ export function GeneratorClient({
       return
     }
 
-    const sessionId = `session_${Date.now()}`
-    const request: GenerationRequest = {
-      ...formState,
-      targetHubId: selectedHubId,
-    }
-    setSession({
-      id: sessionId,
-      createdAt: new Date().toISOString(),
-      request,
-      status: "generating",
-    })
-
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    const response: GenerationResponse = generateMockResponse(request)
-    setSession((prev) => (prev ? { ...prev, response, status: "done" } : null))
-  }
-
-  const handleGenerateAI = async () => {
-    if (!formState.prompt.trim()) {
-      alert("Please enter a prompt")
-      return
-    }
-    if (!selectedHubId || !selectedCollectionId) {
-      setSendError("Please select a hub and collection before generating.")
-      return
-    }
-
-    const sessionId = `session_ai_${Date.now()}`
+    const sessionId = `session_${generationMode}_${Date.now()}`
     const request: GenerationRequest = {
       ...formState,
       targetHubId: selectedHubId,
@@ -279,71 +297,41 @@ export function GeneratorClient({
     })
     setSendError(null)
 
-    try {
-      // Call AI generation API — enrich with network/collection context
-      const response = await fetch("/api/guideforge/generate-guide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...request,
-          networkId,
-          networkName,
-          targetCollectionId: selectedCollectionId,
-        }),
-      })
-
-      let responseText: string
-      try {
-        responseText = await response.text()
-      } catch (readErr) {
-        setSendError("AI generation failed. Please try again.")
-        setSession((prev) => (prev ? { ...prev, status: "error" } : null))
-        return
-      }
-
-      let data: any
-      try {
-        data = JSON.parse(responseText)
-      } catch (parseErr) {
-        setSendError(
-          "AI generation failed. The server returned a non-JSON response. Try Mock Preview, or use the Single Guide asset builder."
-        )
-        setSession((prev) => (prev ? { ...prev, status: "error" } : null))
-        return
-      }
-
-      if (!response.ok || !data.success) {
-        // Provide specific error messages
-        let errorMsg = data.error || "AI generation failed"
-        if (!response.ok && response.status === 500) {
-          errorMsg = "AI service temporarily unavailable. Try Mock Preview or simplify your prompt."
-        } else if (!response.ok && response.status === 429) {
-          errorMsg = "Rate limit reached. Please wait a moment and try again."
-        } else if (errorMsg.includes("timeout") || errorMsg.includes("took too long")) {
-          errorMsg = "Generation took too long. Try a shorter prompt or use Mock Preview."
-        }
-        setSendError(errorMsg)
-        setSession((prev) => (prev ? { ...prev, status: "error" } : null))
-        return
-      }
-
-      // Success - log if guide shape is unexpected
-      const g = data?.guide
-      if (!g?.sections?.length || !g?.title) {
-        console.error("[generator-client] AI guide response has unexpected shape:", {
-          hasTitle: !!g?.title,
-          sectionsCount: g?.sections?.length ?? "missing",
-          hasDifficulty: !!g?.difficulty,
-          raw: JSON.stringify(g)?.substring(0, 300),
-        })
-      }
-      // Update session with response
-      setSession((prev) => (prev ? { ...prev, response: data, status: "done" } : null))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error"
-      setSendError(`Generation error: ${msg}`)
-      setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+    // Brief delay for mock mode so the generating spinner is visible
+    if (generationMode === "mock") {
+      await new Promise((r) => setTimeout(r, 400))
     }
+
+    const builderRequest = buildNetworkGuideGenerationRequest({
+      mode: generationMode,
+      prompt: formState.prompt,
+      guideType: formState.guideType,
+      difficulty: formState.preferredDifficulty ?? "intermediate",
+      networkId,
+      networkName,
+      hubId: selectedHubId,
+      collectionId: selectedCollectionId,
+      source: handoffSource,
+    })
+
+    const result = await generateGuideForgeDraft(builderRequest)
+
+    if (!result.success) {
+      setSendError(result.error || "Generation failed. Please try again.")
+      setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+      return
+    }
+
+    const guide = result.structuredPayload as GeneratedGuide
+    if (!guide) {
+      setSendError("Generation returned no guide data. Please try again.")
+      setSession((prev) => (prev ? { ...prev, status: "error" } : null))
+      return
+    }
+
+    setSession((prev) =>
+      prev ? { ...prev, response: { success: true, guide }, status: "done" } : null
+    )
   }
 
   const handleSendToEditor = async () => {
@@ -697,26 +685,34 @@ export function GeneratorClient({
                 <label className="text-sm font-semibold mb-2 block">
                   Generation Mode
                 </label>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant={generationMode === "mock" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setGenerationMode("mock")}
-                  >
-                    Mock Preview
-                  </Button>
-                  <Button
-                    variant={generationMode === "ai" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setGenerationMode("ai")}
-                  >
-                    AI Generate
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-start gap-3">
+                    <Button
+                      variant={generationMode === "mock" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setGenerationMode("mock")}
+                      className="shrink-0"
+                    >
+                      Mock Preview
+                    </Button>
+                    <p className="text-xs text-muted-foreground pt-1">Local generation — instant, no API key needed.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Button
+                      variant={generationMode === "ai" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setGenerationMode("ai")}
+                      className="shrink-0"
+                    >
+                      AI Generate
+                    </Button>
+                    <p className="text-xs text-muted-foreground pt-1">Calls OpenAI — requires <code className="font-mono">OPENAI_API_KEY</code> on the server.</p>
+                  </div>
                 </div>
               </div>
 
               <Button
-                onClick={generationMode === "mock" ? handleGenerateMock : handleGenerateAI}
+                onClick={handleGenerate}
                 disabled={
                   session?.status === "generating" ||
                   !selectedHubId ||

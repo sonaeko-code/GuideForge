@@ -13,7 +13,7 @@
  * Builder kind map (current migration status):
  *   single_guide_asset  → fully migrated, uses generateSingleGuideAsset()
  *   checklist_asset     → fully migrated, uses generateChecklistAsset() via ai-generation-client
- *   network_guide       → stub; active flow is in generator-client.tsx (migrate next)
+ *   network_guide       → migrated; uses generateNetworkGuide() via AI Builder Core
  *   network_scaffold    → stub; active flow is in smart-fill-network + forge-rules-editor (migrate later)
  *
  * Do NOT create separate one-off builders. Extend this file instead.
@@ -237,17 +237,169 @@ export async function generateGuideForgeDraft(
 async function generateNetworkGuide(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
-  // Migration path: generator-client.tsx currently calls generateMockResponse() and
-  // /api/guideforge/generate-guide directly. When migrating:
-  //   mock  → import { generateMockResponse } from "./mock-generator"; pass GenerationRequest shape
-  //   ai    → fetch("/api/guideforge/generate-guide", { networkId, networkName, collectionId, ...formData })
-  //   Both  → normalize with normalizeGeneratedGuide() before returning structuredPayload
-  // Context: request.networkContext carries networkId, hubId, collectionId, networkName
-  return {
-    kind: "network_guide",
-    mode: request.mode,
-    success: false,
-    error: "Not yet migrated to core — use generator-client.tsx directly",
+  try {
+    // Prefer typed context fields; fall back to formData for legacy callers
+    const nc = request.networkContext
+    const ac = request.assetContext
+    const fd = request.formData ?? {}
+
+    // Small helper: safely extract a string from untyped formData
+    const fdStr = (k: string, fallback = ""): string =>
+      typeof fd[k] === "string" ? (fd[k] as string) || fallback : fallback
+
+    const targetHubId: string = nc?.hubId ?? fdStr("targetHubId")
+    const targetCollectionId: string | undefined =
+      nc?.collectionId ?? (fd.targetCollectionId ? String(fd.targetCollectionId) : undefined)
+    const guideType: string = ac?.guideType ?? fdStr("guideType", "tutorial")
+    const difficulty: string = ac?.difficulty ?? fdStr("preferredDifficulty", "intermediate")
+
+    if (request.mode === "mock") {
+      const { generateMockResponse } = await import("./mock-generator")
+      const result = generateMockResponse({
+        prompt: request.prompt,
+        guideType: guideType as any,
+        preferredDifficulty: difficulty as any,
+        targetHubId,
+        targetCollectionId,
+      })
+      if (!result.success) {
+        return {
+          kind: "network_guide",
+          mode: "mock",
+          success: false,
+          error: result.error || "Mock generation failed",
+        }
+      }
+      return {
+        kind: "network_guide",
+        mode: "mock",
+        success: true,
+        title: result.guide.title,
+        summary: result.guide.summary,
+        structuredPayload: result.guide,
+        generatedBy: "mock",
+        generatedAt: result.guide.generatedAt,
+        saveTargetHint: {
+          type: "network_collection",
+          targetId: targetCollectionId,
+          context: {
+            networkId: nc?.networkId,
+            hubId: targetHubId,
+            collectionId: targetCollectionId,
+          },
+        },
+      }
+    }
+
+    if (request.mode === "ai") {
+      // AI mode is invoked from the client-side generator; the relative URL works in the browser.
+      // Server-side callers must supply an absolute URL or call the route handler directly.
+      const fetchResponse = await fetch("/api/guideforge/generate-guide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: request.prompt,
+          guideType,
+          preferredDifficulty: difficulty,
+          targetHubId,
+          networkId: nc?.networkId,
+          networkName: nc?.networkName,
+          targetCollectionId,
+          forgeRuleContext: request.rules?.forgeRules?.join("\n"),
+        }),
+      })
+
+      let responseText: string
+      try {
+        responseText = await fetchResponse.text()
+      } catch {
+        return {
+          kind: "network_guide",
+          mode: "ai",
+          success: false,
+          error: "AI generation failed — could not read server response. Please try again.",
+          stage: "network",
+        }
+      }
+
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch {
+        return {
+          kind: "network_guide",
+          mode: "ai",
+          success: false,
+          error: "AI generation failed — server returned an invalid response. Please try again.",
+          stage: "parse",
+        }
+      }
+
+      if (!fetchResponse.ok || !data.success) {
+        let errorMsg: string = data.error || "AI generation failed"
+        if (!fetchResponse.ok && fetchResponse.status === 500) {
+          errorMsg = "AI service temporarily unavailable. Try Mock Preview or simplify your prompt."
+        } else if (!fetchResponse.ok && fetchResponse.status === 429) {
+          errorMsg = "Rate limit reached. Please wait a moment and try again."
+        } else if (errorMsg.includes("timeout") || errorMsg.includes("took too long")) {
+          errorMsg = "Generation took too long. Try a shorter prompt or use Mock Preview."
+        }
+        return {
+          kind: "network_guide",
+          mode: "ai",
+          success: false,
+          error: errorMsg,
+          stage: data.stage ?? "generation",
+        }
+      }
+
+      const guide = data.guide
+      if (!guide?.sections?.length || !guide?.title) {
+        return {
+          kind: "network_guide",
+          mode: "ai",
+          success: false,
+          error: "AI returned an incomplete guide. Please try again.",
+          stage: "validation",
+        }
+      }
+
+      return {
+        kind: "network_guide",
+        mode: "ai",
+        success: true,
+        title: guide.title,
+        summary: guide.summary,
+        structuredPayload: guide,
+        generatedBy: "openai",
+        generatedAt: guide.generatedAt,
+        saveTargetHint: {
+          type: "network_collection",
+          targetId: targetCollectionId,
+          context: {
+            networkId: nc?.networkId,
+            hubId: targetHubId,
+            collectionId: targetCollectionId,
+          },
+        },
+      }
+    }
+
+    return {
+      kind: "network_guide",
+      mode: request.mode,
+      success: false,
+      error: `Unknown generation mode: ${request.mode}`,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return {
+      kind: "network_guide",
+      mode: request.mode,
+      success: false,
+      error: message,
+      stage: "generation",
+    }
   }
 }
 
@@ -469,8 +621,8 @@ async function generateNetworkScaffold(
 
 /**
  * Build a GuideForgeBuilderRequest from network guide generator form data.
- * Use this when migrating generator-client.tsx to the builder core.
- * Currently informational — generator-client.tsx calls its own flow directly.
+ * Used by buildNetworkGuideGenerationRequest() in generator-client.tsx to
+ * construct the unified request before calling generateGuideForgeDraft().
  */
 export function toNetworkGuideBuilderRequest(opts: {
   prompt: string

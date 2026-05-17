@@ -228,8 +228,8 @@ export default async function NetworkDashboardPage({
 
           {/* GuideForge Data Spine Contract — see /docs/guideforge-data-spine-contract.md */}
 
-          {/* Governance Summary — collapsible to reduce visual weight on initial load */}
-          <details className="group rounded-xl border border-border/50 bg-card">
+          {/* Governance Summary — open by default; governance is core to GuideForge */}
+          <details open className="group rounded-xl border border-border/50 bg-card">
             <summary className="cursor-pointer list-none flex items-center justify-between p-4 hover:bg-muted/40 transition-colors rounded-xl">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">

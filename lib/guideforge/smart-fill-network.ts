@@ -399,6 +399,14 @@ function detectContentCategories(lowerIdea: string): string[] {
   if (/\b(medication|allerg)\b/.test(lowerIdea)) cats.push("medication")
   if (/\b(childcare|child care)\b/.test(lowerIdea)) cats.push("childcare")
   if (/\b(maintenance|seasonal)\b/.test(lowerIdea)) cats.push("maintenance")
+  // Tech repair categories — used by buildNetworkName tech_repair branch
+  if (/\b(computer|computers|pc|laptop|laptops)\b/.test(lowerIdea)) cats.push("tech:computer")
+  if (/\b(phone|smartphone|mobile phone)\b/.test(lowerIdea)) cats.push("tech:phone")
+  if (/wi-fi|wifi|\bwireless\b|\brouter\b/.test(lowerIdea)) cats.push("tech:wifi")
+  if (/\b(printer|printers)\b/.test(lowerIdea)) cats.push("tech:printer")
+  if (/\b(tablet|ipad)\b/.test(lowerIdea)) cats.push("tech:tablet")
+  if (/\b(home users?|for home)\b/.test(lowerIdea)) cats.push("tech:homeuser")
+  if (/\bjunior tech/.test(lowerIdea)) cats.push("tech:junior")
   return cats
 }
 
@@ -464,6 +472,20 @@ function buildNetworkName(
     if (hasFamily && has("medication")) return "Family Health & Routines Network"
     if (hasFamily) return "Family Operations Playbook"
     return "Home Systems Guide Network"
+  }
+
+  if (typeId === "tech_repair") {
+    const deviceCats = ["tech:computer", "tech:phone", "tech:wifi", "tech:printer", "tech:tablet"].filter((c) => has(c))
+    const isMultiDevice = deviceCats.length >= 2
+    const isHomeUser = has("tech:homeuser") || lowerIdea.includes("home user") || lowerIdea.includes("for home")
+    const isJunior = has("tech:junior") || lowerIdea.includes("junior technician")
+    if (isMultiDevice && (isHomeUser || isJunior)) return "Home Tech Repair Guide Network"
+    if (isMultiDevice) return "Tech Repair Guide Network"
+    if (has("tech:computer") && isHomeUser) return "Home Computer Repair Guides"
+    if (has("tech:phone") && isHomeUser) return "Home Phone Repair Guides"
+    if (has("tech:wifi")) return "Home Network Troubleshooting Hub"
+    if (has("tech:printer")) return "Printer & Device Repair Hub"
+    return ""
   }
 
   if (typeId === "restaurant_training") return "Restaurant Operations Hub"

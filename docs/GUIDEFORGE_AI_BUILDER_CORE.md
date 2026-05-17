@@ -23,7 +23,7 @@ Defined in `lib/guideforge/ai-builder-core.ts` as `GuideForgeBuilderKind`:
 |------|-------------|-----------------|
 | `single_guide_asset` | Step-by-step guide saved to workspace | ✅ Migrated — uses `generateGuideForgeDraft()` |
 | `checklist_asset` | Multi-section checklist saved to workspace | ✅ Migrated — uses `generateGuideForgeDraft()` |
-| `network_guide` | Guide belonging to a network hub/collection | ⏳ Stub — active flow in `generator-client.tsx` |
+| `network_guide` | Guide belonging to a network hub/collection | ✅ Migrated — uses `generateGuideForgeDraft()` via `buildNetworkGuideGenerationRequest()` |
 | `network_scaffold` | Hubs + collections + starter guides for a new network | ⏳ Stub — active flow in `smart-fill-network.ts` + `forge-rules-editor.tsx` |
 
 ---
@@ -90,9 +90,12 @@ generateGuideForgeDraft({
 ### Network Guide Generator (`/builder/network/[networkId]/generate`)
 - Entry: `generator-client.tsx`
 - Fill: Suggest Structure → `classifyNetworkGuidePrompt()` (heuristic, no AI)
-- Generate: `generateMockResponse()` or `fetch("/api/guideforge/generate-guide")`
+- Generate: `generateGuideForgeDraft({ kind: "network_guide", mode })` via `buildNetworkGuideGenerationRequest()` + `toNetworkGuideBuilderRequest()` adapter
+- formData: source metadata (`_source`) is merged onto the adapter output; existing adapter fields are preserved
 - Save: `createAndSaveGuideDraft()` → redirect to guide editor
-- **Not yet on builder core.** Use `toNetworkGuideBuilderRequest()` adapter when migrating.
+- Source tracking: `handoffSource` state distinguishes `"manual_prompt"` from `"starter_guide_idea"`; written to `formData._source` on every generation request
+- AI mode calls `/api/guideforge/generate-guide` via relative URL — this is safe from the browser client; server-side callers must use an absolute URL
+- Future provider routing (e.g. Claude, mock-v2) should plug into `generateNetworkGuide()` in `ai-builder-core.ts`
 
 ### Network Scaffold (`/builder/network/new` → `forge-rules-editor`)
 - Entry: `create-network-form.tsx`
@@ -115,9 +118,8 @@ Forge Rules are governance metadata (verification level, content standard, AI po
 
 ## What Remains to Migrate
 
-1. **Network guide generator** — move `generateMockResponse()` and `/api/guideforge/generate-guide` calls into `generateNetworkGuide()` handler in `ai-builder-core.ts`
-2. **Network scaffold with AI** — add an `/api/guideforge/generate-scaffold` endpoint for AI-powered scaffold generation and wire it to `generateNetworkScaffold()` in `ai-builder-core.ts`
-3. **Forge Rules persistence** — requires a Supabase schema column
+1. **Network scaffold with AI** — add an `/api/guideforge/generate-scaffold` endpoint for AI-powered scaffold generation and wire it to `generateNetworkScaffold()` in `ai-builder-core.ts`
+2. **Forge Rules persistence** — requires a Supabase schema column
 
 ---
 
@@ -176,6 +178,23 @@ Starter guide ideas are scaffold suggestions shown during network creation. They
 - The handoff is single-use: the generator clears it immediately on read.
 - If hub/collection cannot be matched by name, the generator shows a warning and leaves selects empty.
 - No guides are created until the user explicitly clicks Generate and Send to Editor.
+
+---
+
+## Dashboard Panel Behavior
+
+| Panel | Default state | When shown |
+|-------|--------------|------------|
+| Network Snapshot (stats + CTA) | Always visible | Always |
+| Trust & Standards (Governance) | **Open by default** | Always (hideable via native `<details>`) |
+| Network Launch Plan | Visible, compact | Only when sessionStorage key present |
+| Suggested Starter Guides | Visible | Only when launch plan absent AND starter ideas present |
+| Tabs (Drafts, Pending, Published…) | Always visible | Always |
+
+Trust & Standards defaults open because governance is core to GuideForge's value proposition.
+Network Launch Plan is the preferred session-only next-step panel when present.
+Suggested Starter Guides is a fallback shown when no launch plan exists.
+Create this guide still uses the session-only handoff (`writeStarterGuideHandoff`) regardless of which panel triggers it.
 
 ---
 

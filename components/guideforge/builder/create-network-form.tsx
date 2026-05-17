@@ -954,10 +954,11 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
               {buildPlan && (
                 <div className="mt-4 pt-4 border-t border-border/40">
                   <details open>
-                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 select-none list-none">
+                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 select-none list-none">
                       Network launch plan
                     </summary>
-                    <div className="mt-3 space-y-3 text-xs">
+                    <p className="text-xs text-muted-foreground mb-2">A planning preview for what to build first. The launch plan prioritizes the guide ideas above into a recommended first build order.</p>
+                    <div className="mt-2 space-y-3 text-xs">
                       <p className="text-foreground/80 leading-relaxed">{buildPlan.goal}</p>
 
                       <div>

@@ -596,6 +596,17 @@ export function ForgeRulesEditor() {
         </div>
       )}
 
+      {/* Compact bottom summary reminder */}
+      <div className="rounded-md border border-border/50 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{draft.name}</span>
+        {" · "}
+        {draft.scaffold.hubs.length} hub{draft.scaffold.hubs.length !== 1 ? "s" : ""}
+        {" · "}
+        {draft.scaffold.hubs.reduce((s, h) => s + h.collections.length, 0)} collection{draft.scaffold.hubs.reduce((s, h) => s + h.collections.length, 0) !== 1 ? "s" : ""}
+        {" · "}
+        {getRegistryTypeById(draft.type)?.label ?? draft.type}
+      </div>
+
       {/* Footer */}
       <div className="flex items-center justify-between gap-3 pt-2">
         <Button asChild variant="ghost" type="button" disabled={submitting}>
