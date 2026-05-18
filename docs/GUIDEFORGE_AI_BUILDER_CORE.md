@@ -274,3 +274,17 @@ The network build plan is a richer, type-aware planning layer generated alongsid
 - Panel is dismissible and clears only the sessionStorage key.
 - `NetworkBuildPlanIdea` is a structural superset of `NetworkStarterIdeas["ideas"][number]` — can be passed directly to `handleCreateFromIdea`.
 - **Starter guides and build plan ideas are the same data** (both come from `starterGuideIdeas[0]` of each collection). The build plan is the preferred entry point when present.
+
+---
+
+## Related docs
+
+Higher-level product / planning / testing context lives in:
+
+- [`GUIDEFORGE_PRODUCT_ROADMAP.md`](./GUIDEFORGE_PRODUCT_ROADMAP.md) — product north star, current step, ten-step roadmap, near-term lanes, non-goals, guardrails.
+- [`GUIDEFORGE_FULL_TEST_PLAN.md`](./GUIDEFORGE_FULL_TEST_PLAN.md) — manual test plan to run after the TypeScript-clean milestone.
+- [`GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md`](./GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md) — how GuideForge patterns can power Techsperts without replacing it.
+- [`GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md`](./GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md) — productized gaming network template.
+
+This file (AI Builder Core) is the **architecture / contract** doc. The four files above are the
+**product / process** docs. Both layers should agree before any new generation flow is built.
