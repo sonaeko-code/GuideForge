@@ -299,5 +299,10 @@ Higher-level product / planning / testing context lives in:
 - [`GUIDEFORGE_OVERNIGHT_HANDOFF.md`](./GUIDEFORGE_OVERNIGHT_HANDOFF.md) — handoff after the recent build session: what changed, retest priority, deferred work, continuation prompt.
 - [`GUIDEFORGE_CURRENT_BUILD_OVERVIEW.md`](./GUIDEFORGE_CURRENT_BUILD_OVERVIEW.md) — durable snapshot of where GuideForge is right now: major systems, recent work, deferred work, retest priority, continuation prompt.
 
-This file (AI Builder Core) is the **architecture / contract** doc. The four files above are the
-**product / process** docs. Both layers should agree before any new generation flow is built.
+Platform planning docs (the AI builder contracts in this file are the extraction target for `packages/ai`):
+
+- [`PLATFORM_MONOREPO_PLAN.md`](./PLATFORM_MONOREPO_PLAN.md) — target workspace structure; `packages/ai` responsibilities defined there.
+- [`GUIDEFORGE_TECHSPERTS_SHARED_CORE.md`](./GUIDEFORGE_TECHSPERTS_SHARED_CORE.md) — shared AI principle and extraction order.
+- [`SHARED_ENGINE_VOCABULARY_MAP.md`](./SHARED_ENGINE_VOCABULARY_MAP.md) — neutral terminology for shared package boundaries.
+
+This file (AI Builder Core) is the **architecture / contract** doc. The product / process docs and platform planning docs above are its context. All layers should agree before any new generation flow is built.

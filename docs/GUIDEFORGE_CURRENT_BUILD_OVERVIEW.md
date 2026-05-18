@@ -462,3 +462,23 @@ When I paste results:
 - `GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md` — Techsperts reuse spec
 - `GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md` — QuestLine template spec
 - `current-build-state.md` — audited Supabase persistence flows (pre-stabilization snapshot)
+
+---
+
+## Platform Monorepo Direction
+
+GuideForge is preparing for a future platform monorepo (`sonaeko-platform`).
+
+**GuideForge and Techsperts will share a core engine — they will not become one website.**
+
+The platform monorepo will allow both products to share schemas, AI contracts, governance
+patterns, and domain templates without duplicating them. Each product keeps its own UI,
+branding, and product language.
+
+Planning docs (documentation only — no files have moved yet):
+
+- `PLATFORM_MONOREPO_PLAN.md` — target workspace structure, package responsibilities, migration principles
+- `GUIDEFORGE_TECHSPERTS_SHARED_CORE.md` — shared engine concept mapping between products
+- `SHARED_ENGINE_VOCABULARY_MAP.md` — neutral-to-product terminology map
+- `MONOREPO_MIGRATION_CHECKLIST.md` — step-by-step migration checklist
+- `AI_ASSISTANT_MONOREPO_PROTOCOL.md` — assistant operating rules inside the monorepo

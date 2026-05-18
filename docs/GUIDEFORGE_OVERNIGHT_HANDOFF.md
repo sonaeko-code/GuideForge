@@ -284,3 +284,11 @@ When I paste screenshots/logs/results:
 - `GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md` — Techsperts reuse spec
 - `GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md` — QuestLine template spec
 - `GUIDEFORGE_CURRENT_BUILD_OVERVIEW.md` — durable current-state snapshot for future-session handoff
+
+Platform planning docs (documentation only — no files have moved):
+
+- `PLATFORM_MONOREPO_PLAN.md` — platform monorepo architecture plan
+- `GUIDEFORGE_TECHSPERTS_SHARED_CORE.md` — shared engine concept mapping
+- `SHARED_ENGINE_VOCABULARY_MAP.md` — neutral-to-product terminology map
+- `MONOREPO_MIGRATION_CHECKLIST.md` — step-by-step migration checklist
+- `AI_ASSISTANT_MONOREPO_PROTOCOL.md` — assistant operating rules inside the monorepo

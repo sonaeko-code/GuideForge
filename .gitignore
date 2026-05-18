@@ -10,6 +10,9 @@ next.user-config.*
 # Environment variables
 .env*.local
 
+# Claude Code local settings (user-specific, not shared)
+.claude/settings.local.json
+
 # Common ignores
 node_modules
 .next/
