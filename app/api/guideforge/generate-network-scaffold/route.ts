@@ -156,15 +156,37 @@ async function callOpenAI(
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
+/**
+ * Compact per-domain shape hints. Kept SHORT on purpose to avoid bloating the
+ * AI prompt (which can extend latency and risk timeouts). The model still
+ * decides the actual structure — these are guidance only.
+ */
+const DOMAIN_SHAPE_HINTS: Record<string, string> = {
+  gaming:
+    "Gaming networks usually want hubs like Beginner Guides, Builds & Loadouts, Bosses & Encounters, Patch Notes, Gear & Farming, and (if competitive) PvP / Competitive.",
+  tech_repair:
+    "Tech repair / troubleshooting networks usually want hubs like Safety Procedures, Diagnostics & Triage, Common Device Issues, Tools & Equipment, Repair Walkthroughs, and Escalation & Support.",
+  small_business:
+    "SOP / business networks usually want hubs like Onboarding, Daily Operations, Customer Support, Quality Control, and Escalation & Issues.",
+  home_systems:
+    "Home / family networks usually want hubs like Family Routines, Meal Planning, Maintenance / Seasonal, Emergency & Safety, and optionally Budgeting.",
+  creator_workflow:
+    "Creator / community networks usually want hubs like Content Planning, Publishing, Community Management (Discord/comments), Analytics & Growth, and Brand & Sponsorships.",
+}
+
 function buildScaffoldPrompt(idea: string, requestedType?: string): string {
   const typeHint = requestedType && VALID_REGISTRY_IDS.has(requestedType)
     ? `\nThe user expects this to be a "${requestedType}" type network. Prefer that type if appropriate.`
     : ""
+  const shapeHint =
+    requestedType && DOMAIN_SHAPE_HINTS[requestedType]
+      ? `\nDomain shape hint: ${DOMAIN_SHAPE_HINTS[requestedType]} Adapt the names to the specific prompt — these are templates, not literal names to copy.`
+      : ""
 
   return `Design a network scaffold for the following idea:
 
 "${idea}"
-${typeHint}
+${typeHint}${shapeHint}
 
 Return a JSON object with exactly this shape (no extra fields, no markdown, no code blocks):
 {

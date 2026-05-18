@@ -226,6 +226,12 @@ export interface NetworkGuidePromptRequest {
   networkName?: string
   targetHubId?: string
   forgeRuleContext?: string
+  /**
+   * Compact domain-profile instruction block. When present, inserted near the
+   * top of the prompt as additional context (e.g. tone, must-include bullets,
+   * preferred sections, safety notes). Caller is expected to keep this short.
+   */
+  profileInstructions?: string
 }
 
 const NETWORK_GUIDE_SCHEMA = `{
@@ -294,6 +300,9 @@ export function buildNetworkGuidePrompt(request: NetworkGuidePromptRequest): str
   const forgeRulesSection = request.forgeRuleContext
     ? `\nFORGE RULES (apply these to the guide):\n${request.forgeRuleContext}\n`
     : ""
+  const profileSection = request.profileInstructions
+    ? `\nDOMAIN PROFILE — follow this guidance when it does not conflict with the JSON schema or critical rules:\n${request.profileInstructions}\n`
+    : ""
 
   return `You are a structured guide generator for GuideForge. Generate a high-quality, well-organized guide based on the user's idea.
 
@@ -308,7 +317,7 @@ CRITICAL RULES — DO NOT VIOLATE:
 8. "difficulty" must exactly be one of: beginner, intermediate, advanced, expert.
 9. "type" must exactly match the requested guide type.
 10. NEVER use placeholder text like "TODO", "[fill in]", "This section covers X", "Follow this carefully".
-${forgeRulesSection}
+${forgeRulesSection}${profileSection}
 GUIDE REQUEST:
 - Guide Type: ${guideTypeDesc}
 - Difficulty: ${request.preferredDifficulty}

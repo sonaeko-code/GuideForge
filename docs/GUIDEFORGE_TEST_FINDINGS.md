@@ -411,10 +411,23 @@ Next fix needed:
 ## Next Fix Bundle Recommendation
 
 **Recommended next bundle:**
-Retest Flow 1 + Flow 2, then continue Flows 3–14.
+Retest Flow 6 (Launch Plan → Create This Guide) with tech repair and gaming prompts to verify the new domain-aware guide generation profiles. Check that Mock Preview sections match the profile (Safety First / Symptoms / Initial Triage / … for tech repair; Overview / When to Use This / Common Mistakes / Quick Reference for gaming). Then continue Flows 3, 4, 5, 7–14. Do not mark any flow as Pass until manually retested.
+
+**Overnight handoff:**
+- Overnight handoff created at [`docs/GUIDEFORGE_OVERNIGHT_HANDOFF.md`](./GUIDEFORGE_OVERNIGHT_HANDOFF.md).
+- Next action is the manual retest of Flow 1, Flow 2, Gaming Quick Fill, and Flow 6 in that order.
+- **No flow should be marked Pass until the user retests.**
 
 **Reason:**
-Flow 1 (Quick Fill) mostly works; first-bundle fixes addressed the 400 spam and the launch plan visibility, and the second hardening bundle further toughened the AI Draft Scaffold path (defensive JSON extraction, tighter caps, dedup, better error UI, distinct success copy) and added small resilience improvements to Starter Pages + scaffold-save error context. Re-running Flow 1 + Flow 2 will confirm the fixes held. Once confirmed, continue with Flows 3–14 before any new feature work.
+Flow 1 + Flow 2 received hardening fixes in the two prior bundles. The "Improve starter guide creation pipeline" bundle upgraded the **Launch Plan → Create This Guide** path (Flow 6). The current bundle ("Add domain-aware network scaffold templates") tunes Quick Fill, AI Draft Scaffold, and the Launch Plan for five domains: gaming (QuestLine-style), tech repair (Techsperts-style), SOP / business, home / family, creator / community. Earlier highlights from the pipeline bundle:
+- Launch Plan dashboard panel now reads as a "Starter Build Queue" with explicit "suggestions only" copy, per-card guide type + difficulty, and an emerald "Started in this session" badge after a user clicks Create draft.
+- `StarterGuideIdeaHandoff.source` widened to include `launch_plan_priority_guide`; launch-plan cards now write that source while suggested-starter-idea cards continue to write `starter_guide_idea`.
+- Handoff payload now carries `networkName`, `networkType`, `goal`, `reason` so the generator can show a real "Creating from Launch Plan" context card.
+- New `buildStarterGuideHandoffPrompt()` helper produces a richer, domain-generic prompt (works for QuestLine-style gaming networks and Techsperts-style repair networks).
+- Generator client renders a context card above the prompt with title / placement / source / "Review before generating" note.
+- Session-only "started" marker (sessionStorage keyed by network + lowercased title); never written to Supabase.
+
+Flow 6 should now be re-tested specifically. Do **not** mark Flow 6 as Pass until manually retested. Once Flows 1, 2, and 6 are confirmed, continue with Flows 3–5 and 7–14.
 
 **Blocking issues:**
 - None confirmed P0 yet. `GF-BUG-002` was P1 and is now patched, pending re-test.

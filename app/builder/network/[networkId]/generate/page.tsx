@@ -60,6 +60,7 @@ export default async function GeneratorPage({
         <GeneratorClient
           networkId={ctx.networkId}
           networkName={ctx.network.name}
+          networkType={ctx.network.type}
           hubs={ctx.hubs}
           collectionsByHub={ctx.collectionsByHub}
         />

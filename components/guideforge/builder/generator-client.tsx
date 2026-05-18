@@ -28,18 +28,29 @@ import type {
   NormalizedCollection,
 } from "@/lib/guideforge/supabase-networks"
 import { classifyNetworkGuidePrompt } from "@/lib/guideforge/network-guide-classifier"
-import { readStarterGuideHandoff, clearStarterGuideHandoff } from "@/lib/guideforge/intake-session"
+import {
+  readStarterGuideHandoff,
+  clearStarterGuideHandoff,
+  type StarterGuideIdeaHandoff,
+} from "@/lib/guideforge/intake-session"
+import { resolveGuideGenerationProfile } from "@/lib/guideforge/guide-generation-profiles"
 
 interface GeneratorClientProps {
   networkId: string
   networkName: string
+  /** Network's stored DB type ("gaming" / "repair" / "sop" / "creator" / etc.).
+   *  Used to resolve the domain generation profile for both Mock Preview and AI Generate. */
+  networkType?: string
   hubs: NormalizedHub[]
   collectionsByHub: Record<string, NormalizedCollection[]>
 }
 
 // ─── Generation source tracking ──────────────────────────────────────────────
 
-type GenerationSource = "manual_prompt" | "starter_guide_idea"
+type GenerationSource =
+  | "manual_prompt"
+  | "starter_guide_idea"
+  | "launch_plan_priority_guide"
 
 /**
  * Build a unified GuideForgeBuilderRequest for network guide generation.
@@ -53,8 +64,11 @@ function buildNetworkGuideGenerationRequest(opts: {
   difficulty: string
   networkId: string
   networkName: string
+  networkType?: string
   hubId: string
+  hubName?: string
   collectionId: string
+  collectionName?: string
   source?: GenerationSource
 }) {
   const base = toNetworkGuideBuilderRequest({
@@ -62,8 +76,11 @@ function buildNetworkGuideGenerationRequest(opts: {
     mode: opts.mode,
     networkId: opts.networkId,
     networkName: opts.networkName,
+    networkType: opts.networkType,
     hubId: opts.hubId,
+    hubName: opts.hubName,
     collectionId: opts.collectionId,
+    collectionName: opts.collectionName,
     guideType: opts.guideType,
     difficulty: opts.difficulty,
   })
@@ -114,6 +131,7 @@ function sanitizeHandoffGuideType(type: string): string {
 export function GeneratorClient({
   networkId,
   networkName,
+  networkType,
   hubs,
   collectionsByHub,
 }: GeneratorClientProps) {
@@ -164,6 +182,11 @@ export function GeneratorClient({
   } | null>(null)
   const [handoffBanner, setHandoffBanner] = useState<string | null>(null)
   const [handoffSource, setHandoffSource] = useState<GenerationSource>("manual_prompt")
+  /** Full handoff payload kept around so the generator can render a rich
+   *  "Creating from Launch Plan" context card. Cleared from sessionStorage on
+   *  read, but mirrored here for the lifetime of this page so the card stays
+   *  visible while the user reviews placement before generating. */
+  const [handoffContext, setHandoffContext] = useState<StarterGuideIdeaHandoff | null>(null)
 
   // Apply starter guide idea handoff once on mount (written by the dashboard panel)
   const didApplyHandoffRef = useRef(false)
@@ -175,12 +198,12 @@ export function GeneratorClient({
     if (!handoff) return
 
     clearStarterGuideHandoff(networkId)
-    // Use the source field already on the handoff payload.
-    // TODO: Both starter guide ideas and launch plan priority guides currently write
-    // source: "starter_guide_idea" in writeStarterGuideHandoff(). To distinguish launch
-    // plan origin, expand StarterGuideIdeaHandoff.source to include
-    // "launch_plan_priority_guide" and update the dashboard's handleCreateFromIdea.
+
+    // Source field is now reliable: starter idea panel sends "starter_guide_idea",
+    // launch plan priority cards send "launch_plan_priority_guide". Both flow
+    // through to AI Builder Core via `_source` in formData.
     setHandoffSource(handoff.source)
+    setHandoffContext(handoff)
 
     setFormState((prev) => ({
       ...prev,
@@ -302,6 +325,11 @@ export function GeneratorClient({
       await new Promise((r) => setTimeout(r, 400))
     }
 
+    const selectedHubName = hubs.find((h) => h.id === selectedHubId)?.name
+    const selectedCollectionName = collectionsForHub.find(
+      (c) => c.id === selectedCollectionId
+    )?.name
+
     const builderRequest = buildNetworkGuideGenerationRequest({
       mode: generationMode,
       prompt: formState.prompt,
@@ -309,8 +337,11 @@ export function GeneratorClient({
       difficulty: formState.preferredDifficulty ?? "intermediate",
       networkId,
       networkName,
+      networkType,
       hubId: selectedHubId,
+      hubName: selectedHubName,
       collectionId: selectedCollectionId,
+      collectionName: selectedCollectionName,
       source: handoffSource,
     })
 
@@ -516,6 +547,48 @@ export function GeneratorClient({
             </div>
 
             <Card className="border-border/50 p-4 md:p-6 space-y-4">
+              {handoffContext && (() => {
+                const profile = resolveGuideGenerationProfile({
+                  networkType: handoffContext.networkType ?? networkType,
+                  guideType: handoffContext.guideType,
+                  prompt: handoffContext.prompt,
+                  hubName: handoffContext.hubName,
+                  collectionName: handoffContext.collectionName,
+                })
+                return (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-3.5 text-primary shrink-0" aria-hidden="true" />
+                      <p className="text-xs font-semibold text-foreground">
+                        {handoffContext.source === "launch_plan_priority_guide"
+                          ? "Creating from Launch Plan"
+                          : "Creating from Starter Guide Idea"}
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium text-foreground leading-snug">
+                      {handoffContext.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {handoffContext.hubName} › {handoffContext.collectionName}
+                      {handoffContext.guideType ? ` · ${handoffContext.guideType}` : ""}
+                      {handoffContext.difficulty ? ` · ${handoffContext.difficulty}` : ""}
+                    </p>
+                    {profile.id !== "general" && (
+                      <p className="text-[11px] text-muted-foreground/80">
+                        Generation profile: {profile.label}
+                      </p>
+                    )}
+                    {handoffContext.reason && (
+                      <p className="text-xs text-muted-foreground/80 italic leading-snug">
+                        {handoffContext.reason}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground/70 pt-1 border-t border-primary/15">
+                      Review before generating. Nothing is saved until you send to editor.
+                    </p>
+                  </div>
+                )
+              })()}
               {handoffBanner && (
                 <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
                   {handoffBanner}

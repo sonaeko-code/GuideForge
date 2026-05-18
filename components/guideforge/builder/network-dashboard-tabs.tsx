@@ -39,9 +39,13 @@ import {
   writeStarterGuideHandoff,
   readNetworkBuildPlan,
   clearNetworkBuildPlan,
+  buildStarterGuideHandoffPrompt,
+  addStartedGuideTitle,
+  getStartedGuideTitles,
   type NetworkStarterIdeas,
+  type StarterGuideHandoffSource,
 } from "@/lib/guideforge/intake-session"
-import type { NetworkBuildPlan } from "@/lib/guideforge/smart-fill-network"
+import type { NetworkBuildPlan, NetworkBuildPlanIdea } from "@/lib/guideforge/smart-fill-network"
 import type { NormalizedHub, NormalizedCollection } from "@/lib/guideforge/supabase-networks"
 import {
   submitAssetDraftForReview,
@@ -114,15 +118,42 @@ export function NetworkDashboardTabs({
     }
   }, [networkId])
 
-  const handleCreateFromIdea = (idea: NetworkStarterIdeas["ideas"][number]) => {
-    const prompt = [
-      `Create a guide titled "${idea.title}".`,
-      `Summary: ${idea.summary}`,
-      ``,
-      `Network context:`,
-      `Hub: ${idea.hubName}`,
-      `Collection: ${idea.collectionName}`,
-    ].join("\n")
+  // Session-only "started this session" tracker for starter guide ideas.
+  // Loaded once on mount; updated when handleStarterHandoff fires.
+  const [startedTitles, setStartedTitles] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setStartedTitles(getStartedGuideTitles(networkId))
+  }, [networkId])
+
+  /**
+   * Shared handler for "Create this guide" / "Create from idea" — builds a
+   * richer prompt from available context (network name/type, hub, collection,
+   * launch-plan goal/reason) and writes the handoff for the generator to read.
+   *
+   * Distinguishes launch-plan priority guides from suggested starter ideas via
+   * the `source` parameter so the generator can show the correct context card.
+   */
+  const handleStarterHandoff = (
+    idea: NetworkStarterIdeas["ideas"][number] | NetworkBuildPlanIdea,
+    source: StarterGuideHandoffSource,
+  ) => {
+    // Launch-plan ideas carry an extra `reason` field; both shapes share the
+    // common fields below.
+    const reason = "reason" in idea ? idea.reason : undefined
+
+    const prompt = buildStarterGuideHandoffPrompt({
+      title: idea.title,
+      summary: idea.summary,
+      networkName: buildPlan?.networkName,
+      networkType: buildPlan?.networkType,
+      hubName: idea.hubName,
+      collectionName: idea.collectionName,
+      guideType: idea.guideType,
+      difficulty: idea.difficulty,
+      goal: source === "launch_plan_priority_guide" ? buildPlan?.goal : undefined,
+      reason: source === "launch_plan_priority_guide" ? reason : undefined,
+    })
 
     writeStarterGuideHandoff(networkId, {
       title: idea.title,
@@ -132,12 +163,35 @@ export function NetworkDashboardTabs({
       difficulty: idea.difficulty,
       hubName: idea.hubName,
       collectionName: idea.collectionName,
-      source: "starter_guide_idea",
+      source,
+      networkName: buildPlan?.networkName,
+      networkType: buildPlan?.networkType,
+      goal: source === "launch_plan_priority_guide" ? buildPlan?.goal : undefined,
+      reason: source === "launch_plan_priority_guide" ? reason : undefined,
       createdAt: new Date().toISOString(),
+    })
+
+    // Mark as started in this session (session-only; never persisted).
+    addStartedGuideTitle(networkId, idea.title)
+    setStartedTitles((prev) => {
+      const next = new Set(prev)
+      next.add(idea.title.trim().toLowerCase())
+      return next
     })
 
     router.push(`/builder/network/${networkId}/generate`)
   }
+
+  // Convenience wrappers preserve the prior call-sites without forcing every
+  // map() to specify a source string.
+  const handleCreateFromPriorityGuide = (idea: NetworkBuildPlanIdea) =>
+    handleStarterHandoff(idea, "launch_plan_priority_guide")
+
+  const handleCreateFromIdea = (idea: NetworkStarterIdeas["ideas"][number]) =>
+    handleStarterHandoff(idea, "starter_guide_idea")
+
+  const isStarted = (title: string): boolean =>
+    startedTitles.has(title.trim().toLowerCase())
 
   const handleDismissStarterIdeas = () => {
     clearNetworkStarterIdeas(networkId)
@@ -424,35 +478,52 @@ export function NetworkDashboardTabs({
         {/* Goal */}
         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{buildPlan.goal}</p>
 
-        {/* Top 3 priority guides — always visible */}
+        {/* Starter build queue — top 3 priority guides, always visible */}
         {buildPlan.priorityGuides.length > 0 && (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Start with these</p>
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Starter build queue</p>
+              <p className="text-[10px] text-muted-foreground/70">Recommended first guides</p>
+            </div>
+            <p className="text-xs text-muted-foreground/70 mb-3">
+              These are suggestions only. No guides are created until you choose one.
+            </p>
             <div className="grid gap-3 sm:grid-cols-3">
-              {buildPlan.priorityGuides.slice(0, 3).map((idea, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground leading-snug">
-                      <span className="text-muted-foreground/60 mr-1">{i + 1}.</span>
-                      {idea.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{idea.hubName} › {idea.collectionName}</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="self-start text-xs"
-                    onClick={() => handleCreateFromIdea(idea)}
+              {buildPlan.priorityGuides.slice(0, 3).map((idea, i) => {
+                const started = isStarted(idea.title)
+                return (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
                   >
-                    <Sparkles className="size-3 mr-1" aria-hidden="true" />
-                    Create this guide
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground leading-snug">
+                        <span className="text-muted-foreground/60 mr-1">{i + 1}.</span>
+                        {idea.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{idea.hubName} › {idea.collectionName}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                        {idea.guideType} · {idea.difficulty}
+                      </p>
+                      <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
+                      {started && (
+                        <p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                          Started in this session
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="self-start text-xs"
+                      onClick={() => handleCreateFromPriorityGuide(idea)}
+                    >
+                      <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                      {started ? "Continue draft" : "Create draft"}
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -491,30 +562,41 @@ export function NetworkDashboardTabs({
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">More guides</p>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {buildPlan.priorityGuides.slice(3).map((idea, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground leading-snug">
-                          <span className="text-muted-foreground/60 mr-1">{i + 4}.</span>
-                          {idea.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{idea.hubName} › {idea.collectionName}</p>
-                        <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="self-start text-xs"
-                        onClick={() => handleCreateFromIdea(idea)}
+                  {buildPlan.priorityGuides.slice(3).map((idea, i) => {
+                    const started = isStarted(idea.title)
+                    return (
+                      <div
+                        key={i}
+                        className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
                       >
-                        <Sparkles className="size-3 mr-1" aria-hidden="true" />
-                        Create this guide
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground leading-snug">
+                            <span className="text-muted-foreground/60 mr-1">{i + 4}.</span>
+                            {idea.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{idea.hubName} › {idea.collectionName}</p>
+                          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                            {idea.guideType} · {idea.difficulty}
+                          </p>
+                          <p className="text-xs text-muted-foreground/60 mt-1 italic leading-snug">{idea.reason}</p>
+                          {started && (
+                            <p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                              Started in this session
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="self-start text-xs"
+                          onClick={() => handleCreateFromPriorityGuide(idea)}
+                        >
+                          <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                          {started ? "Continue draft" : "Create draft"}
+                        </Button>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -571,33 +653,41 @@ export function NetworkDashboardTabs({
           These came from your network scaffold. They are suggestions only — no guides were created automatically. Suggestions are session-only and may disappear after refresh or browser close.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
-          {starterIdeas.ideas.map((idea, i) => (
-            <div
-              key={i}
-              className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
-            >
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground leading-snug">{idea.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}
-                </p>
-                {idea.summary && (
-                  <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-2 leading-snug">
-                    {idea.summary}
-                  </p>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="self-start text-xs"
-                onClick={() => handleCreateFromIdea(idea)}
+          {starterIdeas.ideas.map((idea, i) => {
+            const started = isStarted(idea.title)
+            return (
+              <div
+                key={i}
+                className="rounded-lg border border-border/40 bg-muted/20 p-3 flex flex-col gap-2"
               >
-                <Sparkles className="size-3 mr-1" aria-hidden="true" />
-                Create from idea
-              </Button>
-            </div>
-          ))}
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground leading-snug">{idea.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {idea.hubName} › {idea.collectionName} · {idea.guideType} · {idea.difficulty}
+                  </p>
+                  {idea.summary && (
+                    <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-2 leading-snug">
+                      {idea.summary}
+                    </p>
+                  )}
+                  {started && (
+                    <p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                      Started in this session
+                    </p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="self-start text-xs"
+                  onClick={() => handleCreateFromIdea(idea)}
+                >
+                  <Sparkles className="size-3 mr-1" aria-hidden="true" />
+                  {started ? "Continue from idea" : "Create from idea"}
+                </Button>
+              </div>
+            )
+          })}
         </div>
       </div>
     )}

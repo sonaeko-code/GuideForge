@@ -101,8 +101,18 @@ export function hasIntakeSession(): boolean {
 // ── Starter Guide Idea Handoff ───────────────────────────────────────────────
 
 /**
+ * Source label for a starter guide handoff. Drives the context-card copy in
+ * the generator and the `_source` value forwarded into AI Builder Core.
+ */
+export type StarterGuideHandoffSource =
+  | "starter_guide_idea"
+  | "launch_plan_priority_guide"
+
+/**
  * A single starter guide idea selected by the user to seed the generator.
  * Written to sessionStorage by the dashboard panel; read and cleared by the generator.
+ *
+ * Session-only: never written to Supabase. Cleared after the generator reads it.
  */
 export interface StarterGuideIdeaHandoff {
   title: string
@@ -113,8 +123,89 @@ export interface StarterGuideIdeaHandoff {
   difficulty: string
   hubName: string
   collectionName: string
-  source: "starter_guide_idea"
+  source: StarterGuideHandoffSource
+  /** Optional network context — included so the generator can show a rich card. */
+  networkName?: string
+  networkType?: string
+  /** Optional launch-plan context — only set when source = launch_plan_priority_guide. */
+  goal?: string
+  reason?: string
   createdAt: string
+}
+
+/**
+ * Input shape for `buildStarterGuideHandoffPrompt`. All fields except
+ * `title` are optional so the helper degrades gracefully if any context is
+ * missing.
+ */
+export interface StarterGuidePromptContext {
+  title: string
+  summary?: string
+  networkName?: string
+  networkType?: string
+  hubName?: string
+  collectionName?: string
+  guideType?: string
+  difficulty?: string
+  goal?: string
+  reason?: string
+}
+
+/**
+ * Build a richer prompt for the Network Guide Generator from a starter guide
+ * handoff. Output is human-readable and domain-generic — works equally well
+ * for gaming networks (QuestLine-style) and tech repair networks
+ * (Techsperts-style). Keeps length reasonable.
+ *
+ * The prompt always ends with the "Do not publish automatically" instruction.
+ */
+export function buildStarterGuideHandoffPrompt(ctx: StarterGuidePromptContext): string {
+  const difficultyPhrase = ctx.difficulty ? `${ctx.difficulty}-level ` : ""
+  const lines: string[] = []
+
+  if (ctx.networkName) {
+    lines.push(
+      `Create a ${difficultyPhrase}guide draft for the network "${ctx.networkName}".`
+    )
+  } else {
+    lines.push(`Create a ${difficultyPhrase}guide draft.`)
+  }
+
+  lines.push("", "Guide title:", ctx.title)
+
+  if (ctx.summary && ctx.summary.trim()) {
+    lines.push("", "Summary:", ctx.summary.trim())
+  }
+
+  if (ctx.networkType) {
+    lines.push("", "Network context:", `This is a ${ctx.networkType} network.`)
+  }
+
+  if (ctx.hubName || ctx.collectionName) {
+    lines.push("", "Placement:")
+    if (ctx.hubName) lines.push(`Hub: ${ctx.hubName}`)
+    if (ctx.collectionName) lines.push(`Collection: ${ctx.collectionName}`)
+  }
+
+  if (ctx.guideType) {
+    lines.push("", `Format: ${ctx.guideType}`)
+  }
+
+  if (ctx.goal && ctx.goal.trim()) {
+    lines.push("", "Launch plan goal:", ctx.goal.trim())
+  }
+
+  if (ctx.reason && ctx.reason.trim()) {
+    lines.push("", "Why this guide is prioritized:", ctx.reason.trim())
+  }
+
+  lines.push(
+    "",
+    "Expected output:",
+    "A structured guide draft with clear sections, prerequisites, any safety warnings, step-by-step actions, and success criteria. Keep it practical and ready for review. Do not publish automatically."
+  )
+
+  return lines.join("\n")
 }
 
 /**
@@ -195,6 +286,62 @@ export function clearStarterGuideHandoff(networkId: string): void {
   if (typeof window === "undefined") return
   try {
     sessionStorage.removeItem(starterHandoffKey(networkId))
+  } catch {
+    // ignore
+  }
+}
+
+// ── Started-this-session marker (session-only UX hint) ───────────────────────
+// Tracks which starter guide ideas the user has clicked "Create this guide" on
+// during the current session. NEVER persisted to Supabase. The marker is keyed
+// by the lowercased idea title so it is stable across re-renders even though
+// session-stored ideas don't carry stable IDs.
+
+function startedTitlesKey(networkId: string): string {
+  return `guideforge:startedGuideTitles:${networkId}`
+}
+
+function normalizeStartedTitle(title: string): string {
+  return title.trim().toLowerCase()
+}
+
+export function getStartedGuideTitles(networkId: string): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = sessionStorage.getItem(startedTitlesKey(networkId))
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) return new Set()
+    return new Set(arr.filter((t): t is string => typeof t === "string"))
+  } catch {
+    return new Set()
+  }
+}
+
+export function addStartedGuideTitle(networkId: string, title: string): void {
+  if (typeof window === "undefined") return
+  if (!title || !title.trim()) return
+  try {
+    const current = getStartedGuideTitles(networkId)
+    current.add(normalizeStartedTitle(title))
+    sessionStorage.setItem(
+      startedTitlesKey(networkId),
+      JSON.stringify(Array.from(current))
+    )
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
+
+export function isGuideTitleStarted(networkId: string, title: string): boolean {
+  if (!title) return false
+  return getStartedGuideTitles(networkId).has(normalizeStartedTitle(title))
+}
+
+export function clearStartedGuideTitles(networkId: string): void {
+  if (typeof window === "undefined") return
+  try {
+    sessionStorage.removeItem(startedTitlesKey(networkId))
   } catch {
     // ignore
   }

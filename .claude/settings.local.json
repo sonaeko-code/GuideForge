@@ -9,7 +9,8 @@
       "Bash(pnpm dev *)",
       "Bash(npx tsc *)",
       "Bash(git diff *)",
-      "Bash(grep \"assets\\\\\\\\\\\\[assetId\\\\\\\\\\\\]\")"
+      "Bash(grep \"assets\\\\\\\\\\\\[assetId\\\\\\\\\\\\]\")",
+      "Bash(awk -F'\"' '{print $2}')"
     ],
     "additionalDirectories": [
       "c:\\Users\\sonaeko\\Documents\\GitHub\\GuideForge"

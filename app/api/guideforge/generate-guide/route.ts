@@ -17,6 +17,10 @@ import {
   GENERATION_TEMPERATURE,
   MAX_GENERATION_TOKENS,
 } from "@/lib/guideforge/ai-generation-config"
+import {
+  resolveGuideGenerationProfile,
+  renderProfileForPrompt,
+} from "@/lib/guideforge/guide-generation-profiles"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -183,8 +187,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       targetHubId?: string
       networkId?: string
       networkName?: string
+      /** UI registry id OR DB NetworkType — both accepted by the profile resolver. */
+      networkType?: string
       targetCollectionId?: string
       forgeRuleContext?: string
+      hubName?: string
+      collectionName?: string
     }
     try {
       intake = await req.json()
@@ -230,6 +238,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       )
     }
 
+    // ── Resolve domain profile (proposal-only; never blocks generation) ────
+    const profile = resolveGuideGenerationProfile({
+      networkType: intake.networkType,
+      guideType: intake.guideType,
+      prompt: intake.prompt,
+      hubName: intake.hubName,
+      collectionName: intake.collectionName,
+    })
+    const profileInstructions =
+      profile.id === "general" ? undefined : renderProfileForPrompt(profile)
+
     // ── Build prompt ────────────────────────────────────────────────────────
     const systemPrompt = buildNetworkGuidePrompt({
       prompt: intake.prompt,
@@ -238,6 +257,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       networkName: intake.networkName,
       targetHubId: intake.targetHubId,
       forgeRuleContext: intake.forgeRuleContext,
+      profileInstructions,
     })
 
     const messages = [

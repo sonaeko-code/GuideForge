@@ -257,15 +257,32 @@ async function generateNetworkGuide(
     const guideType: string = ac?.guideType ?? fdStr("guideType", "tutorial")
     const difficulty: string = ac?.difficulty ?? fdStr("preferredDifficulty", "intermediate")
 
+    // Resolve a domain profile so mock + AI generation match the network's
+    // domain (gaming → QuestLine-style, tech_repair → Techsperts-style, etc.).
+    // Profile is purely guidance — never blocks generation and never publishes.
+    const { resolveGuideGenerationProfile } = await import("./guide-generation-profiles")
+    const profile = resolveGuideGenerationProfile({
+      networkType: nc?.networkType,
+      guideType,
+      prompt: request.prompt,
+      hubName: nc?.hubName,
+      collectionName: nc?.collectionName,
+    })
+
     if (request.mode === "mock") {
       const { generateMockResponse } = await import("./mock-generator")
-      const result = generateMockResponse({
-        prompt: request.prompt,
-        guideType: guideType as any,
-        preferredDifficulty: difficulty as any,
-        targetHubId,
-        targetCollectionId,
-      })
+      const result = generateMockResponse(
+        {
+          prompt: request.prompt,
+          guideType: guideType as any,
+          preferredDifficulty: difficulty as any,
+          targetHubId,
+          targetCollectionId,
+        },
+        // Only pass profile when it materially differs from generic so the
+        // existing gaming mock templates still drive gaming-specific layouts.
+        profile.id !== "general" ? profile : undefined,
+      )
       if (!result.success) {
         return {
           kind: "network_guide",
@@ -308,6 +325,9 @@ async function generateNetworkGuide(
           targetHubId,
           networkId: nc?.networkId,
           networkName: nc?.networkName,
+          networkType: nc?.networkType,
+          hubName: nc?.hubName,
+          collectionName: nc?.collectionName,
           targetCollectionId,
           forgeRuleContext: request.rules?.forgeRules?.join("\n"),
         }),
@@ -724,8 +744,12 @@ export function toNetworkGuideBuilderRequest(opts: {
   mode: "mock" | "ai"
   networkId: string
   networkName: string
+  /** UI registry id OR DB NetworkType — drives the domain generation profile. */
+  networkType?: string
   hubId: string
+  hubName?: string
   collectionId: string
+  collectionName?: string
   guideType?: string
   difficulty?: string
   forgeRules?: string[]
@@ -737,8 +761,11 @@ export function toNetworkGuideBuilderRequest(opts: {
     networkContext: {
       networkId: opts.networkId,
       networkName: opts.networkName,
+      networkType: opts.networkType,
       hubId: opts.hubId,
+      hubName: opts.hubName,
       collectionId: opts.collectionId,
+      collectionName: opts.collectionName,
     },
     assetContext: {
       guideType: opts.guideType,

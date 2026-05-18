@@ -679,7 +679,8 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
     gaming: {
       "survival": "Survival Mechanics",
       "crafting": "Crafting & Materials",
-      "pvp": "PvP & Combat",
+      "pvp": "PvP / Competitive",
+      "competitive": "PvP / Competitive",
       "pve": "PvE & Combat",
       "build": "Builds & Loadouts",
       "builds": "Builds & Loadouts",
@@ -689,9 +690,11 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
       "raid": "Boss Guides",
       "patch": "Patch Notes",
       "beginner": "Beginner Guides",
+      "tutorial": "Beginner Guides",
       "progression": "Progression Guides",
       "economy": "Economy & Trading",
-      "farming": "Farming & Resources",
+      "gear": "Gear & Farming",
+      "farming": "Gear & Farming",
       "multiplayer": "Multiplayer & Co-op",
       "lore": "Lore & World Building",
       "quest": "Quests & Missions",
@@ -703,11 +706,28 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
     tech_repair: {
       "diagnostic": "Diagnostics & Testing",
       "diagnostics": "Diagnostics & Testing",
+      "triage": "Diagnostics & Testing",
       "safety": "Safety Procedures",
       "tools": "Tools & Equipment",
+      "tool": "Tools & Equipment",
       "troubleshoot": "Troubleshooting",
+      "troubleshooting": "Troubleshooting",
       "maintenance": "Preventive Maintenance",
       "installation": "Installation Guides",
+      // Device-specific terms collapse into a shared "Common Device Issues" hub.
+      "phone": "Common Device Issues",
+      "computer": "Common Device Issues",
+      "wifi": "Common Device Issues",
+      "wi-fi": "Common Device Issues",
+      "printer": "Common Device Issues",
+      "device": "Common Device Issues",
+      // Step-by-step / checklist terms map to a Repair Walkthroughs hub.
+      "step-by-step": "Repair Walkthroughs",
+      "walkthrough": "Repair Walkthroughs",
+      "checklist": "Repair Walkthroughs",
+      // Escalation / support-handoff hub.
+      "escalation": "Escalation & Support",
+      "support": "Escalation & Support",
     },
     home_systems: {
       "routine": "Family Routines",
@@ -731,7 +751,12 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
       "household": "Family Routines",
       "kids": "Family Routines",
       "children": "Family Routines",
+      "school": "Family Routines",
       "family": "Family Routines",
+      "meal": "Meal Planning",
+      "meal planning": "Meal Planning",
+      "budget": "Budgeting & Finances",
+      "budgeting": "Budgeting & Finances",
       // Note: "build" is intentionally NOT mapped to prevent leakage of gaming hubs
     },
     small_business: {
@@ -742,6 +767,16 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
       "curriculum": "Core Curriculum",
       "launch": "Launch Checklist",
       "client": "Client Onboarding",
+      "intake": "Customer Support",
+      "customer support": "Customer Support",
+      "support": "Customer Support",
+      "sales": "Sales & Follow-Up",
+      "quality": "Quality Control",
+      "quality check": "Quality Control",
+      "quality control": "Quality Control",
+      "escalation": "Escalation & Issues",
+      "operations": "Daily Operations",
+      "daily operations": "Daily Operations",
     },
     restaurant_training: {
       "onboarding": "Onboarding",
@@ -760,8 +795,15 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
       "content": "Content Planning",
       "production": "Production Workflow",
       "publish": "Publishing",
+      "publishing": "Publishing",
+      "upload": "Publishing",
       "analytics": "Analytics & Growth",
       "resource": "Resources",
+      "discord": "Community Management",
+      "community management": "Community Management",
+      "community": "Community Management",
+      "sponsorship": "Brand & Sponsorships",
+      "brand": "Brand & Sponsorships",
     },
     personal_knowledge: {
       "planning": "Daily Planning",
@@ -785,15 +827,18 @@ function generateHubSuggestions(type: string, idea: string, words: string[]): st
     }
   }
 
-  // Fallback defaults per type (keyed by registry id)
+  // Fallback defaults per type (keyed by registry id). Tuned to match the
+  // domain template specs in docs/GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md and
+  // docs/GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md while staying generic enough to
+  // serve unrelated networks of the same type.
   const defaults: Record<string, string[]> = {
-    gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Community Highlights"],
-    tech_repair: ["Diagnostics & Testing", "Safety Procedures", "Tools & Equipment", "Troubleshooting", "Preventive Maintenance"],
-    home_systems: ["Family Routines", "Medications & Health", "Emergency & Safety", "Seasonal Maintenance", "Baby & Infant Care"],
-    small_business: ["Launch Checklist", "Client Onboarding", "Daily Operations", "Compliance & Policies", "Team Resources"],
+    gaming: ["Beginner Guides", "Builds & Loadouts", "Boss Guides", "Patch Notes", "Gear & Farming"],
+    tech_repair: ["Safety Procedures", "Diagnostics & Testing", "Common Device Issues", "Tools & Equipment", "Repair Walkthroughs"],
+    home_systems: ["Family Routines", "Meal Planning", "Emergency & Safety", "Seasonal Maintenance", "Home Systems"],
+    small_business: ["Onboarding", "Daily Operations", "Customer Support", "Quality Control", "Escalation & Issues"],
     restaurant_training: ["Onboarding", "Daily Operations", "Food Safety", "Compliance & Policies", "Team Resources"],
     wellness_training: ["Programs", "Nutrition", "Habits & Mindset", "Assessments & Quizzes", "Resources"],
-    creator_workflow: ["Content Planning", "Production Workflow", "Publishing", "Analytics & Growth", "Resources"],
+    creator_workflow: ["Content Planning", "Publishing", "Community Management", "Analytics & Growth", "Brand & Sponsorships"],
     personal_knowledge: ["Daily Planning", "Projects", "Learning & Goals", "Resources", "Reviews & Reflections"],
     general: ["Getting Started", "Best Practices", "Community Highlights", "Resources", "Troubleshooting"],
   }
@@ -919,6 +964,77 @@ const HUB_TO_COLLECTIONS: Record<string, SmartFillCollectionSuggestion[]> = {
   "Installation Guides": [
     { name: "First-Time Install", slug: "first-time-install", description: "Out-of-box setup." },
     { name: "Replacement Install", slug: "replacement-install", description: "Swapping an existing unit." },
+  ],
+  "Common Device Issues": [
+    { name: "Phone Repair", slug: "phone-repair", description: "Common phone issues and fixes." },
+    { name: "Computer Troubleshooting", slug: "computer-troubleshooting", description: "Desktop and laptop diagnosis paths." },
+    { name: "Wi-Fi & Network Issues", slug: "wifi-network-issues", description: "Connectivity, signal, and router problems." },
+    { name: "Printer Problems", slug: "printer-problems", description: "Print queue, drivers, and hardware issues." },
+  ],
+  "Repair Walkthroughs": [
+    { name: "Step-by-Step Repair Checklists", slug: "step-by-step-repair-checklists", description: "Reusable structured repair checklists." },
+    { name: "Common Fixes", slug: "common-fixes", description: "Most-followed repair walkthroughs." },
+  ],
+  "Escalation & Support": [
+    { name: "When to Escalate", slug: "when-to-escalate", description: "Decision points for handing off." },
+    { name: "Support Contacts", slug: "support-contacts", description: "Vendor and senior-tech contact reference." },
+  ],
+
+  // Gaming — additional hubs
+  "Gear & Farming": [
+    { name: "Gear Priority", slug: "gear-priority", description: "What gear to chase first at each tier." },
+    { name: "Farming Routes", slug: "farming-routes", description: "Efficient routes for resources and drops." },
+  ],
+  "PvP / Competitive": [
+    { name: "PvP Basics", slug: "pvp-basics", description: "Fundamentals new competitive players need." },
+    { name: "Competitive Strategy", slug: "competitive-strategy", description: "Loadouts, positioning, and meta reads." },
+  ],
+
+  // Creator / Community — additional hubs
+  "Publishing": [
+    { name: "Upload Checklist", slug: "upload-checklist", description: "QA before publishing each piece of content." },
+    { name: "Promotion Workflow", slug: "promotion-workflow", description: "What to share, where, and when after release." },
+  ],
+  "Community Management": [
+    { name: "Discord Setup", slug: "discord-setup", description: "Channel structure, roles, and onboarding." },
+    { name: "Moderation Playbook", slug: "moderation-playbook", description: "Rules, warnings, and escalation steps." },
+  ],
+  "Brand & Sponsorships": [
+    { name: "Sponsorship Readiness", slug: "sponsorship-readiness", description: "Media kit, rates, and outreach templates." },
+    { name: "Brand Style Guide", slug: "brand-style-guide", description: "Voice, palette, and visual standards." },
+  ],
+
+  // SOP / small_business — additional hubs
+  "Customer Support": [
+    { name: "Standard Intake", slug: "standard-intake", description: "How every new customer is received." },
+    { name: "Issue Handling", slug: "issue-handling", description: "Repeatable steps to resolve support tickets." },
+  ],
+  "Quality Control": [
+    { name: "Quality Reviews", slug: "quality-reviews", description: "Periodic checks against defined standards." },
+    { name: "Issue Logging", slug: "issue-logging", description: "Capturing defects and improvement opportunities." },
+  ],
+  "Escalation & Issues": [
+    { name: "Escalation Procedure", slug: "escalation-procedure", description: "When to escalate and to whom." },
+    { name: "Incident Reporting", slug: "incident-reporting", description: "Documenting incidents for review." },
+  ],
+  "Sales & Follow-Up": [
+    { name: "Discovery & Follow-Up", slug: "discovery-follow-up", description: "Discovery, proposal, and follow-up cadence." },
+    { name: "Lead Handoff", slug: "lead-handoff", description: "Handoff from sales to delivery." },
+  ],
+  "Daily Operations": [
+    { name: "Opening Procedures", slug: "opening-procedures", description: "Standard start-of-day checklist." },
+    { name: "Closing Procedures", slug: "closing-procedures", description: "Standard end-of-day checklist." },
+  ],
+
+  // Home / Family — additional hubs
+  "Meal Planning": [
+    { name: "Weekly Menus", slug: "weekly-menus", description: "Rotating weekly meal plans." },
+    { name: "Grocery Lists", slug: "grocery-lists", description: "Reusable shopping lists by menu." },
+    { name: "Family Favorites", slug: "family-favorites", description: "Recipes the household reliably enjoys." },
+  ],
+  "Budgeting & Finances": [
+    { name: "Monthly Budget", slug: "monthly-budget", description: "Income, expenses, and savings tracking." },
+    { name: "Bills & Subscriptions", slug: "bills-subscriptions", description: "Recurring bills, due dates, and renewals." },
   ],
 
   // Training / SOP
@@ -1120,6 +1236,55 @@ const COLLECTION_GUIDE_IDEAS: Record<string, StarterGuideIdea> = {
   "Intro Workflow": { title: "First Client Intake Workflow", summary: "Discovery call, contract, deposit, and kickoff SOP.", guideType: "sop", difficulty: "beginner" },
   "Contracts & Billing": { title: "Service Contract & Invoice Guide", summary: "What to include in service contracts and how to send invoices.", guideType: "guide", difficulty: "beginner" },
   "Daily Workflows": { title: "Daily Operations Workflow", summary: "The repeatable day-to-day process for delivering your service.", guideType: "sop", difficulty: "beginner" },
+
+  // Tech repair — common device issues
+  "Phone Repair": { title: "Phone Repair Quick Reference", summary: "Common phone failures with the safest first-pass fix paths.", guideType: "troubleshooting", difficulty: "intermediate" },
+  "Computer Troubleshooting": { title: "Computer Troubleshooting Decision Tree", summary: "A triage flow that narrows down hardware vs software issues fast.", guideType: "troubleshooting", difficulty: "intermediate" },
+  "Wi-Fi & Network Issues": { title: "Wi-Fi Troubleshooting Starter Guide", summary: "Step-by-step diagnosis from device to router to ISP.", guideType: "troubleshooting", difficulty: "beginner" },
+  "Printer Problems": { title: "Printer Troubleshooting Checklist", summary: "Driver, queue, and physical fixes for the most reported printer issues.", guideType: "troubleshooting", difficulty: "beginner" },
+  "Step-by-Step Repair Checklists": { title: "Repair Checklist Template", summary: "A reusable structure for any repair: triage, fix, verify, document.", guideType: "sop", difficulty: "beginner" },
+  "Common Fixes": { title: "Top 10 Common Fixes Reference", summary: "The most-followed repair walkthroughs for the highest-volume issues.", guideType: "reference", difficulty: "intermediate" },
+  "When to Escalate": { title: "Escalation Decision Guide", summary: "Clear thresholds for when a home user or junior tech should hand off.", guideType: "guide", difficulty: "beginner" },
+  "Support Contacts": { title: "Support & Vendor Contact Reference", summary: "Vendor support lines, senior technician contacts, and warranty info.", guideType: "reference", difficulty: "beginner" },
+  "Required Tools": { title: "Required Tools Overview", summary: "Minimum kit every home user or junior tech should have on hand.", guideType: "reference", difficulty: "beginner" },
+  "Specialty Tools": { title: "Specialty Tools Reference", summary: "Job-specific tools and when each is actually needed.", guideType: "reference", difficulty: "intermediate" },
+  "Initial Triage": { title: "Initial Triage Checklist", summary: "First questions and quick tests before any deep diagnosis.", guideType: "troubleshooting", difficulty: "beginner" },
+  "Common Issues": { title: "Common Issues Quick Reference", summary: "The 10 most-reported problems and their first-pass fixes.", guideType: "troubleshooting", difficulty: "intermediate" },
+
+  // Tech repair — safety / tooling specifics (override the existing generic match in Safety Procedures)
+  "Electrical Safety": { title: "Electrical Safety Procedures", summary: "Mandatory safety checks before any electrical work.", guideType: "sop", difficulty: "beginner" },
+  "PPE & Workspace": { title: "PPE & Workspace Setup Guide", summary: "Personal protective equipment and a safe workspace layout.", guideType: "guide", difficulty: "beginner" },
+
+  // Gaming — gear/farming and PvP
+  "Gear Priority": { title: "Gear Priority Guide for Fresh Max-Level Characters", summary: "What slots to upgrade first and which stats actually matter.", guideType: "guide", difficulty: "intermediate" },
+  "Farming Routes": { title: "Efficient Farming Routes", summary: "High-yield routes ordered by reward per minute.", guideType: "guide", difficulty: "intermediate" },
+  "PvP Basics": { title: "PvP Basics for New Competitive Players", summary: "Core mechanics, common matchups, and first-week priorities.", guideType: "guide", difficulty: "beginner" },
+  "Competitive Strategy": { title: "Competitive Strategy Primer", summary: "Loadouts, positioning, and the most current meta reads.", guideType: "guide", difficulty: "intermediate" },
+
+  // Creator / community
+  "Discord Setup": { title: "Discord Community Setup Guide", summary: "Channel structure, roles, onboarding, and basic moderation.", guideType: "guide", difficulty: "beginner" },
+  "Moderation Playbook": { title: "Community Moderation Playbook", summary: "Rules, warnings, time-outs, and clear escalation paths.", guideType: "sop", difficulty: "beginner" },
+  "Sponsorship Readiness": { title: "Sponsorship Readiness Checklist", summary: "Media kit, rate card, audience snapshot, and outreach scripts.", guideType: "sop", difficulty: "beginner" },
+  "Brand Style Guide": { title: "Brand Style Guide", summary: "Voice, color palette, typography, and visual standards in one place.", guideType: "reference", difficulty: "beginner" },
+  // Note: "Promotion Workflow" / "Opening Procedures" / "Closing Procedures"
+  // already have entries earlier in this map and are reused as-is.
+
+  // SOP / small business
+  "Standard Intake": { title: "Standard Customer Intake SOP", summary: "The repeatable steps for every new customer engagement.", guideType: "sop", difficulty: "beginner" },
+  "Issue Handling": { title: "Customer Issue Handling SOP", summary: "Triage, resolve, document — the standard customer issue flow.", guideType: "sop", difficulty: "beginner" },
+  "Quality Reviews": { title: "Quality Review Checklist", summary: "Periodic checks against the standards your team has agreed on.", guideType: "sop", difficulty: "intermediate" },
+  "Issue Logging": { title: "Issue Logging Procedure", summary: "How defects and improvement opportunities get captured.", guideType: "sop", difficulty: "beginner" },
+  "Escalation Procedure": { title: "Issue Escalation Procedure", summary: "Decision criteria and contacts for every escalation tier.", guideType: "sop", difficulty: "intermediate" },
+  "Incident Reporting": { title: "Incident Reporting Procedure", summary: "What to document, who to notify, and when to review.", guideType: "sop", difficulty: "intermediate" },
+  "Discovery & Follow-Up": { title: "Discovery & Follow-Up Cadence", summary: "Repeatable cadence from first contact through close.", guideType: "sop", difficulty: "beginner" },
+  "Lead Handoff": { title: "Sales → Delivery Lead Handoff SOP", summary: "Clean handoff that prevents repeat questions and dropped balls.", guideType: "sop", difficulty: "intermediate" },
+
+  // Home / Family
+  "Weekly Menus": { title: "Family Meal Planning System", summary: "A reusable weekly menu rotation tuned to the household.", guideType: "guide", difficulty: "beginner" },
+  "Grocery Lists": { title: "Reusable Grocery List Guide", summary: "Shopping lists organized by store section and weekly menu.", guideType: "reference", difficulty: "beginner" },
+  "Family Favorites": { title: "Family Favorite Recipes Reference", summary: "Tried recipes the household reliably enjoys.", guideType: "reference", difficulty: "beginner" },
+  "Monthly Budget": { title: "Monthly Family Budget Guide", summary: "Income, expense categories, savings goals, and review cadence.", guideType: "guide", difficulty: "beginner" },
+  "Bills & Subscriptions": { title: "Bills & Subscriptions Reference", summary: "Recurring bills, due dates, autopay status, and renewal reminders.", guideType: "reference", difficulty: "beginner" },
 }
 
 /**
@@ -1328,31 +1493,31 @@ const TYPE_LAUNCH_GOALS: Record<string, string> = {
 
 const TYPE_FIRST_STEPS: Record<string, string[]> = {
   gaming: [
-    "Pick your highest-traffic game or game mode and create its first hub",
-    "Write a beginner's guide — it's the entry point for most new visitors",
-    "Add a patch notes collection so returning players have a reason to come back",
-    "Create a character or build reference for the most popular competitive pick",
+    "Build a beginner path so new players know where to start",
+    "Add one high-value build guide for the most common player path",
+    "Add a boss or encounter reference before expanding advanced content",
+    "Capture a patch/gear summary so returning players have a reason to come back",
     "Invite a contributor or collaborator to review your first draft guides",
   ],
   tech_repair: [
-    "Create a hub for your most common device category or repair type",
-    "Write a troubleshooting guide for the #1 most-reported issue first",
-    "Add a parts and tools reference collection — technicians need it on every job",
-    "Document a full repair procedure for your highest-volume repair",
-    "Add a safety and warnings collection before expanding to advanced repairs",
+    "Start with safety and required tools before any repair walkthrough",
+    "Add an initial triage checklist so users diagnose before following fixes",
+    "Add common issue references for the highest-volume problems",
+    "Document a full repair walkthrough for your highest-volume device",
+    "Add an escalation guide for cases that exceed home or junior-tech scope",
   ],
   creator_workflow: [
-    "Create a hub for your primary creative medium or output format",
-    "Document your core creative process — start with the phase you know best",
-    "Add a tools and resources collection your team references frequently",
-    "Write a brand or style guide early — it anchors everything else",
-    "Create a templates collection to speed up repeatable creative work",
+    "Set up your first content calendar so planning becomes repeatable",
+    "Write an upload / publishing checklist so every release is consistent",
+    "Document community setup (Discord, comments) and the moderation playbook",
+    "Add a post-launch analytics review so you know what's actually working",
+    "Capture a brand style guide and sponsorship-readiness checklist when growth picks up",
   ],
   small_business: [
-    "Identify your highest-friction process and document it first",
-    "Create an onboarding hub — new team members need orientation before anything else",
-    "Write an SOPs collection for your most repeated tasks",
-    "Add a tools and resources hub so teams know what's available",
+    "Document intake and onboarding first — every customer touches them",
+    "Capture repeatable daily and weekly operations so the team doesn't reinvent them",
+    "Add escalation and quality-control checklists for the cases that need oversight",
+    "Add a customer-support intake SOP so issues are handled the same way every time",
     "Set your network to private until your core playbooks are reviewed and approved",
   ],
   wellness_training: [
@@ -1363,11 +1528,11 @@ const TYPE_FIRST_STEPS: Record<string, string[]> = {
     "Create a progress tracking or assessment guide so clients know how to measure results",
   ],
   home_systems: [
-    "Start with the system that fails most often or costs the most to repair",
-    "Write a seasonal maintenance checklist for your climate or home type",
-    "Add a tools and materials reference — most homeowners don't know what they need",
-    "Document a full repair procedure for the most common failure in your first hub",
-    "Create a safety guide for any work that involves electrical, gas, or structural elements",
+    "Capture the weekly chore rotation and the family routines first",
+    "Add a meal planning system so the household has a repeatable starting point",
+    "Document home maintenance for the seasonal system that fails most often",
+    "Add an emergency contact and prep checklist before extending other hubs",
+    "Capture school / kids routines if those drive most of the household calendar",
   ],
   restaurant_training: [
     "Create a hub for front-of-house and one for back-of-house — they train very differently",

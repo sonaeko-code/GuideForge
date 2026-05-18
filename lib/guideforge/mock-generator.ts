@@ -21,6 +21,7 @@ import type {
 } from "./generation-schemas"
 import type { GuideSectionKind } from "./types"
 import type { NetworkType, ThemeDirection } from "./types"
+import type { GuideGenerationProfile } from "./guide-generation-profiles"
 
 // Mock guide templates for different types
 const MOCK_TEMPLATES = {
@@ -95,23 +96,30 @@ const MOCK_SECTION_CONTENT: Record<GuideSectionKind, string> = {
  * This is what would come back from OpenAI in a real flow.
  */
 export function generateMockGuide(
-  request: GenerationRequest
+  request: GenerationRequest,
+  profile?: GuideGenerationProfile,
 ): GeneratedGuide {
   const now = new Date().toISOString()
-  const template = MOCK_TEMPLATES[request.guideType as keyof typeof MOCK_TEMPLATES]
-  const sections = template.sections
 
-  const generatedSections: GeneratedGuideSection[] = sections.map(
-    (kind, index) => ({
-      title: formatSectionTitle(kind),
-      kind,
-      body: MOCK_SECTION_CONTENT[kind],
-      callout:
-        index === 0
-          ? `This is a ${request.preferredDifficulty || template.defaultDifficulty} guide for ${request.guideType}`
-          : undefined,
-    })
-  )
+  // Resolve the default difficulty + section list. A `profile` argument
+  // overrides the gaming-leaning MOCK_TEMPLATES so tech_repair / SOP / home /
+  // creator previews use a domain-appropriate structure.
+  const template = MOCK_TEMPLATES[request.guideType as keyof typeof MOCK_TEMPLATES]
+  const fallbackDifficulty = template?.defaultDifficulty ?? "intermediate"
+
+  const generatedSections: GeneratedGuideSection[] = profile
+    ? buildProfileSections(profile, request)
+    : (template?.sections ?? ["overview", "requirements", "final-tips"] as GuideSectionKind[]).map(
+        (kind, index) => ({
+          title: formatSectionTitle(kind),
+          kind,
+          body: MOCK_SECTION_CONTENT[kind],
+          callout:
+            index === 0
+              ? `This is a ${request.preferredDifficulty || fallbackDifficulty} guide for ${request.guideType}`
+              : undefined,
+        })
+      )
 
   const title = generateTitle(request)
   const summary = generateSummary(request)
@@ -122,7 +130,7 @@ export function generateMockGuide(
     slug,
     summary,
     type: request.guideType,
-    difficulty: request.preferredDifficulty || template.defaultDifficulty,
+    difficulty: request.preferredDifficulty || fallbackDifficulty,
     estimatedMinutes: 15 + Math.floor(Math.random() * 20),
     sections: generatedSections,
     requirements:
@@ -368,14 +376,161 @@ export function generateAlternateSectionContent(kind: GuideSectionKind): string 
 }
 
 /**
+ * Section-title → safe MOCK_SECTION_CONTENT key mapping for profile-driven
+ * mock output. Profile preferred-section names like "Safety First" don't map
+ * to GuideSectionKind directly, so we pick the closest existing kind for the
+ * deterministic body text.
+ */
+const PROFILE_TITLE_TO_KIND: Record<string, GuideSectionKind> = {
+  // Tech repair
+  "safety first": "warning",
+  "symptoms": "overview",
+  "tools & requirements": "requirements",
+  "initial triage": "overview",
+  "step-by-step fix": "rotation",
+  "verify the repair": "final-tips",
+  "when to escalate": "warning",
+  "documentation notes": "final-tips",
+  // Gaming (extras beyond what MOCK_TEMPLATES covers)
+  "when to use this": "overview",
+  "requirements / setup": "requirements",
+  "step-by-step strategy": "rotation",
+  "common mistakes": "mistakes",
+  "quick reference": "final-tips",
+  "next steps": "final-tips",
+  // SOP / business
+  "purpose": "overview",
+  "when to use this sop": "overview",
+  "owner / roles": "requirements",
+  "inputs required": "requirements",
+  "procedure": "rotation",
+  "quality check": "final-tips",
+  "escalation": "warning",
+  "review cadence": "final-tips",
+  // Home / family
+  "goal": "overview",
+  "when to do this": "overview",
+  "supplies": "requirements",
+  "steps": "rotation",
+  "family roles": "requirements",
+  "troubleshooting": "mistakes",
+  "repeat schedule": "final-tips",
+  // Creator / community
+  "before you start": "requirements",
+  "workflow": "rotation",
+  "publishing checklist": "rotation",
+  "community follow-up": "final-tips",
+  "analytics review": "final-tips",
+  "reuse template": "final-tips",
+}
+
+function profileSectionKindFor(title: string): GuideSectionKind {
+  const key = title.trim().toLowerCase()
+  return PROFILE_TITLE_TO_KIND[key] ?? "custom"
+}
+
+function bodyForProfileSection(title: string, kind: GuideSectionKind, profile: GuideGenerationProfile, request: GenerationRequest): string {
+  // Domain-specific bodies for the three sections that are most safety- or
+  // structure-critical. Everything else falls back to MOCK_SECTION_CONTENT[kind]
+  // (already exists for every GuideSectionKind) so we don't regress generic
+  // sections.
+  const lowerTitle = title.toLowerCase()
+
+  if (profile.id === "tech_repair") {
+    if (lowerTitle === "safety first") {
+      return "Power down and unplug the device before opening any enclosure unless this procedure explicitly requires power. Wear PPE appropriate to the work — gloves and eye protection at minimum. Treat batteries as a hazard: do not puncture, bend, or short-circuit. If you smell burning or see swelling, stop and escalate."
+    }
+    if (lowerTitle === "initial triage") {
+      return "Capture the symptoms in the user's words and confirm what changed recently. Verify the basics first: power, cables, connectivity. Try the simplest reversible test before any disassembly. If the simple tests do not narrow the cause, follow the diagnostic decision tree before attempting a fix."
+    }
+    if (lowerTitle === "verify the repair") {
+      return "Reassemble carefully and power the device through a full boot or operational cycle. Re-test the original symptom and one related operation to make sure nothing else broke. Document what fixed it and any parts replaced so the next technician benefits from your work."
+    }
+    if (lowerTitle === "when to escalate") {
+      return "Escalate when the device shows signs of physical safety risk, when the repair requires soldering or specialty calibration you do not have, or when the user data is at risk and you are not the data-recovery owner. Provide the senior technician with the symptoms, what you tried, and what you observed."
+    }
+  }
+
+  if (profile.id === "small_business") {
+    if (lowerTitle === "purpose") {
+      return "Describe the outcome this SOP guarantees and the friction it removes. State who benefits when the procedure is followed and who is impacted when it is skipped. Keep the purpose to two short sentences so the team can recall it without looking it up."
+    }
+    if (lowerTitle === "owner / roles") {
+      return "Name the role responsible for running this procedure end-to-end. List the supporting roles (review, approval, escalation) and the conditions under which each role is engaged. Avoid naming specific people — assign by role so the SOP survives turnover."
+    }
+    if (lowerTitle === "escalation") {
+      return "Spell out the trigger conditions that move ownership up one level. Identify the receiving role and the minimum information that must accompany the escalation. Confirm the SLA the receiving role commits to."
+    }
+  }
+
+  if (profile.id === "creator_workflow") {
+    if (lowerTitle === "publishing checklist") {
+      return "Title set with the working hook. Thumbnail finalized at the platform's recommended dimensions. Description, tags, and chapters filled in. Scheduling slot selected and confirmed. End screen / cards configured. Cross-post draft prepared for at least one other platform."
+    }
+    if (lowerTitle === "community follow-up") {
+      return "Pin a welcome comment to anchor the discussion. Reply to first-hour comments to seed engagement. Share the release in the community channel (Discord, newsletter) with a single-line context message. Capture any audience questions worth answering in a follow-up."
+    }
+  }
+
+  if (profile.id === "home_systems") {
+    if (lowerTitle === "supplies") {
+      return "List everything you'll need before starting so you don't pause mid-task. Note quantities and any safe substitutions. Keep an at-home inventory note so this task does not repeatedly trigger an emergency store run."
+    }
+    if (lowerTitle === "family roles") {
+      return "Assign each step to the family member most likely to do it well. Note which steps a younger family member can safely handle. Confirm the responsible person knows the expected outcome, not just the action."
+    }
+  }
+
+  if (profile.id === "gaming") {
+    if (lowerTitle === "common mistakes") {
+      return "The first common mistake is rushing the opener before cooldowns are sequenced — slow down and stack the first three abilities deliberately. Another is over-committing defensive abilities early; hold one for the spike phase. Watch for the boss tell that telegraphs phase transitions and reposition before the cleave lands."
+    }
+    if (lowerTitle === "quick reference") {
+      return "Opener: cooldown, primary, primary, builder. Sustain: rotate primary + secondary, weave defensive on cooldown. Phase transition cue: visible tell + sound effect. Bring: consumables for primary stat. Avoid: ground hazards and the rear cleave during the second phase."
+    }
+  }
+
+  // Fall back to the existing generic content keyed by section kind.
+  return MOCK_SECTION_CONTENT[kind]
+}
+
+/**
+ * Build mock sections from a profile's preferred section list. Used when a
+ * `profile` is provided to `generateMockResponse` so the mock preview matches
+ * the network's domain (e.g. tech_repair → Safety First / Symptoms / …).
+ */
+function buildProfileSections(
+  profile: GuideGenerationProfile,
+  request: GenerationRequest,
+): GeneratedGuideSection[] {
+  return profile.preferredSections.map((title, index) => {
+    const kind = profileSectionKindFor(title)
+    return {
+      title,
+      kind,
+      body: bodyForProfileSection(title, kind, profile, request),
+      callout:
+        index === 0
+          ? `${profile.label} — ${request.preferredDifficulty || "intermediate"} difficulty`
+          : undefined,
+    }
+  })
+}
+
+/**
  * Simulate the full generation flow.
  * Returns a GenerationResponse that the UI can display.
+ *
+ * When `profile` is provided, the mock output uses the profile's preferred
+ * section structure instead of the gaming-leaning `MOCK_TEMPLATES`. This makes
+ * Mock Preview useful for tech-repair / SOP / home / creator networks.
  */
 export function generateMockResponse(
-  request: GenerationRequest
+  request: GenerationRequest,
+  profile?: GuideGenerationProfile,
 ): GenerationResponse {
   try {
-    const guide = generateMockGuide(request)
+    const guide = generateMockGuide(request, profile)
     return {
       guide,
       success: true,

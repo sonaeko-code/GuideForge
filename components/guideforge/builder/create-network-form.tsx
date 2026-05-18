@@ -781,14 +781,24 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 </div>
               </div>
               {smartFillSummary && (
-                <p className="text-xs text-green-700 dark:text-green-400 leading-snug">
-                  Filled locally (no AI): {smartFillSummary}
-                </p>
+                <div className="text-xs text-green-700 dark:text-green-400 leading-snug space-y-0.5">
+                  <p>Filled locally (no AI): {smartFillSummary}</p>
+                  {getRegistryTypeById(typeId)?.label && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Template: {getRegistryTypeById(typeId)?.label}
+                    </p>
+                  )}
+                </div>
               )}
               {aiScaffoldSummary && (
-                <p className="text-xs text-blue-700 dark:text-blue-400 leading-snug">
-                  AI drafted: {aiScaffoldSummary} — review before saving
-                </p>
+                <div className="text-xs text-blue-700 dark:text-blue-400 leading-snug space-y-0.5">
+                  <p>AI drafted: {aiScaffoldSummary} — review before saving</p>
+                  {getRegistryTypeById(typeId)?.label && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Template: {getRegistryTypeById(typeId)?.label}
+                    </p>
+                  )}
+                </div>
               )}
               {aiScaffoldError && (
                 <div className="text-xs text-red-700 dark:text-red-400 leading-snug space-y-1">

@@ -159,6 +159,9 @@ The following surfaces are implemented (with the caveats noted below):
 - **Step 6 is now active.**
 - Manual test findings are tracked in [`GUIDEFORGE_TEST_FINDINGS.md`](./GUIDEFORGE_TEST_FINDINGS.md).
 - New feature work should **pause** until P0/P1 findings are resolved.
+- Starter Guide Creation Pipeline upgrade: launch-plan handoff into the Network Guide Generator now carries network name / type / goal / reason and renders a "Creating from Launch Plan" context card. Started-this-session UX marker added (session-only). Durable planning persistence remains future Step 7.
+- Domain-aware scaffold templates added for gaming, tech repair, SOP/business, home/family, and creator/community networks. Quick Fill + AI Draft Scaffold share the same domain registry; per-type hub defaults, collection seeds, and starter guide ideas; AI route adds a compact per-domain shape hint. Templates remain proposal-only and editable.
+- Domain-aware guide generation profiles added on top of scaffold templates. The Network Guide Generator now resolves a profile from networkType / guideType / prompt / hub / collection and injects domain-appropriate guidance (tone, must-include, preferred sections, safety notes) into both Mock Preview and the AI prompt — Techsperts-style tech repair guides are safety-first / diagnosis-first / escalation-aware; QuestLine-style gaming guides include "When to Use This / Common Mistakes / Quick Reference"; SOP / home / creator profiles enforce their own structure. Profile guidance is proposal-only; no auto-generate, no auto-publish. Durable planning / bulk generation remains future Step 7.
 
 ---
 

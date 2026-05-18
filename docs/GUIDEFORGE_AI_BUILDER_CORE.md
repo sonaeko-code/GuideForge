@@ -102,6 +102,8 @@ generateGuideForgeDraft({
 - Fill: **Quick Fill** → `smartFillNetwork()` (heuristic, instant, no AI call) — or **AI Draft Scaffold** → `generateGuideForgeDraft({ kind: "network_scaffold", mode: "ai" })` → `POST /api/guideforge/generate-network-scaffold`
 - Scaffold: `SmartFillScaffoldSuggestion` with hubs, collections, and `starterGuideIdeas` (proposal-only). AI output is adapted via `aiScaffoldToSmartFillSuggestion()` + `aiScaffoldToSmartFillResult()` before being passed to the same `scaffoldDraftFromSmartFill()` / `generateNetworkBuildPlan()` helpers used by Quick Fill.
 - AI endpoint: returns `GeneratedNetworkScaffold` (name, description, type, theme, hubs with collections and starterGuideIdeas). Provider: openai via `resolveGuideForgeProviderRoute({ mode: "ai", task: "network_scaffold" })`.
+- Domain scaffold templates: both Quick Fill (`smartFillNetwork()`) and AI Draft Scaffold use the same domain template registry (`NETWORK_TYPE_REGISTRY` in `network-types.ts`) for keyword detection, `typeSpecificKeywordToHub` + per-type `defaults` (in `smart-fill-network.ts`) for hub selection, and `HUB_TO_COLLECTIONS` + `COLLECTION_GUIDE_IDEAS` for collection / starter-guide shapes. The AI route adds a compact per-domain shape hint to the prompt (`DOMAIN_SHAPE_HINTS`) when the requested type is recognized. Currently covered: gaming (QuestLine-style), tech_repair (Techsperts-style), small_business (SOP), home_systems (home/family), creator_workflow (creator/community). All templates are proposal-only and fully editable in the Starter Pages step.
+- Domain-aware guide generation profiles: `lib/guideforge/guide-generation-profiles.ts` resolves a `GuideGenerationProfile` from networkType + guideType + prompt + hub/collection (precedence: networkType → keyword detection → `general`). Profiles cover gaming (QuestLine-style), tech_repair (Techsperts-style), small_business (SOP), home_systems (home/family), creator_workflow (creator/community), and `general`. The profile drives: (a) a compact instruction block appended to the AI prompt via `buildNetworkGuidePrompt` (tone, must-include, avoid, preferred sections, safety notes); (b) Mock Preview section structure — `generateMockResponse(request, profile?)` swaps the gaming-leaning `MOCK_TEMPLATES` for the profile's preferred sections when the resolver returns a non-general domain. The generator UI shows a `Generation profile: …` line in the Launch Plan context card. Profile guidance is proposal-only: nothing is auto-generated, nothing is auto-published, nothing is saved until the user chooses Send to Editor.
 - AI response handling (route-side hardening):
   - `extractJsonObject()` strips markdown fences and leading prose before `JSON.parse`. Raw provider output is never returned to the UI.
   - `normalizeNetworkScaffold()` enforces safe limits regardless of model output: 5 hubs max, 3 collections per hub, 1 starter idea per collection, 8 starter ideas total. Hub names + collection-within-hub names are de-duplicated by appending " (2)", " (3)", … . Visibility is always forced to `"private"` (scaffold creation is proposal-only).
@@ -199,9 +201,12 @@ Starter guide ideas are scaffold suggestions shown during network creation. They
 2. It re-runs `smartFillNetwork(draft.roughIdea)` to re-derive the scaffold's `starterGuideIdeas`.
 3. Top 6 ideas are written to sessionStorage via `writeNetworkStarterIdeas(networkId, ideas)`.
 4. The network dashboard (`NetworkDashboardTabs`) reads these ideas on mount and shows a **Suggested starter guides** panel.
-5. User clicks **Create from idea** → the selected idea is written as a `StarterGuideIdeaHandoff` via `writeStarterGuideHandoff(networkId, handoff)`, then router navigates to the generator.
-6. The generator reads the handoff on mount via `readStarterGuideHandoff(networkId)`, clears it, and prefills: prompt, guide type, difficulty, hub (matched by name), collection (matched by name).
-7. No content is auto-generated. The user reviews all fields before clicking Generate.
+5. User clicks **Create from idea** (suggested starter ideas panel) or **Create draft** (launch-plan "Starter build queue") → the selected idea is written as a `StarterGuideIdeaHandoff` via `writeStarterGuideHandoff(networkId, handoff)`, then router navigates to the generator.
+6. The handoff prompt is built via `buildStarterGuideHandoffPrompt()`, which produces a richer, domain-generic prompt that includes the network name + type, hub + collection placement, guide type/difficulty, and (for launch-plan handoffs) the launch goal + priority reason. The prompt always ends with "Do not publish automatically."
+7. The handoff payload carries `source: "starter_guide_idea"` (suggested panel) or `source: "launch_plan_priority_guide"` (launch-plan queue). The generator reads + clears the handoff on mount, prefills prompt/guideType/difficulty/hub/collection, and renders a **"Creating from Launch Plan" / "Creating from Starter Guide Idea"** context card above the prompt with placement and a "Review before generating. Nothing is saved until you send to editor." note.
+8. Source is forwarded into AI Builder Core via `_source` in `formData` (one of `manual_prompt | starter_guide_idea | launch_plan_priority_guide`).
+9. No content is auto-generated. The user reviews all fields before clicking Generate. Mock Preview and AI Generate remain explicit user actions.
+10. The dashboard tracks a session-only "Started in this session" marker per network using `addStartedGuideTitle` / `getStartedGuideTitles` (sessionStorage key `guideforge:startedGuideTitles:{networkId}`, keyed by lowercased idea title). Never written to Supabase; cleared on tab close.
 
 ### Storage Keys
 
@@ -209,6 +214,7 @@ Starter guide ideas are scaffold suggestions shown during network creation. They
 |-----|----------|
 | `guideforge:starterGuideIdeas:{networkId}` | `NetworkStarterIdeas` — list of ideas for the panel |
 | `guideforge:starterGuideHandoff:{networkId}` | `StarterGuideIdeaHandoff` — single selected idea for the generator |
+| `guideforge:startedGuideTitles:{networkId}` | `string[]` — lowercased titles the user has clicked Create on this session (UX hint only) |
 
 ### Session-Only Guarantees
 
@@ -290,6 +296,7 @@ Higher-level product / planning / testing context lives in:
 - [`GUIDEFORGE_FULL_TEST_PLAN.md`](./GUIDEFORGE_FULL_TEST_PLAN.md) — manual test plan to run after the TypeScript-clean milestone.
 - [`GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md`](./GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md) — how GuideForge patterns can power Techsperts without replacing it.
 - [`GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md`](./GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md) — productized gaming network template.
+- [`GUIDEFORGE_OVERNIGHT_HANDOFF.md`](./GUIDEFORGE_OVERNIGHT_HANDOFF.md) — handoff after the recent build session: what changed, retest priority, deferred work, continuation prompt.
 
 This file (AI Builder Core) is the **architecture / contract** doc. The four files above are the
 **product / process** docs. Both layers should agree before any new generation flow is built.
