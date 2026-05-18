@@ -25,6 +25,13 @@ import { resolveDbType } from "./network-types"
 const DEV_PROFILE_ID = "550e8400-e29b-41d4-a716-446655440000"
 
 /**
+ * When false, suppresses verbose [v0] payload/result logs from hub/collection/
+ * network normalization paths. Real errors (console.error) are still logged.
+ * Flip to true locally when debugging a network/scaffold save regression.
+ */
+const DEBUG_NETWORK_SAVE = false
+
+/**
  * Get the current user/profile ID
  */
 async function getCurrentProfileId(): Promise<string> {
@@ -155,12 +162,12 @@ async function normalizeNetworkIdForSupabase(networkId: string): Promise<string 
     return null
   }
 
-  console.log("[v0] Original networkId:", networkId)
+  if (DEBUG_NETWORK_SAVE) console.log("[v0] Original networkId:", networkId)
 
   // If it's already a UUID, return it
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (uuidRegex.test(networkId)) {
-    console.log("[v0] networkId is already UUID:", networkId)
+    if (DEBUG_NETWORK_SAVE) console.log("[v0] networkId is already UUID:", networkId)
     return networkId
   }
 
@@ -596,7 +603,7 @@ export async function createHub(
   }
 
   try {
-    console.log("[v0] Create hub route networkId:", networkId)
+    if (DEBUG_NETWORK_SAVE) console.log("[v0] Create hub route networkId:", networkId)
 
     // Normalize networkId to real UUID
     const normalizedNetworkId = await normalizeNetworkIdForSupabase(networkId)
@@ -606,10 +613,8 @@ export async function createHub(
       return { hub: {} as Hub, source: "supabase", error }
     }
 
-    console.log("[v0] Resolved hub network UUID:", normalizedNetworkId)
+    if (DEBUG_NETWORK_SAVE) console.log("[v0] Resolved hub network UUID:", normalizedNetworkId)
 
-    const profileId = await getCurrentProfileId()
-    
     // Only include schema-supported fields
     const hubData = {
       network_id: normalizedNetworkId,
@@ -621,7 +626,7 @@ export async function createHub(
       updated_at: new Date().toISOString(),
     }
 
-    console.log("[v0] Hub save payload:", hubData)
+    if (DEBUG_NETWORK_SAVE) console.log("[v0] Hub save payload:", hubData)
 
     const { data, error } = await supabase
       .from("hubs")
@@ -634,22 +639,13 @@ export async function createHub(
       return { hub: {} as Hub, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Hub save result:", data)
+    if (DEBUG_NETWORK_SAVE) console.log("[v0] Hub save result:", data)
 
-    // Update network's hubIds if supported
-    const { data: network, error: networkError } = await supabase
-      .from("networks")
-      .select("hub_ids")
-      .eq("id", normalizedNetworkId)
-      .single()
-
-    if (network && !networkError) {
-      const hubIds = Array.isArray(network.hub_ids) ? network.hub_ids : []
-      await supabase
-        .from("networks")
-        .update({ hub_ids: [...hubIds, data.id] })
-        .eq("id", normalizedNetworkId)
-    }
+    // NOTE: Previously this function also wrote to networks.hub_ids[] after the
+    // hub insert succeeded. That column does not exist in the live Supabase
+    // schema — the legacy write produced repeated PostgREST 400 errors in the
+    // console during scaffold creation. Hubs are looked up via the hubs.network_id
+    // foreign key (see getHubsByNetworkId), so the array was redundant. Removed.
 
     return { hub: data as Hub, source: "supabase" }
   } catch (err) {
@@ -806,8 +802,10 @@ export async function createCollection(
       updated_at: new Date().toISOString(),
     }
 
-    console.log("[v0] Collection selected hub:", hubId)
-    console.log("[v0] Collection save payload:", collectionData)
+    if (DEBUG_NETWORK_SAVE) {
+      console.log("[v0] Collection selected hub:", hubId)
+      console.log("[v0] Collection save payload:", collectionData)
+    }
 
     const { data, error } = await supabase
       .from("collections")
@@ -820,7 +818,7 @@ export async function createCollection(
       return { collection: {} as Collection, source: "supabase", error: error.message }
     }
 
-    console.log("[v0] Collection save result:", data.id)
+    if (DEBUG_NETWORK_SAVE) console.log("[v0] Collection save result:", data.id)
     return { collection: data as Collection, source: "supabase" }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"

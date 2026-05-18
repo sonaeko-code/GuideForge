@@ -353,6 +353,14 @@ export function StarterPagesEditor() {
 
       {/* Hubs list */}
       <div className="flex flex-col gap-3">
+        {hubs.length === 0 && (
+          <Card className="border-dashed border-border/50 p-6 text-center">
+            <p className="text-sm font-medium text-foreground">No hubs yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Add your first hub to start organizing your network. You can rename and add collections to it afterward.
+            </p>
+          </Card>
+        )}
         {hubs.map((hub, hubIdx) => {
           const isOpen = openHubIds.has(hub.clientId)
           return (

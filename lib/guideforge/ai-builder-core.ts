@@ -666,7 +666,7 @@ async function generateNetworkScaffold(
       } else if (fetchResponse.status === 429) {
         errorMsg = "Rate limit reached. Please wait a moment and try again."
       } else if (fetchResponse.status === 504) {
-        errorMsg = "AI scaffold generation timed out. Try a shorter prompt."
+        errorMsg = "AI scaffold took too long. Your prompt is still saved — use Quick Fill or try AI Draft again."
       }
       return {
         kind: "network_scaffold",

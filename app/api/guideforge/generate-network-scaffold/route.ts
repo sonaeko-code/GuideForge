@@ -16,11 +16,15 @@ import { resolveGuideForgeProviderRoute, normalizeGuideForgeAIError } from "@/li
 import { DEFAULT_NETWORK_GUIDE_MODEL, GENERATION_TEMPERATURE } from "@/lib/guideforge/ai-generation-config"
 
 export const runtime = "nodejs"
-export const maxDuration = 45
+// Modest bump from 45 → 60 to absorb longer OpenAI tail latencies on multi-hub
+// scaffold prompts. OpenAI call timeout still fires earlier than the route cap.
+export const maxDuration = 60
 
-const OPENAI_TIMEOUT_MS = 35000
-const ROUTE_TIMEOUT_MS = 40000
-const MAX_SCAFFOLD_TOKENS = 3000
+// Timeouts: keep OPENAI_TIMEOUT_MS strictly less than ROUTE_TIMEOUT_MS so the
+// route returns a clean 504 rather than racing the platform-level cap.
+const OPENAI_TIMEOUT_MS = 50000
+const ROUTE_TIMEOUT_MS = 55000
+const MAX_SCAFFOLD_TOKENS = 2500
 
 const VALID_REGISTRY_IDS = new Set([
   "gaming", "tech_repair", "creator_workflow", "small_business",
@@ -38,6 +42,62 @@ const VALID_GUIDE_TYPES = new Set([
 ])
 
 const VALID_DIFFICULTIES = new Set(["beginner", "intermediate", "advanced", "expert"])
+
+// ─── JSON extraction helper ──────────────────────────────────────────────────
+
+/**
+ * Extract the first valid JSON object substring from raw AI output.
+ * Handles common provider quirks: markdown fences, leading/trailing prose,
+ * unwrapped objects. Returns null if no plausible object can be located.
+ *
+ * Does NOT attempt to repair broken JSON. Caller still parses + validates.
+ */
+function extractJsonObject(raw: string): string | null {
+  if (!raw) return null
+  let text = raw.trim()
+
+  // Strip ```json ... ``` or ``` ... ``` markdown fences if present.
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim()
+  }
+
+  // Fast path: already starts with `{`.
+  if (text.startsWith("{")) return text
+
+  // Slow path: find the first `{` and walk braces to its matching close,
+  // ignoring braces inside string literals. This tolerates leading prose like
+  // "Here is your scaffold: { ... }".
+  const start = text.indexOf("{")
+  if (start === -1) return null
+
+  let depth = 0
+  let inString = false
+  let escape = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (escape) {
+        escape = false
+      } else if (ch === "\\") {
+        escape = true
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (ch === '"') {
+      inString = true
+      continue
+    }
+    if (ch === "{") depth++
+    else if (ch === "}") {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+
+  return null
+}
 
 // ─── OpenAI helper ───────────────────────────────────────────────────────────
 
@@ -136,17 +196,18 @@ Return a JSON object with exactly this shape (no extra fields, no markdown, no c
 }
 
 Rules — follow these exactly:
-- Return 4-6 hubs total. No more, no less.
-- Return 2-4 collections per hub.
+- Return 4-5 hubs total. No more, no less.
+- Return 2-3 collections per hub.
 - Return exactly 1 starter guide idea per collection. Some collections may have 0 if you cannot think of a specific idea.
-- Total starter guide ideas across the whole network: 8-10 maximum.
+- Total starter guide ideas across the whole network: 6-8 maximum.
 - Hub names must be domain-specific. Avoid generic names like "General", "Resources", "Other", or "Miscellaneous".
 - Guide titles must be specific and actionable — not generic like "Getting Started Guide".
 - Network name must be professional, specific to the domain, and 2-5 words.
 - Type must exactly match one of the valid values.
 - Theme must exactly match one of the valid values.
 - Visibility must be exactly "private".
-- Use the user's domain language, named entities, and specific topics.`
+- Use the user's domain language, named entities, and specific topics.
+- Keep descriptions to a single concise sentence. Do not pad.`
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -192,21 +253,47 @@ function validateNetworkScaffold(raw: unknown): { valid: boolean; errors: string
 
 // ─── Normalization ────────────────────────────────────────────────────────────
 
+/**
+ * De-duplicate a string by appending " (2)", " (3)", … when the same name
+ * has already been seen in the same scope. Used to safely resolve duplicate
+ * hub names across the network and duplicate collection names within a hub.
+ */
+function uniqueName(name: string, seen: Set<string>): string {
+  let candidate = name
+  let n = 2
+  while (seen.has(candidate.toLowerCase())) {
+    candidate = `${name} (${n})`
+    n++
+  }
+  seen.add(candidate.toLowerCase())
+  return candidate
+}
+
 function normalizeNetworkScaffold(raw: any): GeneratedNetworkScaffold {
   const now = new Date().toISOString()
 
   const normalizedType = VALID_REGISTRY_IDS.has(raw.type) ? raw.type : "general"
   const normalizedTheme = VALID_THEME_IDS.has(raw.theme) ? raw.theme : "parchment"
 
+  // Tightened safe limits (match the prompt rules). The model may exceed them
+  // even when asked not to, so the route enforces them again here.
+  const MAX_HUBS = 5
+  const MAX_COLLECTIONS_PER_HUB = 3
+  const MAX_IDEAS_PER_COLLECTION = 1
+  const MAX_TOTAL_IDEAS = 8
+
+  const seenHubNames = new Set<string>()
+
   const hubs = (Array.isArray(raw.hubs) ? raw.hubs : [])
-    .slice(0, 8)
+    .slice(0, MAX_HUBS)
     .map((hub: any) => {
+      const seenCollectionNames = new Set<string>()
       const collections = (Array.isArray(hub.collections) ? hub.collections : [])
-        .slice(0, 4)
+        .slice(0, MAX_COLLECTIONS_PER_HUB)
         .map((col: any) => {
           const ideas = Array.isArray(col.starterGuideIdeas)
             ? col.starterGuideIdeas
-                .slice(0, 2)
+                .slice(0, MAX_IDEAS_PER_COLLECTION)
                 .filter((idea: any) => typeof idea.title === "string" && idea.title.trim())
                 .map((idea: any) => ({
                   title: String(idea.title ?? "").trim(),
@@ -216,29 +303,35 @@ function normalizeNetworkScaffold(raw: any): GeneratedNetworkScaffold {
                 }))
             : []
 
+          const rawName = String(col.name ?? "").trim() || "Untitled Collection"
+          const name = uniqueName(rawName, seenCollectionNames)
+
           return {
-            name: String(col.name ?? "").trim() || "Untitled Collection",
+            name,
             description: typeof col.description === "string" ? col.description.trim() : "",
             ...(ideas.length > 0 ? { starterGuideIdeas: ideas } : {}),
           }
         })
         .filter((col: any) => col.name.length > 0)
 
+      const rawHubName = String(hub.name ?? "").trim() || "Untitled Hub"
+      const hubName = uniqueName(rawHubName, seenHubNames)
+
       return {
-        name: String(hub.name ?? "").trim() || "Untitled Hub",
+        name: hubName,
         description: typeof hub.description === "string" ? hub.description.trim() : "",
         collections,
       }
     })
     .filter((hub: any) => hub.name.length > 0 && hub.collections.length > 0)
 
-  // Cap total starter guide ideas to 10
+  // Cap total starter guide ideas across the whole network
   let ideaCount = 0
   const cappedHubs = hubs.map((hub: any) => ({
     ...hub,
     collections: hub.collections.map((col: any) => {
       if (!col.starterGuideIdeas) return col
-      const allowed = Math.max(0, 10 - ideaCount)
+      const allowed = Math.max(0, MAX_TOTAL_IDEAS - ideaCount)
       const sliced = col.starterGuideIdeas.slice(0, allowed)
       ideaCount += sliced.length
       return { ...col, starterGuideIdeas: sliced.length > 0 ? sliced : undefined }
@@ -250,7 +343,10 @@ function normalizeNetworkScaffold(raw: any): GeneratedNetworkScaffold {
     description: String(raw.description ?? "").trim(),
     type: normalizedType,
     theme: normalizedTheme,
-    visibility: raw.visibility === "public" ? "public" : "private",
+    // Scaffold creation is always private at proposal time. Public visibility
+    // is an explicit later choice; the AI route never preemptively makes a
+    // network public.
+    visibility: "private",
     hubs: cappedHubs,
     generatedAt: now,
     generatedBy: "openai",
@@ -268,7 +364,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       () =>
         resolve(
           NextResponse.json(
-            { success: false, error: "Route timed out. Please try again.", code: "timeout" },
+            {
+              success: false,
+              error:
+                "AI scaffold took too long. Your prompt is still saved — use Quick Fill or try AI Draft again.",
+              code: "timeout",
+            },
             { status: 504 }
           )
         ),
@@ -348,7 +449,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
       if (normalized.code === "timeout" || openaiAbort.signal.aborted) {
         return NextResponse.json(
-          { success: false, error: "AI scaffold generation timed out. Try a shorter prompt.", code: "timeout" },
+          {
+            success: false,
+            error:
+              "AI scaffold took too long. Your prompt is still saved — use Quick Fill or try AI Draft again.",
+            code: "timeout",
+          },
           { status: 504 }
         )
       }
@@ -368,17 +474,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // ── Parse JSON ────────────────────────────────────────────────────────────
+    // Defensively extract the first JSON object — handles markdown fences,
+    // leading prose, etc. Raw provider text is never sent back to the UI.
+    const extracted = extractJsonObject(rawContent)
+    if (!extracted) {
+      return NextResponse.json(
+        { success: false, error: "AI response did not contain a JSON object.", code: "invalid_response" },
+        { status: 502 }
+      )
+    }
+
     let parsed: unknown
     try {
-      parsed = JSON.parse(rawContent)
+      parsed = JSON.parse(extracted)
     } catch {
       return NextResponse.json(
-        {
-          success: false,
-          error: "AI returned invalid JSON.",
-          code: "unknown",
-          raw: rawContent.substring(0, 300),
-        },
+        { success: false, error: "AI returned invalid JSON.", code: "invalid_response" },
         { status: 502 }
       )
     }
@@ -394,6 +505,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Normalize and return ──────────────────────────────────────────────────
     const scaffold = normalizeNetworkScaffold(parsed)
+
+    // Post-normalization safety net: validation accepted the raw shape, but
+    // the normalizer drops empty hubs/collections. If nothing survives, fail
+    // rather than returning an empty scaffold.
+    if (scaffold.hubs.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "AI returned no usable hubs. Please try again.", code: "invalid_response" },
+        { status: 502 }
+      )
+    }
 
     return NextResponse.json({
       success: true,

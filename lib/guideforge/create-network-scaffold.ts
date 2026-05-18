@@ -19,6 +19,12 @@ import {
 import { ScaffoldTemplate, validateScaffoldTemplate } from "./starter-scaffolds"
 import type { Network, Hub, Collection, NetworkType, ThemeDirection, Visibility, NetworkGovernanceSettings } from "./types"
 
+/**
+ * When false, suppresses verbose per-step scaffold progress logs.
+ * Error logs are always emitted via console.error.
+ */
+const DEBUG_SCAFFOLD = false
+
 export interface CreateScaffoldResult {
   success: boolean
   network?: Network
@@ -64,7 +70,7 @@ export async function createNetworkScaffold(
     networkGovernanceSettings?: NetworkGovernanceSettings
   }
 ): Promise<CreateScaffoldResult> {
-  console.log("[v0] createNetworkScaffold: Starting scaffold creation for template:", template.id)
+  if (DEBUG_SCAFFOLD) console.log("[v0] createNetworkScaffold: Starting scaffold creation for template:", template.id)
 
   // Validate template structure
   const validation = validateScaffoldTemplate(template)
@@ -93,13 +99,15 @@ export async function createNetworkScaffold(
       governanceSettings: overrides?.networkGovernanceSettings,
     }
 
-    console.log("[v0] createNetworkScaffold: Creating network with payload:", {
-      name: networkDraft.name,
-      slug: networkDraft.slug,
-      type: networkDraft.type,
-      theme: networkDraft.theme,
-      visibility: networkDraft.visibility,
-    })
+    if (DEBUG_SCAFFOLD) {
+      console.log("[v0] createNetworkScaffold: Creating network with payload:", {
+        name: networkDraft.name,
+        slug: networkDraft.slug,
+        type: networkDraft.type,
+        theme: networkDraft.theme,
+        visibility: networkDraft.visibility,
+      })
+    }
 
     // Step 1: Create network
     const networkResult = await createNetwork(networkDraft)
@@ -113,7 +121,7 @@ export async function createNetworkScaffold(
     }
 
     const networkId = networkResult.network.id
-    console.log("[v0] createNetworkScaffold: Network created successfully:", networkId)
+    if (DEBUG_SCAFFOLD) console.log("[v0] createNetworkScaffold: Network created successfully:", networkId)
 
     // Step 2: Create all hubs
     const createdHubs: Hub[] = []
@@ -138,10 +146,10 @@ export async function createNetworkScaffold(
       }
 
       createdHubs.push(hubResult.hub)
-      console.log("[v0] createNetworkScaffold: Hub created:", hubResult.hub.id)
+      if (DEBUG_SCAFFOLD) console.log("[v0] createNetworkScaffold: Hub created:", hubResult.hub.id)
     }
 
-    console.log("[v0] createNetworkScaffold: All hubs created successfully:", createdHubs.length)
+    if (DEBUG_SCAFFOLD) console.log("[v0] createNetworkScaffold: All hubs created successfully:", createdHubs.length)
 
     // Step 3: Create all collections
     const createdCollections: Collection[] = []
@@ -158,10 +166,14 @@ export async function createNetworkScaffold(
         })
 
         if (collectionResult.source !== "supabase" || !collectionResult.collection.id) {
-          console.error("[v0] createNetworkScaffold: Collection creation failed:", collectionResult.error)
+          const context = `${hubGroup.hub.name} › ${collectionTemplate.name}`
+          console.error("[v0] createNetworkScaffold: Collection creation failed:", context, collectionResult.error)
           return {
             success: false,
-            error: collectionResult.error || `Failed to create collection: ${collectionTemplate.name}`,
+            error:
+              collectionResult.error
+                ? `${collectionResult.error} (collection: ${context})`
+                : `Failed to create collection ${context}`,
             network: networkResult.network,
             hubs: createdHubs,
             collections: createdCollections,
@@ -170,12 +182,14 @@ export async function createNetworkScaffold(
         }
 
         createdCollections.push(collectionResult.collection)
-        console.log("[v0] createNetworkScaffold: Collection created:", collectionResult.collection.id)
+        if (DEBUG_SCAFFOLD) console.log("[v0] createNetworkScaffold: Collection created:", collectionResult.collection.id)
       }
     }
 
-    console.log("[v0] createNetworkScaffold: All collections created successfully:", createdCollections.length)
-    console.log("[v0] createNetworkScaffold: Scaffold creation complete")
+    if (DEBUG_SCAFFOLD) {
+      console.log("[v0] createNetworkScaffold: All collections created successfully:", createdCollections.length)
+      console.log("[v0] createNetworkScaffold: Scaffold creation complete")
+    }
 
     return {
       success: true,

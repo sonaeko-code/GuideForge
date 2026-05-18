@@ -102,6 +102,11 @@ generateGuideForgeDraft({
 - Fill: **Quick Fill** → `smartFillNetwork()` (heuristic, instant, no AI call) — or **AI Draft Scaffold** → `generateGuideForgeDraft({ kind: "network_scaffold", mode: "ai" })` → `POST /api/guideforge/generate-network-scaffold`
 - Scaffold: `SmartFillScaffoldSuggestion` with hubs, collections, and `starterGuideIdeas` (proposal-only). AI output is adapted via `aiScaffoldToSmartFillSuggestion()` + `aiScaffoldToSmartFillResult()` before being passed to the same `scaffoldDraftFromSmartFill()` / `generateNetworkBuildPlan()` helpers used by Quick Fill.
 - AI endpoint: returns `GeneratedNetworkScaffold` (name, description, type, theme, hubs with collections and starterGuideIdeas). Provider: openai via `resolveGuideForgeProviderRoute({ mode: "ai", task: "network_scaffold" })`.
+- AI response handling (route-side hardening):
+  - `extractJsonObject()` strips markdown fences and leading prose before `JSON.parse`. Raw provider output is never returned to the UI.
+  - `normalizeNetworkScaffold()` enforces safe limits regardless of model output: 5 hubs max, 3 collections per hub, 1 starter idea per collection, 8 starter ideas total. Hub names + collection-within-hub names are de-duplicated by appending " (2)", " (3)", … . Visibility is always forced to `"private"` (scaffold creation is proposal-only).
+  - A post-normalization no-hubs guard returns `code: "invalid_response"` rather than handing the UI an empty scaffold.
+  - The route remains proposal-only — no guides, hubs, or networks are created by the AI route itself.
 - Save: `forge-rules-editor.tsx` → `createNetworkScaffold()` → `save-network-skeleton.ts`
 - No Supabase writes in the scaffold step. `starterGuideIdeas` are session-only — not auto-created.
 

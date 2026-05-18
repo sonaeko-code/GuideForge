@@ -782,18 +782,27 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
               </div>
               {smartFillSummary && (
                 <p className="text-xs text-green-700 dark:text-green-400 leading-snug">
-                  Filled: {smartFillSummary}
+                  Filled locally (no AI): {smartFillSummary}
                 </p>
               )}
               {aiScaffoldSummary && (
                 <p className="text-xs text-blue-700 dark:text-blue-400 leading-snug">
-                  AI drafted: {aiScaffoldSummary}
+                  AI drafted: {aiScaffoldSummary} — review before saving
                 </p>
               )}
               {aiScaffoldError && (
-                <p className="text-xs text-red-700 dark:text-red-400 leading-snug">
-                  AI Draft failed: {aiScaffoldError}
-                </p>
+                <div className="text-xs text-red-700 dark:text-red-400 leading-snug space-y-1">
+                  <p>
+                    <span className="font-semibold">AI Draft did not finish.</span>{" "}
+                    Your prompt and current setup are still saved here.
+                  </p>
+                  <p className="text-muted-foreground">
+                    {scaffoldDraft && scaffoldDraft.hubs.length > 0
+                      ? "You can continue with the current scaffold, try AI Draft again, or use Quick Fill."
+                      : "You can try AI Draft again or use Quick Fill."}
+                  </p>
+                  <p className="text-muted-foreground/80 italic">Details: {aiScaffoldError}</p>
+                </div>
               )}
             </div>
           </Card>
@@ -1125,10 +1134,10 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
               {buildPlan && (
                 <div className="mt-4 pt-4 border-t border-border/40">
                   <details open>
-                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 select-none list-none">
-                      Network launch plan
+                    <summary className="cursor-pointer text-sm font-semibold text-foreground mb-1 select-none list-none">
+                      Network launch plan <span className="text-xs font-normal text-muted-foreground">(preview)</span>
                     </summary>
-                    <p className="text-xs text-muted-foreground mb-2">A planning preview for what to build first. The launch plan prioritizes the guide ideas above into a recommended first build order.</p>
+                    <p className="text-xs text-muted-foreground mb-2">A planning preview for what to build first. The launch plan prioritizes the guide ideas above into a recommended first build order. You&apos;ll see the full plan on the dashboard after the network is created.</p>
                     <div className="mt-2 space-y-3 text-xs">
                       <p className="text-foreground/80 leading-relaxed">{buildPlan.goal}</p>
 
