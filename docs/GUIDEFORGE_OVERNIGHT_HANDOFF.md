@@ -283,3 +283,4 @@ When I paste screenshots/logs/results:
 - `GUIDEFORGE_AI_BUILDER_CORE.md` — architecture / contract for AI generation
 - `GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md` — Techsperts reuse spec
 - `GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md` — QuestLine template spec
+- `GUIDEFORGE_CURRENT_BUILD_OVERVIEW.md` — durable current-state snapshot for future-session handoff

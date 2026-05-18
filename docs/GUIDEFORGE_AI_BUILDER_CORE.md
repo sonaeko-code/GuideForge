@@ -297,6 +297,7 @@ Higher-level product / planning / testing context lives in:
 - [`GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md`](./GUIDEFORGE_TECHSPERTS_ADAPTER_SPEC.md) — how GuideForge patterns can power Techsperts without replacing it.
 - [`GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md`](./GUIDEFORGE_QUESTLINE_TEMPLATE_SPEC.md) — productized gaming network template.
 - [`GUIDEFORGE_OVERNIGHT_HANDOFF.md`](./GUIDEFORGE_OVERNIGHT_HANDOFF.md) — handoff after the recent build session: what changed, retest priority, deferred work, continuation prompt.
+- [`GUIDEFORGE_CURRENT_BUILD_OVERVIEW.md`](./GUIDEFORGE_CURRENT_BUILD_OVERVIEW.md) — durable snapshot of where GuideForge is right now: major systems, recent work, deferred work, retest priority, continuation prompt.
 
 This file (AI Builder Core) is the **architecture / contract** doc. The four files above are the
 **product / process** docs. Both layers should agree before any new generation flow is built.
