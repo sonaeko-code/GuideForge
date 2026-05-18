@@ -29,14 +29,14 @@ export default async function PublicGuidePage({
   // Try to load hub from Supabase first, then fallback to mock data
   let hub = await getHubBySlug(hubSlug)
   if (!hub) {
-    hub = MOCK_HUBS.find((h) => h.slug === hubSlug)
+    hub = MOCK_HUBS.find((h) => h.slug === hubSlug) ?? null
   }
 
   // Try to load from Supabase first, then fallback to mock data.
   // Both paths enforce status === "published" — never show drafts/ready/archived/revision drafts.
   let guide = await loadPublishedGuide(guideSlug)
   if (!guide) {
-    guide = MOCK_GUIDES.find((g) => g.slug === guideSlug && g.status === "published")
+    guide = MOCK_GUIDES.find((g) => g.slug === guideSlug && g.status === "published") ?? null
   }
 
   // Clean 404 if hub or guide is missing/unpublished

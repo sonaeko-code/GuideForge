@@ -14,7 +14,8 @@
  * 4. (Optional) Refresh Supabase schema cache if needed
  */
 
-import { supabase } from "./supabase-client"
+import { supabase as _supabase } from "./supabase-client"
+const supabase = _supabase!
 import type { AssetDraft, CreateAssetDraftInput, UpdateAssetDraftInput } from "./asset-draft-types"
 
 const ASSET_DRAFTS_TABLE = "asset_drafts"

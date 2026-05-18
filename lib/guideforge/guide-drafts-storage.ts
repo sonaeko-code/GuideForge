@@ -118,7 +118,20 @@ export function updateDraftStatusSync(draftId: string, status: string): void {
  */
 export async function saveGuideDraft(
   guide: Guide
-): Promise<{ id: string; source: "supabase" | "localStorage"; error?: string }> {
+): Promise<{
+  id: string
+  source: "supabase" | "localStorage"
+  error?: string
+  errorCode?: string
+  errorDetails?: string
+  errorHint?: string
+  stage?: string
+  guideId?: string
+  collectionId?: string
+  authorId?: string
+  status?: string
+  verificationStatus?: string
+}> {
   const adapter = getAdapter()
   return adapter.saveDraft(guide)
 }

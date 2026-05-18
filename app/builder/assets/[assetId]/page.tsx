@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/guideforge/auth-context"
 import { getAssetDraft, updateAssetDraft, deleteAssetDraft } from "@/lib/guideforge/asset-draft-helpers"
 import { getAssetDraftStatusLabel } from "@/lib/guideforge/asset-draft-reviews"
 import type { AssetDraft } from "@/lib/guideforge/asset-draft-types"
-import type { GeneratedSingleGuide, GeneratedChecklist } from "@/lib/guideforge/generation-schemas"
+import type { GeneratedSingleGuide, GeneratedChecklist, GeneratedRecipe } from "@/lib/guideforge/generation-schemas"
 import { SingleGuideEditor } from "@/components/guideforge/builder/single-guide-editor"
 import { ChecklistEditor } from "@/components/guideforge/builder/checklist-editor"
 import { AssetTypeBadge } from "@/components/guideforge/builder/asset-type-badge"
@@ -322,7 +322,7 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
       <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           {asset && <AssetTypeBadge assetType={asset.assetType} variant="small" />}
-          {asset?.payload?.generatedBy === "openai" && (
+          {(asset.payload as unknown as Record<string, unknown>).generatedBy === "openai" && (
             <Badge variant="secondary" className="text-xs">AI Generated</Badge>
           )}
           <Badge variant="outline" className="text-xs">{getAssetDraftStatusLabel(asset.status).displayName}</Badge>
@@ -352,9 +352,10 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
 
       {/* Checklist at-a-glance stats — compact pills, preview mode only */}
       {!isEditMode && asset.assetType === "checklist" && (() => {
-        const sections = Array.isArray(asset.payload?.sections) ? asset.payload.sections : []
-        const totalItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.length : 0), 0)
-        const requiredItems = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s?.items) ? s.items.filter((i: any) => i?.required === true).length : 0), 0)
+        const checklist = asset.payload as GeneratedChecklist
+        const sections = Array.isArray(checklist.sections) ? checklist.sections : []
+        const totalItems = sections.reduce((sum: number, s) => sum + (Array.isArray(s?.items) ? s.items.length : 0), 0)
+        const requiredItems = sections.reduce((sum: number, s) => sum + (Array.isArray(s?.items) ? s.items.filter((i) => i?.required === true).length : 0), 0)
         return (
           <div className="flex flex-wrap gap-2 items-center">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium">
@@ -379,9 +380,10 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
           The embedded editor hides its difficulty/audience block via showModeTabs=false,
           so surface that information here instead. */}
       {!isEditMode && asset.assetType === "single_guide" && (() => {
-        const steps = Array.isArray(asset.payload?.steps) ? asset.payload.steps : []
-        const difficulty = asset.payload?.difficulty as string | undefined
-        const audience = asset.payload?.audience as string | undefined
+        const guide = asset.payload as GeneratedSingleGuide
+        const steps = Array.isArray(guide.steps) ? guide.steps : []
+        const difficulty = guide.difficulty
+        const audience = guide.audience
         return (
           <div className="flex flex-wrap gap-2 items-center">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-medium">
@@ -551,22 +553,25 @@ export default function AssetDetailPage({ params, searchParams }: AssetDetailPag
             />
           )}
 
-          {asset.assetType === "recipe" && (
-            <Card className="p-4 space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Ingredients ({asset.payload.ingredients.length})
-              </h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                {asset.payload.ingredients.slice(0, 10).map((ing, idx) => (
-                  <li key={idx}>
-                    • {ing.name}
-                    {ing.amount && ` (${ing.amount})`}
-                    {ing.notes && ` - ${ing.notes}`}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
+          {asset.assetType === "recipe" && (() => {
+            const recipe = asset.payload as GeneratedRecipe
+            return (
+              <Card className="p-4 space-y-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Ingredients ({recipe.ingredients.length})
+                </h3>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {recipe.ingredients.slice(0, 10).map((ing, idx) => (
+                    <li key={idx}>
+                      • {ing.name}
+                      {ing.amount && ` (${ing.amount})`}
+                      {ing.notes && ` - ${ing.notes}`}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )
+          })()}
 
           {asset.assetType === "checklist" && (
             <ChecklistEditor

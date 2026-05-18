@@ -48,7 +48,7 @@ export default async function PublicHubPage({
     hub = EMBERFALL_HUB
   }
   if (!hub && network) {
-    hub = getHubsByNetwork(network.id).find((h) => h.slug === hubSlug)
+    hub = getHubsByNetwork(network.id).find((h) => h.slug === hubSlug) ?? null
   }
 
   // Clean 404 for missing network or hub
@@ -57,7 +57,7 @@ export default async function PublicHubPage({
   }
 
   // Load collections (Supabase preferred, mock fallback)
-  let collections = []
+  let collections: Awaited<ReturnType<typeof getCollectionsByHubId>> = []
   try {
     collections = await getCollectionsByHubId(hub.id)
   } catch (err) {
@@ -196,7 +196,7 @@ export default async function PublicHubPage({
               <div className="flex flex-col justify-center">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <DifficultyBadge difficulty={featured.difficulty} />
-                  <PublishedBadge verification={featured.verification} />
+                  <PublishedBadge verification={featured.verification === "forge-verified" ? "forge-verified" : null} />
                   {featured.estimatedMinutes && (
                     <span className="text-xs text-muted-foreground">
                       {featured.estimatedMinutes} min read
@@ -316,7 +316,7 @@ export default async function PublicHubPage({
                     {guides.slice(0, 6).map((guide) => (
                       <GuideCard
                         key={guide.id}
-                        guide={guide}
+                        guide={{ ...guide, verification: guide.verification === "forge-verified" ? "forge-verified" : null }}
                         href={`/n/${networkSlug}/${hub.slug}/${guide.slug}`}
                       />
                     ))}
@@ -340,7 +340,7 @@ export default async function PublicHubPage({
                   {uncategorizedGuides.slice(0, 6).map((guide) => (
                     <GuideCard
                       key={guide.id}
-                      guide={guide}
+                      guide={{ ...guide, verification: guide.verification === "forge-verified" ? "forge-verified" : null }}
                       href={`/n/${networkSlug}/${hub.slug}/${guide.slug}`}
                     />
                   ))}
@@ -372,7 +372,7 @@ export default async function PublicHubPage({
               {recent.map((guide) => (
                 <GuideCard
                   key={guide.id}
-                  guide={guide}
+                  guide={{ ...guide, verification: guide.verification === "forge-verified" ? "forge-verified" : null }}
                   href={`/n/${networkSlug}/${hub.slug}/${guide.slug}`}
                 />
               ))}
@@ -394,7 +394,7 @@ export default async function PublicHubPage({
               {beginnerGuides.map((guide) => (
                 <GuideCard
                   key={guide.id}
-                  guide={guide}
+                  guide={{ ...guide, verification: guide.verification === "forge-verified" ? "forge-verified" : null }}
                   href={`/n/${networkSlug}/${hub.slug}/${guide.slug}`}
                   variant="minimal"
                 />

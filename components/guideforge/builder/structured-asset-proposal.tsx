@@ -24,7 +24,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
   const [refinementNotes, setRefinementNotes] = useState("")
   const [refinementApplied, setRefinementApplied] = useState(false)
   const [editTitle, setEditTitle] = useState(asset.title)
-  const [editSummary, setEditSummary] = useState(asset.summary)
+  const [editSummary, setEditSummary] = useState((asset as unknown as { summary?: string }).summary ?? "")
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingSummary, setIsEditingSummary] = useState(false)
   const [checklistDraft, setChecklistDraft] = useState<GeneratedChecklist | null>(
@@ -143,16 +143,16 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         {/* Header */}
         <div className="flex items-center gap-2 flex-wrap">
           <AssetTypeBadge assetType="checklist" variant="small" />
-          {asset.generatedBy && (
+          {(asset as unknown as { generatedBy?: string }).generatedBy && (
             <Badge variant="secondary" className="text-xs">
-              {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+              {(asset as unknown as { generatedBy?: string }).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
             </Badge>
           )}
           <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
         </div>
 
         {/* Mock Preview Clarification Notice */}
-        {asset.generatedBy === "mock" && (
+        {(asset as unknown as { generatedBy?: string }).generatedBy === "mock" && (
           <Card className="p-3 border-amber-500/20 bg-amber-500/5">
             <p className="text-sm text-amber-900 dark:text-amber-100">
               <span className="font-semibold">Mock Preview:</span> This uses deterministic sample content for testing. Click <strong>AI Generate</strong> to create real contextual content.
@@ -263,9 +263,9 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <AssetTypeBadge assetType={asset.assetType} variant="small" />
-          {asset.generatedBy && (
+          {(asset as unknown as { generatedBy?: string }).generatedBy && (
             <Badge variant="secondary" className="text-xs">
-              {asset.generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
+              {(asset as unknown as { generatedBy?: string }).generatedBy === "openai" ? "AI Generated" : "Mock Preview"}
             </Badge>
           )}
           <span className="text-sm text-muted-foreground">Generated — Not Saved Yet</span>
@@ -297,7 +297,7 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
         </div>
 
         {/* Mock Preview Clarification Notice */}
-        {asset.generatedBy === "mock" && (
+        {(asset as unknown as { generatedBy?: string }).generatedBy === "mock" && (
           <Card className="p-3 border-amber-500/20 bg-amber-500/5">
             <p className="text-sm text-amber-900 dark:text-amber-100">
               <span className="font-semibold">Mock Preview:</span> This uses deterministic sample content for testing. Click <strong>AI Generate</strong> to create real contextual content.
@@ -360,26 +360,6 @@ export function StructuredAssetProposal({ asset, onBack }: StructuredAssetPropos
 
       {/* Asset-Specific Content Preview (BEFORE refinement) */}
       <Card className="p-4 space-y-3">
-        {asset.assetType === "single_guide" && (
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground mb-2">Steps ({asset.steps.length})</p>
-              <ol className="space-y-2">
-                {asset.steps.slice(0, 3).map((step, idx) => (
-                  <li key={idx} className="text-sm text-muted-foreground">
-                    <strong>{idx + 1}. {step.title}</strong>
-                  </li>
-                ))}
-              </ol>
-              {asset.steps.length > 3 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  ... and {asset.steps.length - 3} more step{asset.steps.length - 3 !== 1 ? 's' : ''}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
         {asset.assetType === "recipe" && (
           <div className="space-y-3">
             <div>

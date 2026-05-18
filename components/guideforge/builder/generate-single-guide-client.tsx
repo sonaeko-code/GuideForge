@@ -35,7 +35,7 @@ export function GenerateSingleGuideClient() {
     useCase: "",
     tone: "helpful",
     difficulty: "intermediate",
-    guideType: "guide",
+    guideType: "tutorial",
     numberOfSteps: 5,
     hasWarnings: false,
     hasPrerequisites: false,

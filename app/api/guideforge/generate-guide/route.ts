@@ -253,6 +253,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ]
 
     // ── Call OpenAI with timeout ────────────────────────────────────────────
+    // Provider: openai — resolved by resolveGuideForgeProviderRoute({ mode: "ai", task: "network_guide" })
+    // To add Claude: implement an Anthropic route handler and update the resolver.
     let rawContent: string | null = null
     const openaiAbort = new AbortController()
     const openaiTimeout = setTimeout(() => openaiAbort.abort(), OPENAI_TIMEOUT_MS)

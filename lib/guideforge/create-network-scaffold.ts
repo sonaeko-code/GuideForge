@@ -122,8 +122,8 @@ export async function createNetworkScaffold(
         name: hubGroup.hub.name,
         slug: hubGroup.hub.slug,
         description: hubGroup.hub.description,
-        hubKind: "topic", // Safe default - allowed values: game, product, department, topic, channel, other
-        collectionIds: [],
+        hubKind: "topic",
+        networkId,
       })
 
       if (hubResult.source !== "supabase" || !hubResult.hub.id) {
@@ -154,7 +154,7 @@ export async function createNetworkScaffold(
           name: collectionTemplate.name,
           slug: collectionTemplate.slug,
           description: collectionTemplate.description,
-          guideIds: [],
+          defaultGuideType: "tutorial",
         })
 
         if (collectionResult.source !== "supabase" || !collectionResult.collection.id) {

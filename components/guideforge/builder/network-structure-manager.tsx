@@ -128,9 +128,7 @@ export function NetworkStructureManager({ network, networkId }: NetworkStructure
         slug,
         description: newHubDescription,
         hubKind: "topic",
-        collectionIds: [],
         networkId: networkId,
-        id: "", // Will be set by Supabase
       })
 
       if (error || !hub.id) {
@@ -220,7 +218,7 @@ export function NetworkStructureManager({ network, networkId }: NetworkStructure
         name: newCollectionName,
         slug,
         description: newCollectionDescription,
-        defaultGuideType: "how-to",
+        defaultGuideType: "tutorial",
       })
 
       if (error || !collection.id) {

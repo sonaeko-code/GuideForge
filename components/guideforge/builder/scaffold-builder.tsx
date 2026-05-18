@@ -12,6 +12,7 @@ import {
   type ScaffoldTemplate,
 } from "@/lib/guideforge/starter-scaffolds"
 import { createNetworkScaffold } from "@/lib/guideforge/create-network-scaffold"
+import { slugify } from "@/lib/guideforge/utils"
 
 export function ScaffoldBuilder() {
   const router = useRouter()
@@ -21,8 +22,11 @@ export function ScaffoldBuilder() {
   const [networkName, setNetworkName] = useState("")
   const [networkSlug, setNetworkSlug] = useState("")
   const [networkDescription, setNetworkDescription] = useState("")
+  const [networkSlugManuallyEdited, setNetworkSlugManuallyEdited] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createdNetworkId, setCreatedNetworkId] = useState<string | null>(null)
+
+  const computedSlug = networkSlugManuallyEdited ? networkSlug : slugify(networkName)
 
   const templates = getAllScaffoldTemplates()
 

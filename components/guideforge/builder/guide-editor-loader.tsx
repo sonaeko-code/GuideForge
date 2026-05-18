@@ -12,7 +12,7 @@ import type { Guide } from "@/lib/guideforge/types"
 interface GuideEditorLoaderProps {
   networkId: string
   guideId: string
-  fallback: Guide
+  fallback?: Guide
 }
 
 /**
@@ -150,5 +150,5 @@ export function GuideEditorLoader({
     )
   }
 
-  return <GuideEditor guide={safeGuide} networkId={networkId} />
+  return <GuideEditor guide={safeGuide!} networkId={networkId} />
 }

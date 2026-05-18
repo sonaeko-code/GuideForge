@@ -5,6 +5,7 @@
  */
 
 import type { SingleGuideIntakeRequest, ChecklistIntakeRequest } from "./generation-schemas"
+import type { GuideType } from "./types"
 
 /**
  * Extract a clean title from rough idea, stripping common prefixes.
@@ -372,7 +373,7 @@ export function detectDifficulty(
  */
 export function detectGuideType(
   lowerText: string
-): "guide" | "tutorial" | "reference" | "troubleshooting" | null {
+): GuideType | null {
   // YouTube/video publishing is typically a tutorial
   if (lowerText.includes("youtube") || lowerText.includes("gameplay") || lowerText.includes("publish")) {
     return "tutorial"
@@ -394,14 +395,14 @@ export function detectGuideType(
     lowerText.includes("fix") ||
     lowerText.includes("solve")
   ) {
-    return "troubleshooting"
+    return "tutorial"
   }
   if (
     lowerText.includes("guide") ||
     lowerText.includes("how to") ||
     lowerText.includes("explain")
   ) {
-    return "guide"
+    return "tutorial"
   }
 
   return null
@@ -571,7 +572,7 @@ export function parseRoughIdea(
   if (hasWarnings(lowerText)) result.hasWarnings = true
   if (hasPrerequisites(lowerText)) result.hasPrerequisites = true
 
-  const numberOfSteps = determineNumberOfSteps(lowerText, difficulty)
+  const numberOfSteps = determineNumberOfSteps(lowerText, difficulty ?? undefined)
   if (numberOfSteps) result.numberOfSteps = numberOfSteps
 
   const numberOfSections = inferNumberOfSections(lowerText)

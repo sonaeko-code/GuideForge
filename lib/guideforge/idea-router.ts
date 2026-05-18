@@ -364,7 +364,7 @@ export function routeIdea(roughIdea: string): IdeaRouterResult {
     reasoning: [reason],
     routeOptions: [
       {
-        path: "network",
+        path: "network" as const,
         label: typeId
           ? `Build a ${typeId.replace(/_/g, " ")} network`
           : "Build a Network",
@@ -374,12 +374,12 @@ export function routeIdea(roughIdea: string): IdeaRouterResult {
             : "Full guide ecosystem",
       },
       {
-        path: "checklist",
+        path: "checklist" as const,
         label: "Create a Checklist Instead",
         description: "Task list or routine",
       },
       {
-        path: "single_guide",
+        path: "single_guide" as const,
         label: "Create a Single Guide Instead",
         description: "Standalone tutorial",
       },

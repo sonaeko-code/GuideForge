@@ -24,7 +24,7 @@ Defined in `lib/guideforge/ai-builder-core.ts` as `GuideForgeBuilderKind`:
 | `single_guide_asset` | Step-by-step guide saved to workspace | ✅ Migrated — uses `generateGuideForgeDraft()` |
 | `checklist_asset` | Multi-section checklist saved to workspace | ✅ Migrated — uses `generateGuideForgeDraft()` |
 | `network_guide` | Guide belonging to a network hub/collection | ✅ Migrated — uses `generateGuideForgeDraft()` via `buildNetworkGuideGenerationRequest()` |
-| `network_scaffold` | Hubs + collections + starter guides for a new network | ⏳ Stub — active flow in `smart-fill-network.ts` + `forge-rules-editor.tsx` |
+| `network_scaffold` | Hubs + collections + starter guides for a new network | ✅ AI mode active — `POST /api/guideforge/generate-network-scaffold` + Quick Fill via `smartFillNetwork()` |
 
 ---
 
@@ -95,14 +95,15 @@ generateGuideForgeDraft({
 - Save: `createAndSaveGuideDraft()` → redirect to guide editor
 - Source tracking: `handoffSource` state distinguishes `"manual_prompt"` from `"starter_guide_idea"`; written to `formData._source` on every generation request
 - AI mode calls `/api/guideforge/generate-guide` via relative URL — this is safe from the browser client; server-side callers must use an absolute URL
-- Future provider routing (e.g. Claude, mock-v2) should plug into `generateNetworkGuide()` in `ai-builder-core.ts`
+- Provider routing: `resolveGuideForgeProviderRoute({ mode, task: "network_guide" })` is called inside `generateNetworkGuide()`; its result drives `generatedBy` and is the extension point for adding Claude or other providers
 
 ### Network Scaffold (`/builder/network/new` → `forge-rules-editor`)
 - Entry: `create-network-form.tsx`
-- Fill: Quick Fill → `smartFillNetwork()` (heuristic — not the AI Smart Fill from AIIntakeLadder)
-- Scaffold: `SmartFillScaffoldSuggestion` with hubs, collections, and `starterGuideIdeas` (proposal-only)
+- Fill: **Quick Fill** → `smartFillNetwork()` (heuristic, instant, no AI call) — or **AI Draft Scaffold** → `generateGuideForgeDraft({ kind: "network_scaffold", mode: "ai" })` → `POST /api/guideforge/generate-network-scaffold`
+- Scaffold: `SmartFillScaffoldSuggestion` with hubs, collections, and `starterGuideIdeas` (proposal-only). AI output is adapted via `aiScaffoldToSmartFillSuggestion()` + `aiScaffoldToSmartFillResult()` before being passed to the same `scaffoldDraftFromSmartFill()` / `generateNetworkBuildPlan()` helpers used by Quick Fill.
+- AI endpoint: returns `GeneratedNetworkScaffold` (name, description, type, theme, hubs with collections and starterGuideIdeas). Provider: openai via `resolveGuideForgeProviderRoute({ mode: "ai", task: "network_scaffold" })`.
 - Save: `forge-rules-editor.tsx` → `createNetworkScaffold()` → `save-network-skeleton.ts`
-- **Not yet on builder core.** `starterGuideIdeas` are shown in the preview but not persisted in this bundle.
+- No Supabase writes in the scaffold step. `starterGuideIdeas` are session-only — not auto-created.
 
 ---
 
@@ -116,10 +117,44 @@ Forge Rules are governance metadata (verification level, content standard, AI po
 
 ---
 
+## AI Provider Routing
+
+Defined in `lib/guideforge/ai-provider-routing.ts`.
+
+### Types
+
+| Type | Values | Description |
+|------|--------|-------------|
+| `GuideForgeAIProvider` | `"openai" \| "anthropic" \| "mock"` | All providers GuideForge can route to |
+| `GuideForgeGenerationTask` | `"network_guide" \| "single_guide_asset" \| ...` | One per `GuideForgeBuilderKind` |
+| `GuideForgeProviderMode` | `"mock" \| "ai"` | Caller's requested mode |
+| `GuideForgeProviderRoute` | `{ provider, isRealAI, task, mode }` | Resolved route returned by the helper |
+
+### Resolution rules
+
+`resolveGuideForgeProviderRoute(input)`:
+- `mode === "mock"` → `provider: "mock"`, `isRealAI: false`
+- `requestedProvider === "anthropic"` → falls back to `"openai"` (reserved; not yet enabled)
+- Default AI path → `provider: "openai"`, `isRealAI: true`
+
+**Cost-control extension point:** Add budget/quota logic in `resolveGuideForgeProviderRoute()` before any API call reaches a route handler.
+
+### Error normalization
+
+`normalizeGuideForgeAIError(err, provider, task?)` maps the `AUTH_ERROR` / `QUOTA_ERROR` / `OPENAI_ERROR` strings used by all three `callOpenAI()` helpers into a typed `GuideForgeAIError` with a canonical `GuideForgeAIErrorCode`.
+
+### Adding Claude (future)
+
+1. Add `ANTHROPIC_API_KEY` to env
+2. Implement a Claude route handler (e.g. `/api/guideforge/generate-guide-claude`)
+3. Remove the fallback in `resolveGuideForgeProviderRoute()` for `"anthropic"`
+4. Update `generateNetworkGuide()` in `ai-builder-core.ts` to branch on `route.provider`
+
+---
+
 ## What Remains to Migrate
 
-1. **Network scaffold with AI** — add an `/api/guideforge/generate-scaffold` endpoint for AI-powered scaffold generation and wire it to `generateNetworkScaffold()` in `ai-builder-core.ts`
-2. **Forge Rules persistence** — requires a Supabase schema column
+1. **Forge Rules persistence** — requires a Supabase schema column
 
 ---
 

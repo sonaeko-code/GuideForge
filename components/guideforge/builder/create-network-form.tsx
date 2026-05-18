@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Globe, Lock, Loader2, Zap } from "lucide-react"
+import { ArrowLeft, ArrowRight, Globe, Lock, Loader2, Sparkles, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -31,9 +31,11 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SectionCard } from "@/components/guideforge/shared"
 import { generateMockNetworkDraft } from "@/lib/guideforge/mock-generator"
+import { generateGuideForgeDraft } from "@/lib/guideforge/ai-builder-core"
+import type { GeneratedNetworkScaffold } from "@/lib/guideforge/generation-schemas"
 import { getScaffoldTemplate, type ScaffoldTemplate } from "@/lib/guideforge/starter-scaffolds"
 import { getAllNetworkThemes, getNetworkTheme } from "@/lib/guideforge/network-themes"
-import { smartFillNetwork, generateNetworkBuildPlan, type SmartFillScaffoldSuggestion, type StarterGuideIdea, type NetworkBuildPlan } from "@/lib/guideforge/smart-fill-network"
+import { smartFillNetwork, generateNetworkBuildPlan, type SmartFillResult, type SmartFillScaffoldSuggestion, type StarterGuideIdea, type NetworkBuildPlan } from "@/lib/guideforge/smart-fill-network"
 import {
   getDefaultForgeRulesDraft,
   makeCollectionClientId,
@@ -197,6 +199,59 @@ function buildDefaultScaffoldDraft(typeId: string): ScaffoldDraft {
 }
 
 // ---------------------------------------------------------------------------
+// AI scaffold adapter helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert the AI-generated scaffold into a SmartFillScaffoldSuggestion so the
+ * existing scaffoldDraftFromSmartFill() and generateNetworkBuildPlan() can consume it.
+ * Adds slugs (which the AI does not produce) using the local slugify helper.
+ */
+function aiScaffoldToSmartFillSuggestion(scaffold: GeneratedNetworkScaffold): SmartFillScaffoldSuggestion {
+  return {
+    hubs: scaffold.hubs.map((hub) => ({
+      name: hub.name,
+      slug: slugify(hub.name),
+      description: hub.description,
+      collections: hub.collections.map((col) => ({
+        name: col.name,
+        slug: slugify(col.name),
+        description: col.description,
+        ...(col.starterGuideIdeas && col.starterGuideIdeas.length > 0
+          ? { starterGuideIdeas: col.starterGuideIdeas }
+          : {}),
+      })),
+    })),
+  }
+}
+
+/**
+ * Build a minimal SmartFillResult-compatible object from an AI scaffold so that
+ * generateNetworkBuildPlan() can produce a launch plan from AI-generated content.
+ */
+function aiScaffoldToSmartFillResult(
+  scaffold: GeneratedNetworkScaffold,
+  suggestion: SmartFillScaffoldSuggestion
+): SmartFillResult {
+  const validThemes = new Set(["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"])
+  const resolvedTheme = scaffold.theme && validThemes.has(scaffold.theme)
+    ? (scaffold.theme as import("@/lib/guideforge/types").ThemeDirection)
+    : "parchment"
+  const resolvedType = VALID_REGISTRY_IDS.has(scaffold.type) ? scaffold.type : "general"
+
+  return {
+    name: scaffold.name,
+    description: scaffold.description,
+    type: resolvedType,
+    theme: resolvedTheme,
+    slug: slugify(scaffold.name),
+    visibility: scaffold.visibility === "public" ? "public" : "private",
+    success: true,
+    suggestedScaffold: suggestion,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -226,6 +281,9 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [roughIdea, setRoughIdea] = useState("")
   const [isSmartFilling, setIsSmartFilling] = useState(false)
+  const [isAiScaffolding, setIsAiScaffolding] = useState(false)
+  const [aiScaffoldError, setAiScaffoldError] = useState<string | null>(null)
+  const [aiScaffoldSummary, setAiScaffoldSummary] = useState<string | null>(null)
 
   const [scaffoldDraft, setScaffoldDraft] = useState<ScaffoldDraft>(() =>
     buildDefaultScaffoldDraft(safeInitialType)
@@ -451,6 +509,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
           (collectionCount > 0 ? ` · ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "") +
           (ideaCount > 0 ? ` · ${ideaCount} guide idea${ideaCount !== 1 ? "s" : ""}` : "")
         )
+        setAiScaffoldSummary(null)
         setError(null)
       } catch (err) {
         setError("Quick Fill failed. Please try again or fill in the fields manually.")
@@ -458,6 +517,87 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
         setIsSmartFilling(false)
       }
     }, 0)
+  }
+
+  async function handleAiScaffold() {
+    if (!roughIdea.trim()) {
+      setError("Please describe your network idea")
+      return
+    }
+
+    setIsAiScaffolding(true)
+    setAiScaffoldError(null)
+    setAiScaffoldSummary(null)
+
+    try {
+      const result = await generateGuideForgeDraft({
+        kind: "network_scaffold",
+        mode: "ai",
+        prompt: roughIdea,
+        networkContext: {
+          networkId: "",
+          networkType: typeId,
+          networkName: name.trim() || undefined,
+        },
+      })
+
+      if (!result.success || !result.structuredPayload) {
+        setAiScaffoldError(result.error ?? "AI scaffold generation failed.")
+        return
+      }
+
+      const scaffold = result.structuredPayload as GeneratedNetworkScaffold
+
+      if (scaffold.name?.trim()) setName(scaffold.name.trim())
+      if (scaffold.description?.trim()) setDescription(scaffold.description.trim())
+
+      let nextTypeId = typeId
+      if (scaffold.type && VALID_REGISTRY_IDS.has(scaffold.type)) {
+        nextTypeId = scaffold.type
+        setTypeId(scaffold.type)
+      }
+
+      const validThemes = ["parchment", "copper", "neutral", "industrial", "soft", "arcane", "ember"]
+      if (scaffold.theme && validThemes.includes(scaffold.theme)) {
+        setTheme(scaffold.theme as ThemeDirection)
+      }
+
+      const suggestion = aiScaffoldToSmartFillSuggestion(scaffold)
+      const fillResult = aiScaffoldToSmartFillResult(scaffold, suggestion)
+
+      if (fillResult.slug?.trim()) {
+        setDomainPrefix(fillResult.slug)
+        setDomainPrefixManuallyEdited(false)
+      }
+
+      if (suggestion.hubs.length > 0) {
+        setScaffoldDraft(scaffoldDraftFromSmartFill(suggestion))
+        setLastSmartFillScaffold(suggestion)
+        setBuildPlan(generateNetworkBuildPlan(fillResult))
+        setScaffoldIsDefaultForType(false)
+        setScaffoldSourceType(nextTypeId)
+      }
+
+      const hubCount = suggestion.hubs.length
+      const collectionCount = suggestion.hubs.reduce((sum, h) => sum + h.collections.length, 0)
+      const ideaCount = suggestion.hubs.reduce(
+        (sum, h) => sum + h.collections.reduce((s, c) => s + (c.starterGuideIdeas?.length ?? 0), 0),
+        0
+      )
+      setAiScaffoldSummary(
+        `${scaffold.name}` +
+        (hubCount > 0 ? ` · ${hubCount} hub${hubCount !== 1 ? "s" : ""}` : "") +
+        (collectionCount > 0 ? ` · ${collectionCount} collection${collectionCount !== 1 ? "s" : ""}` : "") +
+        (ideaCount > 0 ? ` · ${ideaCount} guide idea${ideaCount !== 1 ? "s" : ""}` : "")
+      )
+      setSmartFillSummary(null)
+      setError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error"
+      setAiScaffoldError(message)
+    } finally {
+      setIsAiScaffolding(false)
+    }
   }
 
   function handleTypeChange(newTypeId: string) {
@@ -485,6 +625,8 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
     setLastSmartFillScaffold(null)
     setBuildPlan(null)
     setSmartFillSummary(null)
+    setAiScaffoldSummary(null)
+    setAiScaffoldError(null)
     setScaffoldIsDefaultForType(true)
     setScaffoldSourceType(newTypeId)
     setStep("configure")
@@ -596,7 +738,7 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                   }
                 }}
               />
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <button
                   type="button"
                   onClick={handleAutofill}
@@ -604,24 +746,53 @@ export function CreateNetworkForm({ initialType }: CreateNetworkFormProps) {
                 >
                   Quick Example
                 </button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleSmartFill}
-                  disabled={isSmartFilling || !roughIdea.trim()}
-                  className="gap-1.5"
-                >
-                  {isSmartFilling ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Zap className="size-3.5" aria-hidden="true" />
-                  )}
-                  {isSmartFilling ? "Filling..." : "Quick Fill"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSmartFill}
+                    disabled={isSmartFilling || isAiScaffolding || !roughIdea.trim()}
+                    className="gap-1.5"
+                    title="Local, fast, no AI call."
+                  >
+                    {isSmartFilling ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Zap className="size-3.5" aria-hidden="true" />
+                    )}
+                    {isSmartFilling ? "Filling..." : "Quick Fill"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAiScaffold}
+                    disabled={isAiScaffolding || isSmartFilling || !roughIdea.trim()}
+                    className="gap-1.5"
+                    title="Uses AI to propose a richer network structure."
+                  >
+                    {isAiScaffolding ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Sparkles className="size-3.5" aria-hidden="true" />
+                    )}
+                    {isAiScaffolding ? "Drafting..." : "AI Draft Scaffold"}
+                  </Button>
+                </div>
               </div>
               {smartFillSummary && (
                 <p className="text-xs text-green-700 dark:text-green-400 leading-snug">
                   Filled: {smartFillSummary}
+                </p>
+              )}
+              {aiScaffoldSummary && (
+                <p className="text-xs text-blue-700 dark:text-blue-400 leading-snug">
+                  AI drafted: {aiScaffoldSummary}
+                </p>
+              )}
+              {aiScaffoldError && (
+                <p className="text-xs text-red-700 dark:text-red-400 leading-snug">
+                  AI Draft failed: {aiScaffoldError}
                 </p>
               )}
             </div>

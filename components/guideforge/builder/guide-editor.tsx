@@ -531,7 +531,7 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
 
   const handlePublishDraft = async () => {
     // Forge rules validation before status transition
-    const rulesErrors = rulesCheckResult?.filter((r) => r.severity === "error") ?? []
+    const rulesErrors = rulesCheckResult?.filter((r) => !r.passed) ?? []
     if (rulesErrors.length > 0) {
       console.log("[v0] Status transition blocked: draft → ready (forge rules errors)")
       setMarkReadyError(true)
@@ -1328,23 +1328,8 @@ export function GuideEditor({ guide, networkId }: GuideEditorProps) {
           canPublish={canPublish}
           onVoteSuccess={() => setRefreshReviewPanel(prev => prev + 1)}
           onPublishSuccess={async () => {
-            // Phase 10I: On publish success, refetch guide from Supabase to verify status
-            console.log('[v0] guide-editor onPublishSuccess: Refetching guide after publish', { guideId: normalizedGuide.id })
-            const { data: refreshedGuide } = await supabase
-              .from('guides')
-              .select('*')
-              .eq('id', normalizedGuide.id)
-              .maybeSingle()
-            
-            if (refreshedGuide) {
-              setGuideStatus(refreshedGuide.status)
-              setGuide(refreshedGuide)
-              console.log('[v0] guide-editor onPublishSuccess: Refetched guide', { status: refreshedGuide.status })
-            } else {
-              console.warn('[v0] guide-editor onPublishSuccess: Could not refetch guide')
-              // Fallback: at least update local status
-              setGuideStatus('published')
-            }
+            console.log('[v0] guide-editor onPublishSuccess: Guide published successfully')
+            setGuideStatus('published')
           }}
         />
 

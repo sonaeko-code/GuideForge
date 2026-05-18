@@ -324,7 +324,7 @@ export async function castGuideReviewVote(
     }
 
     const voterRole = authority.canonicalRole || 'member'
-    const weight = authority.roleDefinition?.review_weight || 0
+    const weight = authority.roleDefinition?.reviewWeight || 0
 
     console.log('[v0] castGuideReviewVote saving vote', {
       guideId,
@@ -784,6 +784,8 @@ export async function publishEligibleGuide(
     }
 
     const archivedGuideIds: string[] = []
+    // Holds the revision family for later archive phase (after publish succeeds)
+    let pendingFamilyGuides: Array<{ id: string; status: string; revision_of: string | null; revision_number: number | null }> | null = null
 
     // Phase 10F: Handle revision family archiving for revisions only
     if (isRevision) {
@@ -843,7 +845,7 @@ export async function publishEligibleGuide(
 
       // Store family guides info for later archive phase (after publish succeeds)
       // This ensures we never archive until the selected guide is verified published
-      context.familyGuides = familyGuides
+      pendingFamilyGuides = familyGuides
     }
 
 /**
@@ -1082,8 +1084,8 @@ async function repairGuideFamilyPublishedStateHelper(
       }
 
       // Phase 10I: NOW (after selected guide is verified published), archive other published guides in family
-      if (context.familyGuides) {
-        const previousPublishedGuides = context.familyGuides.filter(
+      if (pendingFamilyGuides) {
+        const previousPublishedGuides = pendingFamilyGuides.filter(
           (g) => g.status === 'published' && g.id !== guideId
         )
 
@@ -1133,7 +1135,7 @@ async function repairGuideFamilyPublishedStateHelper(
         .select('id, status, revision_of, revision_number')
         .eq('revision_of', rootGuideId)
 
-      const familyGuidesFinal = [rootGuideFinal, ...(revisionFamilyFinal || [])].filter(Boolean)
+      const familyGuidesFinal = [rootGuideFinal, ...(revisionFamilyFinal || [])].filter((g): g is NonNullable<typeof rootGuideFinal> => g !== null && g !== undefined)
       const publishedGuideIds = familyGuidesFinal
         .filter((g) => g.status === 'published')
         .map((g) => g.id)

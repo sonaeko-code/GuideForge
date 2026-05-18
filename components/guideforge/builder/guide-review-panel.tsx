@@ -107,8 +107,8 @@ export default function GuideReviewPanel({ guide, guideStatus, canPublish, onVot
     setIsPublishing(false)
   }
 
-  // Only show panel if status is ready (even with 0 votes)
-  if (guideStatus !== 'ready') {
+  // Only show panel if status is ready or published
+  if (guideStatus !== 'ready' && guideStatus !== 'published') {
     return null
   }
 

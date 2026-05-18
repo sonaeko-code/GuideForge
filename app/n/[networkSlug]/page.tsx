@@ -43,7 +43,7 @@ export default async function PublicNetworkPage({
   }
 
   // Load hubs - only from Supabase, no mock fallback for created networks
-  let hubs = []
+  let hubs: Awaited<ReturnType<typeof getHubsByNetworkId>> = []
   if (network.id) {
     hubs = await getHubsByNetworkId(network.id)
   }
@@ -64,7 +64,7 @@ export default async function PublicNetworkPage({
   const publishedAssets = network.id ? await loadPublishedAssetsForNetwork(network.id) : []
 
   // Load collections - get from all hubs in network with error handling
-  const allCollections = []
+  const allCollections: Awaited<ReturnType<typeof getCollectionsByHubId>> = []
   for (const hub of hubs) {
     try {
       const hubCollections = await getCollectionsByHubId(hub.id)
@@ -163,7 +163,7 @@ export default async function PublicNetworkPage({
               <div className="flex flex-col justify-center">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <DifficultyBadge difficulty={featured.difficulty} />
-                  <PublishedBadge verification={featured.verification} />
+                  <PublishedBadge verification={featured.verification === "forge-verified" ? "forge-verified" : null} />
                   {featured.estimatedMinutes && (
                     <span className="text-xs text-muted-foreground">
                       {featured.estimatedMinutes} min read
@@ -330,7 +330,7 @@ export default async function PublicNetworkPage({
                 return (
                   <GuideCard
                     key={guide.id}
-                    guide={guide}
+                    guide={{ ...guide, verification: guide.verification === "forge-verified" ? "forge-verified" : null }}
                     href={`/n/${networkSlug}/${hub?.slug || ""}/${guide.slug}`}
                   />
                 )
@@ -355,7 +355,7 @@ export default async function PublicNetworkPage({
                 return (
                   <GuideCard
                     key={guide.id}
-                    guide={guide}
+                    guide={{ ...guide, verification: guide.verification === "forge-verified" ? "forge-verified" : null }}
                     href={`/n/${networkSlug}/${hub?.slug || ""}/${guide.slug}`}
                     variant="minimal"
                   />

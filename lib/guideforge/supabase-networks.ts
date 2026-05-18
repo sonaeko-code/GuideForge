@@ -15,8 +15,10 @@
  * - Normalized status mapping: draft→draft, ready/ready_to_publish→ready, published/active→published
  */
 
-import type { Network, Hub, Collection, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership, NetworkGovernanceSettings } from "./types"
-import { supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
+import type { Network, Hub, Collection, Guide, NetworkDraft, NetworkRoleDefinition, NetworkMember, NetworkMembership, NetworkGovernanceSettings } from "./types"
+import { supabase as _supabase, isSupabaseConfigured, getSupabaseSession } from "./supabase-client"
+// All callers guard with isSupabaseConfigured() before using supabase; assertion is safe within those paths
+const supabase = _supabase!
 import { LocalStoragePersistenceAdapter } from "./persistence"
 import { resolveDbType } from "./network-types"
 
@@ -1038,7 +1040,7 @@ export async function getGuidesForNetworkCollections(
     })
 
     console.log("[v0] getGuidesForNetworkCollections: Normalized", normalizedGuides.length, "guides")
-    return normalizedGuides
+    return normalizedGuides as unknown as Guide[]
   } catch (err) {
     console.warn("[v0] getGuidesForNetworkCollections: Exception:", err)
     return []
@@ -1115,11 +1117,6 @@ export async function getGuidesByNetworkId(networkId: string): Promise<any[]> {
         code: guidesError.code,
         details: guidesError.details,
       })
-      // Even on error, check if we got partial results
-      if (guides && guides.length > 0) {
-        console.log("[v0] Despite error, got partial guides:", guides.length)
-        return guides
-      }
       return []
     }
 

@@ -18,6 +18,7 @@ import type {
   GuideDNASuggestions,
 } from "./generation-schemas"
 import { slugify } from "./utils"
+import type { GuideType } from "./types"
 
 /**
  * Generate a network skeleton proposal based on user input.
@@ -85,10 +86,6 @@ export async function generateNetworkSkeletonMock(
  */
 function generateNetworkProposal(request: NetworkSkeletonGenerationRequest): GeneratedNetworkSkeleton {
   const networkSlug = slugify(request.networkTopic)
-  const themeKeywords = request.networkTopic
-    .split(" ")
-    .filter((w) => w.length > 3)
-    .slice(0, 3)
 
   return {
     name: request.networkTopic,
@@ -96,11 +93,10 @@ function generateNetworkProposal(request: NetworkSkeletonGenerationRequest): Gen
     description: request.networkPurpose,
     audience: request.intendedAudience,
     tone: request.tone,
-    type: "topic",
+    type: "community",
     theme: "neutral",
     visibility: "private",
     domain: undefined,
-    themeKeywords,
     suggestedHubs: [],
     generatedAt: new Date().toISOString(),
     generatedBy: "mock",
@@ -153,7 +149,7 @@ function generateCollectionProposal(
     name: collectionName,
     slug: collectionSlug,
     description: `${collectionName} for ${request.networkTopic}`,
-    defaultGuideType: "guide",
+    defaultGuideType: "tutorial",
     guideIdeas,
     generatedAt: new Date().toISOString(),
     generatedBy: "mock",
@@ -193,7 +189,7 @@ function generateGuideIdea(
     summary: `Learn about ${request.networkTopic.toLowerCase()} - part ${guideIdx + 1}`,
     audience: request.intendedAudience,
     difficulty,
-    guideType: request.guideTypeEmphasis[0] || "guide",
+    guideType: (request.guideTypeEmphasis[0] as GuideType) || "tutorial",
     tags: [request.networkTopic.split(" ")[0].toLowerCase(), "guide"],
   }
 }

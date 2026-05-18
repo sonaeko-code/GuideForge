@@ -10,7 +10,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
+import { supabase as _supabase, isSupabaseConfigured } from '@/lib/guideforge/supabase-client'
+const supabase = _supabase!
 
 export interface AuthUser {
   id: string

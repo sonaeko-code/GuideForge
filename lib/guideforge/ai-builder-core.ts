@@ -24,6 +24,7 @@ import type {
   GeneratedChecklist,
   GeneratedSingleGuide,
 } from "./generation-schemas"
+import { resolveGuideForgeProviderRoute } from "./ai-provider-routing"
 
 // ============================================================================
 // BUILDER KINDS
@@ -238,6 +239,9 @@ async function generateNetworkGuide(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
   try {
+    // Resolve provider route — extension point for future Claude/cost-control routing
+    const route = resolveGuideForgeProviderRoute({ mode: request.mode as "mock" | "ai", task: "network_guide" })
+
     // Prefer typed context fields; fall back to formData for legacy callers
     const nc = request.networkContext
     const ac = request.assetContext
@@ -277,7 +281,7 @@ async function generateNetworkGuide(
         title: result.guide.title,
         summary: result.guide.summary,
         structuredPayload: result.guide,
-        generatedBy: "mock",
+        generatedBy: route.provider === "mock" ? "mock" : "other",
         generatedAt: result.guide.generatedAt,
         saveTargetHint: {
           type: "network_collection",
@@ -371,7 +375,7 @@ async function generateNetworkGuide(
         title: guide.title,
         summary: guide.summary,
         structuredPayload: guide,
-        generatedBy: "openai",
+        generatedBy: route.provider === "openai" ? "openai" : "other",
         generatedAt: guide.generatedAt,
         saveTargetHint: {
           type: "network_collection",
@@ -601,17 +605,108 @@ async function generateChecklistAsset(
 async function generateNetworkScaffold(
   request: GuideForgeBuilderRequest
 ): Promise<GuideForgeBuilderResult> {
-  // Migration path: create-network-form.tsx currently calls smartFillNetwork() (heuristic)
-  // and forge-rules-editor.tsx calls createNetworkScaffold() to save.
-  // When migrating:
-  //   smart_fill → import { smartFillNetwork } from "./smart-fill-network"; return SmartFillResult
-  //   ai         → call a future /api/guideforge/generate-scaffold endpoint
-  //   Both       → structuredPayload should conform to NetworkSkeletonGenerationResponse shape
-  return {
-    kind: "network_scaffold",
-    mode: request.mode,
-    success: false,
-    error: "Not yet migrated to core — use smartFillNetwork() in create-network-form.tsx",
+  // Local Quick Fill (mock/smart_fill) is handled directly in create-network-form.tsx
+  // via smartFillNetwork(). Only AI mode is routed through the builder core.
+  if (request.mode !== "ai") {
+    return {
+      kind: "network_scaffold",
+      mode: request.mode,
+      success: false,
+      error: "Local scaffold generation uses smartFillNetwork() directly — call it from the form component.",
+    }
+  }
+
+  try {
+    // Resolve provider route — extension point for future Claude/cost-control routing
+    const route = resolveGuideForgeProviderRoute({ mode: "ai", task: "network_scaffold" })
+
+    // AI mode: call the scaffold generation endpoint.
+    // This is invoked from the client-side form; the relative URL works in the browser.
+    // Server-side callers must supply an absolute URL or call the route handler directly.
+    const fetchResponse = await fetch("/api/guideforge/generate-network-scaffold", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: request.prompt,
+        requestedType: request.networkContext?.networkType,
+        networkName: request.networkContext?.networkName,
+      }),
+    })
+
+    let responseText: string
+    try {
+      responseText = await fetchResponse.text()
+    } catch {
+      return {
+        kind: "network_scaffold",
+        mode: "ai",
+        success: false,
+        error: "AI scaffold generation failed — could not read server response. Please try again.",
+        stage: "network",
+      }
+    }
+
+    let data: any
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      return {
+        kind: "network_scaffold",
+        mode: "ai",
+        success: false,
+        error: "AI scaffold generation failed — server returned an invalid response. Please try again.",
+        stage: "parse",
+      }
+    }
+
+    if (!fetchResponse.ok || !data.success) {
+      let errorMsg: string = data.error || "AI scaffold generation failed."
+      if (fetchResponse.status === 401) {
+        errorMsg = "OpenAI API key is invalid or expired. Check server configuration."
+      } else if (fetchResponse.status === 429) {
+        errorMsg = "Rate limit reached. Please wait a moment and try again."
+      } else if (fetchResponse.status === 504) {
+        errorMsg = "AI scaffold generation timed out. Try a shorter prompt."
+      }
+      return {
+        kind: "network_scaffold",
+        mode: "ai",
+        success: false,
+        error: errorMsg,
+        stage: data.stage ?? "generation",
+      }
+    }
+
+    const scaffold = data.scaffold
+    if (!scaffold?.name || !Array.isArray(scaffold?.hubs) || scaffold.hubs.length === 0) {
+      return {
+        kind: "network_scaffold",
+        mode: "ai",
+        success: false,
+        error: "AI returned an incomplete scaffold. Please try again.",
+        stage: "validation",
+      }
+    }
+
+    return {
+      kind: "network_scaffold",
+      mode: "ai",
+      success: true,
+      title: scaffold.name,
+      summary: scaffold.description,
+      structuredPayload: scaffold,
+      generatedBy: route.provider === "openai" ? "openai" : "other",
+      generatedAt: scaffold.generatedAt,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
+    return {
+      kind: "network_scaffold",
+      mode: "ai",
+      success: false,
+      error: message,
+      stage: "generation",
+    }
   }
 }
 

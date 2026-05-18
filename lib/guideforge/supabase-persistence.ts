@@ -363,6 +363,12 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
       // Normalize collection_id: convert frontend slug to real Supabase UUID
       const normalizedCollectionId = await normalizeCollectionIdForSupabase(guide.collectionId)
 
+      // Normalize type, status, and difficulty early — required for both the
+      // happy path and the early-return error paths below.
+      const normalizedType = normalizeGuideTypeForSupabase(guide.type)
+      const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
+      const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
+
       // HARD-STOP: refuse to write to Supabase without a collection_id.
       // Guides are required to belong to a collection. If the caller did not
       // resolve one, do not silently insert null — return an explicit error
@@ -387,11 +393,6 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           verificationStatus: guide.verification,
         }
       }
-
-      // Normalize type, status, and difficulty to Supabase-allowed values
-      const normalizedType = normalizeGuideTypeForSupabase(guide.type)
-      const normalizedStatus = normalizeGuideStatusForSupabase(guide.status)
-      const normalizedDifficulty = normalizeGuideDifficultyForSupabase(guide.difficulty)
 
       // Determine save mode: UPDATE existing by id, or INSERT new
       // A guide is "existing" if it has a valid UUID format
@@ -503,7 +504,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
         }
         
         canonicalGuideId = updateData.id
-        guideError = error as typeof guideError
+        guideError = error as { code: string; message: string; hint?: string } | null
       } else {
         // INSERT new guide
         // Try with client-provided id first. If schema disallows client-generated ids,
@@ -608,7 +609,7 @@ export class SupabasePersistenceAdapter implements GuidePersistenceAdapter {
           }
         }
 
-        guideError = error as typeof guideError
+        guideError = error as { code: string; message: string; hint?: string } | null
         canonicalGuideId = insertData?.id || guide.id
       }
 

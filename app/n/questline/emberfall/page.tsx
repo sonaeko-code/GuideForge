@@ -42,7 +42,7 @@ export default async function EmberfallHubPage() {
         <QuestLineHeader />
         <div className="mx-auto w-full max-w-6xl px-4 py-24 md:px-6">
           <div className="text-center">
-            <p className="text-lg text-muted-foreground">No published guides yet for {hub.displayName}.</p>
+            <p className="text-lg text-muted-foreground">No published guides yet for {hub.name}.</p>
           </div>
         </div>
         <QuestLineFooter />

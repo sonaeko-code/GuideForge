@@ -42,6 +42,9 @@ export default async function NetworkDashboardPage({
     // Load unified builder context (network + hubs + collections)
     const ctx = await loadNetworkBuilderContext(networkId)
     const network = ctx.network
+    if (!network) {
+      throw new Error(ctx.errors[0] ?? "Network not found.")
+    }
     const hubs: NormalizedHub[] = ctx.hubs
     const collections: NormalizedCollection[] = ctx.collections
 

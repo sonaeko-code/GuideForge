@@ -77,13 +77,11 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
       console.log("[v0] Create hub form saving to network:", networkId)
 
       const { hub, source, error: hubError } = await createHub(networkId, {
-        id: "",
         networkId,
         slug: hubSlug,
         name,
         description,
         hubKind,
-        collectionIds: [],
       })
 
       if (hubError || !hub.id) {
@@ -107,8 +105,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
             slug: collSlug,
             name: collName,
             description: `${collName} for ${name}`,
-            defaultGuideType: "guide",
-            guideIds: [],
+            defaultGuideType: "tutorial",
           }
         )
 
@@ -165,7 +162,7 @@ export function CreateHubForm({ networkId }: CreateHubFormProps) {
         </div>
       )}
 
-      <SaveStatus state={saveStatus} error={error} message="Hub created successfully" />
+      <SaveStatus state={saveStatus} error={error ?? undefined} message="Hub created successfully" />
 
       <FieldGroup>
         <Field>

@@ -96,6 +96,45 @@ export interface GeneratedGuide {
   targetCollectionId?: string
 }
 
+// ---------- Generated Network Scaffold ----------
+
+/**
+ * AI-generated network scaffold proposal.
+ * Returned by /api/guideforge/generate-network-scaffold and passed through
+ * ai-builder-core.ts as structuredPayload. Proposal-only — never persisted
+ * to Supabase directly. The client adapts this into SmartFillScaffoldSuggestion
+ * before passing it to scaffoldDraftFromSmartFill() and generateNetworkBuildPlan().
+ */
+export interface GeneratedNetworkScaffold {
+  /** Short branded network name — 2-5 words. */
+  name: string
+  /** 1-2 sentence description of the network's purpose. */
+  description: string
+  /** Registry UI id (e.g. "gaming", "tech_repair"). Falls back to "general". */
+  type: string
+  /** Theme direction hint. Adapter normalizes against valid values. */
+  theme?: string
+  /** Always "private" from AI — user can change visibility after creation. */
+  visibility?: "private" | "public"
+  hubs: Array<{
+    name: string
+    description: string
+    collections: Array<{
+      name: string
+      description: string
+      /** Max 1-2 per collection. Proposal-only — not auto-created. */
+      starterGuideIdeas?: Array<{
+        title: string
+        summary: string
+        guideType: string
+        difficulty: string
+      }>
+    }>
+  }>
+  generatedAt?: string
+  generatedBy?: "openai" | "mock" | "other"
+}
+
 // ---------- Generated Collection ----------
 
 export interface GeneratedCollection {

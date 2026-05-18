@@ -34,7 +34,7 @@ export function writeIntakeSession(session: Partial<IntakeSession>): void {
       JSON.stringify(session.routerResult)
     )
   }
-  if (session.targetPath !== undefined) {
+  if (session.targetPath !== undefined && session.targetPath !== null) {
     sessionStorage.setItem(INTAKE_KEYS.TARGET_PATH, session.targetPath)
   }
 }

@@ -20,16 +20,18 @@ interface CreateCollectionFormProps {
   networkId: string
   hubs: NormalizedHub[]
   onCollectionCreated?: () => void
+  preselectedHubId?: string
 }
 
 export function CreateCollectionForm({
   networkId,
   hubs,
   onCollectionCreated,
+  preselectedHubId,
 }: CreateCollectionFormProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
-  const [selectedHubId, setSelectedHubId] = useState<string>("")
+  const [selectedHubId, setSelectedHubId] = useState<string>(preselectedHubId ?? "")
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [slug, setSlug] = useState("")
@@ -96,7 +98,7 @@ export function CreateCollectionForm({
         name,
         slug: displaySlug,
         description,
-        defaultGuideType: "how-to",
+        defaultGuideType: "tutorial",
       })
 
       if (result.error) {

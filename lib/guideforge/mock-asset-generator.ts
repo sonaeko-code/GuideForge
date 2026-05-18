@@ -611,7 +611,7 @@ export async function generateSOPMock(
       assetType: "sop",
       title: request.title,
       purpose: request.purpose,
-      scope: request.scope,
+      scope: request.optionalContext || "General scope",
       owner: request.owner || "Process Owner",
       requirements: [
         request.requiredTools,

@@ -22,8 +22,9 @@ import {
 import {
   createAndSaveGuideDraft,
 } from "./create-and-save-guide-draft"
-import type { NetworkDraft, Hub } from "./types"
-import { supabase } from "./supabase-client"
+import type { Hub } from "./types"
+import { supabase as _supabase } from "./supabase-client"
+const supabase = _supabase!
 
 export interface SaveNetworkSkeletonResult {
   success: boolean
@@ -79,14 +80,12 @@ export async function saveNetworkSkeleton(
   try {
     // Step 1: Create network
     console.log("[v0] saveNetworkSkeleton: Creating network...")
-    const networkDraft: NetworkDraft = {
+    const networkResult = await createNetwork({
       name: proposal.network.name,
       slug: proposal.network.slug,
       description: proposal.network.description,
-      primaryColor: "#000000", // Placeholder
-    }
-
-    const networkResult = await createNetwork(networkDraft)
+      primaryColor: "#000000",
+    } as Parameters<typeof createNetwork>[0])
     if (networkResult.source !== "supabase" || !networkResult.network.id) {
       console.error("[v0] saveNetworkSkeleton: Network creation failed:", networkResult.error)
       return {
@@ -147,7 +146,7 @@ export async function saveNetworkSkeleton(
           name: collection.name,
           slug: collection.slug,
           description: collection.description,
-          defaultGuideType: "guide",
+          defaultGuideType: "tutorial",
         })
 
         if (collectionResult.source !== "supabase" || !collectionResult.collection.id) {
@@ -192,7 +191,6 @@ export async function saveNetworkSkeleton(
                   kind: "custom",
                 },
               ],
-              tags: guideIdea.tags,
             })
 
             guidePlaceholdersCreated++

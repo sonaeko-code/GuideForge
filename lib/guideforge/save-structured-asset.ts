@@ -30,7 +30,7 @@ export async function saveStructuredAssetToWorkspace(
     const result = await createAssetDraft({
       assetType: asset.assetType,
       title: asset.title,
-      summary: asset.summary,
+      summary: (asset as unknown as { summary?: string }).summary ?? "",
       payload: asset,
       source: "generated",
     })

@@ -39,7 +39,7 @@ export async function getGuideRevisionFamily(guideId: string): Promise<Guide[]> 
       return []
     }
 
-    return familyGuides || []
+    return (familyGuides || []) as unknown as Guide[]
   } catch (err) {
     console.error('[v0] Exception loading revision family:', err)
     return []

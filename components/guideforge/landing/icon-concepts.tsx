@@ -73,7 +73,7 @@ function GuideRouteMark() {
       {/* Shield background */}
       <div className="absolute inset-0 rounded-lg border-2 border-blue-500/40 bg-blue-500/5" />
       {/* Route path inside */}
-      <svg className="absolute w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400">
+      <svg className="absolute w-6 h-6 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="6" cy="6" r="1" fill="currentColor" />
         <path d="M6 6 l6 6 l6 -4" />
         <circle cx="18" cy="8" r="1" fill="currentColor" />

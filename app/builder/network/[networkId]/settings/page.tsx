@@ -19,6 +19,9 @@ export default async function NetworkSettingsPage({
   try {
     const ctx = await loadNetworkBuilderContext(networkId)
     const network = ctx.network
+    if (!network) {
+      throw new Error(ctx.errors[0] ?? "Network not found.")
+    }
 
     return (
       <main className="min-h-screen surface-parchment">

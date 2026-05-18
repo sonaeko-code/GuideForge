@@ -3,9 +3,6 @@
 import {
   CheckSquare2,
   BookOpen,
-  Globe,
-  Grid3x3,
-  Folder,
   HelpCircle,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -40,30 +37,6 @@ const ASSET_TYPE_CONFIG: Record<
     badgeColor: "bg-blue-100 dark:bg-blue-900/30",
     accentColor: "text-blue-700 dark:text-blue-300",
     dotColor: "bg-blue-500",
-  },
-  network: {
-    icon: Globe,
-    label: "Network",
-    description: "A connected network of assets and hubs",
-    badgeColor: "bg-teal-100 dark:bg-teal-900/30",
-    accentColor: "text-teal-700 dark:text-teal-300",
-    dotColor: "bg-teal-500",
-  },
-  hub: {
-    icon: Grid3x3,
-    label: "Hub",
-    description: "A hub of collections and assets",
-    badgeColor: "bg-purple-100 dark:bg-purple-900/30",
-    accentColor: "text-purple-700 dark:text-purple-300",
-    dotColor: "bg-purple-500",
-  },
-  collection: {
-    icon: Folder,
-    label: "Collection",
-    description: "A curated collection of assets",
-    badgeColor: "bg-green-100 dark:bg-green-900/30",
-    accentColor: "text-green-700 dark:text-green-300",
-    dotColor: "bg-green-500",
   },
   recipe: {
     icon: BookOpen,
