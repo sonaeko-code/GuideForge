@@ -87,7 +87,7 @@ must be resolved before moving apps. See Open Questions in the audit doc.
 - [x] Answer Open Question #1: framework alignment decision → **mixed-framework monorepo** (Decision 1)
 - [x] Answer Open Question #2: React version alignment decision → **no forced alignment during initial move** (Decision 2)
 - [x] Replace Techsperts `utils/supabase/info.tsx` hardcoded credentials with proper env vars (Decision 4 — completed 2026-05-18)
-- [ ] Reorganize Techsperts `utils/` folder (currently at repo root outside `src/`) (Decision 9 Task 4)
+- [x] Reorganize Techsperts `utils/` folder (currently at repo root outside `src/`) (Decision 9 Task 4 — completed 2026-05-18, moved to src/utils/)
 - [x] Audit and clean GuideForge root loose scratch `.md` and `.tsx` files (Decision 9 Task 2 — completed 2026-05-18)
 - [x] Rename `package.json` names: `my-project` → `guideforge`, `@figma/my-make-file` → `techsperts` (Decision 9 Task 3 — completed 2026-05-18)
 
@@ -102,7 +102,7 @@ must be resolved before moving apps. See Open Questions in the audit doc.
 - [x] Techsperts Supabase env cleanup completed (required before Phase 3) — completed 2026-05-18
 - [x] GuideForge root scratch-file audit completed (required before Phase 3) — completed 2026-05-18
 - [x] package.json names cleaned (required before Phase 3) — GuideForge: `guideforge`, Techsperts: `techsperts` — completed 2026-05-18
-- [ ] Techsperts `utils/` reorganization completed (required before Phase 3)
+- [x] Techsperts `utils/` reorganization completed (required before Phase 3) — completed 2026-05-18
 - [ ] Both repos committed/pushed to clean `main` (required before Phase 3)
 - [ ] Monorepo shell creation approved
 
@@ -112,34 +112,44 @@ must be resolved before moving apps. See Open Questions in the audit doc.
 
 ## Phase 3 — Create Monorepo Shell
 
+**Status: ✅ Completed 2026-05-18**
+
 Create the `sonaeko-platform` folder and root files. No app code moves in this phase.
 
-- [ ] Create `sonaeko-platform/` folder and initialize as a git repo
-- [ ] Create `sonaeko-platform/apps/` folder
-- [ ] Create `sonaeko-platform/packages/` folder (empty subfolders: core, ai, governance, domain-templates, design-system, shared-types)
-- [ ] Create `sonaeko-platform/docs/` folder
-- [ ] Create root `package.json` with workspace config
-- [ ] Create `pnpm-workspace.yaml` listing `apps/*` and `packages/*`
-- [ ] Decide whether to add `turbo.json` now or later (recommend: later)
-- [ ] Commit the empty shell with a clear commit message
+- [x] Create `sonaeko-platform/` folder and initialize as a git repo
+- [x] Create `sonaeko-platform/apps/` folder
+- [x] Create `sonaeko-platform/packages/` folder (empty subfolders: core, ai, governance, domain-templates, design-system, shared-types)
+- [x] Create `sonaeko-platform/docs/` folder
+- [x] Create root `package.json` with workspace config
+- [x] Create `pnpm-workspace.yaml` listing `apps/*` and `packages/*`
+- [x] Decide whether to add `turbo.json` now or later — **deferred**
+- [ ] Commit the shell with a clear commit message
+
+**Shell location:** `C:\Users\sonaeko\Documents\GitHub\sonaeko-platform`
+**Shell report:** `docs/MONOREPO_SHELL_CREATION_REPORT.md`
 
 ---
 
 ## Phase 4 — Move Apps Without Behavior Changes
 
+**Status: ✅ Completed 2026-05-18** (combined with Phase 3 — both apps copied as part of shell creation)
+
 Copy or move each app into `apps/`. **No behavior changes. No rewritten imports. No
 extracted packages.** Preserve every config exactly as it is.
 
-- [ ] Copy GuideForge repo contents to `apps/guideforge/`
-- [ ] Preserve `apps/guideforge/package.json` unchanged
-- [ ] Preserve `apps/guideforge/next.config.*` unchanged
-- [ ] Preserve `apps/guideforge/tsconfig.json` unchanged
-- [ ] Preserve `apps/guideforge/.env.local` (not committed — just document it)
-- [ ] Copy Techsperts repo contents to `apps/techsperts/`
-- [ ] Preserve `apps/techsperts/package.json` unchanged
-- [ ] Preserve all Techsperts config files unchanged
-- [ ] Do not rewrite any imports in either app yet
+- [x] Copy GuideForge repo contents to `apps/guideforge/`
+- [x] Preserve `apps/guideforge/package.json` unchanged
+- [x] Preserve `apps/guideforge/next.config.*` unchanged
+- [x] Preserve `apps/guideforge/tsconfig.json` unchanged
+- [x] Preserve `apps/guideforge/.env.local` (not copied — stays in source repo only)
+- [x] Copy Techsperts repo contents to `apps/techsperts/`
+- [x] Preserve `apps/techsperts/package.json` unchanged
+- [x] Preserve all Techsperts config files unchanged
+- [x] No imports rewritten — apps copied as-is (Techsperts import updates were pre-migration cleanup, not monorepo-copy changes)
 - [ ] Commit the move with a clear commit message
+
+**Excluded from copy:** `node_modules/`, `.next/`, `dist/`, `.vercel/`, `.git/`, `.env.local`, `.env`
+**Included:** `package.json`, `pnpm-lock.yaml`, `.env.example`, all app source, all config files
 
 ---
 
