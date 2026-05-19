@@ -46,7 +46,11 @@
       "PowerShell($gfSrc = Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\.env.local\"; $tsSrc = Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\Techsperts\\\\.env.local\"; Write-Output \"GuideForge source .env.local exists: $gfSrc\"; Write-Output \"Techsperts source .env.local exists: $tsSrc\")",
       "PowerShell(Test-Path *)",
       "PowerShell(Start-Process notepad -ArgumentList \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\.env.local\"; Start-Process notepad -ArgumentList \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\\\\.env.local\"; Write-Output \"Opened both .env.local files in Notepad.\")",
-      "PowerShell(\"=== env file existence checks \\(no contents read\\) ===\"; \"guideforge .env.local: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\.env.local\"\\); \"guideforge .env.example: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\.env.example\"\\); \"techsperts .env.local: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\\\\.env.local\"\\); \"techsperts .env.example: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\\\\.env.example\"\\))"
+      "PowerShell(\"=== env file existence checks \\(no contents read\\) ===\"; \"guideforge .env.local: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\.env.local\"\\); \"guideforge .env.example: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\.env.example\"\\); \"techsperts .env.local: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\\\\.env.local\"\\); \"techsperts .env.example: \" + \\(Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\\\\.env.example\"\\))",
+      "Read(//c/Users/sonaeko/Documents/GitHub/**)",
+      "Bash(pnpm typecheck:guideforge)",
+      "Bash(pnpm build:techsperts)",
+      "Bash(pnpm build:guideforge)"
     ],
     "deny": [
       "Bash(cat *.env*)",
