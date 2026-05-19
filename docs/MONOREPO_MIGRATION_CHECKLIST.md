@@ -165,9 +165,9 @@ new location in `apps/`.
 - [x] Run `npx tsc --noEmit` for Techsperts — **no typecheck script** (Vite passthrough confirmed; Decision 2)
 - [x] Run `vite build` for Techsperts — **clean build, 2342 modules, 3.52s** (2026-05-18) — 1 pre-existing chunk-size warning (not caused by migration; bundle 1.45 MB)
 - [x] Run `vite` for Techsperts — **Ready in 264ms at http://localhost:5173** (2026-05-18)
-- [ ] Confirm Vercel root directory requirements for each app
-- [ ] Update GuideForge Vercel project root directory to `apps/guideforge`
-- [ ] Update Techsperts Vercel project root directory to `apps/techsperts`
+- [x] Confirm Vercel root directory requirements for each app — documented in `sonaeko-platform/docs/VERCEL_MONOREPO_CUTOVER_PLAN.md` (2026-05-18)
+- [ ] Update GuideForge Vercel project root directory to `apps/guideforge` (manual; see cutover plan)
+- [ ] Update Techsperts Vercel project root directory to `apps/techsperts` (manual; see cutover plan)
 - [ ] Deploy GuideForge from monorepo and confirm deployment URL works
 - [ ] Deploy Techsperts from monorepo and confirm deployment URL works
 
