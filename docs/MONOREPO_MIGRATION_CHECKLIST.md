@@ -166,10 +166,10 @@ new location in `apps/`.
 - [x] Run `vite build` for Techsperts — **clean build, 2342 modules, 3.52s** (2026-05-18) — 1 pre-existing chunk-size warning (not caused by migration; bundle 1.45 MB)
 - [x] Run `vite` for Techsperts — **Ready in 264ms at http://localhost:5173** (2026-05-18)
 - [x] Confirm Vercel root directory requirements for each app — documented in `sonaeko-platform/docs/VERCEL_MONOREPO_CUTOVER_PLAN.md` (2026-05-18)
-- [ ] Update GuideForge Vercel project root directory to `apps/guideforge` (manual; see cutover plan)
-- [ ] Update Techsperts Vercel project root directory to `apps/techsperts` (manual; see cutover plan)
-- [ ] Deploy GuideForge from monorepo and confirm deployment URL works
-- [ ] Deploy Techsperts from monorepo and confirm deployment URL works
+- [x] Update GuideForge Vercel project root directory to `apps/guideforge` (2026-05-19; preview deploys from `apps/guideforge`)
+- [x] Update Techsperts Vercel project root directory to `apps/techsperts` (2026-05-19; preview deploys from `apps/techsperts`)
+- [~] Deploy GuideForge from monorepo and confirm deployment URL works — preview reachable, auth fixed (commit `be54246`), `/builder/networks` works; **AI generation end-to-end, save flow, My Assets still unverified** (2026-05-19)
+- [~] Deploy Techsperts from monorepo and confirm deployment URL works — preview reachable, `/diagnosis` loads, scenarios render; "No Verified Guided Fix Yet" branch **unclassified pending DevTools console** (2026-05-19)
 
 ---
 
