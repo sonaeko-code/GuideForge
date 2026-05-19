@@ -160,7 +160,7 @@ new location in `apps/`.
 
 - [x] Install dependencies: `pnpm install` at workspace root — completed 2026-05-18 (430 packages; 2 warnings noted)
 - [x] Run `npx tsc --noEmit` for GuideForge — **0 errors** (2026-05-18)
-- [ ] Run `next build` for GuideForge — confirm clean build
+- [x] Run `next build` for GuideForge — **clean build, 32 pages, 0 errors** (2026-05-18) — 1 warning: stale `apps/guideforge/pnpm-workspace.yaml` (non-blocking)
 - [ ] Run `next dev` for GuideForge — confirm local dev works
 - [x] Run `npx tsc --noEmit` for Techsperts — **no typecheck script** (Vite passthrough confirmed; Decision 2)
 - [ ] Run `vite build` for Techsperts — confirm clean build (NOT next build — Techsperts is Vite)
