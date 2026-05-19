@@ -103,8 +103,8 @@ must be resolved before moving apps. See Open Questions in the audit doc.
 - [x] GuideForge root scratch-file audit completed (required before Phase 3) — completed 2026-05-18
 - [x] package.json names cleaned (required before Phase 3) — GuideForge: `guideforge`, Techsperts: `techsperts` — completed 2026-05-18
 - [x] Techsperts `utils/` reorganization completed (required before Phase 3) — completed 2026-05-18
-- [ ] Both repos committed/pushed to clean `main` (required before Phase 3)
-- [ ] Monorepo shell creation approved
+- [x] Both repos committed/pushed to clean `main` (required before Phase 3) — completed 2026-05-18
+- [x] Monorepo shell creation approved
 
 **Decision doc:** `MONOREPO_MIGRATION_DECISIONS.md` — created 2026-05-18.
 
@@ -123,7 +123,7 @@ Create the `sonaeko-platform` folder and root files. No app code moves in this p
 - [x] Create root `package.json` with workspace config
 - [x] Create `pnpm-workspace.yaml` listing `apps/*` and `packages/*`
 - [x] Decide whether to add `turbo.json` now or later — **deferred**
-- [ ] Commit the shell with a clear commit message
+- [x] Commit the shell with a clear commit message — committed 2026-05-18 (commit `1950b2a`)
 
 **Shell location:** `C:\Users\sonaeko\Documents\GitHub\sonaeko-platform`
 **Shell report:** `docs/MONOREPO_SHELL_CREATION_REPORT.md`
@@ -146,7 +146,7 @@ extracted packages.** Preserve every config exactly as it is.
 - [x] Preserve `apps/techsperts/package.json` unchanged
 - [x] Preserve all Techsperts config files unchanged
 - [x] No imports rewritten — apps copied as-is (Techsperts import updates were pre-migration cleanup, not monorepo-copy changes)
-- [ ] Commit the move with a clear commit message
+- [x] Commit the move with a clear commit message — combined with Phase 3 commit `1950b2a`
 
 **Excluded from copy:** `node_modules/`, `.next/`, `dist/`, `.vercel/`, `.git/`, `.env.local`, `.env`
 **Included:** `package.json`, `pnpm-lock.yaml`, `.env.example`, all app source, all config files
