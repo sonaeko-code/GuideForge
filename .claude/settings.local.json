@@ -33,7 +33,17 @@
       "Bash(git -C * ls-files *)",
       "Bash(git ls-files *)",
       "Bash(npx tsc --noEmit)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(git *)",
+      "Bash(Select-String -Pattern \"\\\\.env|node_modules|\\\\.next|dist\\\\\\\\\\\\\\\\|\\\\.vercel\")",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\" -Name)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\" -Name)",
+      "PowerShell(pnpm typecheck:guideforge *)",
+      "PowerShell(git *)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(pnpm *)",
+      "PowerShell($gf = Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\.env.local\"; $ts = Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\techsperts\\\\.env.local\"; Write-Output \"guideforge/.env.local exists: $gf\"; Write-Output \"techsperts/.env.local exists: $ts\")",
+      "PowerShell($gfSrc = Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\GuideForge\\\\.env.local\"; $tsSrc = Test-Path \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\Techsperts\\\\.env.local\"; Write-Output \"GuideForge source .env.local exists: $gfSrc\"; Write-Output \"Techsperts source .env.local exists: $tsSrc\")"
     ],
     "deny": [
       "Bash(cat *.env*)",
