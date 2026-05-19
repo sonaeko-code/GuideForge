@@ -163,7 +163,7 @@ new location in `apps/`.
 - [x] Run `next build` for GuideForge — **clean build, 32 pages, 0 errors** (2026-05-18) — stale `pnpm-workspace.yaml` removed; Turbopack warning cleared
 - [ ] Run `next dev` for GuideForge — confirm local dev works
 - [x] Run `npx tsc --noEmit` for Techsperts — **no typecheck script** (Vite passthrough confirmed; Decision 2)
-- [ ] Run `vite build` for Techsperts — confirm clean build (NOT next build — Techsperts is Vite)
+- [x] Run `vite build` for Techsperts — **clean build, 2342 modules, 3.52s** (2026-05-18) — 1 pre-existing chunk-size warning (not caused by migration; bundle 1.45 MB)
 - [ ] Run `vite` for Techsperts — confirm local dev works
 - [ ] Confirm Vercel root directory requirements for each app
 - [ ] Update GuideForge Vercel project root directory to `apps/guideforge`
