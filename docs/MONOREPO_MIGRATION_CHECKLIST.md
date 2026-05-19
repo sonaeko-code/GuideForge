@@ -86,10 +86,10 @@ must be resolved before moving apps. See Open Questions in the audit doc.
 ### Pre-migration tasks surfaced by audit (must be resolved before Phase 3)
 - [x] Answer Open Question #1: framework alignment decision → **mixed-framework monorepo** (Decision 1)
 - [x] Answer Open Question #2: React version alignment decision → **no forced alignment during initial move** (Decision 2)
-- [ ] Replace Techsperts `utils/supabase/info.tsx` hardcoded credentials with proper env vars (Decision 4 — dedicated bundle next)
+- [x] Replace Techsperts `utils/supabase/info.tsx` hardcoded credentials with proper env vars (Decision 4 — completed 2026-05-18)
 - [ ] Reorganize Techsperts `utils/` folder (currently at repo root outside `src/`) (Decision 9 Task 4)
-- [ ] Audit and clean GuideForge root loose scratch `.md` and `.tsx` files (Decision 9 Task 2)
-- [ ] Rename `package.json` names: `my-project` → `guideforge`, `@figma/my-make-file` → `techsperts` (Decision 9 Task 3)
+- [x] Audit and clean GuideForge root loose scratch `.md` and `.tsx` files (Decision 9 Task 2 — completed 2026-05-18)
+- [x] Rename `package.json` names: `my-project` → `guideforge`, `@figma/my-make-file` → `techsperts` (Decision 9 Task 3 — completed 2026-05-18)
 
 ### Migration decisions
 - [x] Framework strategy decided: mixed-framework monorepo first (GuideForge: Next.js; Techsperts: Vite)
@@ -99,9 +99,9 @@ must be resolved before moving apps. See Open Questions in the audit doc.
 - [x] Initial extraction strategy decided: docs → types → templates → core → AI contracts → governance → design-system
 - [x] Deployment strategy decided: each app keeps its own Vercel project; root directories updated to `apps/*`
 - [x] First shell scope decided: structure + app move only; no logic extraction in same session
-- [ ] Techsperts Supabase env cleanup completed (required before Phase 3)
-- [ ] GuideForge root scratch-file audit completed (required before Phase 3)
-- [ ] package.json names cleaned (required before Phase 3)
+- [x] Techsperts Supabase env cleanup completed (required before Phase 3) — completed 2026-05-18
+- [x] GuideForge root scratch-file audit completed (required before Phase 3) — completed 2026-05-18
+- [x] package.json names cleaned (required before Phase 3) — GuideForge: `guideforge`, Techsperts: `techsperts` — completed 2026-05-18
 - [ ] Techsperts `utils/` reorganization completed (required before Phase 3)
 - [ ] Both repos committed/pushed to clean `main` (required before Phase 3)
 - [ ] Monorepo shell creation approved

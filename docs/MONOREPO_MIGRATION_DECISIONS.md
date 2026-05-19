@@ -254,9 +254,9 @@ bundles. Each item is its own bundle — do not combine them.
 
 | # | Task | Owner | Status |
 |---|------|-------|--------|
-| 1 | **Techsperts Supabase env cleanup** — replace `utils/supabase/info.tsx` hardcoded credentials with `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` env vars | Techsperts | ❌ Not started |
-| 2 | **GuideForge root scratch-file cleanup** — audit and remove or move the 6 loose `.tsx` files and ~35 loose `.md` files at the GuideForge root | GuideForge | ❌ Not started |
-| 3 | **package.json name cleanup** — rename `my-project` → `guideforge` (GuideForge), `@figma/my-make-file` → `techsperts` (Techsperts) | Both | ❌ Not started |
+| 1 | **Techsperts Supabase env cleanup** — replace `utils/supabase/info.tsx` hardcoded credentials with `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` env vars | Techsperts | ✅ Completed 2026-05-18 |
+| 2 | **GuideForge root scratch-file cleanup** — audit and remove or move the 6 loose `.tsx` files and ~35 loose `.md` files at the GuideForge root | GuideForge | ✅ Completed 2026-05-18 — see `docs/GUIDEFORGE_ROOT_SCRATCH_FILE_AUDIT.md` |
+| 3 | **package.json name cleanup** — rename `my-project` → `guideforge` (GuideForge), `@figma/my-make-file` → `techsperts` (Techsperts) | Both | ✅ Completed 2026-05-18 — GuideForge: `guideforge`, Techsperts: `techsperts` |
 | 4 | **Techsperts `utils/` reorganization** — move `utils/` folder inside `src/` or consolidate into app structure | Techsperts | ❌ Not started |
 | 5 | **Confirm both repos committed/pushed** — both on clean `main` before shell creation | Both | ❌ Not started |
 | 6 | **Verify deployment URLs for both apps** — confirm live URLs working before starting migration | Both | ❌ Not started |
