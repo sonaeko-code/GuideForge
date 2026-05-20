@@ -50,7 +50,10 @@
       "Read(//c/Users/sonaeko/Documents/GitHub/**)",
       "Bash(pnpm typecheck:guideforge)",
       "Bash(pnpm build:techsperts)",
-      "Bash(pnpm build:guideforge)"
+      "Bash(pnpm build:guideforge)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\sonaeko\\\\Documents\\\\GitHub\\\\sonaeko-platform\\\\apps\\\\guideforge\\\\app\\\\builder\\\\jobs\\\\[jobId]\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"done\")"
     ],
     "deny": [
       "Bash(cat *.env*)",
